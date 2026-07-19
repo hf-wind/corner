@@ -24,19 +24,23 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          {
-            echo 'set -e'
-            echo "cd ${APP_PATH}"
-            echo 'if [ ! -f .env ]; then'
-            echo "  cp .env.example .env"
-            echo "  sed -i \"s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/\" .env"
-            echo "  sed -i \"s/REDIS_PASS=.*/REDIS_PASS=${REDIS_PASS}/\" .env"
-            echo "  sed -i \"s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/\" .env"
-            echo 'fi'
-            echo 'git pull'
-            echo 'docker compose up -d --build'
-          } | ssh -o StrictHostKeyChecking=no \
-                  -o UserKnownHostsFile=/dev/null \
-                  -o ConnectTimeout=10 \
-                  -i ~/.ssh/deploy_key \
-                  "${SSH_USER}@${SSH_HOST}" bash
+          cat > /tmp/deploy.sh << 'SCRIPT'
+set -e
+cd __APP_PATH__
+if [ ! -f .env ]; then
+  cp .env.example .env
+  sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=__POSTGRES_PASSWORD__/" .env
+  sed -i "s/REDIS_PASS=.*/REDIS_PASS=__REDIS_PASS__/" .env
+  sed -i "s/JWT_SECRET=.*/JWT_SECRET=__JWT_SECRET__/" .env
+fi
+git pull
+docker compose up -d --build
+SCRIPT
+          sed -i "s|__APP_PATH__|${APP_PATH}|g; s|__POSTGRES_PASSWORD__|${POSTGRES_PASSWORD}|g; s|__REDIS_PASS__|${REDIS_PASS}|g; s|__JWT_SECRET__|${JWT_SECRET}|g" /tmp/deploy.sh
+          chmod +x /tmp/deploy.sh
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=10 \
+              -i ~/.ssh/deploy_key \
+              "${SSH_USER}@${SSH_HOST}" \
+              "cd ${APP_PATH} && bash -s" < /tmp/deploy.sh
