@@ -9,7 +9,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Debug secrets
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PASS: ${{ secrets.SSH_PASS }}
+          APP_PATH: ${{ secrets.APP_PATH }}
+        run: |
+          echo "USER=[${SSH_USER}] HOST=[${SSH_HOST}] PATH=[${APP_PATH}] PASS_LEN=${#SSH_PASS}"
+
       - name: Deploy via sshpass
+        if: ${{ env.SSH_HOST != '' }}
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
