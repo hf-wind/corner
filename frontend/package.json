@@ -9,12 +9,15 @@
     "preview": "nuxi preview"
   },
   "dependencies": {
+    "@iconify-json/ph": "^1.2.2",
+    "@iconify-json/solar": "^1.2.5",
     "nuxt": "^3.16.0",
+    "nuxt-icon": "1.0.0-beta.7",
     "vue": "^3.5.0",
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "sass": "^1.86.0",
-    "@nuxtjs/google-fonts": "^3.2.0"
+    "@nuxtjs/google-fonts": "^3.2.0",
+    "sass": "^1.86.0"
   }
 }

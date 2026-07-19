@@ -8,22 +8,22 @@
         <div class="about-name">清欢小筑</div>
         <div class="about-slogan">「雨过天晴云破处，这般颜色做将来」</div>
         <div class="about-social">
-          <a href="#" title="GitHub">🐙</a>
-          <a href="#" title="Twitter">🐦</a>
-          <a href="#" title="Email">✉</a>
-          <a href="#" title="RSS">📡</a>
+          <a href="#" title="GitHub"><Icon name="ph:github-logo-bold" /></a>
+          <a href="#" title="Twitter"><Icon name="ph:twitter-logo-bold" /></a>
+          <a href="#" title="Email"><Icon name="ph:envelope-bold" /></a>
+          <a href="#" title="RSS"><Icon name="ph:rss-bold" /></a>
         </div>
       </div>
 
       <div class="about-section">
-        <h3>👋 Hi there</h3>
+        <h3><Icon name="ph:hand-waving-bold" /> Hi there</h3>
         <p>我是一个热爱技术与生活的开发者。白天写代码，晚上写文字。相信代码可以改变世界，文字可以温暖人心。</p>
         <p>这个博客是我的数字花园，记录着技术探索、生活感悟、旅行见闻。希望这些文字能给你带来一些启发或共鸣。</p>
         <p>如果你也喜欢安静地写点东西，欢迎常来坐坐。</p>
       </div>
 
       <div class="about-section">
-        <h3>🛠 技能栈</h3>
+        <h3><Icon name="ph:wrench-bold" /> 技能栈</h3>
         <div class="skills-grid">
           <div v-for="s in skills" :key="s.name" class="skill-item">
             <div class="skill-name">{{ s.name }}</div>
@@ -34,7 +34,7 @@
       </div>
 
       <div class="about-section">
-        <h3>📅 时间线</h3>
+        <h3><Icon name="ph:calendar-bold" /> 时间线</h3>
         <div class="about-timeline">
           <div v-for="item in timeline" :key="item.year" class="about-timeline-item">
             <div class="about-timeline-date">{{ item.year }}</div>
@@ -50,7 +50,7 @@
         <div class="right-card-title">联系方式</div>
         <div class="contact-list">
           <div v-for="c in contacts" :key="c.label" class="contact-item">
-            <span style="width:20px;text-align:center;">{{ c.icon }}</span>
+            <span style="width:20px;text-align:center;display:inline-flex;align-items:center;justify-content:center;"><Icon :name="c.icon" /></span>
             <span style="color:var(--text-secondary);">{{ c.value }}</span>
           </div>
         </div>
@@ -94,9 +94,9 @@ const timeline = [
 ]
 
 const contacts = [
-  { icon: '✉️', label: 'Email', value: 'hello@corner.ink' },
-  { icon: '🐙', label: 'GitHub', value: 'github.com/corner' },
-  { icon: '🐦', label: 'Twitter', value: '@corner_ink' },
+  { icon: 'ph:envelope-bold', label: 'Email', value: 'hello@corner.ink' },
+  { icon: 'ph:github-logo-bold', label: 'GitHub', value: 'github.com/corner' },
+  { icon: 'ph:twitter-logo-bold', label: 'Twitter', value: '@corner_ink' },
 ]
 
 const siteInfo = [
@@ -125,19 +125,20 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
 
 .section-title {
   font-size: 0.82rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   letter-spacing: 0.12em;
   margin-bottom: 14px;
   padding-left: 4px;
 }
 
 .about-hero {
-  background: var(--card);
+  background: var(--ld-bg-card);
   border-radius: 14px;
   padding: 40px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 4px var(--ld-shadow);
   margin-bottom: 28px;
   text-align: center;
+  transition: all 0.2s;
 }
 
 .about-avatar {
@@ -145,8 +146,8 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   height: 100px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid var(--accent);
-  box-shadow: 0 0 0 6px var(--accent-light);
+  border: 3px solid var(--c-primary);
+  box-shadow: 0 0 0 6px var(--c-primary-soft);
   margin-bottom: 20px;
 }
 
@@ -154,11 +155,12 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 8px;
+  color: var(--c-text);
 }
 
 .about-slogan {
   font-size: 0.92rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-style: italic;
   margin-bottom: 20px;
 }
@@ -183,18 +185,25 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
 }
 
 .about-social a:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-light);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
 }
 
 .about-section {
-  background: var(--card);
+  background: var(--ld-bg-card);
   border-radius: 14px;
   padding: 28px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 4px var(--ld-shadow);
   margin-bottom: 20px;
+  transition: box-shadow 0.3s;
 }
+
+.about-section:hover {
+  box-shadow: 0 8px 24px var(--ld-shadow-md);
+}
+
+
 
 .about-section h3 {
   font-size: 1.05rem;
@@ -205,11 +214,12 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--c-text);
 }
 
 .about-section p {
   font-size: 0.88rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   line-height: 1.8;
   margin-bottom: 12px;
 }
@@ -226,14 +236,20 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
 
 .skill-item {
   padding: 16px;
-  background: var(--bg-secondary);
+  background: var(--c-bg-1);
   border-radius: 10px;
+  transition: background 0.3s;
+}
+
+.skill-item:hover {
+  background: var(--c-bg-2);
 }
 
 .skill-name {
   font-size: 0.85rem;
   font-weight: 700;
   margin-bottom: 8px;
+  color: var(--c-text);
 }
 
 .skill-bar {
@@ -245,13 +261,13 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
 
 .skill-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--c-primary);
   border-radius: 3px;
 }
 
 .skill-percent {
   font-size: 0.68rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   text-align: right;
   margin-top: 4px;
 }
@@ -275,6 +291,11 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   position: relative;
   margin-bottom: 20px;
   padding-left: 16px;
+  transition: transform 0.2s;
+}
+
+.about-timeline-item:hover {
+  transform: translateX(4px);
 }
 
 .about-timeline-item::before {
@@ -285,12 +306,13 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-primary);
+  box-shadow: 0 0 0 2px var(--c-primary-soft);
 }
 
 .about-timeline-date {
   font-size: 0.7rem;
-  color: var(--accent);
+  color: var(--c-primary);
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -299,11 +321,12 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   font-size: 0.88rem;
   font-weight: 700;
   margin-bottom: 4px;
+  color: var(--c-text);
 }
 
 .about-timeline-desc {
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   line-height: 1.6;
 }
 
@@ -318,10 +341,11 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
 }
 
 .right-card {
-  background: var(--card);
+  background: var(--ld-bg-card);
   border-radius: 12px;
   padding: 18px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 4px var(--ld-shadow);
+  transition: all 0.2s;
 }
 
 .right-card-title {
@@ -331,6 +355,7 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
   letter-spacing: 0.05em;
+  color: var(--c-text);
 }
 
 .contact-list {
@@ -344,6 +369,7 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   align-items: center;
   gap: 10px;
   font-size: 0.78rem;
+  color: var(--c-text);
 }
 
 .site-info-list {
@@ -351,7 +377,7 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   flex-direction: column;
   gap: 8px;
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .site-info-item {
@@ -368,8 +394,8 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
 .tool-tag {
   padding: 4px 10px;
   border-radius: 16px;
-  background: var(--accent-light);
-  color: var(--accent);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
   font-size: 0.7rem;
 }
 </style>

@@ -25,7 +25,7 @@
       <button class="enter-btn" @click="enterSite">进入小筑</button>
     </div>
 
-    <button class="theme-toggle" @click="toggleTheme">{{ themeIcon }}</button>
+    <button class="theme-toggle" @click="toggleTheme"><Icon :name="themeIcon" /></button>
   </div>
 </template>
 
@@ -37,7 +37,7 @@ const router = useRouter()
 const particleCanvas = ref<HTMLCanvasElement | null>(null)
 const typewriterEl = ref<HTMLSpanElement | null>(null)
 
-const themeIcon = ref('🌙')
+const themeIcon = ref('ph:moon-bold')
 let animationId = 0
 let particles: Particle[] = []
 let typewriterTimer = 0
@@ -58,7 +58,7 @@ function enterSite() {
 function toggleTheme() {
   const html = document.documentElement
   html.classList.toggle('dark')
-  themeIcon.value = html.classList.contains('dark') ? '☀' : '🌙'
+  themeIcon.value = html.classList.contains('dark') ? 'ph:sun-bold' : 'ph:moon-bold'
 }
 
 function initTypewriter() {
@@ -142,8 +142,8 @@ onUnmounted(() => {
 <style scoped>
 .welcome-page {
   font-family: 'LXGW WenKai', serif;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--c-bg);
+  color: var(--c-text);
   height: 100vh;
   overflow: hidden;
   display: flex;
@@ -178,7 +178,7 @@ onUnmounted(() => {
   height: 110px;
   border-radius: 50%;
   overflow: hidden;
-  box-shadow: 0 0 0 3px var(--accent), 0 0 0 8px var(--accent-light), var(--shadow-lg);
+  box-shadow: 0 0 0 3px var(--c-primary), 0 0 0 8px var(--c-primary-soft), 0 10px 40px rgba(0,0,0,0.1);
   animation: float-in 1s ease-out;
   flex-shrink: 0;
 }
@@ -194,11 +194,12 @@ onUnmounted(() => {
   font-weight: 700;
   letter-spacing: 0.06em;
   animation: fade-up 1s ease-out 0.3s both;
+  color: var(--c-text);
 }
 
 .slogan {
   font-size: 1.05rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-weight: 300;
   letter-spacing: 0.08em;
   animation: fade-up 1s ease-out 0.6s both;
@@ -206,7 +207,7 @@ onUnmounted(() => {
 
 .typewriter {
   display: inline-block;
-  border-right: 2px solid var(--accent);
+  border-right: 2px solid var(--c-primary);
   animation: blink 0.8s step-end infinite;
 }
 
@@ -227,22 +228,22 @@ onUnmounted(() => {
 .stat-num {
   font-size: 1.6rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--c-primary);
 }
 
 .stat-label {
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   letter-spacing: 0.1em;
 }
 
 .enter-btn {
   margin-top: 16px;
   padding: 12px 44px;
-  border: 1.5px solid var(--accent);
+  border: 1.5px solid var(--c-primary);
   border-radius: 40px;
   background: transparent;
-  color: var(--accent);
+  color: var(--c-primary);
   font-family: inherit;
   font-size: 0.95rem;
   letter-spacing: 0.12em;
@@ -252,14 +253,10 @@ onUnmounted(() => {
 }
 
 .enter-btn:hover {
-  background: var(--accent);
+  background: var(--c-primary);
   color: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.25);
-}
-
-:global(.dark) .enter-btn:hover {
-  box-shadow: 0 6px 24px rgba(96, 165, 250, 0.3);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--c-primary) 40%, transparent);
 }
 
 .theme-toggle {
@@ -271,20 +268,20 @@ onUnmounted(() => {
   height: 42px;
   border-radius: 50%;
   border: 1.5px solid var(--border);
-  background: var(--card);
-  color: var(--text-secondary);
+  background: var(--ld-bg-card);
+  color: var(--c-text-2);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.15rem;
   transition: all 0.3s;
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 4px var(--ld-shadow);
 }
 
 .theme-toggle:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
 }
 
 @keyframes float-in {
@@ -299,6 +296,6 @@ onUnmounted(() => {
 
 @keyframes blink {
   from, to { border-color: transparent; }
-  50% { border-color: var(--accent); }
+  50% { border-color: var(--c-primary); }
 }
 </style>

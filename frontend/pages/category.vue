@@ -5,7 +5,7 @@
 
       <div class="category-grid">
         <NuxtLink to="#" v-for="c in categories" :key="c.name" class="category-card" :class="{ active: c.active }">
-          <div class="category-icon">{{ c.icon }}</div>
+          <div class="category-icon"><Icon :name="c.icon" /></div>
           <div class="category-name">{{ c.name }}</div>
           <div class="category-desc">{{ c.desc }}</div>
           <div class="category-meta">
@@ -40,7 +40,7 @@
         <div class="right-card-title">分类统计</div>
         <div class="cat-stats-list">
           <div v-for="c in categories" :key="c.name" class="cat-stat-row">
-            <span class="cat-stat-name">{{ c.icon }} {{ c.name }}</span>
+            <span class="cat-stat-name"><Icon :name="c.icon" /> {{ c.name }}</span>
             <span class="cat-stat-count">{{ c.count }} 篇</span>
           </div>
         </div>
@@ -58,12 +58,12 @@
 
 <script setup lang="ts">
 const categories = [
-  { icon: '💻', name: '技术', desc: '前端、后端、架构设计、开源项目分享', count: 48, updated: '3 天前', active: true },
-  { icon: '✍️', name: '随笔', desc: '生活感悟、深夜思考、日常碎念', count: 32, updated: '5 天前', active: false },
-  { icon: '🌍', name: '旅行', desc: '城市漫步、山野徒步、人文记录', count: 18, updated: '2 周前', active: false },
-  { icon: '📚', name: '读书', desc: '书评、笔记、阅读清单', count: 15, updated: '1 月前', active: false },
-  { icon: '🎨', name: '设计', desc: 'UI/UX、配色、排版、设计思路', count: 8, updated: '1 周前', active: false },
-  { icon: '🤔', name: '思考', desc: '技术之外的思考、行业观察、人生哲学', count: 7, updated: '2 周前', active: false },
+  { icon: 'ph:code-bold', name: '技术', desc: '前端、后端、架构设计、开源项目分享', count: 48, updated: '3 天前', active: true },
+  { icon: 'ph:pencil-bold', name: '随笔', desc: '生活感悟、深夜思考、日常碎念', count: 32, updated: '5 天前', active: false },
+  { icon: 'ph:globe-bold', name: '旅行', desc: '城市漫步、山野徒步、人文记录', count: 18, updated: '2 周前', active: false },
+  { icon: 'ph:book-bold', name: '读书', desc: '书评、笔记、阅读清单', count: 15, updated: '1 月前', active: false },
+  { icon: 'ph:paint-brush-bold', name: '设计', desc: 'UI/UX、配色、排版、设计思路', count: 8, updated: '1 周前', active: false },
+  { icon: 'ph:brain-bold', name: '思考', desc: '技术之外的思考、行业观察、人生哲学', count: 7, updated: '2 周前', active: false },
 ]
 
 const techArticles = [
@@ -80,37 +80,37 @@ const hotTags = ['Rust', '前端', 'TypeScript', 'WebAssembly', 'Nuxt', 'Vue']
 
 .main-content { flex: 1; overflow-y: auto; padding: 24px 32px; min-width: 0; }
 
-.section-title { font-size: 0.82rem; color: var(--text-secondary); letter-spacing: 0.12em; margin-bottom: 14px; padding-left: 4px; }
+.section-title { font-size: 0.82rem; color: var(--c-text-2); letter-spacing: 0.12em; margin-bottom: 14px; padding-left: 4px; }
 
 .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 32px; }
-.category-card { background: var(--card); border-radius: 14px; padding: 24px; box-shadow: var(--shadow); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 12px; }
-.category-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
-.category-card.active { border: 2px solid var(--accent); background: var(--accent-light); }
-.category-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: var(--accent-light); }
-.category-name { font-size: 1rem; font-weight: 700; }
-.category-desc { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; }
-.category-meta { display: flex; gap: 12px; font-size: 0.7rem; color: var(--text-secondary); margin-top: auto; }
+.category-card { background: var(--ld-bg-card); border-radius: 14px; padding: 24px; box-shadow: 0 2px 4px var(--ld-shadow); cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 12px; }
+.category-card:hover { transform: translateY(-2px); box-shadow: 0 0.5em 1em var(--ld-shadow); }
+.category-card.active { border-color: var(--c-primary); background: var(--c-primary-soft); }
+.category-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: var(--c-primary-soft); }
+.category-name { font-size: 1rem; font-weight: 700; color: var(--c-text); }
+.category-desc { font-size: 0.78rem; color: var(--c-text-2); line-height: 1.6; }
+.category-meta { display: flex; gap: 12px; font-size: 0.7rem; color: var(--c-text-2); margin-top: auto; }
 
 .article-list { display: flex; flex-direction: column; gap: 14px; }
-.article-item { display: flex; gap: 16px; padding: 16px; background: var(--card); border-radius: 12px; box-shadow: var(--shadow); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; text-decoration: none; color: inherit; }
-.article-item:hover { transform: translateX(4px); box-shadow: var(--shadow-md); }
+.article-item { display: flex; gap: 16px; padding: 16px; background: var(--ld-bg-card); border-radius: 12px; box-shadow: 0 2px 4px var(--ld-shadow); cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; }
+.article-item:hover { transform: translateX(2px); box-shadow: 0 0.5em 1em var(--ld-shadow); }
 .article-item-cover { width: 120px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
 .article-item-cover img { width: 100%; height: 100%; object-fit: cover; }
 .article-item-body { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.article-item-title { font-size: 0.92rem; font-weight: 700; line-height: 1.4; }
-.article-item-desc { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.article-item-meta { display: flex; gap: 12px; font-size: 0.68rem; color: var(--text-secondary); margin-top: auto; }
+.article-item-title { font-size: 0.92rem; font-weight: 700; line-height: 1.4; color: var(--c-text); }
+.article-item-desc { font-size: 0.78rem; color: var(--c-text-2); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.article-item-meta { display: flex; gap: 12px; font-size: 0.68rem; color: var(--c-text-2); margin-top: auto; }
 
 .sidebar-right { width: var(--right-w); flex-shrink: 0; padding: 24px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-.right-card { background: var(--card); border-radius: 12px; padding: 18px; box-shadow: var(--shadow); }
-.right-card-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: 0.05em; }
+.right-card { background: var(--ld-bg-card); border-radius: 12px; padding: 18px; box-shadow: 0 2px 4px var(--ld-shadow); transition: all 0.2s; }
+.right-card-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: 0.05em; color: var(--c-text); }
 
 .cat-stats-list { display: flex; flex-direction: column; gap: 10px; }
 .cat-stat-row { display: flex; justify-content: space-between; align-items: center; }
-.cat-stat-name { font-size: 0.78rem; }
-.cat-stat-count { font-size: 0.72rem; color: var(--accent); }
+.cat-stat-name { font-size: 0.78rem; color: var(--c-text); }
+.cat-stat-count { font-size: 0.72rem; color: var(--c-primary); }
 
 .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
-.tag-item { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.72rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
-.tag-item:hover { border-color: var(--accent); color: var(--accent); }
+.tag-item { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.72rem; color: var(--c-text-2); cursor: pointer; transition: all 0.2s; }
+.tag-item:hover { border-color: var(--c-primary); color: var(--c-primary); }
 </style>

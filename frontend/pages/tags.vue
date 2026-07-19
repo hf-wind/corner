@@ -122,45 +122,46 @@ const rustArticles = [
 
 .main-content { flex: 1; overflow-y: auto; padding: 24px 32px; min-width: 0; }
 
-.section-title { font-size: 0.82rem; color: var(--text-secondary); letter-spacing: 0.12em; margin-bottom: 14px; padding-left: 4px; }
+.section-title { font-size: 0.82rem; color: var(--c-text-2); letter-spacing: 0.12em; margin-bottom: 14px; padding-left: 4px; }
 
 .tag-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
-.tag-stat-card { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); text-align: center; }
-.tag-stat-num { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
-.tag-stat-label { font-size: 0.68rem; color: var(--text-secondary); margin-top: 4px; }
+.tag-stat-card { background: var(--ld-bg-card); border-radius: 12px; padding: 16px; box-shadow: 0 2px 4px var(--ld-shadow); text-align: center; transition: all 0.2s; }
+.tag-stat-card:hover { transform: translateY(-2px); box-shadow: 0 0.5em 1em var(--ld-shadow); }
+.tag-stat-num { font-size: 1.4rem; font-weight: 700; color: var(--c-primary); }
+.tag-stat-label { font-size: 0.68rem; color: var(--c-text-2); margin-top: 4px; }
 
-.tag-cloud-section { background: var(--card); border-radius: 14px; padding: 28px; box-shadow: var(--shadow); margin-bottom: 32px; }
+.tag-cloud-section { background: linear-gradient(135deg, var(--c-bg-1), var(--ld-bg-card)); border-radius: 14px; padding: 28px; box-shadow: 0 2px 4px var(--ld-shadow); margin-bottom: 32px; }
 .tag-cloud { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
-.tag-item { padding: 8px 18px; border-radius: 24px; border: 1.5px solid var(--border); font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; transition: all 0.25s; background: var(--bg-secondary); }
-.tag-item:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); transform: translateY(-2px); }
-.tag-item.active { border-color: var(--accent); color: #fff; background: var(--accent); }
+.tag-item { padding: 8px 18px; border-radius: 24px; border: 1.5px solid var(--border); font-size: 0.82rem; color: var(--c-text-2); cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); background: var(--c-bg); }
+.tag-item:hover { border-color: var(--c-primary); color: var(--c-primary); background: var(--c-primary-soft); transform: translateY(-2px); }
+.tag-item.active { border-color: var(--c-primary); color: #fff; background: var(--c-primary); box-shadow: 0 4px 12px color-mix(in srgb, var(--c-primary) 40%, transparent); }
 .tag-item.size-lg { font-size: 1rem; padding: 10px 22px; font-weight: 700; }
 .tag-item.size-md { font-size: 0.88rem; padding: 9px 20px; }
 .tag-item.size-sm { font-size: 0.72rem; padding: 6px 14px; }
 .tag-count { font-size: 0.65rem; opacity: 0.7; margin-left: 4px; }
 
 .tag-articles { margin-top: 24px; }
-.tag-articles-title { font-size: 0.92rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-.tag-articles-title .tag-badge { font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; background: var(--accent); color: #fff; }
+.tag-articles-title { font-size: 0.92rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; color: var(--c-text); }
+.tag-articles-title .tag-badge { font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; background: var(--c-primary); color: #fff; box-shadow: 0 2px 8px color-mix(in srgb, var(--c-primary) 30%, transparent); }
 
 .article-list { display: flex; flex-direction: column; gap: 12px; }
-.article-item { display: flex; gap: 16px; padding: 14px; background: var(--card); border-radius: 10px; box-shadow: var(--shadow); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; text-decoration: none; color: inherit; }
-.article-item:hover { transform: translateX(4px); box-shadow: var(--shadow-md); }
+.article-item { display: flex; gap: 16px; padding: 14px; background: var(--ld-bg-card); border-radius: 10px; box-shadow: 0 2px 4px var(--ld-shadow); cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; }
+.article-item:hover { transform: translateX(2px); box-shadow: 0 0.5em 1em var(--ld-shadow); }
 .article-item-cover { width: 100px; height: 70px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
 .article-item-cover img { width: 100%; height: 100%; object-fit: cover; }
 .article-item-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.article-item-title { font-size: 0.88rem; font-weight: 700; line-height: 1.4; }
-.article-item-meta { font-size: 0.68rem; color: var(--text-secondary); }
+.article-item-title { font-size: 0.88rem; font-weight: 700; line-height: 1.4; color: var(--c-text); }
+.article-item-meta { font-size: 0.68rem; color: var(--c-text-2); }
 
 .sidebar-right { width: var(--right-w); flex-shrink: 0; padding: 24px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-.right-card { background: var(--card); border-radius: 12px; padding: 18px; box-shadow: var(--shadow); }
-.right-card-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: 0.05em; }
+.right-card { background: var(--ld-bg-card); border-radius: 12px; padding: 18px; box-shadow: 0 2px 4px var(--ld-shadow); transition: all 0.2s; }
+.right-card-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: 0.05em; color: var(--c-text); }
 
 .hot-tags-list { display: flex; flex-direction: column; gap: 10px; }
-.hot-tag-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; }
+.hot-tag-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--c-text); }
 
 .dist-items { display: flex; flex-direction: column; gap: 8px; }
-.dist-info { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 4px; }
+.dist-info { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--c-text-2); margin-bottom: 4px; }
 .dist-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-.dist-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.dist-fill { height: 100%; background: var(--c-primary); border-radius: 3px; }
 </style>

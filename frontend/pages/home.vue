@@ -2,14 +2,25 @@
   <div class="page-layout">
     <main class="main-content">
       <div class="section-title">· 精选推荐</div>
-      <div class="swiper-wrap">
-        <NuxtLink v-for="item in featured" :key="item.slug" :to="'/article/' + item.slug" class="swiper-card">
-          <img :src="item.cover" alt="">
-          <div class="overlay">
-            <h3>{{ item.title }}</h3>
-            <span>{{ item.date }}</span>
-          </div>
-        </NuxtLink>
+      <div class="swiper-3d-wrap" ref="swiperRef">
+        <div class="swiper-3d-track" :style="{ transform: `translateX(${-currentIndex * cardWidth}px)` }" :class="{ transitioning: isTransitioning }">
+          <NuxtLink
+            v-for="(item, i) in featured"
+            :key="i"
+            :to="'/article/' + item.slug"
+            class="swiper-card-3d"
+            :class="{ active: i === currentIndex, prev: i === currentIndex - 1, next: i === currentIndex + 1 }"
+          >
+            <img :src="item.cover" alt="">
+            <div class="swiper-overlay">
+              <h3>{{ item.title }}</h3>
+              <span>{{ item.date }}</span>
+            </div>
+          </NuxtLink>
+        </div>
+        <div class="swiper-dots">
+          <span v-for="(item, i) in featured" :key="i" class="dot" :class="{ active: i === currentIndex }" @click="goTo(i)"></span>
+        </div>
       </div>
 
       <div class="section-title">· 最新文章</div>
@@ -38,41 +49,8 @@
     </main>
 
     <aside class="sidebar-right">
-      <div class="right-card">
-        <div class="right-card-title">公告</div>
-        <div class="notice-item" v-for="(notice, i) in notices" :key="i">
-          <span class="notice-dot"></span>
-          <span>{{ notice }}</span>
-        </div>
-      </div>
-
-      <div class="right-card">
-        <div class="right-card-title">标签</div>
-        <div class="tag-cloud">
-          <NuxtLink v-for="tag in tags" :key="tag.name" :to="'/tags' + tag.query" class="tag-item">{{ tag.name }}</NuxtLink>
-        </div>
-      </div>
-
-      <div class="right-card">
-        <div class="right-card-title">友链</div>
-        <NuxtLink v-for="friend in friends" :key="friend.name" :to="friend.url" class="friend-item">
-          <img class="friend-avatar" :src="friend.avatar" :alt="friend.name">
-          <div>
-            <div class="friend-name">{{ friend.name }}</div>
-            <div class="friend-desc">{{ friend.desc }}</div>
-          </div>
-        </NuxtLink>
-      </div>
-
-      <div class="right-card">
-        <div class="right-card-title">站点统计</div>
-        <div class="stats-wrap">
-          <div v-for="stat in stats" :key="stat.label">
-            <div class="progress-info"><span>{{ stat.label }}</span><span>{{ stat.value }}</span></div>
-            <div class="progress-bar"><div class="progress-fill" :style="{ width: stat.pct }"></div></div>
-          </div>
-        </div>
-      </div>
+      <WeatherClock />
+      <RadarChart />
     </aside>
   </div>
 </template>
@@ -86,42 +64,42 @@ const featured = [
 ]
 
 const articles = [
-  { slug: 'rust-blog', cover: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&h=250&fit=crop', tag: '技术', title: '用 Rust 重写我的个人博客系统', date: '2025-07-10', desc: '从 Node.js 迁移到 Rust，不仅获得了更好的性能，还让我重新思考了系统架构的设计哲学。这是一次充满挑战的技术旅程。' },
-  { slug: 'late-night-coding', cover: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&h=250&fit=crop', tag: '随笔', title: '深夜写代码时的那些胡思乱想', date: '2025-07-05', desc: '凌晨三点的屏幕光映在脸上，思绪却飘向了远方。关于创造、关于意义、关于那些代码之外的东西。' },
-  { slug: 'yunnan-travel', cover: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=250&fit=crop', tag: '旅行', title: '云南行记：在丽江古城寻找慢生活', date: '2025-06-22', desc: '放下键盘，背上行囊。在古城的石板路上，时间似乎变得很慢很慢。这里的每一个角落都有故事。' },
-  { slug: 'wasm-practice', cover: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=250&fit=crop', tag: '技术', title: 'WebAssembly 实战：浏览器中的高性能计算', date: '2025-06-15', desc: '探索 WASM 在前端的无限可能，从图像处理到实时音视频，性能提升令人惊叹。' },
-  { slug: 'ai-creator', cover: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=250&fit=crop', tag: '思考', title: 'AI 时代的创作者：工具还是伙伴？', date: '2025-06-01', desc: '当 AI 可以写诗、作画、编程，人类创作者的独特价值究竟在哪里？一些深夜的思考碎片。' },
+  { slug: 'rust-blog', cover: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&h=250&fit=crop', tag: '技术', title: '用 Rust 重写我的个人博客系统', date: '2025-07-10', desc: '从 Node.js 迁移到 Rust，不仅获得了更好的性能，还让我重新思考了系统架构的设计哲学。' },
+  { slug: 'late-night-coding', cover: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&h=250&fit=crop', tag: '随笔', title: '深夜写代码时的那些胡思乱想', date: '2025-07-05', desc: '凌晨三点的屏幕光映在脸上，思绪却飘向了远方。关于创造、关于意义。' },
+  { slug: 'yunnan-travel', cover: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=250&fit=crop', tag: '旅行', title: '云南行记：在丽江古城寻找慢生活', date: '2025-06-22', desc: '放下键盘，背上行囊。在古城的石板路上，时间似乎变得很慢很慢。' },
+  { slug: 'wasm-practice', cover: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=250&fit=crop', tag: '技术', title: 'WebAssembly 实战：浏览器中的高性能计算', date: '2025-06-15', desc: '探索 WASM 在前端的无限可能，从图像处理到实时音视频。' },
+  { slug: 'ai-creator', cover: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=250&fit=crop', tag: '思考', title: 'AI 时代的创作者：工具还是伙伴？', date: '2025-06-01', desc: '当 AI 可以写诗、作画、编程，人类创作者的独特价值究竟在哪里？' },
 ]
 
-const notices = [
-  '博客已升级至 v3.0，全新设计上线！',
-  '每周三、周六定期更新',
-]
+const currentIndex = ref(0)
+const cardWidth = ref(260)
+const isTransitioning = ref(false)
+const swiperRef = ref<HTMLElement>()
+let autoTimer: ReturnType<typeof setInterval>
 
-const tags = [
-  { name: 'Rust', query: '?tag=rust' },
-  { name: '前端', query: '?tag=frontend' },
-  { name: '随笔', query: '?tag=essay' },
-  { name: '旅行', query: '?tag=travel' },
-  { name: '摄影', query: '?tag=photo' },
-  { name: '读书', query: '?tag=reading' },
-  { name: 'AI', query: '?tag=ai' },
-  { name: '设计', query: '?tag=design' },
-  { name: '音乐', query: '?tag=music' },
-  { name: '生活', query: '?tag=life' },
-]
+function goTo(index: number) {
+  isTransitioning.value = true
+  currentIndex.value = index
+}
 
-const friends = [
-  { name: '林间小径', url: '/friends', desc: '自然笔记', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=face' },
-  { name: '数字花园', url: '/friends', desc: '技术探索', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face' },
-  { name: '光影手记', url: '/friends', desc: '摄影日记', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop&crop=face' },
-]
+function nextSlide() {
+  if (currentIndex.value >= featured.length - 1) {
+    clearInterval(autoTimer)
+    return
+  }
+  isTransitioning.value = true
+  currentIndex.value++
+}
 
-const stats = [
-  { label: '文章', value: '128 篇', pct: '64%' },
-  { label: '标签', value: '42 个', pct: '42%' },
-  { label: '运行天数', value: '365 天', pct: '90%' },
-]
+onMounted(() => {
+  cardWidth.value = swiperRef.value ? (swiperRef.value.clientWidth - 48) / 3 : 220
+  if (cardWidth.value < 180) cardWidth.value = 180
+  autoTimer = setInterval(nextSlide, 10000)
+})
+
+onUnmounted(() => {
+  clearInterval(autoTimer)
+})
 </script>
 
 <style scoped>
@@ -134,100 +112,146 @@ const stats = [
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px;
+  padding: 24px 28px;
   min-width: 0;
 }
 
 .section-title {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
+  font-size: 0.8rem;
+  color: var(--c-text-2);
   letter-spacing: 0.12em;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   padding-left: 4px;
 }
 
-.swiper-wrap {
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 8px;
-  margin-bottom: 28px;
+.swiper-3d-wrap {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 0 28px;
+  margin-bottom: 20px;
+  perspective: 800px;
+  user-select: none;
 }
 
-.swiper-card {
-  flex: 0 0 280px;
-  scroll-snap-align: start;
-  border-radius: 14px;
+.swiper-3d-track {
+  display: flex;
+  gap: 16px;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0 8px;
+}
+
+.swiper-3d-track.transitioning {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.swiper-card-3d {
+  flex: 0 0 calc((100% - 32px) / 3);
+  border-radius: 12px;
   overflow: hidden;
   position: relative;
   cursor: pointer;
-  transition: transform 0.3s;
   text-decoration: none;
   color: inherit;
   display: block;
+  background: var(--c-bg-2);
+  transform: scale(0.88) translateZ(-40px);
+  filter: brightness(0.7);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), filter 0.5s ease;
+  opacity: 0.7;
 }
 
-.swiper-card:hover {
-  transform: translateY(-3px);
+.swiper-card-3d.active {
+  transform: scale(1) translateZ(0);
+  filter: brightness(1);
+  opacity: 1;
+  box-shadow: 0 8px 24px var(--ld-shadow);
 }
 
-.swiper-card img {
+.swiper-card-3d.prev,
+.swiper-card-3d.next {
+  transform: scale(0.92) translateZ(-20px);
+  filter: brightness(0.85);
+  opacity: 0.85;
+}
+
+.swiper-card-3d img {
   width: 100%;
-  height: 160px;
+  height: 150px;
   object-fit: cover;
   display: block;
 }
 
-.overlay {
+.swiper-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 16px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  padding: 14px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.6));
   color: #fff;
 }
 
-.overlay h3 {
-  font-size: 0.92rem;
+.swiper-overlay h3 {
+  font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.4;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
-.overlay span {
-  font-size: 0.7rem;
+.swiper-overlay span {
+  font-size: 0.68rem;
   opacity: 0.8;
+}
+
+.swiper-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.dot.active {
+  width: 18px;
+  border-radius: 3px;
+  background: var(--c-primary);
 }
 
 .article-list {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .article-card {
   display: flex;
   gap: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
-  background: var(--card);
-  box-shadow: var(--shadow);
+  background: var(--ld-bg-card);
+  box-shadow: 0 2px 4px var(--ld-shadow);
   cursor: pointer;
-  transition: transform 0.3s, box-shadow 0.3s;
+  transition: all 0.2s;
   text-decoration: none;
   color: inherit;
 }
 
 .article-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: 0 0.5em 1em var(--ld-shadow);
 }
 
 .article-cover {
-  width: 220px;
-  min-height: 150px;
+  width: 180px;
+  min-height: 130px;
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
@@ -238,59 +262,47 @@ const stats = [
   height: 100%;
   object-fit: cover;
   display: block;
-}
-
-.article-cover::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 60px;
-  background: linear-gradient(to right, transparent, var(--card));
-  pointer-events: none;
-}
-
-:global(.dark) .article-cover::after {
-  background: linear-gradient(to right, transparent, #2a2d35);
+  mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
 }
 
 .article-body {
   flex: 1;
-  padding: 20px 22px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
 .article-tag {
   display: inline-block;
-  font-size: 0.68rem;
-  padding: 2px 10px;
+  font-size: 0.65rem;
+  padding: 2px 8px;
   border-radius: 20px;
-  background: var(--accent-light);
-  color: var(--accent);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
   width: fit-content;
   letter-spacing: 0.06em;
 }
 
 .article-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.5;
+  color: var(--c-text);
 }
 
 .article-date {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
+  font-size: 0.7rem;
+  color: var(--c-text-2);
 }
 
 .article-desc {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  line-height: 1.7;
+  font-size: 0.8rem;
+  color: var(--c-text-2);
+  line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -302,18 +314,18 @@ const stats = [
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 32px;
+  margin-top: 28px;
 }
 
 .page-btn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   border: 1.5px solid var(--border);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-family: inherit;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
@@ -322,144 +334,23 @@ const stats = [
 }
 
 .page-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
 }
 
 .page-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--c-primary);
+  border-color: var(--c-primary);
   color: #fff;
 }
 
 .sidebar-right {
   width: var(--right-w);
   flex-shrink: 0;
-  padding: 24px 16px;
+  padding: 24px 14px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.right-card {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 18px;
-  box-shadow: var(--shadow);
-}
-
-.right-card-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  margin-bottom: 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-  letter-spacing: 0.05em;
-}
-
-.notice-item {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  padding: 8px 0;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.notice-item + .notice-item {
-  border-top: 1px solid var(--border);
-}
-
-.notice-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
-  margin-top: 6px;
-}
-
-.tag-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag-item {
-  padding: 4px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-}
-
-.tag-item:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.friend-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  text-decoration: none;
-  color: inherit;
-}
-
-.friend-item + .friend-item {
-  border-top: 1px solid var(--border);
-}
-
-.friend-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.friend-name {
-  font-size: 0.8rem;
-  font-weight: 400;
-}
-
-.friend-desc {
-  font-size: 0.68rem;
-  color: var(--text-secondary);
-}
-
-.stats-wrap {
-  display: flex;
-  flex-direction: column;
   gap: 12px;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  margin-top: 6px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--accent);
-  transition: width 0.6s ease;
-}
-
-.progress-info {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  margin-top: 6px;
 }
 </style>
