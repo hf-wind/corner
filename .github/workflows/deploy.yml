@@ -9,6 +9,18 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Check runner
+        run: |
+          whoami
+          uname -a
+          ls -la ~/.ssh/ 2>&1 || echo ".ssh not exist"
+
+      - name: Test TCP
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          timeout 5 bash -c "echo >/dev/tcp/${SSH_HOST}/22" 2>/dev/null && echo "TCP_OK" || echo "TCP_FAIL"
+
       - name: SSH and deploy
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -19,6 +31,7 @@ jobs:
           REDIS_PASS: ${{ secrets.REDIS_PASS }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          set -x
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
@@ -29,4 +42,4 @@ jobs:
               -o ConnectTimeout=10 \
               -i ~/.ssh/deploy_key \
               "${SSH_USER}@${SSH_HOST}" \
-              "cd ${APP_PATH} && test -f .env || (cp .env.example .env && sed -i \"s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/\" .env && sed -i \"s/REDIS_PASS=.*/REDIS_PASS=${REDIS_PASS}/\" .env && sed -i \"s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/\" .env) && git pull && docker compose up -d --build" 2>&1
+              "cd ${APP_PATH} && git pull && docker compose up -d --build" 2>&1 || echo "SSH_EXIT=$?"
