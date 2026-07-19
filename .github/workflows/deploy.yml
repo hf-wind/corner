@@ -3,21 +3,32 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Debug secrets existence
+        run: |
+          [ -n "${{ secrets.SSH_HOST }}" ] && echo "SSH_HOST=configured" || echo "SSH_HOST=MISSING"
+          [ -n "${{ secrets.SSH_USER }}" ] && echo "SSH_USER=configured" || echo "SSH_USER=MISSING"
+          [ -n "${{ secrets.SSH_KEY }}" ]   && echo "SSH_KEY=configured"   || echo "SSH_KEY=MISSING"
+          [ -n "${{ secrets.APP_PATH }}" ]  && echo "APP_PATH=configured"  || echo "APP_PATH=MISSING"
+
       - name: SSH and deploy
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: 22
+          debug: true
           script: |
             cd ${{ secrets.APP_PATH }}
 
-            # create .env from example on first deploy
             if [ ! -f .env ]; then
               cp .env.example .env
               sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}/" .env
