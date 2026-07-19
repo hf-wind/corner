@@ -9,32 +9,44 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Debug secrets existence
-        run: |
-          [ -n "${{ secrets.SSH_HOST }}" ] && echo "SSH_HOST=configured" || echo "SSH_HOST=MISSING"
-          [ -n "${{ secrets.SSH_USER }}" ] && echo "SSH_USER=configured" || echo "SSH_USER=MISSING"
-          [ -n "${{ secrets.SSH_KEY }}" ]   && echo "SSH_KEY=configured"   || echo "SSH_KEY=MISSING"
-          [ -n "${{ secrets.APP_PATH }}" ]  && echo "APP_PATH=configured"  || echo "APP_PATH=MISSING"
-
       - name: SSH and deploy
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          debug: true
-          script: |
-            cd ${{ secrets.APP_PATH }}
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          APP_PATH: ${{ secrets.APP_PATH }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASS: ${{ secrets.REDIS_PASS }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          set -e
+
+          echo "SSH_HOST=$SSH_HOST"
+          echo "SSH_USER=$SSH_USER"
+          echo "SSH_KEY_len=${#SSH_KEY} chars"
+          echo "APP_PATH=$APP_PATH"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              -i ~/.ssh/deploy_key \
+              "${SSH_USER}@${SSH_HOST}" << EOSSH
+            set -e
+            cd ${APP_PATH}
 
             if [ ! -f .env ]; then
               cp .env.example .env
-              sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}/" .env
-              sed -i "s/REDIS_PASS=.*/REDIS_PASS=${{ secrets.REDIS_PASS }}/" .env
-              sed -i "s/JWT_SECRET=.*/JWT_SECRET=${{ secrets.JWT_SECRET }}/" .env
+              sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
+              sed -i "s/REDIS_PASS=.*/REDIS_PASS=${REDIS_PASS}/" .env
+              sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
             fi
 
+            date
             git pull
             docker compose up -d --build
+EOSSH
