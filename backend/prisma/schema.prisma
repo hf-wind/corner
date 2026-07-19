@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  username     String   @unique @db.VarChar(50)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.Text
+  avatar       String?
+  bio          String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  posts        Post[]
+  media        Media[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @db.VarChar(100)
+  slug        String     @unique @db.VarChar(100)
+  description String?    @db.Text
+  parentId    String?    @map("parent_id") @db.Uuid
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  posts       Post[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id    String     @id @default(uuid()) @db.Uuid
+  name  String     @db.VarChar(50)
+  slug  String     @unique @db.VarChar(50)
+  posts PostTag[]
+
+  @@map("tags")
+}
+
+model Post {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @db.VarChar(255)
+  slug        String    @unique @db.VarChar(255)
+  content     String    @db.Text
+  excerpt     String?   @db.Text
+  coverImage  String?   @map("cover_image") @db.Text
+  authorId    String    @map("author_id") @db.Uuid
+  categoryId  String?   @map("category_id") @db.Uuid
+  status      String    @default("draft") @db.VarChar(20)
+  viewCount   Int       @default(0) @map("view_count")
+  likeCount   Int       @default(0) @map("like_count")
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  author      User      @relation(fields: [authorId], references: [id])
+  category    Category? @relation(fields: [categoryId], references: [id])
+  tags        PostTag[]
+  comments    Comment[]
+  visitStats  VisitStat[]
+
+  @@map("posts")
+}
+
+model PostTag {
+  postId String @map("post_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
+
+model Comment {
+  id           String   @id @default(uuid()) @db.Uuid
+  postId       String   @map("post_id") @db.Uuid
+  authorName   String?  @map("author_name") @db.VarChar(100)
+  authorEmail  String?  @map("author_email") @db.VarChar(255)
+  content      String   @db.Text
+  parentId     String?  @map("parent_id") @db.Uuid
+  status       String   @default("pending") @db.VarChar(20)
+  createdAt    DateTime @default(now()) @map("created_at")
+  post         Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent       Comment? @relation("CommentReply", fields: [parentId], references: [id])
+  replies      Comment[] @relation("CommentReply")
+
+  @@map("comments")
+}
+
+model Media {
+  id           String   @id @default(uuid()) @db.Uuid
+  filename     String   @db.VarChar(255)
+  originalName String?  @map("original_name") @db.VarChar(255)
+  mimeType     String?  @map("mime_type") @db.VarChar(100)
+  size         Int?
+  path         String   @db.Text
+  uploadedBy   String?  @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  uploader     User?    @relation(fields: [uploadedBy], references: [id])
+
+  @@map("media")
+}
+
+model Setting {
+  key       String   @id @db.VarChar(100)
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model VisitStat {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String?  @map("post_id") @db.Uuid
+  ipHash    String?  @map("ip_hash") @db.VarChar(64)
+  userAgent String?  @map("user_agent") @db.Text
+  visitedAt DateTime @default(now()) @map("visited_at")
+  post      Post?    @relation(fields: [postId], references: [id])
+
+  @@map("visit_stats")
+}

@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@300;400;700&display=swap');
+
+:root {
+  --bg: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --text: #1E293B;
+  --text-secondary: #64748B;
+  --accent: #3B82F6;
+  --accent-light: rgba(59, 130, 246, 0.08);
+  --border: #E2E8F0;
+  --card: #FFFFFF;
+  --shadow: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.08);
+  --left-w: 260px;
+  --right-w: 300px;
+  --code-bg: #f1f5f9;
+}
+.dark {
+  --bg: #1d1f23;
+  --bg-secondary: #252830;
+  --text: #FFFFFF;
+  --text-secondary: #94A3B8;
+  --accent: #60A5FA;
+  --accent-light: rgba(96,165,250,0.1);
+  --border: #334155;
+  --card: #2a2d35;
+  --shadow: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.25);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.3);
+  --code-bg: #2a2d35;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  font-family: 'LXGW WenKai', serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  transition: background 0.4s, color 0.4s;
+}
+
+a { text-decoration: none; color: inherit; }
+
+::-webkit-scrollbar { display: none; }

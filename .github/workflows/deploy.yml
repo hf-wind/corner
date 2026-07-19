@@ -1,0 +1,29 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ${{ secrets.APP_PATH }}
+
+            # create .env from example on first deploy
+            if [ ! -f .env ]; then
+              cp .env.example .env
+              sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}/" .env
+              sed -i "s/REDIS_PASS=.*/REDIS_PASS=${{ secrets.REDIS_PASS }}/" .env
+              sed -i "s/JWT_SECRET=.*/JWT_SECRET=${{ secrets.JWT_SECRET }}/" .env
+            fi
+
+            git pull
+            docker compose up -d --build
