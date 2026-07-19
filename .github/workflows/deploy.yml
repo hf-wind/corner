@@ -26,25 +26,14 @@ jobs:
           echo "SSH_KEY_len=${#SSH_KEY} chars"
           echo "APP_PATH=$APP_PATH"
 
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          {
-            echo 'set -e'
-            echo "cd ${APP_PATH}"
-            echo 'if [ ! -f .env ]; then'
-            echo "  cp .env.example .env"
-            echo "  sed -i \"s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/\" .env"
-            echo "  sed -i \"s/REDIS_PASS=.*/REDIS_PASS=${REDIS_PASS}/\" .env"
-            echo "  sed -i \"s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/\" .env"
-            echo 'fi'
-            echo 'date'
-            echo 'git pull'
-            echo 'docker compose up -d --build'
-          } | ssh -o StrictHostKeyChecking=no \
-                  -o UserKnownHostsFile=/dev/null \
-                  -o LogLevel=ERROR \
-                  -i ~/.ssh/deploy_key \
-                  "${SSH_USER}@${SSH_HOST}" bash
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=10 \
+              -v \
+              -i ~/.ssh/deploy_key \
+              -p 22 \
+              "${SSH_USER}@${SSH_HOST}" \
+              "echo SSH_OK" 2>&1 || true
