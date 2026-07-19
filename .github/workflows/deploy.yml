@@ -9,46 +9,34 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Check runner
-        run: |
-          echo "HOME=$HOME"
-          echo "runner=$(uname -a)"
-          ls -la ~/ 2>&1 | head -5
-
-      - name: Debug env
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          APP_PATH: ${{ secrets.APP_PATH }}
-        run: |
-          echo "SSH_HOST=[${SSH_HOST}]"
-          echo "SSH_USER=[${SSH_USER}]"
-          echo "APP_PATH=[${APP_PATH}]"
-
-      - name: Test TCP
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-        run: |
-          if command -v nc &>/dev/null; then
-            nc -zv -w5 "${SSH_HOST}" 22 || echo "TCP_FAIL"
-          else
-            timeout 5 bash -c "echo >/dev/tcp/${SSH_HOST}/22" 2>/dev/null && echo "TCP_OK" || echo "TCP_FAIL"
-          fi
-
-      - name: SSH test
+      - name: SSH and deploy
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
+          APP_PATH: ${{ secrets.APP_PATH }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASS: ${{ secrets.REDIS_PASS }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
-          set -x
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -v -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              -o ConnectTimeout=10 \
-              -i ~/.ssh/deploy_key \
-              "${SSH_USER}@${SSH_HOST}" \
-              "echo SSH_OK" 2>&1 || echo "SSH_EXIT_CODE=$?"
+
+          {
+            echo 'set -e'
+            echo "cd ${APP_PATH}"
+            echo 'if [ ! -f .env ]; then'
+            echo "  cp .env.example .env"
+            echo "  sed -i \"s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/\" .env"
+            echo "  sed -i \"s/REDIS_PASS=.*/REDIS_PASS=${REDIS_PASS}/\" .env"
+            echo "  sed -i \"s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/\" .env"
+            echo 'fi'
+            echo 'git pull'
+            echo 'docker compose up -d --build'
+          } | ssh -o StrictHostKeyChecking=no \
+                  -o UserKnownHostsFile=/dev/null \
+                  -o ConnectTimeout=10 \
+                  -i ~/.ssh/deploy_key \
+                  "${SSH_USER}@${SSH_HOST}" bash
