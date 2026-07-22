@@ -71,15 +71,18 @@
 
     <div class="sidebar-bottom">
       <div class="sidebar-divider"></div>
-      <NuxtLink v-if="!isLoggedIn" to="/login" class="user-entry">
+      <NuxtLink v-if="!isLoggedIn" to="/login" class="login-link">
+        <Icon name="ph:sign-in-bold" /> 登录 / 注册
+      </NuxtLink>
+      <div v-else class="user-entry">
         <div class="avatar-wrapper">
-          <Icon name="ph:user-circle-bold" class="default-avatar-icon" />
+          <Icon name="ph:user-circle-fill" class="avatar-icon" />
         </div>
         <div class="user-info">
-          <span class="user-name">登录</span>
-          <span class="user-desc">点击登录账号</span>
+          <span class="user-name">{{ user?.username ?? '用户' }}</span>
+          <span class="user-desc" @click="handleLogout">退出登录</span>
         </div>
-      </NuxtLink>
+      </div>
       <div class="theme-pill">
         <button :class="{ active: theme === 'light' }" @click="setTheme('light')" title="亮色">
           <Icon name="ph:sun-bold" />
@@ -98,10 +101,26 @@
 <script setup lang="ts">
 const emit = defineEmits<{ openSearch: [] }>()
 const { theme, setTheme } = useTheme()
+const router = useRouter()
+
 const isLoggedIn = computed(() => import.meta.client && !!localStorage.getItem('token'))
+const user = computed(() => {
+  if (!import.meta.client) return null
+  try {
+    return JSON.parse(localStorage.getItem('user') ?? 'null') as { username: string } | null
+  } catch {
+    return null
+  }
+})
 
 function openSearch() {
   emit('openSearch')
+}
+
+function handleLogout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  router.push('/home')
 }
 </script>
 
@@ -277,25 +296,35 @@ function openSearch() {
   margin: 0 0 4px;
 }
 
-.user-entry {
+.login-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 7px 10px;
   border-radius: 8px;
   color: var(--c-text-2);
+  font-size: 0.8rem;
   text-decoration: none;
   transition: all 0.15s;
 }
 
-.user-entry:hover {
+.login-link:hover {
+  color: var(--c-text);
   background: var(--c-bg-2);
 }
 
+.user-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
 .avatar-wrapper {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -304,8 +333,8 @@ function openSearch() {
   flex-shrink: 0;
 }
 
-.default-avatar-icon {
-  font-size: 1.25rem;
+.avatar-icon {
+  font-size: 1.1rem;
   color: var(--c-text-3);
 }
 
@@ -316,17 +345,23 @@ function openSearch() {
 }
 
 .user-name {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--c-text);
   line-height: 1.3;
 }
 
 .user-desc {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: var(--c-text-3);
   line-height: 1.3;
   margin-top: 1px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.user-desc:hover {
+  color: var(--c-primary);
 }
 
 .theme-pill {
