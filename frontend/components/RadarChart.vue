@@ -52,6 +52,7 @@
 </template>
 
 <script setup lang="ts">
+const api = useApi()
 const mode = ref('overview')
 const hovered = ref<number | null>(null)
 const barHover = ref<number | null>(null)
@@ -61,14 +62,47 @@ const r = 90
 const labelR = 112
 const R3 = 3
 
-const labels = ['文章', '天数', '相册', '动态', '友链', '书单']
-const rawValues = [85, 90, 45, 60, 40, 55]
+const labels = ['文章', '评论', '分类', '标签', '浏览', '点赞']
+const rawValues = ref([0, 0, 0, 0, 0, 0])
+const recentBars = ref([
+  { name: '文章', count: 0, pct: 0 },
+  { name: '评论', count: 0, pct: 0 },
+  { name: '分类', count: 0, pct: 0 },
+  { name: '标签', count: 0, pct: 0 },
+  { name: '浏览', count: 0, pct: 0 },
+  { name: '点赞', count: 0, pct: 0 },
+])
+
+async function loadStats() {
+  try {
+    const d = await api.get<any>('/stats/radar')
+    const maxVal = Math.max(d.posts, d.comments, d.categories, d.tags, d.views, d.likes, 1)
+    rawValues.value = [
+      Math.round((d.posts / maxVal) * 100),
+      Math.round((d.comments / maxVal) * 100),
+      Math.round((d.categories / maxVal) * 100),
+      Math.round((d.tags / maxVal) * 100),
+      Math.round((d.views / maxVal) * 100),
+      Math.round((d.likes / maxVal) * 100),
+    ]
+    recentBars.value = [
+      { name: '文章', count: d.posts, pct: Math.round((d.posts / maxVal) * 100) },
+      { name: '评论', count: d.comments, pct: Math.round((d.comments / maxVal) * 100) },
+      { name: '分类', count: d.categories, pct: Math.round((d.categories / maxVal) * 100) },
+      { name: '标签', count: d.tags, pct: Math.round((d.tags / maxVal) * 100) },
+      { name: '浏览', count: d.views, pct: Math.round((d.views / maxVal) * 100) },
+      { name: '点赞', count: d.likes, pct: Math.round((d.likes / maxVal) * 100) },
+    ]
+  } catch { /* keep zeros */ }
+}
+
+onMounted(loadStats)
 
 function a(i: number) { return (i * 60 - 60) * Math.PI / 180 }
 function n(v: number) { return +v.toFixed(R3) }
 
 const overviewData = computed(() =>
-  rawValues.map((v, i) => ({
+  rawValues.value.map((v, i) => ({
     val: v,
     x: n(r * (v / 100) * Math.cos(a(i + 1))),
     y: n(r * (v / 100) * Math.sin(a(i + 1)))
@@ -108,15 +142,6 @@ function showPopup(ev: MouseEvent, i: number) {
   tooltip.y = ev.clientY - rect.top - 10
   tooltip.index = i
 }
-
-const recentBars = [
-  { name: '文章', count: 12, pct: 100 },
-  { name: '天数', count: 30, pct: 85 },
-  { name: '相册', count: 5, pct: 35 },
-  { name: '动态', count: 8, pct: 50 },
-  { name: '友链', count: 3, pct: 20 },
-  { name: '书单', count: 6, pct: 40 },
-]
 </script>
 
 <style scoped>

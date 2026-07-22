@@ -76,7 +76,12 @@ html, body {
   overflow: hidden;
   transition: background 0.4s, color 0.4s;
 }
+html.no-transition, html.no-transition body {
+  transition: none !important;
+}
 
 a { text-decoration: none; color: inherit; }
 
 ::-webkit-scrollbar { display: none; }
+
+.table-spin { min-height:200px; display:flex; align-items:center; justify-content:center; }

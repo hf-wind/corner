@@ -1,0 +1,19 @@
+{
+  "id": "doraemon",
+  "displayName": "哆啦A梦",
+  "description": "阿风的伙伴 · 蓝色机器猫",
+  "spritesheetPath": "spritesheet.webp",
+  "frameWidth": 192,
+  "frameHeight": 208,
+  "displayWidth": 96,
+  "displayHeight": 104,
+  "cols": 8,
+  "rows": 9,
+  "idle": { "row": 0, "frames": 6, "fps": 6 },
+  "greetings": [
+    "欢迎来到阿风的博客～我是哆啦A梦！",
+    "我是阿风的伙伴哆啦A梦，有什么想了解的尽管问我～",
+    "欢迎光临！我是阿风博客里的蓝色机器猫～",
+    "Hi～我是哆啦A梦，阿风的好伙伴！带你逛逛这里～"
+  ]
+}

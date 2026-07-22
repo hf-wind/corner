@@ -7,22 +7,30 @@
         <text x="90" y="52" text-anchor="middle" class="clock-date" data-allow-mismatch="text">{{ dateStr }}</text>
       </svg>
       <div class="wc-weather">
-        <span class="wc-temp"><Icon name="ph:sun-bold" /> 28°</span>
-        <span class="wc-city">北京</span>
+        <span class="wc-temp"><Icon name="ph:sun-bold" /> {{ temp }}</span>
+        <span class="wc-city">{{ city }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+const api = useApi()
 const now = ref(new Date())
 const mounted = ref(false)
+const temp = ref('28°')
+const city = ref('北京')
 let timer: ReturnType<typeof setInterval>
 
-onMounted(() => {
+onMounted(async () => {
   mounted.value = true
   now.value = new Date()
   timer = setInterval(() => { now.value = new Date() }, 1000)
+  try {
+    const w = await api.get<any>('/weather')
+    temp.value = `${w.temperature}°`
+    city.value = w.city
+  } catch { /* keep default */ }
 })
 onUnmounted(() => { clearInterval(timer) })
 

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './modules/prisma/prisma.module';
@@ -12,10 +14,30 @@ import { MediaModule } from './modules/media/media.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { WeatherModule } from './modules/weather/weather.module';
 import { AiPetModule } from './modules/ai-pet/ai-pet.module';
+import { AiModule } from './modules/ai/ai.module';
 import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UserModule, PostModule, CategoryModule, TagModule, CommentModule, MediaModule, StatsModule, WeatherModule, AiPetModule, SettingsModule],
+  imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+      serveStaticOptions: { index: false },
+    }),
+    PrismaModule,
+    AuthModule,
+    UserModule,
+    PostModule,
+    CategoryModule,
+    TagModule,
+    CommentModule,
+    MediaModule,
+    StatsModule,
+    WeatherModule,
+    AiPetModule,
+    AiModule,
+    SettingsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -5,6 +5,9 @@
 </template>
 
 <script setup lang="ts">
+const { init } = useTheme()
+onMounted(() => init())
+
 useHead({
   titleTemplate: (chunk) => {
     return chunk ? `${chunk} - 清欢小筑` : '清欢小筑'
