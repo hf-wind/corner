@@ -22,4 +22,4 @@ jobs:
               -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=10 \
               "${SSH_USER}@${SSH_HOST}" \
-              "cd ${APP_PATH} && git pull && docker compose up -d --build"
+              "cd ${APP_PATH} && git fetch origin && git reset --hard origin/main && docker compose up -d --build"
