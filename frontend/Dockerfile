@@ -1,10 +1,13 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=2048"
-RUN npx nuxt build
+RUN --mount=type=cache,target=/root/.npm \
+    --mount=type=cache,target=/app/.nuxt \
+    npx nuxt build
 
 FROM node:20-alpine
 WORKDIR /app

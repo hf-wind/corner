@@ -48,7 +48,7 @@
 
 <script setup lang="ts">
 import petMeta from '~/assets/dram/pet.json'
-import spriteUrl from '~/assets/dram/spritesheet.webp'
+const spriteUrl = '/dram/spritesheet.webp'
 
 type Role = 'user' | 'assistant'
 interface Msg { role: Role; content: string }
