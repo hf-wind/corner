@@ -78,12 +78,12 @@ function pad(n: number) { return n.toString().padStart(2, '0') }
   fill: var(--c-text);
   font-size: 26px;
   font-weight: 700;
-  font-family: 'LXGW WenKai', serif;
+  font-family: var(--font-heading);
 }
 .clock-date {
   fill: var(--c-text-2);
   font-size: 10px;
-  font-family: 'LXGW WenKai', serif;
+  font-family: var(--font-body);
 }
 .wc-weather {
   display: flex;

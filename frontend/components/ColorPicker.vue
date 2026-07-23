@@ -64,7 +64,7 @@ function onHexBlur() {
 .transparent-swatch.active { border-color:var(--border); box-shadow:0 0 0 2px var(--c-bg), 0 0 0 4px rgba(128,128,128,0.3); }
 .custom-row { display:flex; align-items:center; gap:8px; }
 .custom-preview { width:24px; height:24px; border-radius:6px; flex-shrink:0; border:1px solid; }
-.custom-input { flex:1; height:28px; border:1px solid var(--border); border-radius:6px; padding:0 8px; font-size:0.8rem; font-family:monospace; outline:none; background:var(--c-bg); color:var(--c-text); min-width:0; }
+.custom-input { flex:1; height:28px; border:1px solid var(--border); border-radius:6px; padding:0 8px; font-size:0.8rem; font-family:var(--font-mono); outline:none; background:var(--c-bg); color:var(--c-text); min-width:0; }
 .custom-input:focus { border-color:var(--c-primary); }
 .custom-hint { font-size:0.7rem; color:var(--c-text-4); white-space:nowrap; }
 </style>

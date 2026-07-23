@@ -10,6 +10,7 @@
   "cols": 8,
   "rows": 9,
   "idle": { "row": 0, "frames": 6, "fps": 6 },
+  "play": { "row": 2, "frames": 8, "fps": 8 },
   "greetings": [
     "欢迎来到阿风的博客～我是哆啦A梦！",
     "我是阿风的伙伴哆啦A梦，有什么想了解的尽管问我～",

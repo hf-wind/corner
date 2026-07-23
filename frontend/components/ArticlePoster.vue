@@ -152,7 +152,7 @@ onUnmounted(() => {
 .poster-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 12000;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -218,7 +218,7 @@ onUnmounted(() => {
   background: #0f1218;
   color: #f8fafc;
   box-shadow: 0 18px 40px color-mix(in srgb, #000 35%, transparent);
-  font-family: 'LXGW WenKai', serif;
+  font-family: var(--font-heading);
 }
 
 .poster-cover {
@@ -384,5 +384,41 @@ onUnmounted(() => {
 .poster-fade-leave-to .poster-panel {
   opacity: 0;
   transform: translateY(12px) scale(0.98);
+}
+
+@media (max-width: 640px) {
+  .poster-overlay {
+    align-items: start;
+    padding: max(12px, env(safe-area-inset-top)) 8px max(12px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
+  .poster-panel {
+    width: 100%;
+    max-height: none;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .poster-card {
+    width: min(320px, 100%);
+  }
+
+  .poster-cover {
+    height: clamp(132px, 45vw, 168px);
+  }
+
+  .poster-body {
+    padding: 4px 14px 14px;
+  }
+
+  .poster-title {
+    font-size: 1rem;
+  }
+
+  .poster-qr {
+    width: 62px;
+    height: 62px;
+  }
 }
 </style>

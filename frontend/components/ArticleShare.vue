@@ -115,7 +115,7 @@ onUnmounted(() => {
 .share-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 12000;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -295,5 +295,23 @@ onUnmounted(() => {
 .share-fade-leave-to .share-panel {
   opacity: 0;
   transform: translateY(12px) scale(0.98);
+}
+
+@media (max-width: 640px) {
+  .share-overlay {
+    align-items: start;
+    padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
+  .share-panel {
+    width: 100%;
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .share-card {
+    padding: 15px;
+  }
 }
 </style>

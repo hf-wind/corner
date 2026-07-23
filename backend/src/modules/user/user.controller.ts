@@ -11,14 +11,14 @@ export class UserController {
     return this.user.findAll();
   }
 
-  @Get(':id')
-  findById(@Param('id') id: string) {
-    return this.user.findById(id);
-  }
-
   @UseGuards(AuthGuard('jwt'))
   @Put('profile')
   update(@Req() req: any, @Body() data: { avatar?: string; bio?: string; username?: string }) {
     return this.user.update(req.user.id, data);
+  }
+
+  @Get(':id')
+  findById(@Param('id') id: string) {
+    return this.user.findById(id);
   }
 }

@@ -222,7 +222,7 @@ async function confirmAssign() {
 .assign-item.assigned { background:color-mix(in srgb, var(--c-primary) 6%, transparent); }
 .assign-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .assign-empty { text-align:center; padding:32px; font-size:0.85rem; color:var(--c-text-3); }
-.table-color-pill { display:inline-flex; align-items:center; gap:5px; font-size:0.75rem; font-family:monospace; color:var(--c-text-2); }
+.table-color-pill { display:inline-flex; align-items:center; gap:5px; font-size:0.75rem; font-family:var(--font-mono); color:var(--c-text-2); }
 .table-color-pill.table-color-none { color:var(--c-text-4); }
 .table-color-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
 .add-field { display:flex; align-items:center; gap:12px; margin-bottom:14px; }

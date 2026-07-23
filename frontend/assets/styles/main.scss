@@ -1,7 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@300;400;700&display=optional');
 
 :root {
   --hue-theme: 220deg;
+
+  --font-rounded: 'MiSans VF', 'MiSans', 'HarmonyOS Sans SC', 'OPPO Sans 4.0', 'OPPO Sans', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --font-system-rounded: ui-rounded, 'SF Pro Rounded', 'Segoe UI Variable', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --font-noto: 'Noto Sans SC', 'Source Han Sans SC', 'Source Han Sans CN', 'Microsoft YaHei', sans-serif;
+  --font-wenkai: 'LXGW WenKai', 'KaiTi', 'STKaiti', serif;
+  --font-mono-rounded: 'Maple Mono NF CN', 'Maple Mono SC NF', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  --font-mono-system: 'Cascadia Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --font-mono-modern: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+
+  --font-body: var(--font-rounded);
+  --font-heading: var(--font-rounded);
+  --font-mono: var(--font-mono-rounded);
+  --font-heading-weight: 650;
+  --font-letter-spacing: 0.01em;
+  --ui-scale: 0.9;
 
   --c-bg: hsl(var(--hue-theme) 0% 100%);
   --c-bg-1: hsl(var(--hue-theme) 20% 98%);
@@ -33,6 +48,38 @@
   --left-w: 240px;
   --right-w: 260px;
   --code-bg: hsl(var(--hue-theme) 20% 96%);
+}
+
+:root[data-font='rounded'] {
+  --font-body: var(--font-rounded);
+  --font-heading: var(--font-rounded);
+  --font-mono: var(--font-mono-rounded);
+  --font-heading-weight: 650;
+  --font-letter-spacing: 0.01em;
+}
+
+:root[data-font='system-rounded'] {
+  --font-body: var(--font-system-rounded);
+  --font-heading: var(--font-system-rounded);
+  --font-mono: var(--font-mono-system);
+  --font-heading-weight: 650;
+  --font-letter-spacing: 0.005em;
+}
+
+:root[data-font='noto'] {
+  --font-body: var(--font-noto);
+  --font-heading: var(--font-noto);
+  --font-mono: var(--font-mono-modern);
+  --font-heading-weight: 700;
+  --font-letter-spacing: 0;
+}
+
+:root[data-font='wenkai'] {
+  --font-body: var(--font-wenkai);
+  --font-heading: var(--font-wenkai);
+  --font-mono: var(--font-mono-modern);
+  --font-heading-weight: 700;
+  --font-letter-spacing: 0.015em;
 }
 
 .dark {
@@ -69,12 +116,118 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
-  font-family: 'LXGW WenKai', serif;
+  font-family: var(--font-body);
   background: var(--c-bg);
   color: var(--c-text);
   height: 100vh;
   overflow: hidden;
   transition: background 0.4s, color 0.4s;
+  letter-spacing: var(--font-letter-spacing);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-body);
+}
+
+:where(h1, h2, h3, h4, h5, h6, .site-title, .hero-name, .article-title, .card-title, .post-title, .login-title, .section-title) {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+}
+
+:where(code, pre, kbd, samp) {
+  font-family: var(--font-mono);
+  font-variant-ligatures: contextual;
+  letter-spacing: 0;
+}
+
+:where(pre, code) * {
+  font-family: inherit;
+}
+
+:where(.ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-dropdown, .ant-menu, .ant-modal, .ant-table, .ant-form, .ant-message, .ant-notification) {
+  font-family: var(--font-body) !important;
+}
+
+#__nuxt {
+  width: 100%;
+  height: 100%;
+}
+
+/* Desktop density: CSS zoom participates in layout, so text and hit areas stay sharp. */
+@supports (zoom: 1) {
+  body {
+    zoom: var(--ui-scale);
+    /* 111.11vh × 0.9 = 100vh; width must stay untouched to avoid right clipping. */
+    height: 111.111111vh;
+  }
+}
+
+@supports not (zoom: 1) {
+  html {
+    font-size: 90%;
+  }
+
+  :root {
+    --left-w: 216px;
+    --right-w: 234px;
+  }
+}
+
+@media (max-width: 900px) {
+  html,
+  body {
+    zoom: 1;
+    width: 100%;
+    height: 100dvh;
+    min-height: 100%;
+    overflow: hidden;
+  }
+
+  #__nuxt {
+    height: 100dvh;
+  }
+
+  .layout-page,
+  .layout-page .page-layout {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .layout-page .page-layout {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .layout-page .sidebar-right {
+    display: none !important;
+  }
+
+  .layout-page .main-content,
+  .layout-page .article-main {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: max(68px, calc(env(safe-area-inset-top) + 60px)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)) !important;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 420px) {
+  .layout-page .main-content,
+  .layout-page .article-main {
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+  }
 }
 html.no-transition, html.no-transition body {
   transition: none !important;

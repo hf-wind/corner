@@ -141,10 +141,10 @@ onUnmounted(() => {
 
 <style scoped>
 .welcome-page {
-  font-family: 'LXGW WenKai', serif;
+  font-family: var(--font-body);
   background: var(--c-bg);
   color: var(--c-text);
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -297,5 +297,71 @@ onUnmounted(() => {
 @keyframes blink {
   from, to { border-color: transparent; }
   50% { border-color: var(--c-primary); }
+}
+
+@media (max-width: 640px) {
+  .welcome-page {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  }
+
+  .welcome-container {
+    width: 100%;
+    gap: clamp(16px, 4vh, 24px);
+  }
+
+  .logo-ring {
+    width: 86px;
+    height: 86px;
+  }
+
+  .site-title {
+    font-size: clamp(1.85rem, 10vw, 2.3rem);
+    line-height: 1.2;
+  }
+
+  .slogan {
+    min-height: 2.9em;
+    max-width: 92vw;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .stats-row {
+    width: min(100%, 330px);
+    justify-content: space-around;
+    gap: 12px;
+    margin-top: 2px;
+  }
+
+  .stat-num {
+    font-size: 1.3rem;
+  }
+
+  .enter-btn {
+    margin-top: 6px;
+    padding: 11px 38px;
+  }
+
+  .theme-toggle {
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-height: 620px) and (max-width: 640px) {
+  .welcome-container {
+    gap: 12px;
+  }
+
+  .logo-ring {
+    width: 68px;
+    height: 68px;
+  }
+
+  .site-title {
+    font-size: 1.7rem;
+  }
 }
 </style>

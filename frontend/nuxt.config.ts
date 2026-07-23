@@ -1,7 +1,12 @@
 export default defineNuxtConfig({
   compatibilityDate: '2026-07-19',
   devtools: { enabled: false },
-  css: ['~/assets/styles/main.scss', 'ant-design-vue/dist/reset.css'],
+  css: [
+    'ant-design-vue/dist/reset.css',
+    'misans/lib/Normal/MiSans-Regular.min.css',
+    'misans/lib/Normal/MiSans-Semibold.min.css',
+    '~/assets/styles/main.scss',
+  ],
   modules: ['nuxt-icon'],
   runtimeConfig: {
     public: {
@@ -19,7 +24,7 @@ export default defineNuxtConfig({
       ],
       script: [
         {
-          innerHTML: '!function(){try{var d=document.documentElement;d.classList.add("no-transition");var t=localStorage.getItem("theme");if(t==="dark"||(t==="auto"&&window.matchMedia("(prefers-color-scheme:dark)").matches)){d.classList.add("dark");var l=document.querySelector("link[rel=icon]");if(l)l.href="/logo-dark.svg"}}catch(e){}}()',
+          innerHTML: '!function(){try{var d=document.documentElement;d.classList.add("no-transition");var f=localStorage.getItem("font-preset");d.dataset.font=f||"rounded";var t=localStorage.getItem("theme");if(t==="dark"||(t==="auto"&&window.matchMedia("(prefers-color-scheme:dark)").matches)){d.classList.add("dark");var l=document.querySelector("link[rel=icon]");if(l)l.href="/logo-dark.svg"}}catch(e){}}()',
           tagPosition: 'head',
         },
       ],

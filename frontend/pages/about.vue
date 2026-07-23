@@ -398,4 +398,39 @@ const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
   color: var(--c-primary);
   font-size: 0.7rem;
 }
+
+@media (max-width: 640px) {
+  .about-hero {
+    padding: 28px 16px;
+    margin-bottom: 20px;
+  }
+
+  .about-avatar {
+    width: 82px;
+    height: 82px;
+    margin-bottom: 16px;
+  }
+
+  .about-name {
+    font-size: 1.3rem;
+  }
+
+  .about-slogan {
+    font-size: 0.84rem;
+  }
+
+  .about-section {
+    padding: 20px 16px;
+    margin-bottom: 14px;
+  }
+
+  .skills-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .skill-item {
+    padding: 13px;
+  }
+}
 </style>

@@ -13,6 +13,7 @@ model User {
   passwordHash String   @map("password_hash") @db.Text
   avatar       String?
   bio          String?  @db.Text
+  role         String   @default("user") @db.VarChar(20)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   posts        Post[]
@@ -107,6 +108,7 @@ model Media {
   mimeType     String?  @map("mime_type") @db.VarChar(100)
   size         Int?
   path         String   @db.Text
+  originalPath String?  @map("original_path") @db.Text
   folder       String?  @db.VarChar(100)
   uploadedBy   String?  @map("uploaded_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
@@ -142,5 +144,6 @@ model ChatMessage {
   createdAt DateTime @default(now()) @map("created_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt])
   @@map("chat_messages")
 }

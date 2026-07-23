@@ -5,6 +5,14 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcryptjs';
 
+type AuthUser = {
+  id: string;
+  email: string;
+  username: string;
+  role: string;
+  avatar?: string | null;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -20,7 +28,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
-      data: { username: dto.username, email: dto.email, passwordHash },
+      data: { username: dto.username, email: dto.email, passwordHash, role: 'user' },
     });
 
     return this.token(user);
@@ -39,16 +47,30 @@ export class AuthService {
   async profile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, username: true, email: true, avatar: true, bio: true, createdAt: true },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        avatar: true,
+        bio: true,
+        role: true,
+        createdAt: true,
+      },
     });
     return user;
   }
 
-  private token(user: { id: string; email: string; username: string }) {
-    const payload = { sub: user.id, email: user.email };
+  private token(user: AuthUser) {
+    const payload = { sub: user.id, email: user.email, role: user.role };
     return {
       access_token: this.jwt.sign(payload),
-      user: { id: user.id, username: user.username, email: user.email },
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role || 'user',
+        avatar: user.avatar ?? null,
+      },
     };
   }
 }

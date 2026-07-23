@@ -63,7 +63,7 @@ onUnmounted(() => observer?.disconnect())
 }
 
 .article-md-wrap :deep(.md-editor-preview) {
-  font-family: inherit;
+  font-family: var(--font-body);
   font-size: 0.95rem;
   line-height: 1.9;
   color: var(--c-text);
@@ -78,6 +78,7 @@ onUnmounted(() => observer?.disconnect())
   scroll-margin-top: 24px;
   color: var(--c-text);
   font-weight: 700;
+  font-family: var(--font-heading);
 }
 
 .article-md-wrap :deep(.md-editor-preview a) {
@@ -98,6 +99,7 @@ onUnmounted(() => observer?.disconnect())
 
 .article-md-wrap :deep(.md-editor-preview pre),
 .article-md-wrap :deep(.md-editor-preview .md-editor-code) {
+  font-family: var(--font-mono);
   border-radius: 12px;
   box-shadow: 0 8px 22px var(--ld-shadow);
   border: none;
@@ -107,5 +109,63 @@ onUnmounted(() => observer?.disconnect())
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 22px var(--ld-shadow);
+}
+
+.article-md-wrap :deep(.md-editor-preview) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.article-md-wrap :deep(.md-editor-preview img),
+.article-md-wrap :deep(.md-editor-preview video),
+.article-md-wrap :deep(.md-editor-preview iframe) {
+  max-width: 100%;
+}
+
+.article-md-wrap :deep(.md-editor-preview pre),
+.article-md-wrap :deep(.md-editor-preview .md-editor-code) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.article-md-wrap :deep(.md-editor-preview table) {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 640px) {
+  .article-md-wrap :deep(.md-editor-preview) {
+    font-size: 0.9rem;
+    line-height: 1.8;
+  }
+
+  .article-md-wrap :deep(.md-editor-preview h1) {
+    font-size: 1.55rem;
+  }
+
+  .article-md-wrap :deep(.md-editor-preview h2) {
+    font-size: 1.3rem;
+  }
+
+  .article-md-wrap :deep(.md-editor-preview h3) {
+    font-size: 1.12rem;
+  }
+
+  .article-md-wrap :deep(.md-editor-preview blockquote) {
+    margin-right: 0;
+    margin-left: 0;
+    padding: 10px 12px;
+  }
+
+  .article-md-wrap :deep(.md-editor-preview pre),
+  .article-md-wrap :deep(.md-editor-preview .md-editor-code),
+  .article-md-wrap :deep(.md-editor-preview img),
+  .article-md-wrap :deep(.md-editor-preview table) {
+    border-radius: 10px;
+  }
 }
 </style>

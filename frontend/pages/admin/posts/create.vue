@@ -72,7 +72,7 @@
         <a-card :bordered="false" class="meta-card" size="small" title="封面图">
           <div class="cover-setter" @click="coverOpen = true">
             <div v-if="form.coverImage" class="cover-preview">
-              <img :src="form.coverImage" class="cover-img" />
+              <img :src="mediaUrl(form.coverImage)" class="cover-img" />
               <div class="cover-overlay">点击修改</div>
             </div>
             <div v-else class="cover-placeholder"><PictureOutlined /> 点击设置封面</div>
@@ -104,6 +104,7 @@ import { buildSlug, ensureSlug } from '~/utils/postMeta'
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const { mediaUrl } = useMediaUrl()
 const router = useRouter()
 const saving = ref(false)
 const generatingExcerpt = ref(false)
@@ -205,7 +206,7 @@ function coverConfirmUrl() {
 
 async function coverUpload() {
   const { open } = useMediaLibrary()
-  const urls = await open({ multiple: false })
+  const urls = await open({ multiple: false, folder: 'cover' })
   if (urls.length) { form.value.coverImage = urls[0]; coverOpen.value = false }
 }
 
@@ -215,6 +216,7 @@ async function onUploadImg(files: File[], callback: (urls: string[]) => void) {
     for (const file of files) {
       const fd = new FormData()
       fd.append('file', file)
+      fd.append('folder', 'article')
       const res = await api.upload<any>('/media/upload', fd)
       urls.push(res.path || '')
     }

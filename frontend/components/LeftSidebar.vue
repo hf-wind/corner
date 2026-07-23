@@ -1,26 +1,27 @@
 <template>
   <aside class="sidebar-left">
+    <div class="sidebar-scroll">
     <div class="hero">
       <svg class="hero-bg" viewBox="0 0 240 120" preserveAspectRatio="none">
         <defs>
-          <radialGradient id="glow1" cx="30%" cy="20%" r="60%">
+          <radialGradient :id="glowId1" cx="30%" cy="20%" r="60%">
             <stop offset="0%" stop-color="var(--c-primary)" stop-opacity="0.08" />
             <stop offset="100%" stop-color="var(--c-primary)" stop-opacity="0" />
           </radialGradient>
-          <radialGradient id="glow2" cx="70%" cy="40%" r="50%">
+          <radialGradient :id="glowId2" cx="70%" cy="40%" r="50%">
             <stop offset="0%" stop-color="var(--c-primary)" stop-opacity="0.05" />
             <stop offset="100%" stop-color="var(--c-primary)" stop-opacity="0" />
           </radialGradient>
         </defs>
-        <rect width="240" height="120" fill="url(#glow1)" />
-        <rect width="240" height="120" fill="url(#glow2)" />
+        <rect width="240" height="120" :fill="`url(#${glowId1})`" />
+        <rect width="240" height="120" :fill="`url(#${glowId2})`" />
       </svg>
       <div class="hero-content">
-        <NuxtLink to="/home" class="hero-row">
+        <NuxtLink :to="heroLink" class="hero-row">
           <div class="logo-wrap">
             <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                <linearGradient id="l-glow" x1=".5" y1=".5" x2="1" y2="1">
+                <linearGradient :id="logoGlowId" x1=".5" y1=".5" x2="1" y2="1">
                   <stop offset="0%" stop-color="currentColor" stop-opacity=".12" />
                   <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
                 </linearGradient>
@@ -30,58 +31,61 @@
                 <line x1="36" y1="38" x2="36" y2="76" stroke-width="4.5" />
                 <line x1="22" y1="76" x2="66" y2="76" stroke-width="1.5" opacity=".25" />
                 <line x1="66" y1="76" x2="66" y2="30" stroke-width="1.5" opacity=".15" />
-                <circle cx="51" cy="57" r="12" fill="url(#l-glow)" stroke="none" />
+                <circle cx="51" cy="57" r="12" :fill="`url(#${logoGlowId})`" stroke="none" />
                 <circle cx="51" cy="57" r="4.5" fill="currentColor" stroke="none" />
               </g>
             </svg>
           </div>
           <div class="hero-text">
-            <div class="hero-name">清欢小筑</div>
-            <div class="hero-slogan">此心安处，便是清欢</div>
+            <div class="hero-name">{{ heroTitle }}</div>
+            <div class="hero-slogan">{{ heroSlogan }}</div>
           </div>
         </NuxtLink>
       </div>
     </div>
 
-    <div class="search-box" @click="openSearch">
+    <div v-if="!isPanel" class="search-box" @click="openSearch">
       <input type="text" placeholder="搜索文章..." readonly>
       <Icon name="ph:magnifying-glass-bold" class="search-suffix" />
     </div>
 
     <nav class="nav-menu">
-      <NuxtLink to="/home" class="nav-item" active-class="active">
-        <Icon name="ph:house-bold" class="nav-icon" />首页
-      </NuxtLink>
-      <NuxtLink to="/archive" class="nav-item" active-class="active">
-        <Icon name="ph:archive-bold" class="nav-icon" />归档
-      </NuxtLink>
-      <NuxtLink to="/category" class="nav-item" active-class="active">
-        <Icon name="ph:folder-open-bold" class="nav-icon" />分类
-      </NuxtLink>
-      <NuxtLink to="/tags" class="nav-item" active-class="active">
-        <Icon name="ph:tag-bold" class="nav-icon" />标签
-      </NuxtLink>
-      <NuxtLink to="/friends" class="nav-item" active-class="active">
-        <Icon name="ph:handshake-bold" class="nav-icon" />友链
-      </NuxtLink>
-      <NuxtLink to="/about" class="nav-item" active-class="active">
-        <Icon name="ph:info-bold" class="nav-icon" />关于
+      <NuxtLink
+        v-for="item in navItems"
+        :key="item.to"
+        :to="item.to"
+        class="nav-item"
+        :class="{ active: isNavActive(item.to) }"
+      >
+        <Icon :name="item.icon" class="nav-icon" />{{ item.label }}
       </NuxtLink>
     </nav>
+    </div>
 
     <div class="sidebar-bottom">
       <div class="sidebar-divider"></div>
-      <NuxtLink v-if="!isLoggedIn" to="/login" class="login-link">
+      <div ref="playerSlotRef" class="sidebar-player-slot" />
+      <NuxtLink v-if="!isLoggedIn && !isPanel" to="/login" class="login-link">
         <Icon name="ph:sign-in-bold" /> 登录 / 注册
       </NuxtLink>
-      <div v-else class="user-entry">
-        <div class="avatar-wrapper">
-          <Icon name="ph:user-circle-fill" class="avatar-icon" />
+      <div v-else-if="isLoggedIn" class="user-card">
+        <div class="user-row">
+          <button type="button" class="user-main" @click="goPanel">
+            <div class="avatar-wrapper">
+              <img v-if="user?.avatar" :src="avatarSrc" alt="" class="avatar-img">
+              <Icon v-else name="ph:user-circle-fill" class="avatar-icon" />
+            </div>
+            <span class="user-name">{{ user?.username ?? '用户' }}</span>
+            <span v-if="isUserAdmin" class="user-badge">管</span>
+          </button>
+          <button type="button" class="user-logout" title="退出登录" @click="handleLogout">
+            <Icon name="ph:sign-out-bold" />
+          </button>
         </div>
-        <div class="user-info">
-          <span class="user-name">{{ user?.username ?? '用户' }}</span>
-          <span class="user-desc" @click="handleLogout">退出登录</span>
-        </div>
+        <NuxtLink v-if="isPanel" to="/home" class="user-back">
+          <Icon name="ph:arrow-left-bold" />
+          <span>返回前台</span>
+        </NuxtLink>
       </div>
       <div class="theme-pill">
         <button :class="{ active: theme === 'light' }" @click="setTheme('light')" title="亮色">
@@ -94,34 +98,146 @@
           <Icon name="ph:monitor-bold" />
         </button>
       </div>
+      <div v-if="!isPanel" class="font-pill" role="group" aria-label="全局字体">
+        <button
+          v-for="option in fontPresets"
+          :key="option.id"
+          type="button"
+          :class="{ active: fontPreset === option.id }"
+          :title="option.label"
+          :aria-label="option.label"
+          @click="setFontPreset(option.id)"
+        >
+          {{ option.short }}
+        </button>
+      </div>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
+const props = withDefaults(defineProps<{
+  variant?: 'site' | 'admin'
+}>(), {
+  variant: 'site',
+})
+
 const emit = defineEmits<{ openSearch: [] }>()
 const { theme, setTheme } = useTheme()
+const { fontPreset, fontPresets, setFontPreset } = useTypography()
+const { registerSlot, unregisterSlot } = useMusicPlayerSlot()
+const {
+  user,
+  isLoggedIn,
+  isAdmin: isUserAdmin,
+  readStorage,
+  refreshProfile,
+  clearSession,
+  panelHome,
+} = useAuth()
+const { mediaUrl } = useMediaUrl()
+const route = useRoute()
 const router = useRouter()
 
-const isLoggedIn = computed(() => import.meta.client && !!localStorage.getItem('token'))
-const user = computed(() => {
-  if (!import.meta.client) return null
-  try {
-    return JSON.parse(localStorage.getItem('user') ?? 'null') as { username: string } | null
-  } catch {
-    return null
+const isPanel = computed(() => props.variant === 'admin')
+const avatarSrc = computed(() => mediaUrl(user.value?.avatar))
+const playerSlotRef = ref<HTMLElement | null>(null)
+let registeredSlot: HTMLElement | null = null
+const uid = useId()
+const glowId1 = `glow1-${uid}`
+const glowId2 = `glow2-${uid}`
+const logoGlowId = `l-glow-${uid}`
+
+watch(playerSlotRef, (el) => {
+  if (registeredSlot && registeredSlot !== el) unregisterSlot(registeredSlot)
+  registeredSlot = el
+  if (el) registerSlot(el)
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  if (registeredSlot) {
+    unregisterSlot(registeredSlot)
+    registeredSlot = null
   }
 })
+
+const siteNav = [
+  { to: '/home', icon: 'ph:house-bold', label: '首页' },
+  { to: '/archive', icon: 'ph:archive-bold', label: '归档' },
+  { to: '/category', icon: 'ph:folder-open-bold', label: '分类' },
+  { to: '/tags', icon: 'ph:tag-bold', label: '标签' },
+  { to: '/friends', icon: 'ph:handshake-bold', label: '友链' },
+  { to: '/about', icon: 'ph:info-bold', label: '关于' },
+]
+
+const adminFullNav = [
+  { to: '/admin', icon: 'ph:gauge-bold', label: '仪表盘' },
+  { to: '/admin/posts', icon: 'ph:article-bold', label: '文章' },
+  { to: '/admin/categories', icon: 'ph:folder-open-bold', label: '分类' },
+  { to: '/admin/tags', icon: 'ph:tag-bold', label: '标签' },
+  { to: '/admin/comments', icon: 'ph:chat-circle-dots-bold', label: '评论' },
+  { to: '/admin/media', icon: 'ph:image-bold', label: '文件' },
+  { to: '/admin/friends', icon: 'ph:handshake-bold', label: '友链' },
+  { to: '/admin/ai', icon: 'ph:robot-bold', label: 'AI' },
+  { to: '/admin/settings', icon: 'ph:gear-bold', label: '设置' },
+  { to: '/admin/info', icon: 'ph:info-bold', label: '系统信息' },
+  { to: '/admin/profile', icon: 'ph:user-bold', label: '我的信息' },
+  { to: '/admin/messages', icon: 'ph:bell-bold', label: '我的消息' },
+]
+
+const userPanelNav = [
+  { to: '/admin/profile', icon: 'ph:user-bold', label: '我的信息' },
+  { to: '/admin/messages', icon: 'ph:bell-bold', label: '我的消息' },
+]
+
+const navItems = computed(() => {
+  if (!isPanel.value) return siteNav
+  return isUserAdmin.value ? adminFullNav : userPanelNav
+})
+
+const heroLink = computed(() => {
+  if (!isPanel.value) return '/home'
+  return panelHome()
+})
+
+const heroTitle = computed(() => {
+  if (!isPanel.value) return '清欢小筑'
+  return isUserAdmin.value ? '管理后台' : '个人中心'
+})
+
+const heroSlogan = computed(() => {
+  if (!isPanel.value) return '此心安处，便是清欢'
+  return isUserAdmin.value ? '清欢小筑 · 内容管理' : '管理账号与消息'
+})
+
+function isNavActive(to: string) {
+  if (isPanel.value) {
+    if (to === '/admin') return route.path === '/admin'
+    return route.path === to || route.path.startsWith(`${to}/`)
+  }
+  return route.path === to || route.path.startsWith(`${to}/`)
+}
 
 function openSearch() {
   emit('openSearch')
 }
 
+function goPanel() {
+  router.push(panelHome())
+}
+
 function handleLogout() {
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
+  clearSession()
   router.push('/home')
 }
+
+onMounted(() => {
+  readStorage()
+  if (isLoggedIn.value) refreshProfile()
+})
+watch(() => route.fullPath, () => {
+  readStorage()
+})
 </script>
 
 <style scoped>
@@ -131,8 +247,29 @@ function handleLogout() {
   display: flex;
   flex-direction: column;
   padding: 24px 16px 16px;
+  overflow: visible;
+  min-height: 0;
+  height: 100%;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-right: 2px;
+}
+
+.sidebar-player-slot {
+  position: relative;
+  z-index: 50;
+  overflow: visible;
+  width: 100%;
+  min-height: 0;
+}
+
+.sidebar-player-slot:empty {
+  display: none;
 }
 
 /* ===== Hero ===== */
@@ -282,11 +419,13 @@ function handleLogout() {
 
 /* ===== Bottom ===== */
 .sidebar-bottom {
-  margin-top: auto;
+  flex-shrink: 0;
+  margin-top: 8px;
   padding-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow: visible;
 }
 
 .sidebar-divider {
@@ -301,67 +440,146 @@ function handleLogout() {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 10px;
-  border-radius: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
   color: var(--c-text-2);
   font-size: 0.8rem;
   text-decoration: none;
+  background: var(--c-bg-2);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   transition: all 0.15s;
 }
 
 .login-link:hover {
-  color: var(--c-text);
-  background: var(--c-bg-2);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  border-color: transparent;
 }
 
-.user-entry {
+.user-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--c-bg-2);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.user-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.user-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  border: none;
   border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.user-main:hover {
+  background: color-mix(in srgb, var(--ld-bg-card) 70%, transparent);
 }
 
 .avatar-wrapper {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--c-bg-2);
+  background: color-mix(in srgb, var(--c-primary-soft) 80%, var(--ld-bg-card));
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar-icon {
   font-size: 1.1rem;
-  color: var(--c-text-3);
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  color: var(--c-primary);
 }
 
 .user-name {
-  font-size: 0.82rem;
-  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.84rem;
+  font-weight: 650;
   color: var(--c-text);
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.user-desc {
-  font-size: 0.62rem;
-  color: var(--c-text-3);
-  line-height: 1.3;
-  margin-top: 1px;
-  cursor: pointer;
-  transition: color 0.15s;
-}
-
-.user-desc:hover {
+.user-badge {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  font-size: 0.58rem;
+  font-weight: 700;
   color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.user-logout {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-text-3);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.user-logout:hover {
+  color: color-mix(in srgb, #ef4444 70%, var(--c-text-2));
+  background: color-mix(in srgb, #ef4444 8%, transparent);
+}
+
+.user-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  text-decoration: none;
+  color: var(--c-text-2);
+  background: color-mix(in srgb, var(--ld-bg-card) 70%, transparent);
+  transition: all 0.15s;
+}
+
+.user-back:hover {
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
 }
 
 .theme-pill {
@@ -394,6 +612,44 @@ function handleLogout() {
 .theme-pill button.active {
   background: var(--ld-bg-card);
   color: var(--c-text);
+  box-shadow: 0.1em 0.2em 0.5em var(--ld-shadow);
+}
+
+.font-pill {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  width: fit-content;
+  margin: -3px auto 0;
+  background: var(--c-bg-2);
+  border-radius: 1.2rem;
+}
+
+.font-pill button {
+  width: 30px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 1rem;
+  background: transparent;
+  color: var(--c-text-3);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.font-pill button:hover {
+  color: var(--c-text);
+}
+
+.font-pill button.active {
+  background: var(--ld-bg-card);
+  color: var(--c-primary);
+  font-weight: 700;
   box-shadow: 0.1em 0.2em 0.5em var(--ld-shadow);
 }
 </style>

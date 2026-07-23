@@ -230,8 +230,9 @@ let resizeTimer: ReturnType<typeof setTimeout>
 function onResize() {
   clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
+    const scale = Number.parseFloat(getComputedStyle(document.body).getPropertyValue('zoom')) || 1
     windowSize.width = window.innerWidth
-    windowSize.height = window.innerHeight
+    windowSize.height = window.innerHeight / scale
   }, 100)
 }
 
@@ -267,7 +268,7 @@ onUnmounted(() => {
   position: fixed;
   transform-origin: center center;
   transform: translate(-50%, -50%) rotate(0);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
   font-size: 15px !important;
   box-sizing: border-box;
 }
@@ -336,19 +337,17 @@ onUnmounted(() => {
   border: 1px solid var(--fp-widget-border);
   border-radius: 100px;
   background-color: var(--fp-widget-bg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   color: var(--fp-widget-fg);
   box-shadow: 2px 2px 8px var(--fp-widget-shadow);
   user-select: none;
   touch-action: none;
   max-width: 150px;
   transition:
-    all 0.6s ease,
     max-width 0.6s ease,
     padding 0.5s ease,
     transform 0.4s ease,
-    opacity 0.2s ease;
+    opacity 0.2s ease,
+    border-radius 0.4s ease;
 }
 
 /* hide / minimized — exact Nuxt */
@@ -394,17 +393,31 @@ onUnmounted(() => {
   width: 160px;
   height: 160px;
   opacity: 0;
-  transition: all 1s ease;
+  transition: opacity 1s ease;
   pointer-events: none;
   z-index: -1;
   border-radius: 9999px;
-  background-image: linear-gradient(
-    45deg,
-    var(--c-primary),
-    var(--c-primary),
-    var(--c-primary)
-  );
-  filter: blur(60px);
+  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 35%, transparent), transparent 65%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #fp-pagination-anchor .fp-panel,
+  #fp-pagination-anchor .fp-panel-content,
+  #fp-pagination-anchor .fp-icon-button,
+  #fp-pagination-anchor .fp-glowing {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  #fp-pagination-anchor {
+    font-size: 14px !important;
+    transform: translate(-50%, calc(-50% - env(safe-area-inset-bottom))) rotate(0);
+  }
+
+  #fp-pagination-anchor .fp-panel {
+    box-shadow: 0 6px 20px var(--fp-widget-shadow);
+  }
 }
 
 @media print {

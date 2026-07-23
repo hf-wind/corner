@@ -16,13 +16,18 @@ import { WeatherModule } from './modules/weather/weather.module';
 import { AiPetModule } from './modules/ai-pet/ai-pet.module';
 import { AiModule } from './modules/ai/ai.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { MusicModule } from './modules/music/music.module';
 
 @Module({
   imports: [
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
-      serveStaticOptions: { index: false },
+      serveStaticOptions: {
+        index: false,
+        maxAge: '1y',
+        immutable: true,
+      },
     }),
     PrismaModule,
     AuthModule,
@@ -37,6 +42,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     AiPetModule,
     AiModule,
     SettingsModule,
+    MusicModule,
   ],
   controllers: [AppController],
   providers: [AppService],

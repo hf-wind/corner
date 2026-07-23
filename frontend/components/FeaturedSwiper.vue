@@ -6,7 +6,15 @@
       <NuxtLink v-for="(item, i) in featured" :key="item.slug" :to="'/article/' + item.slug" class="swiper-card-3d"
         :class="{ ...slideClasses(i), hovered: hoveredIndex === i }"
         @pointerenter="onPointerEnter(i)" @pointerleave="onPointerLeave">
-        <img :src="item.cover" :alt="item.title" loading="lazy">
+        <img
+          :src="coverUrl(item.cover)"
+          :alt="item.title"
+          :loading="i < 3 ? 'eager' : 'lazy'"
+          :fetchpriority="i === currentIndex ? 'high' : 'low'"
+          decoding="async"
+          width="480"
+          height="320"
+        >
         <div class="swiper-overlay">
           <span v-if="i === currentIndex" class="feat-badge">精选</span>
           <h3>{{ item.title }}</h3>
@@ -23,6 +31,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { getDisplayImageUrl } from '~/utils/imagePerformance'
 
 const props = withDefaults(defineProps<{ ready?: boolean }>(), { ready: true })
 const api = useApi()
@@ -38,6 +47,11 @@ const initialized = ref(false)
 const hoveredIndex = ref(-1)
 let autoTimer: ReturnType<typeof setInterval>
 let hoverTimer: ReturnType<typeof setTimeout>
+let pointerInside = false
+
+function coverUrl(source: string) {
+  return getDisplayImageUrl(source, 480, 320)
+}
 
 const trackOffset = computed(() => {
   if (!swiperRef.value) return 0
@@ -75,13 +89,15 @@ function nextSlide() {
 }
 
 function pauseTimer() {
+  pointerInside = true
   clearInterval(autoTimer)
 }
 
 function restartTimer() {
+  pointerInside = false
   if (!initialized.value) return
   clearInterval(autoTimer)
-  if (featured.value.length > 2) autoTimer = setInterval(nextSlide, 3000)
+  startAutoScroll()
 }
 
 function onPointerEnter(i: number) {
@@ -95,14 +111,26 @@ function onPointerLeave() {
 }
 
 function startAutoScroll() {
-  if (featured.value.length > 2) autoTimer = setInterval(nextSlide, 3000)
+  if (
+    featured.value.length > 2
+    && !pointerInside
+    && !document.hidden
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    autoTimer = setInterval(nextSlide, 3000)
+  }
+}
+
+function onVisibilityChange() {
+  clearInterval(autoTimer)
+  if (!document.hidden) startAutoScroll()
 }
 
 function tryInit() {
   if (props.ready && !loading.value && !initialized.value) {
     initialized.value = true
     nextTick(() => {
-      recalcWidth()
+      updateCardWidth()
       if (featured.value.length >= 3) currentIndex.value = 1
       mounted.value = true
       startAutoScroll()
@@ -112,13 +140,19 @@ function tryInit() {
 }
 
 let resizeTimer: ReturnType<typeof setTimeout>
+function updateCardWidth() {
+  if (!swiperRef.value) return
+  const containerWidth = swiperRef.value.clientWidth
+  if (window.matchMedia('(max-width: 640px)').matches) {
+    cardWidth.value = Math.min(420, Math.max(240, containerWidth - 32))
+    return
+  }
+  cardWidth.value = Math.max(180, (containerWidth - 48) / 3)
+}
+
 function recalcWidth() {
   clearTimeout(resizeTimer)
-  resizeTimer = setTimeout(() => {
-    if (!swiperRef.value) return
-    cardWidth.value = (swiperRef.value.clientWidth - 48) / 3
-    if (cardWidth.value < 180) cardWidth.value = 180
-  }, 100)
+  resizeTimer = setTimeout(updateCardWidth, 100)
 }
 
 async function fetchFeatured() {
@@ -138,12 +172,16 @@ async function fetchFeatured() {
 watch(() => props.ready, tryInit)
 
 onMounted(() => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
   fetchFeatured()
 })
 
 onUnmounted(() => {
   clearInterval(autoTimer)
+  clearTimeout(hoverTimer)
+  clearTimeout(resizeTimer)
   window.removeEventListener('resize', recalcWidth)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 
@@ -192,19 +230,15 @@ onUnmounted(() => {
   background: var(--c-bg-2);
   transform-origin: center center;
   transform: scale(0.7);
-  filter: brightness(0.5) saturate(0.5) blur(0.5px);
   opacity: 0.4;
   transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
-    filter 0.5s ease,
-    opacity 0.5s ease,
-    box-shadow 0.5s ease;
+    opacity 0.5s ease;
 }
 
 .swiper-card-3d.prev,
 .swiper-card-3d.next {
   z-index: 2;
   transform: scale(0.86);
-  filter: brightness(0.78) saturate(0.75);
   opacity: 0.85;
 }
 
@@ -219,7 +253,6 @@ onUnmounted(() => {
 .swiper-card-3d.active {
   z-index: 3;
   transform: scale(1);
-  filter: brightness(1) saturate(1);
   opacity: 1;
   box-shadow: 0 12px 40px color-mix(in srgb, var(--c-primary) 22%, transparent);
 }
@@ -227,7 +260,6 @@ onUnmounted(() => {
 .swiper-card-3d.hovered {
   z-index: 4;
   transform: scale(1.02);
-  filter: brightness(1.1);
 }
 
 .swiper-card-3d.hovered.active {
@@ -250,11 +282,10 @@ onUnmounted(() => {
   flex-direction: column;
   justify-content: flex-end;
   color: #fff;
-  transition: background 0.4s ease;
 }
 
 .swiper-card-3d.active .swiper-overlay {
-  background: linear-gradient(transparent 30%, rgba(0, 0, 0, 0.8) 85%);
+  background: linear-gradient(transparent 35%, rgba(0, 0, 0, 0.75) 88%);
 }
 
 .swiper-overlay h3 {
@@ -277,9 +308,7 @@ onUnmounted(() => {
   font-size: 0.58rem;
   padding: 2px 10px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(20, 20, 20, 0.42);
   color: #fff;
   letter-spacing: 0.06em;
   font-weight: 500;
@@ -314,5 +343,60 @@ onUnmounted(() => {
   border-radius: 4px;
   background: var(--c-primary);
   box-shadow: 0 0 10px color-mix(in srgb, var(--c-primary) 40%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swiper-3d-wrap,
+  .swiper-3d-track,
+  .swiper-card-3d,
+  .feat-badge,
+  .dot {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .swiper-3d-wrap {
+    padding: 4px 0 24px;
+    perspective: none;
+  }
+
+  .swiper-3d-wrap .section-title {
+    margin-bottom: 10px;
+  }
+
+  .swiper-3d-track {
+    gap: 16px;
+    transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .swiper-card-3d,
+  .swiper-card-3d.prev,
+  .swiper-card-3d.next {
+    transform: scale(0.94);
+    opacity: 0.56;
+  }
+
+  .swiper-card-3d.active,
+  .swiper-card-3d.hovered,
+  .swiper-card-3d.hovered.active {
+    transform: scale(1);
+  }
+
+  .swiper-card-3d img {
+    height: 148px;
+  }
+
+  .swiper-overlay {
+    padding: 13px;
+  }
+
+  .swiper-overlay h3 {
+    font-size: 0.86rem;
+  }
+
+  .swiper-dots {
+    margin-top: 9px;
+  }
 }
 </style>

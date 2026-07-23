@@ -7,7 +7,7 @@
       </NuxtLink>
 
       <div class="post-header" :class="{ 'has-cover': article.hero }">
-        <img v-if="article.hero" :src="article.hero" class="post-cover" :alt="article.title" />
+        <img v-if="article.hero" :src="coverUrl(article.hero)" class="post-cover" :alt="article.title" />
 
         <div class="post-nav">
           <div class="operations">
@@ -128,6 +128,12 @@
 <script setup lang="ts">
 import type { Comment } from '~/types/article'
 import avatarImg from '~/assets/images/avatar.jpg'
+import { getDisplayImageUrl } from '~/utils/imagePerformance'
+
+function coverUrl(source: string) {
+  return getDisplayImageUrl(source, 800, 300)
+}
+
 const api = useApi()
 const route = useRoute()
 const slug = route.params.slug as string
@@ -610,5 +616,69 @@ onMounted(() => {
 .surround-link.no-link:hover {
   transform: none;
   box-shadow: 0 6px 18px var(--ld-shadow);
+}
+
+@media (max-width: 640px) {
+  .back-btn {
+    margin-bottom: 14px;
+  }
+
+  .post-header {
+    margin-bottom: 18px;
+  }
+
+  .post-cover {
+    max-height: 240px;
+    margin-bottom: 15px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px var(--ld-shadow);
+  }
+
+  .operations {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .z-btn {
+    padding: 6px 9px;
+  }
+
+  .post-info {
+    gap: 8px 10px;
+    line-height: 1.5;
+  }
+
+  .post-title {
+    font-size: clamp(1.25rem, 6vw, 1.5rem);
+    line-height: 1.45;
+  }
+
+  .md-excerpt {
+    padding: 12px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+  }
+
+  .article-shell {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .post-footer {
+    margin-top: 24px;
+    padding: 15px;
+    border-radius: 13px;
+  }
+
+  .surround-post {
+    flex-direction: column;
+    gap: 9px;
+    margin-top: 18px;
+  }
+
+  .surround-link {
+    width: 100%;
+    padding: 12px;
+  }
 }
 </style>

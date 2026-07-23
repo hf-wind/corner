@@ -108,5 +108,42 @@ function showApply() {
 .friend-stats-list { display: flex; flex-direction: column; gap: 10px; }
 .friend-stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--c-text); }
 .apply-notice { font-size: 0.78rem; color: var(--c-text-2); line-height: 1.7; }
-.apply-format { background: var(--c-bg-1); padding: 8px; border-radius: 6px; font-family: monospace; font-size: 0.72rem; margin-top: 6px; color: var(--c-text); }
+.apply-format { background: var(--c-bg-1); padding: 8px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.72rem; margin-top: 6px; color: var(--c-text); }
+
+@media (max-width: 640px) {
+  .friends-hero {
+    padding: 24px 16px;
+    margin-bottom: 22px;
+  }
+
+  .friends-hero h2 {
+    font-size: 1.15rem;
+  }
+
+  .friends-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .friend-card {
+    padding: 16px 10px;
+  }
+
+  .friend-avatar {
+    width: 54px;
+    height: 54px;
+    margin-bottom: 9px;
+  }
+
+  .friend-name {
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .friends-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

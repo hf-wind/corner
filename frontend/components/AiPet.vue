@@ -6,8 +6,8 @@
           <div class="pet-chat-title">
             <span class="pet-dot" />
             <div>
-              <strong>{{ meta.displayName }}</strong>
-              <p>{{ meta.description }}</p>
+              <strong>{{ displayName }}</strong>
+              <p>{{ description }}</p>
             </div>
           </div>
           <button type="button" class="pet-icon-btn" aria-label="关闭" @click="chatOpen = false">
@@ -36,9 +36,9 @@
       </div>
     </Transition>
 
-    <button type="button" class="pet-fab" :title="chatOpen ? '收起' : '和哆啦A梦聊天'" @click="toggleChat">
+    <button type="button" class="pet-fab" :class="{ 'is-music': musicPlaying }" :title="chatOpen ? '收起' : '和哆啦A梦聊天'" @click="toggleChat">
       <span class="pet-sprite-wrap" :style="wrapStyle">
-        <span class="pet-sprite-img" :style="spriteStyle" />
+        <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
       </span>
       <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
       <span v-if="showLoginBubble" class="pet-hint pet-hint-login">登录后就能和我聊天啦～</span>
@@ -53,6 +53,8 @@ const spriteUrl = '/dram/spritesheet.webp'
 type Role = 'user' | 'assistant'
 interface Msg { role: Role; content: string }
 
+type AnimClip = { row: number; frames: number; fps: number }
+
 const meta = petMeta as {
   displayName: string
   description: string
@@ -62,11 +64,13 @@ const meta = petMeta as {
   displayHeight: number
   cols: number
   rows: number
-  idle: { row: number; frames: number; fps: number }
+  idle: AnimClip
+  play?: AnimClip
   greetings: string[]
 }
 
 const api = useApi()
+const { playing: musicPlaying } = useMusicPlayerState()
 const chatOpen = ref(false)
 const sending = ref(false)
 const input = ref('')
@@ -74,62 +78,88 @@ const messages = ref<Msg[]>([])
 const listRef = ref<HTMLElement | null>(null)
 const showHint = ref(true)
 const showLoginBubble = ref(false)
-const frame = ref(0)
+
+const displayName = ref(meta.displayName || '哆啦A梦')
+const description = ref(meta.description || '阿风的伙伴 · 蓝色机器猫')
+const greetings = ref<string[]>([...(meta.greetings || [])])
 
 const isLoggedIn = computed(() => import.meta.client && !!localStorage.getItem('token'))
-const hintText = computed(() => meta.greetings[0] || '你好呀～')
+const hintText = computed(() => greetings.value[0] || '你好呀～')
 
-const fw = meta.frameWidth || 192
-const fh = meta.frameHeight || 208
+async function loadPetMeta() {
+  try {
+    const res = await api.get<{
+      displayName?: string
+      description?: string
+      greetings?: string[]
+    }>('/ai/pet/meta')
+    if (res?.displayName) displayName.value = res.displayName
+    if (res?.description) description.value = res.description
+    if (Array.isArray(res?.greetings) && res.greetings.length) {
+      greetings.value = res.greetings
+    }
+  } catch {
+    // keep local pet.json defaults
+  }
+}
+
 const dw = meta.displayWidth || 96
 const dh = meta.displayHeight || 104
 const bgCols = meta.cols || 8
 const bgRows = meta.rows || 9
-const totalFrames = meta.idle?.frames || 6
-const idleRow = meta.idle?.row || 0
+
+const idleClip: AnimClip = {
+  row: meta.idle?.row ?? 0,
+  frames: meta.idle?.frames ?? 6,
+  fps: meta.idle?.fps ?? 6,
+}
+const playClip: AnimClip = {
+  row: meta.play?.row ?? 2,
+  frames: meta.play?.frames ?? 8,
+  fps: meta.play?.fps ?? 8,
+}
+
+const activeClip = computed(() => (musicPlaying.value ? playClip : idleClip))
+const animKey = computed(() => `${activeClip.value.row}-${activeClip.value.frames}-${activeClip.value.fps}`)
 
 const wrapStyle = { width: `${dw}px`, height: `${dh}px` }
 
 const spriteStyle = computed(() => {
-  const phase = frame.value % totalFrames
+  const clip = activeClip.value
+  const frames = Math.max(1, clip.frames)
+  const fps = Math.max(1, clip.fps)
+  const row = Math.max(0, clip.row)
   return {
+    '--pet-frame-shift': `${-frames * dw}px`,
+    '--pet-duration': `${frames / fps}s`,
+    '--pet-steps': String(frames),
     backgroundImage: `url(${spriteUrl})`,
     backgroundRepeat: 'no-repeat',
-    backgroundPosition: `${-phase * dw}px ${-idleRow * dh}px`,
+    backgroundPosition: '0 0',
     backgroundSize: `${bgCols * dw}px ${bgRows * dh}px`,
-    width: `${dw}px`,
-    height: `${dh}px`,
+    width: `${bgCols * dw}px`,
+    height: `${bgRows * dh}px`,
+    top: `${-row * dh}px`,
   }
 })
 
-let timer: ReturnType<typeof setInterval> | null = null
-
-function startAnim() {
-  stopAnim()
-  const fps = meta.idle?.fps || 4
-  timer = setInterval(() => {
-    frame.value = (frame.value + 1) % totalFrames
-  }, 1000 / fps)
-}
-
-function stopAnim() {
-  if (timer) clearInterval(timer)
-  timer = null
-}
+let hintTimer: ReturnType<typeof setTimeout> | null = null
+let loginBubbleTimer: ReturnType<typeof setTimeout> | null = null
 
 async function toggleChat() {
   showHint.value = false
   if (!isLoggedIn.value) {
     showLoginBubble.value = true
-    setTimeout(() => { showLoginBubble.value = false }, 3000)
+    if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
+    loginBubbleTimer = setTimeout(() => { showLoginBubble.value = false }, 3000)
     return
   }
   chatOpen.value = !chatOpen.value
   if (chatOpen.value) {
     await loadHistory()
     if (messages.value.length === 0) {
-      const greetings = meta.greetings || []
-      const g = greetings[Math.floor(Math.random() * greetings.length)] || '你好，我是哆啦A梦！'
+      const list = greetings.value.length ? greetings.value : ['你好，我是哆啦A梦！']
+      const g = list[Math.floor(Math.random() * list.length)]
       messages.value.push({ role: 'assistant', content: g })
     }
     await nextTick(scrollBottom)
@@ -175,20 +205,14 @@ function scrollBottom() {
   if (el) el.scrollTop = el.scrollHeight
 }
 
-function onVisibilityChange() {
-  if (document.hidden) stopAnim()
-  else startAnim()
-}
-
 onMounted(() => {
-  startAnim()
-  setTimeout(() => { showHint.value = false }, 8000)
-  document.addEventListener('visibilitychange', onVisibilityChange)
+  loadPetMeta()
+  hintTimer = setTimeout(() => { showHint.value = false }, 8000)
 })
 
 onUnmounted(() => {
-  stopAnim()
-  document.removeEventListener('visibilitychange', onVisibilityChange)
+  if (hintTimer) clearTimeout(hintTimer)
+  if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
 })
 </script>
 
@@ -215,10 +239,22 @@ onUnmounted(() => {
   background: transparent;
   padding: 0;
   cursor: pointer;
-  filter: drop-shadow(0 10px 18px color-mix(in srgb, var(--c-primary) 25%, transparent));
   transition: transform 0.2s ease;
   animation: pet-bob 2.8s ease-in-out infinite;
   will-change: transform;
+}
+
+.pet-fab::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 22%;
+  right: 22%;
+  bottom: 3px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-primary) 18%, transparent);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--c-primary) 16%, transparent);
 }
 
 .pet-fab:hover {
@@ -228,14 +264,20 @@ onUnmounted(() => {
 
 .pet-sprite-wrap {
   display: block;
+  position: relative;
   border-radius: 28px;
   overflow: hidden;
   user-select: none;
   flex-shrink: 0;
+  contain: strict;
 }
 
 .pet-sprite-img {
   display: block;
+  position: absolute;
+  left: 0;
+  will-change: transform;
+  animation: pet-frames var(--pet-duration) steps(var(--pet-steps)) infinite;
 }
 
 .pet-hint {
@@ -452,6 +494,12 @@ onUnmounted(() => {
   }
 }
 
+@keyframes pet-frames {
+  to {
+    transform: translate3d(var(--pet-frame-shift), 0, 0);
+  }
+}
+
 @keyframes hint-in {
   from {
     opacity: 0;
@@ -487,12 +535,35 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .ai-pet {
-    right: 14px;
-    bottom: 14px;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
   }
 
   .pet-hint {
     display: none;
+  }
+
+  .pet-fab {
+    scale: 0.86;
+    transform-origin: right bottom;
+  }
+
+  .pet-chat {
+    width: min(320px, calc(100vw - 24px));
+    height: min(420px, calc(100dvh - 96px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-fab,
+  .pet-sprite-img,
+  .pet-bubble.typing span {
+    animation: none !important;
+  }
+
+  .pet-panel-enter-active,
+  .pet-panel-leave-active {
+    transition: none;
   }
 }
 </style>

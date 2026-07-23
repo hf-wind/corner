@@ -80,7 +80,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.search-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.4); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; backdrop-filter: blur(2px); }
+.search-overlay { position: fixed; inset: 0; z-index: 12000; background: rgba(0,0,0,0.4); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; backdrop-filter: blur(2px); }
 .search-panel { width: min(580px, 90vw); background: var(--ld-bg-card); border-radius: 14px; box-shadow: 0 8px 40px var(--ld-shadow), 0 0 0 1px var(--border); overflow: hidden; animation: slide-down 0.2s ease-out; }
 @keyframes slide-down { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
 .search-input-wrap { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
@@ -98,4 +98,29 @@ onUnmounted(() => {
 .search-row-title { font-size: 0.85rem; font-weight: 700; color: var(--c-text); line-height: 1.4; margin-bottom: 2px; }
 .search-row-desc { font-size: 0.75rem; color: var(--c-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-empty { padding: 28px 18px; text-align: center; font-size: 0.82rem; color: var(--c-text-2); }
+
+@media (max-width: 640px) {
+  .search-overlay {
+    padding: max(68px, calc(env(safe-area-inset-top) + 60px)) 12px 12px;
+    align-items: flex-start;
+  }
+
+  .search-panel {
+    width: 100%;
+    max-height: calc(100dvh - 84px - env(safe-area-inset-top));
+    border-radius: 16px;
+  }
+
+  .search-input-wrap {
+    padding: 13px 14px;
+  }
+
+  .search-results {
+    max-height: calc(100dvh - 155px - env(safe-area-inset-top));
+  }
+
+  .search-result-row {
+    padding: 12px 14px;
+  }
+}
 </style>

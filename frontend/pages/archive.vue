@@ -330,4 +330,39 @@ const hotTags = computed(() => tags.value.slice(0, 8))
   background: var(--c-bg-2);
   color: var(--c-text-2);
 }
+
+@media (max-width: 640px) {
+  .archive-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin-bottom: 22px;
+  }
+
+  .stat-card {
+    padding: 13px 8px;
+  }
+
+  .stat-num {
+    font-size: 1.25rem;
+  }
+
+  .timeline-item {
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 6px;
+  }
+
+  .timeline-date {
+    width: 68px;
+    padding-top: 2px;
+  }
+
+  .timeline-title {
+    line-height: 1.5;
+  }
+
+  .timeline-tag {
+    display: none;
+  }
+}
 </style>

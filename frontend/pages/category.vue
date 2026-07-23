@@ -27,7 +27,7 @@
         <div v-if="categoryPosts.length" class="article-list">
           <NuxtLink :to="'/article/' + a.slug" v-for="a in categoryPosts" :key="a.slug" class="article-item">
             <div class="article-item-cover">
-              <img :src="a.cover" alt="cover">
+              <img :src="coverUrl(a.cover)" alt="cover">
             </div>
             <div class="article-item-body">
               <div class="article-item-title">{{ a.title }}</div>
@@ -64,6 +64,8 @@
 </template>
 
 <script setup lang="ts">
+import { getDisplayImageUrl } from '~/utils/imagePerformance'
+
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
@@ -78,11 +80,21 @@ const activeCategoryName = computed(() => {
   return c?.name || ''
 })
 
+function coverUrl(source: string) {
+  return getDisplayImageUrl(source, 240, 160)
+}
+
 async function selectCategory(slug: string) {
   await router.replace({ query: { cat: slug === activeCategory.value ? undefined : slug } })
   if (slug) {
     const res = await api.get<any>('/posts', { category: slug, limit: 20 })
-    categoryPosts.value = res.items ?? []
+    categoryPosts.value = (res.items ?? []).map((p: any) => ({
+      slug: p.slug,
+      title: p.title,
+      cover: p.coverImage,
+      excerpt: p.excerpt,
+      publishedAt: p.publishedAt,
+    }))
   } else {
     categoryPosts.value = []
   }
@@ -136,4 +148,61 @@ onMounted(async () => {
 .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
 .tag-item { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.72rem; color: var(--c-text-2); cursor: pointer; transition: all 0.2s; }
 .tag-item:hover { border-color: var(--c-primary); color: var(--c-primary); }
+
+@media (max-width: 640px) {
+  .category-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .category-card {
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 15px;
+  }
+
+  .category-icon {
+    grid-row: 1 / 3;
+    width: 42px;
+    height: 42px;
+    font-size: 1.25rem;
+  }
+
+  .category-desc {
+    grid-column: 2 / 4;
+  }
+
+  .category-meta {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .article-item {
+    gap: 11px;
+    padding: 10px;
+  }
+
+  .article-item-cover {
+    width: 94px;
+    height: 72px;
+  }
+
+  .article-item-desc {
+    -webkit-line-clamp: 1;
+  }
+}
+
+@media (max-width: 380px) {
+  .category-desc,
+  .article-item-desc {
+    display: none;
+  }
+
+  .category-card {
+    grid-template-columns: 42px 1fr auto;
+  }
+}
 </style>

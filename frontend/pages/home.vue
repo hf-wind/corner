@@ -4,21 +4,31 @@
       <FeaturedSwiper :ready="!loading" />
 
       <div class="section-title">· 最新文章</div>
-      <div v-if="loading" class="loading-tip">加载中...</div>
-      <div v-else class="article-list">
-        <NuxtLink v-for="article in articles" :key="article.slug" :to="'/article/' + article.slug" class="article-card"
-          @click="saveScroll">
-          <div class="article-cover">
-            <img :src="article.cover" :alt="article.title" loading="lazy">
+
+      <template v-if="loading">
+        <div class="skeleton-list">
+          <div v-for="i in 4" :key="i" class="skeleton-card">
+            <div class="skeleton-cover" />
+            <div class="skeleton-body">
+              <div class="skeleton-line skeleton-line-tag" />
+              <div class="skeleton-line skeleton-line-title" />
+              <div class="skeleton-line skeleton-line-title skeleton-line-short" />
+              <div class="skeleton-line skeleton-line-desc" />
+              <div class="skeleton-line skeleton-line-footer" />
+            </div>
           </div>
-          <div class="article-body">
-            <span class="article-tag">{{ article.tag }}</span>
-            <div class="article-title">{{ article.title }}</div>
-            <div class="article-date">{{ article.date }}</div>
-            <div class="article-desc">{{ article.desc }}</div>
-          </div>
-        </NuxtLink>
-      </div>
+        </div>
+      </template>
+
+      <TransitionGroup v-else name="card" tag="div" class="article-list">
+        <ArticleCard
+          v-for="(article, i) in articles"
+          :key="article.slug"
+          :eager="i < 5"
+          :priority="i === 0"
+          v-bind="article"
+        />
+      </TransitionGroup>
 
       <FloatingPagination v-model="page" :total="totalPages" @change="loadArticles" />
     </main>
@@ -39,7 +49,6 @@ const articles = ref<any[]>([])
 const loading = ref(true)
 const page = ref(1)
 const totalPages = ref(1)
-const SCROLL_KEY = 'home-scroll'
 
 async function loadArticles() {
   loading.value = true
@@ -49,24 +58,24 @@ async function loadArticles() {
       slug: p.slug,
       cover: p.coverImage,
       tag: p.category?.name ?? p.tags?.[0]?.name ?? '',
+      tags: (p.tags ?? []).map((t: any) => t.name),
       title: p.title,
       date: p.publishedAt?.slice(0, 10) ?? '',
       desc: p.excerpt ?? '',
+      author: p.author ? { name: p.author.username, avatar: p.author.avatar } : undefined,
+      views: p.viewCount ?? 0,
+      comments: p._count?.comments ?? 0,
+      readingTime: Math.max(1, Math.ceil((p.content?.length ?? 0) / 500)),
     }))
     totalPages.value = res.totalPages ?? 1
   } catch { /* keep empty */ }
   loading.value = false
 }
 
-function saveScroll() {
-  const el = document.querySelector('.main-content')
-  if (el) sessionStorage.setItem(SCROLL_KEY, String(el.scrollTop))
-}
-
 async function restoreScroll() {
-  const saved = sessionStorage.getItem(SCROLL_KEY)
+  const saved = sessionStorage.getItem('home-scroll')
   if (!saved) return
-  sessionStorage.removeItem(SCROLL_KEY)
+  sessionStorage.removeItem('home-scroll')
 
   const target = parseInt(saved, 10)
   if (target <= 0) return
@@ -96,13 +105,15 @@ onMounted(() => {
   padding: 24px 28px;
   min-width: 0;
   min-height: 0;
+  overscroll-behavior: contain;
+  background: var(--c-bg);
 }
 
 .section-title {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--c-text-2);
   letter-spacing: 0.12em;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   padding-left: 4px;
 }
 
@@ -116,87 +127,8 @@ onMounted(() => {
 .article-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.article-card {
-  display: flex;
-  gap: 0;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--ld-bg-card);
-  box-shadow: 0 2px 4px var(--ld-shadow);
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  color: inherit;
-}
-
-.article-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0.5em 1em var(--ld-shadow);
-}
-
-.article-cover {
-  width: 180px;
-  aspect-ratio: 180 / 130;
-  flex-shrink: 0;
+  gap: 10px;
   position: relative;
-  overflow: hidden;
-}
-
-.article-cover img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
-}
-
-.article-body {
-  flex: 1;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.article-tag {
-  display: inline-block;
-  font-size: 0.65rem;
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-  width: fit-content;
-  letter-spacing: 0.06em;
-}
-
-.article-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1.5;
-  color: var(--c-text);
-}
-
-.article-date {
-  font-size: 0.7rem;
-  color: var(--c-text-2);
-}
-
-.article-desc {
-  font-size: 0.8rem;
-  color: var(--c-text-2);
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .sidebar-right {
@@ -207,5 +139,131 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* ===== Skeleton ===== */
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-card {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--ld-bg-card);
+  box-shadow: 0 1px 3px var(--ld-shadow);
+  position: relative;
+  contain: layout paint style;
+}
+
+.skeleton-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c-bg-3) 70%, transparent), transparent);
+  animation: shimmer 1.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.skeleton-cover {
+  width: 140px;
+  aspect-ratio: 140 / 110;
+  flex-shrink: 0;
+  background: var(--c-bg-2);
+}
+
+.skeleton-body {
+  flex: 1;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--c-bg-2);
+}
+
+.skeleton-line-tag { width: 60px; height: 16px; border-radius: 8px; }
+.skeleton-line-title { width: 85%; height: 15px; }
+.skeleton-line-short { width: 50%; }
+.skeleton-line-desc { width: 65%; height: 11px; }
+.skeleton-line-footer { width: 55%; height: 11px; }
+
+/* ===== TransitionGroup ===== */
+
+.card-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  will-change: opacity, transform;
+}
+
+.card-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  position: absolute;
+}
+
+.card-enter-from {
+  opacity: 0;
+  transform: translateY(24px) scale(0.97);
+}
+
+.card-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.card-move {
+  transition: transform 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-card::after {
+    animation: none;
+  }
+
+  .card-enter-active,
+  .card-leave-active,
+  .card-move {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .article-list,
+  .skeleton-list {
+    gap: 9px;
+  }
+
+  .skeleton-card {
+    min-height: 112px;
+    border-radius: 12px;
+  }
+
+  .skeleton-cover {
+    width: clamp(96px, 29vw, 112px);
+    min-height: 112px;
+    aspect-ratio: auto;
+  }
+
+  .skeleton-body {
+    padding: 10px;
+  }
+
+  .skeleton-line-desc,
+  .skeleton-line-footer {
+    display: none;
+  }
 }
 </style>

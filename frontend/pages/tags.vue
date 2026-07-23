@@ -45,7 +45,7 @@
           <div class="article-list">
             <NuxtLink v-for="a in tagPosts" :key="a.slug" :to="'/article/' + a.slug" class="article-item">
               <div class="article-item-cover">
-                <img :src="a.cover" alt="cover">
+                <img :src="coverUrl(a.cover)" alt="cover">
               </div>
               <div class="article-item-body">
                 <div class="article-item-title">{{ a.title }}</div>
@@ -90,6 +90,8 @@
 </template>
 
 <script setup lang="ts">
+import { getDisplayImageUrl } from '~/utils/imagePerformance'
+
 const api = useApi()
 const allTags = ref<any[]>([])
 const tagPosts = ref<any[]>([])
@@ -133,6 +135,10 @@ const distCounts = computed(() => {
   return { high, medium, low }
 })
 
+function coverUrl(source: string) {
+  return getDisplayImageUrl(source, 200, 140)
+}
+
 async function selectTag(name: string) {
   activeTag.value = name === activeTag.value ? '' : name
   if (activeTag.value) {
@@ -141,7 +147,7 @@ async function selectTag(name: string) {
       slug: p.slug,
       title: p.title,
       date: p.publishedAt,
-      cover: p.cover || '',
+      cover: p.coverImage || '',
     }))
   }
 }
@@ -186,4 +192,50 @@ async function selectTag(name: string) {
 .dist-info { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--c-text-2); margin-bottom: 4px; }
 .dist-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .dist-fill { height: 100%; background: var(--c-primary); border-radius: 3px; }
+
+@media (max-width: 640px) {
+  .tag-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin-bottom: 22px;
+  }
+
+  .tag-stat-card {
+    padding: 13px 8px;
+  }
+
+  .tag-stat-num {
+    font-size: 1.15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tag-cloud-section {
+    padding: 18px 12px;
+    margin-bottom: 24px;
+  }
+
+  .tag-cloud {
+    gap: 8px;
+  }
+
+  .tag-item,
+  .tag-item.size-sm,
+  .tag-item.size-md,
+  .tag-item.size-lg {
+    padding: 6px 12px;
+    font-size: 0.76rem;
+  }
+
+  .article-item {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .article-item-cover {
+    width: 88px;
+    height: 64px;
+  }
+}
 </style>

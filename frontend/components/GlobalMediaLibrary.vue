@@ -2,6 +2,7 @@
   <MediaLibraryModal
     v-model="state.visible"
     :multiple="state.multiple"
+    :folder="state.folder"
     @confirm="onConfirm"
   />
 </template>

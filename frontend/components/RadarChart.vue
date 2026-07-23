@@ -226,7 +226,7 @@ function showPopup(ev: MouseEvent, i: number) {
 .radar-label {
   fill: var(--c-text-2);
   font-size: 8px;
-  font-family: 'LXGW WenKai', serif;
+  font-family: var(--font-body);
 }
 .radar-tooltip {
   position: absolute;

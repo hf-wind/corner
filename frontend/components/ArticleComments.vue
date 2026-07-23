@@ -731,4 +731,48 @@ function reportComment() {
   opacity: 0;
   transform: translateX(20px);
 }
+
+@media (max-width: 640px) {
+  .z-comment {
+    margin: 24px 0 18px;
+  }
+
+  .comment-form-card {
+    padding: 14px;
+    border-radius: 13px;
+  }
+
+  .comment-form-fields {
+    flex-direction: column;
+  }
+
+  .field-row {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .comment-item {
+    gap: 9px;
+    padding: 12px 10px;
+    border-radius: 12px;
+  }
+
+  .comment-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .comment-meta-row {
+    gap: 5px;
+  }
+
+  .comment-time {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .comment-replies {
+    padding-left: 6px;
+  }
+}
 </style>

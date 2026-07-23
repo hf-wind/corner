@@ -3,15 +3,23 @@
     <div class="media-layout">
       <div class="media-sidebar">
         <a-menu :selectedKeys="[activeMenu]" mode="inline" @click="handleMenuSelect" class="mlib-menu">
-          <a-menu-item key="all"><FolderOutlined /> 全部文件</a-menu-item>
-          <a-menu-item key="image"><PictureOutlined /> 图片</a-menu-item>
-          <a-menu-item key="video"><PlaySquareOutlined /> 视频</a-menu-item>
-          <a-menu-item key="document"><FileTextOutlined /> 文档</a-menu-item>
+          <a-menu-item key="all"><FolderOutlined /> 全部</a-menu-item>
+          <a-menu-item v-for="f in folders" :key="`folder:${f.key}`">
+            <FolderFilled /> {{ f.label }}
+          </a-menu-item>
+          <a-menu-divider />
+          <a-menu-item key="type:image"><PictureOutlined /> 图片</a-menu-item>
+          <a-menu-item key="type:video"><PlaySquareOutlined /> 视频</a-menu-item>
+          <a-menu-item key="type:document"><FileTextOutlined /> 文档</a-menu-item>
         </a-menu>
       </div>
       <div class="media-main">
         <div class="media-toolbar">
-          <a-upload :showUploadList="false" :beforeUpload="handleUpload">
+          <a-upload
+            :showUploadList="false"
+            accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+            :beforeUpload="handleUpload"
+          >
             <a-button size="small" type="primary"><UploadOutlined /> 上传</a-button>
           </a-upload>
           <a-popconfirm title="确认删除？" @confirm="handleDelete">
@@ -32,14 +40,14 @@
               @click="toggleSelect(item)"
             >
               <div class="media-card-preview">
-                <img v-if="isImage(item)" :src="imgUrl(item)" class="media-card-img" />
+                <img v-if="isImage(item)" :src="mediaUrl(item.path)" class="media-card-img" />
                 <div v-else class="media-card-icon"><FileOutlined /></div>
                 <div class="media-card-selected" v-if="selectedIds.has(item.id)">
                   <CheckOutlined />
                 </div>
               </div>
               <div class="media-card-footer">
-                <span class="media-card-name">{{ item.filename }}</span>
+                <span class="media-card-name">{{ item.originalName || item.filename }}</span>
               </div>
             </div>
           </div>
@@ -61,7 +69,8 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   multiple?: boolean
   readonly?: boolean
-}>(), { multiple: false, readonly: false })
+  folder?: string
+}>(), { multiple: false, readonly: false, folder: '' })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
@@ -69,13 +78,12 @@ const emit = defineEmits<{
 }>()
 
 const api = useApi()
-const config = useRuntimeConfig()
-const imageBase = computed(() => (config.public.apiBase as string).replace('/api', ''))
-const imgUrl = (item: any) => `${imageBase.value}${item.path}`
+const { mediaUrl } = useMediaUrl()
 
 const visible = ref(props.modelValue)
 const loading = ref(false)
 const items = ref<any[]>([])
+const folders = ref<{ key: string; label: string; preset?: boolean }[]>([])
 const total = ref(0)
 const totalPages = ref(1)
 const page = ref(1)
@@ -83,39 +91,74 @@ const limit = 30
 const activeMenu = ref('all')
 const selectedIds = ref(new Set<string>())
 const selected = computed(() => items.value.filter((i) => selectedIds.value.has(i.id)))
+const uploadFolder = computed(() => {
+  if (activeMenu.value.startsWith('folder:')) return activeMenu.value.slice(7)
+  return props.folder || 'general'
+})
 
 watch(() => props.modelValue, (v) => { visible.value = v })
+watch(() => props.folder, (f) => {
+  if (f) activeMenu.value = `folder:${f}`
+})
 
 const isImage = (item: any) => item.mimeType?.startsWith('image/')
 
 function toggleSelect(item: any) {
   if (!props.multiple) {
     selectedIds.value.clear()
-    if (!selectedIds.value.has(item.id)) selectedIds.value.add(item.id)
+    selectedIds.value.add(item.id)
     return
   }
   if (selectedIds.value.has(item.id)) selectedIds.value.delete(item.id)
   else selectedIds.value.add(item.id)
 }
 
+async function loadFolders() {
+  try {
+    const res = await api.get<any[]>('/media/folders')
+    folders.value = Array.isArray(res) ? res : []
+  } catch {
+    folders.value = []
+  }
+}
+
 async function loadMedia() {
   loading.value = true
   try {
-    const res = await api.get<any>('/media', { page: page.value, limit, type: activeMenu.value })
+    const params: any = { page: page.value, limit }
+    if (activeMenu.value.startsWith('type:')) {
+      params.type = activeMenu.value.slice(5)
+    } else if (activeMenu.value.startsWith('folder:')) {
+      params.folder = activeMenu.value.slice(7)
+    } else if (props.folder) {
+      params.folder = props.folder
+    }
+    const res = await api.get<any>('/media', params)
     items.value = res.items ?? []
     total.value = res.total ?? 0
     totalPages.value = res.totalPages ?? 1
-  } catch { items.value = []; total.value = 0; totalPages.value = 1 }
+  } catch {
+    items.value = []
+    total.value = 0
+    totalPages.value = 1
+  }
   loading.value = false
 }
 
 function handleMenuSelect({ key }: { key: string }) {
-  activeMenu.value = key; page.value = 1; selectedIds.value.clear(); loadMedia()
+  activeMenu.value = key
+  page.value = 1
+  selectedIds.value.clear()
+  loadMedia()
 }
 
 function handleUpload(file: File) {
-  const fd = new FormData(); fd.append('file', file)
-  api.upload('/media/upload', fd).then(() => { message.success('上传成功'); loadMedia() }).catch(() => message.error('上传失败'))
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('folder', uploadFolder.value)
+  api.upload('/media/upload', fd)
+    .then(() => { message.success('上传成功'); loadMedia() })
+    .catch(() => message.error('上传失败'))
   return false
 }
 
@@ -123,25 +166,38 @@ async function handleDelete() {
   const ids = [...selectedIds.value]
   try {
     await Promise.all(ids.map((id) => api.delete(`/media/${id}`)))
-    message.success(`已删除 ${ids.length} 个文件`); selectedIds.value.clear(); loadMedia()
-  } catch { message.error('删除失败') }
+    message.success(`已删除 ${ids.length} 个文件`)
+    selectedIds.value.clear()
+    loadMedia()
+  } catch {
+    message.error('删除失败')
+  }
 }
 
 function handleConfirm() {
   const urls = selected.value.map((i) => i.path)
-  emit('confirm', urls); visible.value = false
+  emit('confirm', urls)
+  visible.value = false
 }
 
 function handleClose() {
-  selectedIds.value.clear(); emit('update:modelValue', false)
+  selectedIds.value.clear()
+  emit('update:modelValue', false)
 }
 
-watch(visible, (v) => { if (v) { selectedIds.value.clear(); loadMedia() } })
+watch(visible, (v) => {
+  if (v) {
+    selectedIds.value.clear()
+    if (props.folder) activeMenu.value = `folder:${props.folder}`
+    loadFolders()
+    loadMedia()
+  }
+})
 </script>
 
 <style scoped>
 .media-layout { display:flex; gap:16px; height:60vh; }
-.media-sidebar { width:140px; flex-shrink:0; }
+.media-sidebar { width:150px; flex-shrink:0; overflow-y:auto; }
 .mlib-menu { border-inline-end:none !important; background:transparent; }
 .mlib-menu :deep(.ant-menu-item) { height:34px; line-height:34px; margin:2px 0; border-radius:6px; font-size:0.82rem; }
 .mlib-menu :deep(.ant-menu-item-selected) { background:var(--c-primary-soft); font-weight:600; }

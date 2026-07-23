@@ -15,11 +15,12 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@corner.dev' },
-    update: {},
+    update: { role: 'admin' },
     create: {
       username: 'admin',
       email: 'admin@corner.dev',
       passwordHash,
+      role: 'admin',
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
       bio: '博客管理员，热爱技术与写作。',
     },
@@ -27,11 +28,12 @@ async function main() {
 
   const author = await prisma.user.upsert({
     where: { email: 'author@corner.dev' },
-    update: {},
+    update: { role: 'user' },
     create: {
       username: 'writer',
       email: 'author@corner.dev',
       passwordHash,
+      role: 'user',
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=writer',
       bio: '一个喜欢写代码也喜欢写文章的人。',
     },

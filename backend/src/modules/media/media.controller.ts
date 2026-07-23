@@ -1,8 +1,7 @@
 import { Controller, Get, Post, Delete, Param, Query, UseGuards, UseInterceptors, UploadedFile, Req, Body } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import { memoryStorage } from 'multer';
 import { MediaService } from './media.service';
 
 @Controller('media')
@@ -34,16 +33,11 @@ export class MediaController {
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads'),
-        filename: (_req: any, file: any, cb: (err: Error | null, name: string) => void) => {
-          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, unique + extname(file.originalname));
-        },
-      }),
+      storage: memoryStorage(),
+      limits: { fileSize: 30 * 1024 * 1024 },
     }),
   )
-  upload(@UploadedFile() file: any, @Req() req: any, @Body() body: any) {
+  upload(@UploadedFile() file: Express.Multer.File, @Req() req: any, @Body() body: any) {
     return this.media.create(file, req.user?.id, body?.folder);
   }
 
