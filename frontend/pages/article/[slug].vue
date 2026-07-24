@@ -1,12 +1,12 @@
 <template>
-  <div class="page-layout">
+  <div class="page-layout article-page">
     <main id="main-content" class="article-main" ref="articleMainRef" @scroll="handleArticleScroll">
       <NuxtLink to="/home" class="back-btn">
         <Icon name="ph:arrow-left-bold" />
         返回首页
       </NuxtLink>
 
-      <div class="post-header" :class="{ 'has-cover': article.hero }">
+      <div class="post-header article-anim" :class="{ 'has-cover': article.hero }">
         <img v-if="article.hero" :src="coverUrl(article.hero)" class="post-cover" :alt="article.title" />
 
         <div class="post-nav">
@@ -48,23 +48,23 @@
         <h1 class="post-title text-creative">{{ article.title }}</h1>
       </div>
 
-      <div class="md-excerpt gradient-card" ref="excerptRef" data-animation="true" data-speed="30">
+      <div class="md-excerpt gradient-card article-anim" ref="excerptRef" data-animation="true" data-speed="30">
         <Icon name="ph:highlighter-bold" />
         <span id="excerpt-text" :data-text="article.excerpt"></span>
         <span id="excerpt-caret" class="excerpt-caret">_</span>
       </div>
 
-      <div class="outdated-notice" ref="noticeRef" :data-publish-time="article.date" data-threshold="180"
+      <div class="outdated-notice article-anim" ref="noticeRef" :data-publish-time="article.date" data-threshold="180"
         data-message="本文发布于 {days} 天前，内容可能已过时，请注意甄别。">
         <Icon name="ph:warning-circle-bold" />
         <span class="notice-text"></span>
       </div>
 
-      <div class="article-shell">
+      <div class="article-shell article-anim">
         <ArticleMarkdown :content="article.content" :editor-id="editorId" />
       </div>
 
-      <div class="post-footer">
+      <div class="post-footer article-anim">
         <section class="tags-section">
           <div class="title text-creative">文章标签</div>
           <div class="content tags-list">
@@ -84,7 +84,7 @@
         </section>
       </div>
 
-      <div class="surround-post">
+      <div class="surround-post article-anim">
         <NuxtLink v-if="prevArticle" :to="'/article/' + prevArticle.slug" class="surround-link">
           <Icon name="solar:rewind-back-bold-duotone" />
           <div class="surround-text">
@@ -114,7 +114,12 @@
         </div>
       </div>
 
-      <ArticleComments :post-id="article.id" v-model:comments="comments" @load-more="page++" />
+      <ArticleComments :post-id="article.id" v-model:comments="comments"
+        :comment-total="commentTotal" v-model:comment-page="commentPage" :comment-total-pages="commentTotalPages" />
+
+      <ClientOnly>
+        <FloatingPagination v-if="showCommentPagination" v-model="commentPage" :total="commentTotalPages" />
+      </ClientOnly>
     </main>
 
     <ArticleSidebar :editor-id="editorId" scroll-element="#main-content" :progress="readingProgress"
@@ -143,7 +148,10 @@ const article = ref<any>({})
 const prevArticle = ref<any>(null)
 const nextArticle = ref<any>(null)
 const comments = ref<Comment[]>([])
-const page = ref(1)
+const commentPage = ref(1)
+const commentTotalPages = ref(1)
+const commentTotal = ref(0)
+const showCommentPagination = ref(false)
 
 const shareOpen = ref(false)
 const posterOpen = ref(false)
@@ -178,27 +186,34 @@ async function loadArticle() {
   } catch { /* keep empty */ }
 }
 
-async function loadComments() {
+async function loadComments(page = 1) {
   if (!article.value?.id) return
   try {
-    const list = await api.get<any[]>(`/comments/post/${article.value.id}`)
-    comments.value = list.map((c: any) => ({
+    const data = await api.get<any>(`/comments/post/${article.value.id}`, { page, limit: 10, replyLimit: 3 })
+    comments.value = data.items.map((c: any) => ({
       id: c.id,
       name: c.authorName ?? '匿名',
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.id}`,
+      avatar: c.authorAvatar,
       time: formatTime(c.createdAt),
       content: c.content,
-      likes: 0,
-      liked: false,
+      likes: c.likesCount ?? 0,
+      liked: c.liked ?? false,
+      replyCount: c.replyCount ?? 0,
       replies: (c.replies ?? []).map((r: any) => ({
+        id: r.id,
         name: r.authorName ?? '匿名',
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`,
+        avatar: r.authorAvatar,
         time: formatTime(r.createdAt),
         content: r.content,
+        replyTo: r.parent?.authorName ?? undefined,
       })),
     }))
+    commentTotal.value = data.total
+    commentTotalPages.value = data.totalPages
   } catch { /* keep empty */ }
 }
+
+
 
 function formatTime(iso: string) {
   const d = new Date(iso)
@@ -230,6 +245,12 @@ function handleArticleScroll() {
   const max = container.scrollHeight - container.clientHeight
   readingProgress.value = max > 0 ? Math.min(1, Math.max(0, container.scrollTop / max)) : 0
   showBackTop.value = container.scrollTop > 240
+  const commentSection = document.getElementById('comment')
+  if (container && commentSection) {
+    const offset = commentSection.offsetTop
+    const threshold = container.clientHeight * 0.6
+    showCommentPagination.value = container.scrollTop + threshold >= offset
+  }
 }
 
 function typeExcerpt() {
@@ -270,9 +291,13 @@ function checkOutdated() {
   }
 }
 
+watch(commentPage, (page) => {
+  loadComments(page)
+})
+
 onMounted(() => {
   loadArticle().then(async () => {
-    await loadComments()
+    await loadComments(1)
     await nextTick()
     typeExcerpt()
     checkOutdated()
@@ -282,10 +307,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-::deep(.article-md-wrap .md-editor-preview .md-editor-code) {
-  border-radius: 0px !important;
-}
-
 .page-layout {
   display: flex;
   flex: 1;
@@ -472,6 +493,23 @@ onMounted(() => {
     opacity: 0;
   }
 }
+
+@keyframes article-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.article-anim {
+  animation: article-fade-up 0.5s ease both;
+}
+
+.article-anim:nth-child(2) { animation-delay: 0.05s; }
+.article-anim:nth-child(3) { animation-delay: 0.1s; }
+.article-anim:nth-child(4) { animation-delay: 0.15s; }
+.article-anim:nth-child(5) { animation-delay: 0.2s; }
+.article-anim:nth-child(6) { animation-delay: 0.25s; }
+.article-anim:nth-child(7) { animation-delay: 0.3s; }
+.article-anim:nth-child(8) { animation-delay: 0.35s; }
 
 .outdated-notice {
   display: none;

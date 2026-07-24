@@ -30,7 +30,21 @@ export default defineNuxtConfig({
       ],
     },
   },
+  vite: {
+    optimizeDeps: {
+      include: ['ant-design-vue', '@ant-design/icons-vue'],
+    },
+  },
   routeRules: {
+    '/': { ssr: false },
+    '/home': { ssr: false },
+    '/article/**': { ssr: false },
+    '/tags': { ssr: false },
+    '/category': { ssr: false },
+    '/archive': { ssr: false },
+    '/friends': { ssr: false },
+    '/about': { ssr: false },
+    '/login': { ssr: false },
     '/admin/**': { ssr: false },
   },
 })

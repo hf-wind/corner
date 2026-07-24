@@ -9,6 +9,7 @@ export const PRESET_FOLDERS: MediaFolderDef[] = [
   { key: 'avatar', label: '头像', preset: true },
   { key: 'cover', label: '封面', preset: true },
   { key: 'article', label: '文章', preset: true },
+  { key: 'emoji', label: '表情', preset: true },
   { key: 'general', label: '通用', preset: true },
 ]
 

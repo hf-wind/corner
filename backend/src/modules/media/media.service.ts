@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
@@ -128,6 +128,70 @@ export class MediaService {
     return { key, label: key, preset: false };
   }
 
+  async batchMove(ids: string[], targetFolder: string) {
+    const folder = sanitizeFolder(targetFolder);
+    this.ensureFolderDirs(folder);
+
+    const items = await this.prisma.media.findMany({ where: { id: { in: ids } } });
+    if (!items.length) throw new NotFoundException('No media found');
+
+    const updated: any[] = [];
+    for (const item of items) {
+      if (item.folder === folder) {
+        updated.push(item);
+        continue;
+      }
+
+      const oldPath = join(process.cwd(), item.path.replace(/^\//, ''));
+      const newPath = join(UPLOAD_ROOT, folder, item.filename);
+      if (existsSync(oldPath)) {
+        try { renameSync(oldPath, newPath); } catch { /* skip */ }
+      }
+
+      let origRel: string | null = null;
+      if (item.originalPath) {
+        const oldOrig = join(process.cwd(), item.originalPath.replace(/^\//, ''));
+        const origName = item.originalPath.split('/').pop() || item.filename;
+        const newOrig = join(UPLOAD_ROOT, folder, 'original', origName);
+        if (existsSync(oldOrig)) {
+          try { renameSync(oldOrig, newOrig); } catch { /* skip */ }
+        }
+        origRel = `/uploads/${folder}/original/${origName}`;
+      }
+
+      const rec = await this.prisma.media.update({
+        where: { id: item.id },
+        data: {
+          folder,
+          path: `/uploads/${folder}/${item.filename}`,
+          originalPath: origRel,
+        },
+      });
+      updated.push(rec);
+    }
+    return updated;
+  }
+
+  async batchRemove(ids: string[]) {
+    const items = await this.prisma.media.findMany({ where: { id: { in: ids } } });
+    if (!items.length) throw new NotFoundException('No media found');
+
+    for (const item of items) {
+      const candidates = [
+        join(process.cwd(), item.path.replace(/^\//, '')),
+        item.originalPath ? join(process.cwd(), item.originalPath.replace(/^\//, '')) : '',
+        join(UPLOAD_ROOT, item.filename),
+        item.folder ? join(UPLOAD_ROOT, item.folder, item.filename) : '',
+      ].filter(Boolean);
+      for (const p of candidates) {
+        if (p && existsSync(p)) {
+          try { unlinkSync(p); } catch { /* ignore */ }
+        }
+      }
+    }
+    await this.prisma.media.deleteMany({ where: { id: { in: ids } } });
+  }
+
   private async generateNameBase(originalName: string): Promise<string> {
     const all = await this.settings.findAll();
     const mode = (all.media_naming as string) || 'timestamp';
@@ -148,7 +212,7 @@ export class MediaService {
     }
   }
 
-  async create(file: Express.Multer.File, userId?: string, folderInput?: string) {
+  async create(file: Express.Multer.File, userId?: string, folderInput?: string, compressAnimated?: boolean) {
     if (!file?.buffer?.length && !(file as any)?.path) {
       throw new BadRequestException('No file uploaded');
     }
@@ -166,10 +230,11 @@ export class MediaService {
       ? file.buffer
       : readFileSync((file as any).path);
 
+    const isGif = !!file.mimetype?.includes('gif');
     const isRasterImage =
       !!file.mimetype?.startsWith('image/') &&
       !file.mimetype.includes('svg') &&
-      !file.mimetype.includes('gif');
+      !isGif;
 
     let filename: string;
     let path: string;
@@ -177,7 +242,23 @@ export class MediaService {
     let mimeType = file.mimetype || 'application/octet-stream';
     let size = buffer.length;
 
-    if (isRasterImage) {
+    // compress animated GIFs if requested
+    if (isGif && compressAnimated) {
+      const origFilename = `${nameBase}${ext || '.gif'}`;
+      const origFs = join(UPLOAD_ROOT, folder, 'original', origFilename);
+      writeFileSync(origFs, buffer);
+      originalPath = `/uploads/${folder}/original/${origFilename}`;
+
+      const webpName = `${nameBase}.webp`;
+      const webpFs = join(UPLOAD_ROOT, folder, webpName);
+      const webpBuf = await sharp(buffer, { animated: true }).webp({ quality: 80 }).toBuffer();
+      writeFileSync(webpFs, webpBuf);
+
+      filename = webpName;
+      path = `/uploads/${folder}/${webpName}`;
+      mimeType = 'image/webp';
+      size = webpBuf.length;
+    } else if (isRasterImage) {
       const origFilename = `${nameBase}${ext || '.bin'}`;
       const origFs = join(UPLOAD_ROOT, folder, 'original', origFilename);
       writeFileSync(origFs, buffer);
@@ -229,6 +310,11 @@ export class MediaService {
     if (folder === 'cover') {
       pipeline = pipeline.resize(1920, 1080, { fit: 'inside', withoutEnlargement: true });
       return pipeline.webp({ quality: 82 }).toBuffer();
+    }
+
+    if (folder === 'emoji') {
+      pipeline = pipeline.resize(160, 160, { fit: 'inside', withoutEnlargement: true });
+      return pipeline.webp({ quality: 80 }).toBuffer();
     }
 
     // article / general

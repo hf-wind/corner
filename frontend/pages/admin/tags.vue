@@ -19,6 +19,7 @@
             <template v-if="column.key === 'actions'">
               <a-button type="link" size="small" @click="viewPosts(record)"><EyeOutlined /> 查看文章</a-button>
               <a-button type="link" size="small" @click="openAssign(record)"><SwapOutlined /> 分配文章</a-button>
+              <a-button type="link" size="small" @click="openEdit(record)"><EditOutlined /> 编辑</a-button>
               <a-button type="link" size="small" danger @click="remove(record.slug, record.name)"><DeleteOutlined /> 删除</a-button>
             </template>
           </template>
@@ -26,7 +27,7 @@
       </a-card>
     </a-spin>
 
-    <a-modal v-model:open="addDialog.open" title="添加标签" width="460px" @ok="confirmAdd" @cancel="addDialog.open = false">
+    <a-modal v-model:open="addDialog.open" :title="addDialog.editing ? '编辑标签' : '添加标签'" width="460px" @ok="confirmSave" @cancel="addDialog.open = false">
       <div class="add-field">
         <label class="add-label">名称</label>
         <a-input v-model:value="addDialog.name" placeholder="标签名称" />
@@ -92,7 +93,7 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 const api = useApi()
 const loading = ref(true)
 const tags = ref<any[]>([])
-const addDialog = reactive({ open: false, name: '', slug: '', icon: 'TagOutlined', color: '' })
+const addDialog = reactive({ open: false, name: '', slug: '', icon: 'TagOutlined', color: '', editing: false, editingSlug: '' })
 
 const columns = [
   { title: '', key: 'icon', width: 36, align: 'center' as const },
@@ -137,6 +138,14 @@ async function load() {
 
 function openAdd() {
   addDialog.name = ''; addDialog.slug = ''; addDialog.icon = 'TagOutlined'; addDialog.color = ''
+  addDialog.editing = false; addDialog.editingSlug = ''
+  addDialog.open = true
+}
+
+function openEdit(record: any) {
+  addDialog.name = record.name; addDialog.slug = record.slug
+  addDialog.icon = record.icon || 'TagOutlined'; addDialog.color = record.color || ''
+  addDialog.editing = true; addDialog.editingSlug = record.slug
   addDialog.open = true
 }
 
@@ -146,13 +155,20 @@ async function openIconPickerAdd() {
   if (icon) addDialog.icon = icon
 }
 
-async function confirmAdd() {
+async function confirmSave() {
   if (!addDialog.name) { message.warning('请填写名称'); return }
   const slug = addDialog.slug || addDialog.name.toLowerCase().replace(/\s+/g, '-')
+  const payload = { name: addDialog.name, slug, icon: addDialog.icon || null, color: addDialog.color || null }
   try {
-    await api.post('/tags', { name: addDialog.name, slug, icon: addDialog.icon || null, color: addDialog.color || null })
-    message.success('添加成功'); addDialog.open = false; load()
-  } catch { message.error('添加失败') }
+    if (addDialog.editing) {
+      await api.put(`/tags/${addDialog.editingSlug}`, payload)
+      message.success('保存成功')
+    } else {
+      await api.post('/tags', payload)
+      message.success('添加成功')
+    }
+    addDialog.open = false; load()
+  } catch { message.error(addDialog.editing ? '保存失败' : '添加失败') }
 }
 
 async function remove(slug: string, name: string) {

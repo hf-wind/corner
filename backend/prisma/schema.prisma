@@ -19,6 +19,8 @@ model User {
   posts        Post[]
   media        Media[]
   chatMessages ChatMessage[]
+  comments     Comment[]
+  commentLikes CommentLike[]
 
   @@map("users")
 }
@@ -87,18 +89,33 @@ model PostTag {
 model Comment {
   id           String   @id @default(uuid()) @db.Uuid
   postId       String   @map("post_id") @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
   authorName   String?  @map("author_name") @db.VarChar(100)
   authorEmail  String?  @map("author_email") @db.VarChar(255)
   content      String   @db.Text
   parentId     String?  @map("parent_id") @db.Uuid
-  status       String   @default("pending") @db.VarChar(20)
+  status       String   @default("approved") @db.VarChar(20)
   rejectReason String?  @map("reject_reason") @db.Text
   createdAt    DateTime @default(now()) @map("created_at")
   post         Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id])
   parent       Comment? @relation("CommentReply", fields: [parentId], references: [id])
   replies      Comment[] @relation("CommentReply")
+  likes        CommentLike[]
 
   @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  commentId String   @map("comment_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@map("comment_likes")
 }
 
 model Media {
@@ -134,6 +151,32 @@ model VisitStat {
   post      Post?    @relation(fields: [postId], references: [id])
 
   @@map("visit_stats")
+}
+
+model EmojiPack {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @db.VarChar(100)
+  type             String   @default("static") @db.VarChar(20)
+  sort             Int      @default(0)
+  enabled          Boolean  @default(true)
+  compressAnimated Boolean  @default(false) @map("compress_animated")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  items            EmojiItem[]
+
+  @@map("emoji_packs")
+}
+
+model EmojiItem {
+  id      String    @id @default(uuid()) @db.Uuid
+  packId  String    @map("pack_id") @db.Uuid
+  label   String?   @db.VarChar(100)
+  char    String?   @db.VarChar(20)
+  imageUrl String?  @map("image_url") @db.Text
+  sort    Int       @default(0)
+  pack    EmojiPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@map("emoji_items")
 }
 
 model ChatMessage {

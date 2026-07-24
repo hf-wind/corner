@@ -21,14 +21,20 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findFirst({
-      where: { OR: [{ email: dto.email }, { username: dto.username }] },
-    });
-    if (existing) throw new ConflictException('Email or username already exists');
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (existing) throw new ConflictException('Email already exists');
+
+    const username = await this.generateUsername(dto.email);
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
-      data: { username: dto.username, email: dto.email, passwordHash, role: 'user' },
+      data: {
+        username,
+        email: dto.email,
+        passwordHash,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        role: 'user',
+      },
     });
 
     return this.token(user);
@@ -58,6 +64,23 @@ export class AuthService {
       },
     });
     return user;
+  }
+
+  private async generateUsername(email: string): Promise<string> {
+    let base = email.split('@')[0].replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
+    if (!base) base = 'user';
+
+    const exists = await this.prisma.user.findUnique({ where: { username: base } });
+    if (!exists) return base;
+
+    for (let i = 0; i < 10; i++) {
+      const suffix = Math.random().toString(36).substring(2, 5);
+      const candidate = `${base}_${suffix}`;
+      const taken = await this.prisma.user.findUnique({ where: { username: candidate } });
+      if (!taken) return candidate;
+    }
+
+    return `${base}_${Date.now().toString(36)}`;
   }
 
   private token(user: AuthUser) {

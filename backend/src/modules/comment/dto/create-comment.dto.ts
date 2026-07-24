@@ -1,23 +1,13 @@
-import { IsString, IsOptional, IsEmail, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateCommentDto {
-  @IsString()
+  @IsUUID()
   postId: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  authorName?: string;
-
-  @IsOptional()
-  @IsEmail()
-  @MaxLength(255)
-  authorEmail?: string;
 
   @IsString()
   content: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   parentId?: string;
 }

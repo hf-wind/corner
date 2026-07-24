@@ -3,6 +3,7 @@
     v-model="state.visible"
     :multiple="state.multiple"
     :folder="state.folder"
+    :compress-animated="state.compressAnimated"
     @confirm="onConfirm"
   />
 </template>

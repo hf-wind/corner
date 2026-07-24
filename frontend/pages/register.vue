@@ -20,28 +20,33 @@
     <div class="login-card">
       <div class="login-header">
         <img class="login-avatar" :src="avatarImg" alt="avatar">
-        <div class="login-title">欢迎回来</div>
-        <div class="login-subtitle">登录你的账号</div>
+        <div class="login-title">创建账号</div>
+        <div class="login-subtitle">加入我们，开始评论互动</div>
       </div>
 
-      <form class="login-form" @submit.prevent="handleLogin">
+      <form class="login-form" @submit.prevent="handleRegister">
         <div class="form-group">
           <label class="form-label">邮箱</label>
           <input v-model="email" class="form-input" type="email" placeholder="请输入邮箱地址" required>
         </div>
         <div class="form-group">
           <label class="form-label">密码</label>
-          <input v-model="password" class="form-input" type="password" placeholder="请输入密码" required>
+          <input v-model="password" class="form-input" type="password" placeholder="至少 6 位密码" required minlength="6">
         </div>
+        <div class="form-group">
+          <label class="form-label">确认密码</label>
+          <input v-model="confirmPassword" class="form-input" type="password" placeholder="再次输入密码" required minlength="6">
+        </div>
+        <div class="form-hint">注册后系统将自动为你分配昵称和头像，后续可在个人中心修改。</div>
         <div v-if="error" class="form-error">{{ error }}</div>
-        <button class="login-btn" type="submit" :disabled="submitting">{{ submitting ? '登录中...' : '登录' }}</button>
+        <button class="login-btn" type="submit" :disabled="submitting">{{ submitting ? '注册中...' : '注册' }}</button>
       </form>
 
       <div class="login-divider">或者</div>
 
       <div class="login-footer">
-        <span>没有账号？</span>
-        <NuxtLink to="/register" class="login-footer-link">去注册</NuxtLink>
+        <span>已有账号？</span>
+        <NuxtLink to="/login" class="login-footer-link">去登录</NuxtLink>
       </div>
     </div>
   </div>
@@ -56,6 +61,7 @@ const router = useRouter()
 const theme = ref('light')
 const email = ref('')
 const password = ref('')
+const confirmPassword = ref('')
 const error = ref('')
 const submitting = ref(false)
 
@@ -64,20 +70,23 @@ function setTheme(mode: string) {
   document.documentElement.classList.toggle('dark', mode === 'dark')
 }
 
-async function handleLogin() {
+async function handleRegister() {
   error.value = ''
+  if (password.value !== confirmPassword.value) {
+    error.value = '两次密码输入不一致'
+    return
+  }
   submitting.value = true
   try {
-    const res = await api.post<any>('/auth/login', { email: email.value, password: password.value })
+    const res = await api.post<any>('/auth/register', { email: email.value, password: password.value })
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
     router.push(panelHome())
   } catch (e: any) {
-    error.value = e?.message || '登录失败，请检查邮箱和密码'
+    error.value = e?.message || '注册失败，请检查邮箱是否已被注册'
   }
   submitting.value = false
 }
-
 </script>
 
 <style scoped>
@@ -265,6 +274,13 @@ async function handleLogin() {
 
 .form-input::placeholder {
   color: var(--c-text-3);
+}
+
+.form-hint {
+  font-size: 0.7rem;
+  color: var(--c-text-3);
+  text-align: center;
+  line-height: 1.5;
 }
 
 .form-error {

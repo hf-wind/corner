@@ -91,5 +91,7 @@ onUnmounted(() => removeMqListener?.())
   min-height: 0;
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>

@@ -32,17 +32,32 @@
           </a-upload>
         </div>
 
+        <div v-if="selectedIds.size" class="selection-bar">
+          <span class="selection-count">已选中 {{ selectedIds.size }} 项</span>
+          <a-button size="small" @click="openMoveDialog"><FolderAddOutlined /> 移动到</a-button>
+          <a-button size="small" danger @click="handleBatchRemove"><DeleteOutlined /> 删除</a-button>
+          <a-button size="small" @click="selectedIds.clear()">取消选择</a-button>
+        </div>
+
         <a-spin :spinning="loading" class="table-spin">
           <a-card :bordered="false" class="list-card" size="small">
             <div class="media-grid" v-if="items.length">
-              <div v-for="item in items" :key="item.id" class="media-item">
+              <div
+                v-for="(item, i) in items" :key="item.id"
+                class="media-item"
+                :class="{ selected: selectedIds.has(item.id) }"
+                @click="toggleSelect(item.id, i, $event)"
+              >
+                <div class="media-check" @click.stop>
+                  <a-checkbox :checked="selectedIds.has(item.id)" @change="toggleSelect(item.id, i)" />
+                </div>
                 <div v-if="isImage(item)" class="media-img-wrap">
                   <a-image :src="mediaUrl(item.path)" style="width:100%;height:120px;object-fit:cover" />
                 </div>
                 <div v-else class="media-icon"><FileOutlined style="font-size:28px" /></div>
                 <div class="media-meta">
-                  <span class="media-name" :title="item.originalName || item.filename">{{ item.originalName || item.filename }}</span>
-                  <a-button type="link" size="small" danger @click="handleRemove(item)">删除</a-button>
+                  <span class="media-name" :title="item.filename">{{ item.filename }}</span>
+                  <a-button type="link" size="small" danger @click.stop="handleRemove(item)">删除</a-button>
                 </div>
               </div>
             </div>
@@ -58,6 +73,14 @@
 
     <a-modal v-model:open="showNewFolder" title="新建文件夹" @ok="createFolder" @cancel="showNewFolder = false">
       <a-input v-model:value="newFolderName" placeholder="文件夹名称（如 gallery）" />
+    </a-modal>
+
+    <a-modal v-model:open="moveDialog.open" title="移动到文件夹" width="420px" @ok="confirmMove" @cancel="moveDialog.open = false">
+      <a-radio-group v-model:value="moveDialog.target" direction="vertical" style="width:100%">
+        <a-radio v-for="f in moveDialog.folders" :key="f.key" :value="f.key" style="display:flex;padding:6px 0">
+          <FolderFilled style="margin-right:6px" /> {{ f.label }}
+        </a-radio>
+      </a-radio-group>
     </a-modal>
   </div>
 </template>
@@ -80,6 +103,14 @@ const folders = ref<{ key: string; label: string; preset?: boolean }[]>([])
 const activeFolder = ref('all')
 const showNewFolder = ref(false)
 const newFolderName = ref('')
+const selectedIds = reactive(new Set<string>())
+let lastClickedIndex = -1
+
+const moveDialog = reactive({
+  open: false,
+  target: '',
+  folders: [] as { key: string; label: string }[],
+})
 
 const isImage = (item: any) => item.mimeType?.startsWith('image/')
 
@@ -88,6 +119,25 @@ const uploadFolder = computed(() => {
   return activeFolder.value
 })
 
+function toggleSelect(id: string, index: number, event?: MouseEvent) {
+  if (event?.shiftKey && lastClickedIndex >= 0) {
+    const start = Math.min(lastClickedIndex, index)
+    const end = Math.max(lastClickedIndex, index)
+    for (let i = start; i <= end; i++) {
+      const item = items.value[i]
+      if (item) {
+        if (selectedIds.has(item.id)) selectedIds.delete(item.id)
+        else selectedIds.add(item.id)
+      }
+    }
+    lastClickedIndex = index
+    return
+  }
+  if (selectedIds.has(id)) selectedIds.delete(id)
+  else selectedIds.add(id)
+  lastClickedIndex = index
+}
+
 function onFolderClick({ key }: { key: string }) {
   if (key === '__add__') {
     showNewFolder.value = true
@@ -95,6 +145,7 @@ function onFolderClick({ key }: { key: string }) {
   }
   activeFolder.value = key
   page.value = 1
+  selectedIds.clear()
   loadMedia()
 }
 
@@ -113,6 +164,7 @@ async function loadMedia() {
     total.value = 0
     totalPages.value = 0
   }
+  selectedIds.clear()
   loading.value = false
 }
 
@@ -138,7 +190,7 @@ function beforeUpload(file: File) {
 async function handleRemove(item: any) {
   Modal.confirm({
     title: '删除确认',
-    content: `确认删除「${item.originalName || item.filename}」？`,
+    content: `确认删除「${item.filename}」？`,
     okText: '删除',
     okType: 'danger',
     cancelText: '取消',
@@ -153,6 +205,49 @@ async function handleRemove(item: any) {
       }
     },
   })
+}
+
+async function handleBatchRemove() {
+  if (!selectedIds.size) return
+  const names = [...selectedIds].map(id => items.value.find(i => i.id === id)?.filename || '').filter(Boolean).slice(0, 5)
+  const suffix = selectedIds.size > 5 ? ` 等 ${selectedIds.size} 项` : ''
+  Modal.confirm({
+    title: '批量删除',
+    content: `确认删除以下文件？\n${names.join('、')}${suffix}`,
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await api.post('/media/batch/delete', { ids: [...selectedIds] })
+        message.success(`已删除 ${selectedIds.size} 项`)
+        loadMedia()
+        loadFolders()
+      } catch {
+        message.error('删除失败')
+      }
+    },
+  })
+}
+
+function openMoveDialog() {
+  if (!selectedIds.size) return
+  moveDialog.folders = folders.value.filter(f => f.key !== activeFolder.value && f.key !== '__none__')
+  moveDialog.target = moveDialog.folders[0]?.key || ''
+  moveDialog.open = true
+}
+
+async function confirmMove() {
+  if (!moveDialog.target) { message.warning('请选择目标文件夹'); return }
+  try {
+    await api.put('/media/batch/move', { ids: [...selectedIds], folder: moveDialog.target })
+    message.success(`已移动 ${selectedIds.size} 项`)
+    moveDialog.open = false
+    loadMedia()
+    loadFolders()
+  } catch {
+    message.error('移动失败')
+  }
 }
 
 async function createFolder() {
@@ -180,10 +275,14 @@ onMounted(() => { loadMedia(); loadFolders() })
 .media-sidebar { width:200px; flex-shrink:0; }
 .media-main { flex:1; display:flex; flex-direction:column; min-width:0; }
 .media-toolbar { display:flex; gap:12px; align-items:center; margin-bottom:12px; }
+.selection-bar { display:flex; gap:10px; align-items:center; padding:8px 12px; margin-bottom:10px; background:var(--c-primary-soft); border-radius:6px; border:1px solid var(--c-primary); }
+.selection-count { font-size:0.82rem; color:var(--c-text); margin-right:auto; }
 .list-card { border-radius:8px; }
-.media-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
-.media-item { border:1px solid var(--border); border-radius:4px; overflow:hidden; transition:border-color 0.2s; display:flex; flex-direction:column; }
+.media-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+.media-item { position:relative; border:2px solid var(--border); border-radius:6px; overflow:hidden; transition:border-color 0.2s; display:flex; flex-direction:column; cursor:pointer; }
 .media-item:hover { border-color:var(--c-primary); }
+.media-item.selected { border-color:var(--c-primary); background:var(--c-primary-soft); }
+.media-check { position:absolute; top:6px; left:6px; z-index:2; }
 .media-img-wrap { display:flex; align-items:center; justify-content:center; width:100%; height:120px; overflow:hidden; background:var(--c-bg-1); }
 .media-icon { width:100%; height:120px; display:flex; align-items:center; justify-content:center; color:var(--c-text-3); background:var(--c-bg-1); }
 .media-meta { display:flex; align-items:center; padding:4px 6px; gap:4px; }

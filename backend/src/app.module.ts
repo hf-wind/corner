@@ -17,6 +17,7 @@ import { AiPetModule } from './modules/ai-pet/ai-pet.module';
 import { AiModule } from './modules/ai/ai.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { MusicModule } from './modules/music/music.module';
+import { EmojiModule } from './modules/emoji/emoji.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { MusicModule } from './modules/music/music.module';
     AiModule,
     SettingsModule,
     MusicModule,
+    EmojiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

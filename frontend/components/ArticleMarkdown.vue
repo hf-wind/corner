@@ -97,11 +97,16 @@ onUnmounted(() => observer?.disconnect())
   box-shadow: 0 10px 28px var(--ld-shadow);
 }
 
-.article-md-wrap :deep(.md-editor-preview pre),
 .article-md-wrap :deep(.md-editor-preview .md-editor-code) {
   font-family: var(--font-mono);
   border-radius: 12px;
   box-shadow: 0 8px 22px var(--ld-shadow);
+  border: none;
+}
+
+.article-md-wrap :deep(.md-editor-preview pre) {
+  border-radius: 0;
+  box-shadow: none;
   border: none;
 }
 

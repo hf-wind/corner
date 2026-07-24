@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Query, UseGuards, UseInterceptors, UploadedFile, Req, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Query, UseGuards, UseInterceptors, UploadedFile, Req, Body } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -38,7 +38,19 @@ export class MediaController {
     }),
   )
   upload(@UploadedFile() file: Express.Multer.File, @Req() req: any, @Body() body: any) {
-    return this.media.create(file, req.user?.id, body?.folder);
+    return this.media.create(file, req.user?.id, body?.folder, body?.compressAnimated === 'true');
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Put('batch/move')
+  batchMove(@Body() body: { ids: string[]; folder: string }) {
+    return this.media.batchMove(body.ids, body.folder);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('batch/delete')
+  batchRemove(@Body() body: { ids: string[] }) {
+    return this.media.batchRemove(body.ids);
   }
 
   @UseGuards(AuthGuard('jwt'))

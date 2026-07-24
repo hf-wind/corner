@@ -8,7 +8,7 @@
               <span class="comment-author">{{ record.authorName || '匿名' }}</span>
             </template>
             <template v-if="column.key === 'content'">
-              <span style="white-space:pre-wrap">{{ record.content }}</span>
+              <span style="white-space:pre-wrap" v-html="renderContent(record.content)"></span>
             </template>
             <template v-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
@@ -25,23 +25,53 @@
       </a-card>
     </a-spin>
 
-    <a-modal v-model:open="detail.open" title="评论详情" width="520px" :footer="null" @cancel="detail.open = false">
-      <a-descriptions v-if="detail.item" column="1" size="small" bordered>
-        <a-descriptions-item label="评论作者">{{ detail.item.authorName || '匿名' }}</a-descriptions-item>
-        <a-descriptions-item label="邮箱">{{ detail.item.authorEmail || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="评论内容">{{ detail.item.content }}</a-descriptions-item>
-        <a-descriptions-item label="状态">
-          <a-tag :color="statusColor(detail.item.status)">{{ statusText(detail.item.status) }}</a-tag>
-        </a-descriptions-item>
-        <a-descriptions-item label="所属文章">
-          <NuxtLink :to="`/posts/${detail.item.post?.slug}`" target="_blank">
-            {{ detail.item.post?.title || detail.item.postId }}
-          </NuxtLink>
-        </a-descriptions-item>
-        <a-descriptions-item label="评论时间">{{ detail.item.createdAt?.slice(0, 16) || '-' }}</a-descriptions-item>
-        <a-descriptions-item v-if="detail.item.parentId" label="回复对象">#{{ detail.item.parentId?.slice(0, 8) }}</a-descriptions-item>
-        <a-descriptions-item v-if="detail.item.status === 'rejected' && detail.item.rejectReason" label="驳回理由">{{ detail.item.rejectReason }}</a-descriptions-item>
-      </a-descriptions>
+    <a-modal v-model:open="detail.open" title="评论详情" width="640px" :footer="null" @cancel="detail.open = false">
+      <div v-if="detail.item" class="detail-wrap">
+        <div class="detail-header">
+          <div class="detail-author">
+            <img v-if="detail.item.user?.avatar" :src="mediaUrl(detail.item.user.avatar)" alt="" class="detail-avatar" />
+            <div class="detail-author-info">
+              <span class="detail-name">{{ detail.item.authorName || '匿名' }}</span>
+              <span class="detail-email">{{ detail.item.user?.email || detail.item.authorEmail || '-' }}</span>
+            </div>
+          </div>
+          <div class="detail-status-group">
+            <a-tag :color="statusColor(detail.item.status)">{{ statusText(detail.item.status) }}</a-tag>
+            <span class="detail-time">{{ detail.item.createdAt?.slice(0, 16) || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">评论内容</div>
+          <div class="detail-content" v-html="renderContent(detail.item.content)"></div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-row">
+            <span class="detail-label">所属文章</span>
+            <a :href="`/article/${detail.item.post?.slug}`" target="_blank" class="detail-value detail-link">
+              {{ detail.item.post?.title || detail.item.postId }}
+            </a>
+          </div>
+          <div class="detail-row" v-if="detail.item.parent">
+            <span class="detail-label">回复对象</span>
+            <div class="detail-value">
+              <span class="reply-mention">@{{ detail.item.parent.authorName }}</span>
+              <span class="detail-parent-preview">{{ detail.item.parent.content?.slice(0, 60) }}</span>
+            </div>
+          </div>
+          <div class="detail-row" v-if="detail.item.rejectReason">
+            <span class="detail-label">驳回理由</span>
+            <span class="detail-value">{{ detail.item.rejectReason }}</span>
+          </div>
+        </div>
+
+        <div class="detail-actions">
+          <a-button v-if="detail.item.status==='pending'" type="primary" size="small" @click="handleApprove(detail.item)">通过</a-button>
+          <a-button v-if="detail.item.status==='pending'" danger size="small" @click="openReject(detail.item)">驳回</a-button>
+          <a-button v-if="detail.item.status==='rejected'" type="primary" size="small" @click="handleApprove(detail.item)">通过</a-button>
+        </div>
+      </div>
     </a-modal>
 
     <a-modal v-model:open="rejectDialog.open" title="驳回评论" width="400px" @ok="confirmReject" @cancel="cancelReject">
@@ -63,10 +93,25 @@ import { message } from 'ant-design-vue'
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
 const comments = ref<any[]>([])
 const rejectDialog = reactive({ open: false, comment: null as any, reason: '', customReason: '' })
 const detail = reactive({ open: false, item: null as any })
+
+function renderContent(text: string) {
+  const tokens: string[] = []
+  let r = text.replace(/◆emoji:([^◆]+)◆/g, (_, url) => {
+    tokens.push(url)
+    return `◆EMJ${tokens.length - 1}◆`
+  })
+  r = r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  r = r.replace(/\n/g, '<br>')
+  r = r.replace(/https?:\/\/[^\s<]+/g, '<a href="$&" target="_blank" rel="noopener noreferrer">$&</a>')
+  r = r.replace(/@(\S+)/g, '<span class="reply-mention">@$1</span>')
+  r = r.replace(/◆EMJ(\d+)◆/g, (_, idx) => `<img src="${mediaUrl(tokens[parseInt(idx)])}" alt="emoji" class="inline-emoji" />`)
+  return r
+}
 
 const columns = [
   { title: '作者', dataIndex: 'authorName', key: 'authorName', width: 90 },
@@ -123,4 +168,28 @@ async function confirmReject() {
 <style scoped>
 .list-card { border-radius:8px; }
 .comment-author { font-weight:500; font-size:0.82rem; }
+.inline-emoji { display:inline; width:1.6em; height:1.6em; vertical-align:-0.35em; border-radius:4px; }
+.reply-mention { color:var(--c-primary); font-weight:600; }
+
+.detail-wrap { display:flex; flex-direction:column; gap:16px; }
+.detail-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.detail-author { display:flex; align-items:center; gap:10px; }
+.detail-avatar { width:40px; height:40px; border-radius:50%; object-fit:cover; }
+.detail-author-info { display:flex; flex-direction:column; gap:2px; }
+.detail-name { font-weight:700; font-size:0.9rem; color:var(--c-text); }
+.detail-email { font-size:0.72rem; color:var(--c-text-3); }
+.detail-status-group { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.detail-time { font-size:0.7rem; color:var(--c-text-3); white-space:nowrap; }
+
+.detail-section { display:flex; flex-direction:column; gap:8px; }
+.detail-section-title { font-size:0.75rem; font-weight:600; color:var(--c-text-2); text-transform:uppercase; letter-spacing:0.05em; }
+.detail-content { padding:12px; background:var(--c-bg-2); border-radius:8px; font-size:0.85rem; line-height:1.7; color:var(--c-text); white-space:pre-wrap; }
+.detail-row { display:flex; align-items:baseline; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); }
+.detail-row:last-child { border-bottom:none; }
+.detail-label { font-size:0.75rem; font-weight:600; color:var(--c-text-2); min-width:72px; flex-shrink:0; }
+.detail-value { font-size:0.82rem; color:var(--c-text); display:flex; align-items:center; gap:6px; }
+.detail-link { color:var(--c-primary); text-decoration:none; }
+.detail-link:hover { text-decoration:underline; }
+.detail-parent-preview { font-size:0.72rem; color:var(--c-text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:300px; }
+.detail-actions { display:flex; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
 </style>

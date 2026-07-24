@@ -180,6 +180,7 @@ const adminFullNav = [
   { to: '/admin/friends', icon: 'ph:handshake-bold', label: '友链' },
   { to: '/admin/ai', icon: 'ph:robot-bold', label: 'AI' },
   { to: '/admin/settings', icon: 'ph:gear-bold', label: '设置' },
+  { to: '/admin/emoji', icon: 'ph:smiley-bold', label: '表情' },
   { to: '/admin/info', icon: 'ph:info-bold', label: '系统信息' },
   { to: '/admin/profile', icon: 'ph:user-bold', label: '我的信息' },
   { to: '/admin/messages', icon: 'ph:bell-bold', label: '我的消息' },

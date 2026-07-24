@@ -47,7 +47,7 @@
                 </div>
               </div>
               <div class="media-card-footer">
-                <span class="media-card-name">{{ item.originalName || item.filename }}</span>
+                <span class="media-card-name">{{ item.filename }}</span>
               </div>
             </div>
           </div>
@@ -70,7 +70,8 @@ const props = withDefaults(defineProps<{
   multiple?: boolean
   readonly?: boolean
   folder?: string
-}>(), { multiple: false, readonly: false, folder: '' })
+  compressAnimated?: boolean
+}>(), { multiple: false, readonly: false, folder: '', compressAnimated: false })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
@@ -156,6 +157,9 @@ function handleUpload(file: File) {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('folder', uploadFolder.value)
+  if (props.compressAnimated) {
+    fd.append('compressAnimated', 'true')
+  }
   api.upload('/media/upload', fd)
     .then(() => { message.success('上传成功'); loadMedia() })
     .catch(() => message.error('上传失败'))

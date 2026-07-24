@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -17,13 +17,49 @@ export class CommentController {
   }
 
   @Get('post/:postId')
-  findByPost(@Param('postId') postId: string) {
-    return this.comment.findByPost(postId);
+  findByPost(
+    @Param('postId') postId: string,
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('replyLimit') replyLimit?: string,
+  ) {
+    const userId = req.user?.id;
+    return this.comment.findByPost(
+      postId,
+      userId,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 10,
+      replyLimit ? parseInt(replyLimit) : 3,
+    );
   }
 
+  @Get(':id/replies')
+  findReplies(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const userId = req.user?.id;
+    return this.comment.findReplies(
+      id,
+      userId,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 3,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Post()
-  create(@Body() dto: CreateCommentDto) {
-    return this.comment.create(dto);
+  create(@Body() dto: CreateCommentDto, @Req() req: any) {
+    return this.comment.create(dto, req.user.id, req.user.username);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/like')
+  toggleLike(@Param('id') id: string, @Req() req: any) {
+    return this.comment.toggleLike(id, req.user.id);
   }
 
   @UseGuards(AuthGuard('jwt'))

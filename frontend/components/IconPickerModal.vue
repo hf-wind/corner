@@ -27,6 +27,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'confirm', icon: string): void
+  (e: 'cancel'): void
 }>()
 
 const visible = ref(props.modelValue)
@@ -40,11 +41,11 @@ const icons = [
   'FolderOutlined', 'FolderOpenOutlined', 'BookOutlined', 'ReadOutlined',
   'CodeOutlined', 'FileTextOutlined', 'FileUnknownOutlined',
   'PictureOutlined', 'CameraOutlined', 'VideoCameraOutlined',
-  'AudioOutlined', 'MusicOutlined', 'StarOutlined', 'HeartOutlined',
+  'AudioOutlined', 'StarOutlined', 'HeartOutlined',
   'TagOutlined', 'TagsOutlined', 'BulbOutlined', 'RocketOutlined',
   'FireOutlined', 'SmileOutlined', 'MehOutlined', 'FrownOutlined',
   'EnvironmentOutlined', 'GlobalOutlined', 'CoffeeOutlined',
-  'CrownOutlined', 'DiamondOutlined', 'GiftOutlined', 'KeyOutlined',
+  'CrownOutlined', 'GiftOutlined', 'KeyOutlined',
   'PushpinOutlined', 'SafetyOutlined', 'ShoppingOutlined',
   'SoundOutlined', 'ThunderboltOutlined', 'ToolOutlined',
   'TrophyOutlined', 'UserOutlined', 'TeamOutlined', 'WalletOutlined',
@@ -69,6 +70,7 @@ function handleConfirm() {
 
 function handleCancel() {
   emit('update:modelValue', false)
+  emit('cancel')
 }
 </script>
 
