@@ -20,6 +20,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { MusicModule } from './modules/music/music.module';
 import { EmojiModule } from './modules/emoji/emoji.module';
 import { EmailModule } from './modules/email/email.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { EmailModule } from './modules/email/email.module';
     MusicModule,
     EmojiModule,
     EmailModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

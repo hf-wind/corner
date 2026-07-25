@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { NotificationService } from '../notification/notification.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class CommentService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private notificationService: NotificationService,
   ) {}
 
   async findByPost(
@@ -236,25 +238,41 @@ export class CommentService {
           select: { id: true, username: true, email: true },
         });
 
-        if (parentAuthor && parentAuthor.id !== currentUserId && parentAuthor.email) {
-          await this.emailService.sendReplyNotification({
-            to: parentAuthor.email,
-            toName: parentAuthor.username,
+        if (parentAuthor && parentAuthor.id !== currentUserId) {
+          await this.notificationService.create(parentAuthor.id, {
+            type: 'reply',
+            title: '新回复通知',
+            content: `${comment.authorName || '匿名用户'} 回复了你在《${post.title}》的评论`,
+            link: `/article/${post.slug || post.id}`,
+          });
+          if (parentAuthor.email) {
+            await this.emailService.sendReplyNotification({
+              to: parentAuthor.email,
+              toName: parentAuthor.username,
+              senderName: comment.authorName || '匿名用户',
+              postTitle: post.title,
+              postId: post.id,
+              content: comment.content,
+            });
+          }
+        }
+      } else {
+        await this.notificationService.create(postAuthor.id, {
+          type: 'comment',
+          title: '新评论通知',
+          content: `${comment.authorName || '匿名用户'} 评论了你的文章《${post.title}》`,
+          link: `/article/${post.slug || post.id}`,
+        });
+        if (postAuthor.email) {
+          await this.emailService.sendCommentNotification({
+            to: postAuthor.email,
+            toName: postAuthor.username,
             senderName: comment.authorName || '匿名用户',
             postTitle: post.title,
             postId: post.id,
             content: comment.content,
           });
         }
-      } else if (postAuthor.email) {
-        await this.emailService.sendCommentNotification({
-          to: postAuthor.email,
-          toName: postAuthor.username,
-          senderName: comment.authorName || '匿名用户',
-          postTitle: post.title,
-          postId: post.id,
-          content: comment.content,
-        });
       }
     } catch (error) {
       console.error('发送评论通知失败:', error);
@@ -292,7 +310,7 @@ export class CommentService {
         select: { id: true, username: true, email: true },
       });
 
-      if (!commentAuthor || !commentAuthor.email) return;
+      if (!commentAuthor) return;
 
       const liker = await this.prisma.user.findUnique({
         where: { id: currentUserId },
@@ -301,18 +319,27 @@ export class CommentService {
 
       const post = await this.prisma.post.findUnique({
         where: { id: comment.postId },
-        select: { id: true, title: true },
+        select: { id: true, title: true, slug: true },
       });
 
       if (!post) return;
 
-      await this.emailService.sendLikeNotification({
-        to: commentAuthor.email,
-        toName: commentAuthor.username,
-        senderName: liker?.username || '匿名用户',
-        postTitle: post.title,
-        postId: post.id,
+      await this.notificationService.create(commentAuthor.id, {
+        type: 'like',
+        title: '点赞通知',
+        content: `${liker?.username || '匿名用户'} 赞了你在《${post.title}》的评论`,
+        link: `/article/${post.slug || post.id}`,
       });
+
+      if (commentAuthor.email) {
+        await this.emailService.sendLikeNotification({
+          to: commentAuthor.email,
+          toName: commentAuthor.username,
+          senderName: liker?.username || '匿名用户',
+          postTitle: post.title,
+          postId: post.id,
+        });
+      }
     } catch (error) {
       console.error('发送点赞通知失败:', error);
     }
