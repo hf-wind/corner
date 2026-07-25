@@ -74,7 +74,7 @@ export class EmailService {
     return code;
   }
 
-  async sendVerificationCode(email: string, type: 'register' | 'login'): Promise<{ success: boolean; message: string }> {
+  async sendVerificationCode(email: string, type: 'register' | 'login' | 'change_password'): Promise<{ success: boolean; message: string }> {
     const config = await this.getEmailConfig();
     if (!config.enabled) {
       return { success: false, message: '邮件服务未启用' };
@@ -105,7 +105,7 @@ export class EmailService {
       },
     });
 
-    const typeText = type === 'register' ? '注册' : '登录';
+    const typeText = type === 'register' ? '注册' : type === 'login' ? '登录' : '修改密码';
     const html = this.getVerificationCodeTemplate(code, typeText);
 
     await this.verificationQueue.add('send-verification', {
@@ -119,7 +119,7 @@ export class EmailService {
     return { success: true, message: '验证码已发送' };
   }
 
-  async verifyCode(email: string, code: string, type: 'register' | 'login'): Promise<boolean> {
+  async verifyCode(email: string, code: string, type: 'register' | 'login' | 'change_password'): Promise<boolean> {
     const verification = await this.prisma.verificationCode.findFirst({
       where: {
         email,

@@ -22,13 +22,18 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
-  async sendVerificationCode(email: string, type: 'register' | 'login') {
+  async sendVerificationCode(email: string, type: 'register' | 'login' | 'change_password') {
     if (type === 'register') {
       const existing = await this.prisma.user.findUnique({ where: { email } });
       if (existing) throw new ConflictException('该邮箱已被注册');
     }
 
     if (type === 'login') {
+      const user = await this.prisma.user.findUnique({ where: { email } });
+      if (!user) throw new BadRequestException('该邮箱未注册');
+    }
+
+    if (type === 'change_password') {
       const user = await this.prisma.user.findUnique({ where: { email } });
       if (!user) throw new BadRequestException('该邮箱未注册');
     }
@@ -92,6 +97,19 @@ export class AuthService {
       },
     });
     return user;
+  }
+
+  async changePassword(userId: string, email: string, newPassword: string, code: string) {
+    const valid = await this.emailService.verifyCode(email, code, 'change_password');
+    if (!valid) throw new BadRequestException('验证码无效或已过期');
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { success: true, message: '密码修改成功' };
   }
 
   private async generateUsername(email: string): Promise<string> {

@@ -42,6 +42,28 @@
           </a-form-item>
         </a-form>
       </a-card>
+
+      <a-card :bordered="false" class="section-card" size="small" title="修改密码" style="margin-top: 16px;">
+        <a-form layout="vertical" class="profile-form" :model="pwdForm" @finish="changePassword">
+          <a-form-item label="新密码" name="newPassword" :rules="[{ required: true, message: '请输入新密码' }, { min: 6, message: '密码至少6位' }]">
+            <a-input-password v-model:value="pwdForm.newPassword" placeholder="请输入新密码" />
+          </a-form-item>
+          <a-form-item label="确认密码" name="confirmPassword" :rules="[{ required: true, message: '请确认密码' }, { validator: validateConfirm }]">
+            <a-input-password v-model:value="pwdForm.confirmPassword" placeholder="请再次输入新密码" />
+          </a-form-item>
+          <a-form-item label="验证码" name="code" :rules="[{ required: true, message: '请输入验证码' }]">
+            <div class="code-row">
+              <a-input v-model:value="pwdForm.code" placeholder="请输入验证码" maxlength="6" />
+              <a-button :disabled="codeCooldown > 0" @click="sendChangePasswordCode">
+                {{ codeCooldown > 0 ? `${codeCooldown}s` : '发送验证码' }}
+              </a-button>
+            </div>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" html-type="submit" :loading="pwdSaving">修改密码</a-button>
+          </a-form-item>
+        </a-form>
+      </a-card>
     </a-spin>
   </div>
 </template>
@@ -64,6 +86,66 @@ const form = reactive({
   avatar: '',
   bio: '',
 })
+
+const pwdSaving = ref(false)
+const codeCooldown = ref(0)
+const pwdForm = reactive({
+  newPassword: '',
+  confirmPassword: '',
+  code: '',
+})
+
+function validateConfirm(_rule: any, value: string) {
+  if (value !== pwdForm.newPassword) {
+    return Promise.reject(new Error('两次密码输入不一致'))
+  }
+  return Promise.resolve()
+}
+
+let cooldownTimer: ReturnType<typeof setInterval> | null = null
+
+function sendChangePasswordCode() {
+  if (!form.email) {
+    message.warning('请先加载个人信息')
+    return
+  }
+  api.post('/auth/send-code', { email: form.email, type: 'change_password' })
+    .then((res: any) => {
+      if (res.success) {
+        message.success('验证码已发送')
+        codeCooldown.value = 60
+        cooldownTimer = setInterval(() => {
+          codeCooldown.value--
+          if (codeCooldown.value <= 0 && cooldownTimer) {
+            clearInterval(cooldownTimer)
+            cooldownTimer = null
+          }
+        }, 1000)
+      } else {
+        message.warning(res.message || '发送失败')
+      }
+    })
+    .catch((e: any) => {
+      message.error(e?.message || '发送验证码失败')
+    })
+}
+
+async function changePassword() {
+  pwdSaving.value = true
+  try {
+    await api.post('/auth/change-password', {
+      newPassword: pwdForm.newPassword,
+      code: pwdForm.code,
+    })
+    message.success('密码修改成功')
+    pwdForm.newPassword = ''
+    pwdForm.confirmPassword = ''
+    pwdForm.code = ''
+  } catch (e: any) {
+    message.error(e?.message || '修改失败')
+  }
+  pwdSaving.value = false
+}
 
 onMounted(async () => {
   readStorage()
@@ -248,4 +330,11 @@ async function save() {
   color: var(--c-text-3);
 }
 .profile-form { max-width: 420px; }
+.code-row {
+  display: flex;
+  gap: 8px;
+}
+.code-row :deep(.ant-input) {
+  flex: 1;
+}
 </style>
