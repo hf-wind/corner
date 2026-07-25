@@ -35,6 +35,26 @@
             <a-textarea v-model:value="form.ai_summarize_prompt" :rows="5" />
           </a-card>
 
+          <a-card size="small" title="评论审核" :bordered="false" class="section-card">
+            <a-form layout="vertical" size="middle">
+              <a-form-item label="审核 Prompt">
+                <a-textarea v-model:value="form.ai_moderate_prompt" :rows="8" placeholder="定义 AI 审核评论的标准和输出格式" />
+              </a-form-item>
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="12">
+                  <a-form-item label="审核 temperature">
+                    <a-input-number v-model:value="form.ai_moderate_temperature" :min="0" :max="2" :step="0.1" style="width:100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12">
+                  <a-form-item label="审核 maxTokens">
+                    <a-input-number v-model:value="form.ai_moderate_max_tokens" :min="64" :max="1024" style="width:100%" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
+          </a-card>
+
           <a-card size="small" title="欢迎语 / 兜底回复" :bordered="false" class="section-card">
             <a-form layout="vertical" size="middle">
               <a-form-item label="欢迎语（每行一条）">

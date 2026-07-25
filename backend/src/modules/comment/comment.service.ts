@@ -25,9 +25,18 @@ export class CommentService {
   ) {
     const skip = (page - 1) * limit;
 
+    const where: any = {
+      postId,
+      parentId: null,
+      OR: [
+        { status: 'approved' },
+        ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
+      ],
+    };
+
     const [comments, total] = await Promise.all([
       this.prisma.comment.findMany({
-        where: { postId, status: 'approved', parentId: null },
+        where,
         skip,
         take: limit,
         include: {
@@ -44,9 +53,7 @@ export class CommentService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.comment.count({
-        where: { postId, status: 'approved', parentId: null },
-      }),
+      this.prisma.comment.count({ where }),
     ]);
 
     const topIds = comments.map((c) => c.id);
@@ -90,6 +97,7 @@ export class CommentService {
         authorAvatar: c.user?.avatar ?? null,
         content: c.content,
         parentId: c.parentId,
+        status: c.status,
         createdAt: c.createdAt,
         likesCount: c._count?.likes ?? 0,
         liked: (c as any).likes?.length > 0,

@@ -204,22 +204,14 @@ export class AiService {
       return { approved: true, reason: 'AI 未配置，自动通过' };
     }
 
+    const cfg = await this.getConfig();
+
     try {
       const result = await this.chat(
         [
           {
             role: 'system',
-            content: `你是一个评论审核助手。请审核以下评论内容是否适合公开发布。
-
-审核标准：
-1. 包含广告、推销内容 → 拒绝
-2. 包含恶意攻击、辱骂、歧视 → 拒绝
-3. 包含色情、暴力、违法内容 → 拒绝
-4. 包含垃圾信息、无意义内容 → 拒绝
-5. 正常交流、提问、分享观点 → 通过
-
-请严格按以下 JSON 格式回复，不要添加任何其他内容：
-{"approved": true/false, "reason": "审核原因简述"}`
+            content: cfg.ai_moderate_prompt,
           },
           {
             role: 'user',
@@ -227,8 +219,8 @@ export class AiService {
           }
         ],
         {
-          temperature: 0.1,
-          maxTokens: 200,
+          temperature: cfg.ai_moderate_temperature,
+          maxTokens: cfg.ai_moderate_max_tokens,
           thinking: 'disabled',
         }
       );

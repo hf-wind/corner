@@ -13,6 +13,7 @@ export interface Comment {
   avatar: string
   time: string
   content: string
+  status?: 'pending' | 'approved' | 'rejected'
   hot?: boolean
   author?: boolean
   liked?: boolean

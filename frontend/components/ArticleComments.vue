@@ -112,6 +112,10 @@
               <Icon name="ph:fire-bold" /> 热评
             </span>
             <span v-if="c.author" class="comment-badge author">博主</span>
+            <span v-if="c.status === 'pending'" class="comment-badge pending">
+              <Icon name="ph:spinner-gap-bold" class="spinning" /> 审核中
+            </span>
+            <span v-if="c.status === 'rejected'" class="comment-badge rejected">审核未通过</span>
             <span class="comment-time">
               <Icon name="ph:clock-bold" />
               {{ c.time }}
@@ -472,6 +476,7 @@ async function submitComment() {
         avatar: authUser.value?.avatar,
         time: '刚刚',
         content: c.content,
+        status: 'pending',
         likes: 0,
         liked: false,
         replies: [],
@@ -1253,6 +1258,16 @@ onMounted(() => {
 .comment-badge.author {
   background: var(--c-primary-soft);
   color: var(--c-primary);
+}
+
+.comment-badge.pending {
+  background: #f59e0b20;
+  color: #f59e0b;
+}
+
+.comment-badge.rejected {
+  background: #ef444420;
+  color: #ef4444;
 }
 
 .comment-time {

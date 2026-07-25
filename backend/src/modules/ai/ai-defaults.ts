@@ -1,6 +1,7 @@
 export const AI_SETTING_KEYS = [
   'ai_pet_system_prompt',
   'ai_summarize_prompt',
+  'ai_moderate_prompt',
   'ai_pet_display_name',
   'ai_pet_description',
   'ai_pet_greetings',
@@ -10,6 +11,8 @@ export const AI_SETTING_KEYS = [
   'ai_chat_max_tokens',
   'ai_summarize_temperature',
   'ai_summarize_max_tokens',
+  'ai_moderate_temperature',
+  'ai_moderate_max_tokens',
   'ai_history_limit',
   'ai_history_char_budget',
   'ai_owner_username',
@@ -24,6 +27,7 @@ export type AiSettingKey = (typeof AI_SETTING_KEYS)[number];
 export type AiConfig = {
   ai_pet_system_prompt: string;
   ai_summarize_prompt: string;
+  ai_moderate_prompt: string;
   ai_pet_display_name: string;
   ai_pet_description: string;
   ai_pet_greetings: string[];
@@ -33,6 +37,8 @@ export type AiConfig = {
   ai_chat_max_tokens: number;
   ai_summarize_temperature: number;
   ai_summarize_max_tokens: number;
+  ai_moderate_temperature: number;
+  ai_moderate_max_tokens: number;
   ai_history_limit: number;
   ai_history_char_budget: number;
   ai_owner_username: string;
@@ -61,6 +67,20 @@ export const AI_DEFAULTS: AiConfig = {
     '客观概括主题与要点；不编造正文没有的信息；可以带上对阿风的吐槽。',
   ].join(''),
 
+  ai_moderate_prompt: [
+    '你是一个评论审核助手。请审核以下评论内容是否适合公开发布。',
+    '',
+    '审核标准：',
+    '1. 包含广告、推销内容 → 拒绝',
+    '2. 包含恶意攻击、辱骂、歧视 → 拒绝',
+    '3. 包含色情、暴力、违法内容 → 拒绝',
+    '4. 包含垃圾信息、无意义内容 → 拒绝',
+    '5. 正常交流、提问、分享观点 → 通过',
+    '',
+    '请严格按以下 JSON 格式回复，不要添加任何其他内容：',
+    '{"approved": true/false, "reason": "审核原因简述"}',
+  ].join('\n'),
+
   ai_pet_display_name: '哆啦A梦',
   ai_pet_description: '阿风的伙伴 · 蓝色机器猫',
   ai_pet_greetings: [
@@ -76,6 +96,8 @@ export const AI_DEFAULTS: AiConfig = {
   ai_chat_max_tokens: 512,
   ai_summarize_temperature: 0.5,
   ai_summarize_max_tokens: 256,
+  ai_moderate_temperature: 0.1,
+  ai_moderate_max_tokens: 200,
   ai_history_limit: 24,
   ai_history_char_budget: 4096,
   ai_owner_username: '阿风',

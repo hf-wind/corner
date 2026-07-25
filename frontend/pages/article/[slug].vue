@@ -196,6 +196,7 @@ async function loadComments(page = 1) {
       avatar: c.authorAvatar,
       time: formatTime(c.createdAt),
       content: c.content,
+      status: c.status,
       likes: c.likesCount ?? 0,
       liked: c.liked ?? false,
       replyCount: c.replyCount ?? 0,
