@@ -20,6 +20,9 @@ export const AI_SETTING_KEYS = [
   'ai_knowledge_catalog_limit',
   'ai_knowledge_top_k',
   'ai_knowledge_snippet_len',
+  'ai_friend_moderate_prompt',
+  'ai_friend_moderate_temperature',
+  'ai_friend_moderate_max_tokens',
 ] as const;
 
 export type AiSettingKey = (typeof AI_SETTING_KEYS)[number];
@@ -46,6 +49,9 @@ export type AiConfig = {
   ai_knowledge_catalog_limit: number;
   ai_knowledge_top_k: number;
   ai_knowledge_snippet_len: number;
+  ai_friend_moderate_prompt: string;
+  ai_friend_moderate_temperature: number;
+  ai_friend_moderate_max_tokens: number;
 };
 
 export const AI_DEFAULTS: AiConfig = {
@@ -105,4 +111,19 @@ export const AI_DEFAULTS: AiConfig = {
   ai_knowledge_catalog_limit: 20,
   ai_knowledge_top_k: 4,
   ai_knowledge_snippet_len: 600,
+  ai_friend_moderate_prompt: [
+    '你是一个友联审核助手。请审核以下网站是否适合交换友情链接。',
+    '',
+    '审核标准：',
+    '1. 网站内容合法合规（无色情、暴力、赌博、钓鱼内容）→ 通过',
+    '2. 网站是正常的博客/个人网站 → 通过',
+    '3. 网站包含恶意软件、广告联盟堆砌 → 拒绝',
+    '4. 网站无法访问或内容极少（不到3篇文章）→ 拒绝',
+    '5. 网站内容与友联申请信息一致 → 通过',
+    '',
+    '请严格按以下 JSON 格式回复，不要添加任何其他内容：',
+    '{"approved": true/false, "reason": "审核原因简述"}',
+  ].join('\n'),
+  ai_friend_moderate_temperature: 0.1,
+  ai_friend_moderate_max_tokens: 300,
 };
