@@ -10,6 +10,10 @@
           <template v-if="column.key === 'url'">
             <a :href="record.url" target="_blank" class="friend-link">{{ record.url }}</a>
           </template>
+          <template v-if="column.key === 'rssUrl'">
+            <a v-if="record.rssUrl" :href="record.rssUrl" target="_blank" class="friend-link" style="font-size:0.72rem;">RSS</a>
+            <span v-else style="color:var(--c-text-2)">-</span>
+          </template>
           <template v-if="column.key === 'actions'">
             <a-button type="link" size="small" @click="editFriend(index)"><EditOutlined /> 编辑</a-button>
             <a-button type="link" size="small" danger @click="removeFriend(index, record.name)"><DeleteOutlined /> 删除</a-button>
@@ -24,6 +28,8 @@
         <a-form-item label="URL"><a-input v-model:value="dialog.form.url" placeholder="https://" /></a-form-item>
         <a-form-item label="头像"><a-input v-model:value="dialog.form.avatar" placeholder="头像 URL" /></a-form-item>
         <a-form-item label="描述"><a-textarea v-model:value="dialog.form.description" :rows="2" /></a-form-item>
+        <a-form-item label="RSS URL"><a-input v-model:value="dialog.form.rssUrl" placeholder="RSS/Atom feed URL (可选)" /></a-form-item>
+        <a-form-item label="站长名"><a-input v-model:value="dialog.form.webmasterName" placeholder="站长名称 (可选)" /></a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -37,11 +43,14 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 const api = useApi()
 const toast = useToast()
 const friends = ref<any[]>([])
-const dialog = reactive({ open: false, isEdit: false, editIndex: -1, form: { name: '', url: '', avatar: '', description: '' } })
+const dialog = reactive({ open: false, isEdit: false, editIndex: -1, form: { name: '', url: '', avatar: '', description: '', rssUrl: '', webmasterName: '' } })
 
 const columns = [
   { title: '名称', dataIndex: 'name', key: 'name', width: 90 },
   { title: 'URL', key: 'url', minWidth: 140 },
+  { title: '描述', dataIndex: 'description', key: 'description', width: 150, ellipsis: true },
+  { title: 'RSS', key: 'rssUrl', width: 80 },
+  { title: '站长', dataIndex: 'webmasterName', key: 'webmasterName', width: 80 },
   { title: '操作', key: 'actions', width: 160, fixed: 'right' as const },
 ]
 
@@ -58,7 +67,7 @@ async function persistFriends() {
   try { await api.put('/settings', { key: 'friends', value: friends.value }) } catch { toast.error('保存失败') }
 }
 
-function openAddFriend() { dialog.isEdit = false; dialog.editIndex = -1; dialog.form = { name: '', url: '', avatar: '', description: '' }; dialog.open = true }
+function openAddFriend() { dialog.isEdit = false; dialog.editIndex = -1; dialog.form = { name: '', url: '', avatar: '', description: '', rssUrl: '', webmasterName: '' }; dialog.open = true }
 function editFriend(i: number) { dialog.isEdit = true; dialog.editIndex = i; dialog.form = { ...friends.value[i] }; dialog.open = true }
 
 async function saveFriend() {
