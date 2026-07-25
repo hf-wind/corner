@@ -15,7 +15,7 @@ async function main() {
 
   const existingAdmin = await prisma.user.findUnique({ where: { email: '1833079849@qq.com' } });
   const admin = existingAdmin
-    ? await prisma.user.update({ where: { id: existingAdmin.id }, data: { role: 'admin' } })
+    ? await prisma.user.update({ where: { id: existingAdmin.id }, data: { role: 'admin', passwordHash } })
     : await prisma.user.create({
         data: {
           username: 'admin',
@@ -31,7 +31,7 @@ async function main() {
   if (!author) {
     author = await prisma.user.findUnique({ where: { username: 'writer' } });
     if (author) {
-      author = await prisma.user.update({ where: { id: author.id }, data: { email: 'huifeng0615@outlook.com', role: 'user' } });
+      author = await prisma.user.update({ where: { id: author.id }, data: { email: 'huifeng0615@outlook.com', role: 'user', passwordHash } });
     } else {
       author = await prisma.user.create({
         data: {
@@ -45,7 +45,7 @@ async function main() {
       });
     }
   } else {
-    author = await prisma.user.update({ where: { id: author.id }, data: { role: 'user' } });
+    author = await prisma.user.update({ where: { id: author.id }, data: { role: 'user', passwordHash } });
   }
 
   const categories = [
