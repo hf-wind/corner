@@ -208,6 +208,10 @@ export class AiService {
     const cfg = await this.getConfig();
     this.logger.log(`开始 AI 评论审核，prompt 长度: ${cfg.ai_moderate_prompt?.length || 0}`);
 
+    const cleanContent = content
+      .replace(/\[\[emoji:[^\]|]+\|([^\]]+)\]\]/g, '[$1]')
+      .replace(/◆emoji:[^◆]+◆/g, '[表情]');
+
     try {
       const result = await this.chat(
         [
@@ -217,7 +221,7 @@ export class AiService {
           },
           {
             role: 'user',
-            content: `文章标题：${postTitle || '无'}\n\n评论内容：\n${content.slice(0, 1000)}`
+            content: `文章标题：${postTitle || '无'}\n\n评论内容：\n${cleanContent.slice(0, 1000)}`
           }
         ],
         {
@@ -240,6 +244,80 @@ export class AiService {
       return { approved: true, reason: 'AI 返回格式异常，自动通过' };
     } catch (e) {
       this.logger.warn(`评论审核失败: ${e}`);
+      return { approved: true, reason: 'AI 审核异常，自动通过' };
+    }
+  }
+
+  async moderateFriendSite(
+    siteUrl: string,
+    friendPageUrl: string,
+    mySiteUrl: string,
+  ): Promise<{ approved: boolean; reason: string }> {
+    if (!this.isConfigured()) {
+      this.logger.warn('AI 未配置，友联审核自动通过');
+      return { approved: true, reason: 'AI 未配置，自动通过' };
+    }
+
+    try {
+      const friendPageRes = await fetch(friendPageUrl, {
+        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': 'CornerBot/1.0' },
+      });
+      if (friendPageRes.ok) {
+        const friendPageHtml = await friendPageRes.text();
+        const normalizedMyUrl = mySiteUrl.replace(/\/+$/, '').toLowerCase();
+        if (!friendPageHtml.toLowerCase().includes(normalizedMyUrl)) {
+          return {
+            approved: false,
+            reason: '友联页面中未找到本站链接，请先添加本站友联后再申请',
+          };
+        }
+      }
+    } catch (e) {
+      this.logger.warn(`友联页面检查失败，跳过链接检查: ${e}`);
+    }
+
+    try {
+      const siteRes = await fetch(siteUrl, {
+        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': 'CornerBot/1.0' },
+      });
+      if (!siteRes.ok) {
+        return { approved: false, reason: `站点无法访问 (${siteRes.status})` };
+      }
+
+      const siteHtml = await siteRes.text();
+      const plainText = this.toPlainText(siteHtml).slice(0, 3000);
+
+      const cfg = await this.getConfig();
+      const result = await this.chat(
+        [
+          { role: 'system', content: cfg.ai_friend_moderate_prompt },
+          {
+            role: 'user',
+            content: `站点URL：${siteUrl}\n友联页面：${friendPageUrl}\n\n站点内容：\n${plainText}`,
+          },
+        ],
+        {
+          temperature: cfg.ai_friend_moderate_temperature,
+          maxTokens: cfg.ai_friend_moderate_max_tokens,
+          thinking: 'disabled',
+        },
+      );
+
+      this.logger.log(`AI 友联审核原始返回: ${result?.slice(0, 200)}`);
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          approved: Boolean(parsed.approved),
+          reason: String(parsed.reason || 'AI 审核完成'),
+        };
+      }
+
+      return { approved: true, reason: 'AI 返回格式异常，自动通过' };
+    } catch (e) {
+      this.logger.warn(`友联审核失败: ${e}`);
       return { approved: true, reason: 'AI 审核异常，自动通过' };
     }
   }
