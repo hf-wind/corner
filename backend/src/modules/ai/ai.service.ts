@@ -199,6 +199,56 @@ export class AiService {
     }
   }
 
+  async moderateComment(content: string, postTitle?: string): Promise<{ approved: boolean; reason: string }> {
+    if (!this.isConfigured()) {
+      return { approved: true, reason: 'AI 未配置，自动通过' };
+    }
+
+    try {
+      const result = await this.chat(
+        [
+          {
+            role: 'system',
+            content: `你是一个评论审核助手。请审核以下评论内容是否适合公开发布。
+
+审核标准：
+1. 包含广告、推销内容 → 拒绝
+2. 包含恶意攻击、辱骂、歧视 → 拒绝
+3. 包含色情、暴力、违法内容 → 拒绝
+4. 包含垃圾信息、无意义内容 → 拒绝
+5. 正常交流、提问、分享观点 → 通过
+
+请严格按以下 JSON 格式回复，不要添加任何其他内容：
+{"approved": true/false, "reason": "审核原因简述"}`
+          },
+          {
+            role: 'user',
+            content: `文章标题：${postTitle || '无'}\n\n评论内容：\n${content.slice(0, 1000)}`
+          }
+        ],
+        {
+          temperature: 0.1,
+          maxTokens: 200,
+          thinking: 'disabled',
+        }
+      );
+
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          approved: Boolean(parsed.approved),
+          reason: String(parsed.reason || 'AI 审核完成'),
+        };
+      }
+
+      return { approved: true, reason: 'AI 返回格式异常，自动通过' };
+    } catch (e) {
+      this.logger.warn(`评论审核失败: ${e}`);
+      return { approved: true, reason: 'AI 审核异常，自动通过' };
+    }
+  }
+
   private extractKeywords(query: string): string[] {
     const raw = String(query || '')
       .toLowerCase()

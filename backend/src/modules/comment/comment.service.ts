@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { NotificationService } from '../notification/notification.service';
+import { AiService } from '../ai/ai.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 
 @Injectable()
 export class CommentService {
+  private readonly logger = new Logger(CommentService.name);
+
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
     private notificationService: NotificationService,
+    private aiService: AiService,
   ) {}
 
   async findByPost(
@@ -203,7 +207,7 @@ export class CommentService {
         authorName: userName,
         content: dto.content,
         parentId: resolvedParentId,
-        status: 'approved',
+        status: 'pending',
       },
       include: {
         parent: { select: { authorName: true } },
@@ -211,11 +215,74 @@ export class CommentService {
       },
     });
 
-    this.sendCommentNotification(post, comment, parentComment, userId).catch((err) => {
-      console.error('发送评论通知失败:', err);
+    this.moderateAndNotify(comment, post, parentComment, userId, userName).catch((err) => {
+      this.logger.error('AI 审核流程异常:', err);
     });
 
     return comment;
+  }
+
+  private async moderateAndNotify(
+    comment: any,
+    post: any,
+    parentComment: any | null,
+    currentUserId: string,
+    userName: string,
+  ) {
+    try {
+      const review = await this.aiService.moderateComment(comment.content, post.title);
+
+      await this.prisma.comment.update({
+        where: { id: comment.id },
+        data: {
+          aiReview: review.reason,
+          aiReviewResult: review.approved ? 'approved' : 'rejected',
+          status: review.approved ? 'approved' : 'rejected',
+          rejectReason: review.approved ? null : review.reason,
+        },
+      });
+
+      if (review.approved) {
+        await this.sendCommentNotification(post, { ...comment, status: 'approved' }, parentComment, currentUserId);
+
+        if (comment.userId) {
+          await this.notificationService.create(comment.userId, {
+            type: 'system',
+            title: '评论审核通过',
+            content: `你的评论在《${post.title}》已通过审核并发布`,
+            link: `/article/${post.slug || post.id}`,
+          });
+        }
+      } else {
+        if (comment.userId) {
+          await this.notificationService.create(comment.userId, {
+            type: 'system',
+            title: '评论审核未通过',
+            content: `你的评论在《${post.title}》未通过审核：${review.reason}`,
+            link: `/article/${post.slug || post.id}`,
+          });
+        }
+
+        const admins = await this.prisma.user.findMany({
+          where: { role: 'admin' },
+          select: { id: true },
+        });
+        for (const admin of admins) {
+          await this.notificationService.create(admin.id, {
+            type: 'comment',
+            title: '评论审核未通过',
+            content: `${userName} 的评论在《${post.title}》被 AI 拒绝：${review.reason}`,
+            link: `/admin/comments`,
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('AI 审核流程异常:', error);
+      await this.prisma.comment.update({
+        where: { id: comment.id },
+        data: { status: 'approved', aiReview: 'AI 审核异常，自动通过' },
+      });
+    }
   }
 
   private async sendCommentNotification(

@@ -13,6 +13,11 @@
             <template v-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
             </template>
+            <template v-if="column.key === 'aiReview'">
+              <a-tag v-if="record.aiReviewResult === 'approved'" color="green">通过</a-tag>
+              <a-tag v-else-if="record.aiReviewResult === 'rejected'" color="red">拒绝</a-tag>
+              <a-tag v-else color="default">待审核</a-tag>
+            </template>
             <template v-if="column.key === 'createdAt'">{{ record.createdAt?.slice(0, 16) || '' }}</template>
             <template v-if="column.key === 'actions'">
               <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
@@ -63,6 +68,15 @@
           <div class="detail-row" v-if="detail.item.rejectReason">
             <span class="detail-label">驳回理由</span>
             <span class="detail-value">{{ detail.item.rejectReason }}</span>
+          </div>
+          <div class="detail-row" v-if="detail.item.aiReview">
+            <span class="detail-label">AI 审核</span>
+            <div class="detail-value">
+              <a-tag :color="detail.item.aiReviewResult === 'approved' ? 'green' : 'red'">
+                {{ detail.item.aiReviewResult === 'approved' ? '通过' : '拒绝' }}
+              </a-tag>
+              <span class="detail-ai-review">{{ detail.item.aiReview }}</span>
+            </div>
           </div>
         </div>
 
@@ -120,14 +134,15 @@ function renderContent(text: string) {
 
 const columns = [
   { title: '作者', dataIndex: 'authorName', key: 'authorName', width: 90 },
-  { title: '内容', dataIndex: 'content', key: 'content', minWidth: 280 },
+  { title: '内容', dataIndex: 'content', key: 'content', minWidth: 220 },
+  { title: 'AI审核', key: 'aiReview', width: 80 },
   { title: '状态', key: 'status', width: 80 },
   { title: '时间', dataIndex: 'createdAt', key: 'createdAt', width: 140 },
   { title: '操作', key: 'actions', width: 180, fixed: 'right' as const },
 ]
 
 function statusColor(s: string) { return s === 'approved' ? 'green' : s === 'rejected' ? 'red' : 'default' }
-function statusText(s: string) { return s === 'approved' ? '已审核' : s === 'rejected' ? '审核未通过' : '待审核' }
+function statusText(s: string) { return s === 'approved' ? '已发布' : s === 'rejected' ? '已拒绝' : '待审核' }
 
 onMounted(async () => {
   try {
@@ -196,5 +211,6 @@ async function confirmReject() {
 .detail-link { color:var(--c-primary); text-decoration:none; }
 .detail-link:hover { text-decoration:underline; }
 .detail-parent-preview { font-size:0.72rem; color:var(--c-text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:300px; }
+.detail-ai-review { font-size:0.78rem; color:var(--c-text-2); }
 .detail-actions { display:flex; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
 </style>
