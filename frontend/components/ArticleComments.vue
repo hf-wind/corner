@@ -469,28 +469,52 @@ async function submitComment() {
       content,
     })
     const userName = authUser.value?.username || '用户'
-    const updated = [
-      {
-        id: c.id,
-        name: userName,
-        avatar: authUser.value?.avatar,
-        time: '刚刚',
-        content: c.content,
-        status: 'pending',
-        likes: 0,
-        liked: false,
-        replies: [],
-        replyCount: 0,
-      },
-      ...props.comments,
-    ]
+    const newComment = {
+      id: c.id,
+      name: userName,
+      avatar: authUser.value?.avatar,
+      time: '刚刚',
+      content: c.content,
+      status: 'pending',
+      likes: 0,
+      liked: false,
+      replies: [],
+      replyCount: 0,
+    }
+    const updated = [newComment, ...props.comments]
     emit('update:comments', updated)
     if (editorRef.value) editorRef.value.innerHTML = ''
     if (props.commentPage > 1) {
       emit('update:commentPage', 1)
     }
+    pollCommentStatus(c.id)
   } catch { /* ignore */ }
   submitting.value = false
+}
+
+function pollCommentStatus(commentId: string, maxAttempts = 30) {
+  let attempts = 0
+  const interval = setInterval(async () => {
+    attempts++
+    if (attempts > maxAttempts) {
+      clearInterval(interval)
+      return
+    }
+    try {
+      const data = await api.get<any>(`/comments/post/${props.postId}`, { page: 1, limit: 10, replyLimit: 3 })
+      const found = data.items?.find((c: any) => c.id === commentId)
+      if (found && found.status !== 'pending') {
+        clearInterval(interval)
+        const updated = props.comments.map((c) => {
+          if (c.id === commentId) {
+            return { ...c, status: found.status }
+          }
+          return c
+        })
+        emit('update:comments', updated)
+      }
+    } catch { /* ignore */ }
+  }, 2000)
 }
 
 async function likeComment(c: Comment) {
