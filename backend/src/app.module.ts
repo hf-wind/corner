@@ -21,6 +21,7 @@ import { MusicModule } from './modules/music/music.module';
 import { EmojiModule } from './modules/emoji/emoji.module';
 import { EmailModule } from './modules/email/email.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { FriendLinkModule } from './modules/friend-link/friend-link.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     EmojiModule,
     EmailModule,
     NotificationModule,
+    FriendLinkModule,
   ],
   controllers: [AppController],
   providers: [AppService],
