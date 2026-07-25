@@ -32,9 +32,7 @@
               <a-tag :color="getStatusColor(record.status)">{{ getStatusLabel(record.status) }}</a-tag>
             </template>
             <template v-if="column.key === 'content'">
-              <a-tooltip v-if="record.content" :title="stripHtml(record.content)">
-                <span class="content-text">{{ truncate(stripHtml(record.content), 50) }}</span>
-              </a-tooltip>
+              <span v-if="record.content" class="content-text">{{ truncate(stripHtml(record.content), 50) }}</span>
               <span v-else>-</span>
             </template>
             <template v-if="column.key === 'createdAt'">
@@ -49,10 +47,50 @@
               </a-tooltip>
               <span v-else>-</span>
             </template>
+            <template v-if="column.key === 'actions'">
+              <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+            </template>
           </template>
         </a-table>
       </a-spin>
     </a-card>
+
+    <a-modal v-model:open="detail.open" title="邮件详情" width="640px" :footer="null" @cancel="detail.open = false">
+      <div v-if="detail.item" class="detail-wrap">
+        <div class="detail-row">
+          <span class="detail-label">收件人</span>
+          <span class="detail-value">{{ detail.item.to }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">主题</span>
+          <span class="detail-value">{{ detail.item.subject }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">类型</span>
+          <a-tag :color="getTypeColor(detail.item.type)">{{ getTypeLabel(detail.item.type) }}</a-tag>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">状态</span>
+          <a-tag :color="getStatusColor(detail.item.status)">{{ getStatusLabel(detail.item.status) }}</a-tag>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">创建时间</span>
+          <span class="detail-value">{{ formatDate(detail.item.createdAt) }}</span>
+        </div>
+        <div class="detail-row" v-if="detail.item.sentAt">
+          <span class="detail-label">发送时间</span>
+          <span class="detail-value">{{ formatDate(detail.item.sentAt) }}</span>
+        </div>
+        <div class="detail-section" v-if="detail.item.content">
+          <div class="detail-section-title">邮件内容</div>
+          <div class="detail-content" v-html="detail.item.content"></div>
+        </div>
+        <div class="detail-section" v-if="detail.item.error">
+          <div class="detail-section-title">错误信息</div>
+          <div class="detail-error">{{ detail.item.error }}</div>
+        </div>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -64,6 +102,7 @@ const loading = ref(false)
 const logs = ref<any[]>([])
 const filterType = ref<string | undefined>(undefined)
 const filterStatus = ref<string | undefined>(undefined)
+const detail = reactive({ open: false, item: null as any })
 
 const pagination = reactive({
   current: 1,
@@ -82,6 +121,7 @@ const columns = [
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
   { title: '发送时间', dataIndex: 'sentAt', key: 'sentAt', width: 150 },
   { title: '错误信息', dataIndex: 'error', key: 'error', width: 180 },
+  { title: '操作', key: 'actions', width: 80, fixed: 'right' as const },
 ]
 
 onMounted(() => {
@@ -112,6 +152,11 @@ function handleTableChange(pag: any) {
   pagination.current = pag.current
   pagination.pageSize = pag.pageSize
   loadLogs()
+}
+
+function openDetail(record: any) {
+  detail.item = record
+  detail.open = true
 }
 
 function getTypeColor(type: string) {
@@ -204,5 +249,63 @@ function stripHtml(html: string) {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 280px;
+}
+
+.detail-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: var(--color-text-secondary, #666);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: var(--color-text, #333);
+  flex: 1;
+}
+
+.detail-section {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.detail-section-title {
+  font-weight: 500;
+  color: var(--color-text-secondary, #666);
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.detail-content {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.detail-content :deep(img) {
+  max-width: 100%;
+}
+
+.detail-error {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  padding: 12px;
+  border-radius: 6px;
+  color: #ff4d4f;
+  font-size: 13px;
 }
 </style>
