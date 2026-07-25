@@ -237,8 +237,10 @@ export class CommentService {
     currentUserId: string,
     userName: string,
   ) {
+    this.logger.log(`开始审核评论: ${comment.id}`);
     try {
       const review = await this.aiService.moderateComment(comment.content, post.title);
+      this.logger.log(`AI 审核结果: ${JSON.stringify(review)}`);
 
       await this.prisma.comment.update({
         where: { id: comment.id },
@@ -249,6 +251,7 @@ export class CommentService {
           rejectReason: review.approved ? null : review.reason,
         },
       });
+      this.logger.log(`评论 ${comment.id} 状态已更新为: ${review.approved ? 'approved' : 'rejected'}`);
 
       if (review.approved) {
         await this.sendCommentNotification(post, { ...comment, status: 'approved' }, parentComment, currentUserId);

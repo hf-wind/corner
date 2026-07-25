@@ -201,10 +201,12 @@ export class AiService {
 
   async moderateComment(content: string, postTitle?: string): Promise<{ approved: boolean; reason: string }> {
     if (!this.isConfigured()) {
+      this.logger.warn('AI 未配置，评论审核自动通过');
       return { approved: true, reason: 'AI 未配置，自动通过' };
     }
 
     const cfg = await this.getConfig();
+    this.logger.log(`开始 AI 评论审核，prompt 长度: ${cfg.ai_moderate_prompt?.length || 0}`);
 
     try {
       const result = await this.chat(
@@ -225,6 +227,7 @@ export class AiService {
         }
       );
 
+      this.logger.log(`AI 审核原始返回: ${result?.slice(0, 200)}`);
       const jsonMatch = result.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
