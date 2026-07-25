@@ -11,8 +11,67 @@
           <a-alert
             :type="apiConfigured ? 'success' : 'warning'"
             show-icon
-            :message="apiConfigured ? 'DeepSeek API 已配置（Key 仅存环境变量）' : '未检测到 DEEPSEEK_API_KEY，聊天将使用兜底文案'"
+            :message="apiConfigured ? 'AI 服务已配置，所有功能将使用后台配置' : 'AI 服务未配置或已关闭，需要在后台填写 API Key 后启用'"
           />
+
+          <a-card size="small" title="服务连接" :bordered="false" class="section-card">
+            <a-form layout="vertical" size="middle">
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="启用 AI">
+                    <a-switch v-model:checked="form.ai_enabled" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="服务商">
+                    <a-input v-model:value="form.ai_provider" placeholder="deepseek / openai compatible" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="请求超时(ms)">
+                    <a-input-number v-model:value="form.ai_request_timeout_ms" :min="3000" :max="120000" :step="1000" style="width:100%" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="API Key">
+                <a-input-password v-model:value="form.ai_api_key" placeholder="sk-..." autocomplete="new-password" />
+              </a-form-item>
+              <a-row :gutter="16">
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="Base URL">
+                    <a-input v-model:value="form.ai_base_url" placeholder="https://api.deepseek.com" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="默认模型">
+                    <a-input v-model:value="form.ai_model" placeholder="deepseek-v4-flash" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="12" :md="6">
+                  <a-form-item label="聊天">
+                    <a-switch v-model:checked="form.ai_pet_chat_enabled" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="6">
+                  <a-form-item label="文章摘要">
+                    <a-switch v-model:checked="form.ai_summarize_enabled" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="6">
+                  <a-form-item label="评论审核">
+                    <a-switch v-model:checked="form.ai_comment_moderation_enabled" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :md="6">
+                  <a-form-item label="友链审核">
+                    <a-switch v-model:checked="form.ai_friend_moderation_enabled" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
+          </a-card>
 
           <a-card size="small" title="人设与关系" :bordered="false" class="section-card">
             <a-form layout="vertical" size="middle">
@@ -37,6 +96,9 @@
 
           <a-card size="small" title="评论审核" :bordered="false" class="section-card">
             <a-form layout="vertical" size="middle">
+              <a-form-item label="评论审核模型（留空使用默认模型）">
+                <a-input v-model:value="form.ai_moderate_model" placeholder="留空使用默认模型" />
+              </a-form-item>
               <a-form-item label="审核 Prompt">
                 <a-textarea v-model:value="form.ai_moderate_prompt" :rows="8" placeholder="定义 AI 审核评论的标准和输出格式" />
               </a-form-item>
@@ -55,10 +117,16 @@
             </a-form>
           </a-card>
 
-          <a-card size="small" title="友联审核配置" :bordered="false" class="section-card">
+          <a-card size="small" title="友链审核配置" :bordered="false" class="section-card">
             <a-form layout="vertical" size="middle">
+              <a-form-item label="要求对方先添加本站友链">
+                <a-switch v-model:checked="form.ai_friend_require_backlink" />
+              </a-form-item>
+              <a-form-item label="友链审核模型（留空使用默认模型）">
+                <a-input v-model:value="form.ai_friend_moderate_model" placeholder="留空使用默认模型" />
+              </a-form-item>
               <a-form-item label="审核 Prompt">
-                <a-textarea v-model:value="form.ai_friend_moderate_prompt" :rows="8" placeholder="定义 AI 审核友联申请的标准和输出格式" />
+                <a-textarea v-model:value="form.ai_friend_moderate_prompt" :rows="8" placeholder="定义 AI 审核友链申请的标准和输出格式" />
               </a-form-item>
               <a-row :gutter="16">
                 <a-col :xs="24" :sm="12">
@@ -91,6 +159,16 @@
 
           <a-card size="small" title="模型参数" :bordered="false" class="section-card">
             <a-row :gutter="16">
+              <a-col :xs="24" :sm="12" :md="8">
+                <a-form-item label="聊天模型">
+                  <a-input v-model:value="form.ai_chat_model" placeholder="留空使用默认模型" />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="8">
+                <a-form-item label="摘要模型">
+                  <a-input v-model:value="form.ai_summarize_model" placeholder="留空使用默认模型" />
+                </a-form-item>
+              </a-col>
               <a-col :xs="24" :sm="12" :md="8">
                 <a-form-item label="聊天 temperature">
                   <a-input-number v-model:value="form.ai_chat_temperature" :min="0" :max="2" :step="0.1" style="width:100%" />
@@ -161,6 +239,7 @@
 
           <div class="actions">
             <a-button type="primary" :loading="saving" @click="saveConfig">保存配置</a-button>
+            <a-button :loading="testing" @click="testConnection">测试连接</a-button>
             <a-button @click="resetDefaults">恢复默认</a-button>
           </div>
         </a-space>
@@ -246,6 +325,7 @@ watch(tab, (v) => {
 
 const cfgLoading = ref(true)
 const saving = ref(false)
+const testing = ref(false)
 const apiConfigured = ref(false)
 const defaults = ref<Record<string, any>>({})
 const form = reactive<Record<string, any>>({})
@@ -303,10 +383,31 @@ async function saveConfig() {
     applyConfig(res.config || payload)
     apiConfigured.value = !!res.apiConfigured
     toast.success('已保存')
+    return true
   } catch {
     toast.error('保存失败')
+    return false
   } finally {
     saving.value = false
+  }
+}
+
+async function testConnection() {
+  testing.value = true
+  try {
+    const saved = await saveConfig()
+    if (!saved) return
+    const res = await api.post<any>('/ai/admin/test')
+    if (res.success) {
+      toast.success(res.message || '连接成功')
+    } else {
+      toast.error(res.message || '连接失败')
+    }
+    apiConfigured.value = !!res.success
+  } catch (e: any) {
+    toast.error(e?.message || '连接失败')
+  } finally {
+    testing.value = false
   }
 }
 

@@ -5,6 +5,7 @@ export interface Reply {
   time: string
   content: string
   replyTo?: string
+  status?: 'pending' | 'approved' | 'rejected'
 }
 
 export interface Comment {

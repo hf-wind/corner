@@ -41,11 +41,11 @@
                       :class="{ active: emojiPackIdx === pi }" @click="emojiPackIdx = pi" :title="p.name">{{
                         p.name.replace(/[·.·\s]/g, '') }}</button>
                   </div>
-                  <div class="emoji-grid-wrap">
+                  <div class="emoji-grid-wrap" @scroll.passive="onEmojiScroll($event, emojiPackIdx)">
                     <div class="emoji-grid">
                       <template v-if="emojiPacks[emojiPackIdx]?.type === 'animated'">
                         <button v-for="a in emojiPacks[emojiPackIdx].items" :key="a.id" type="button"
-                          class="emoji-item emoji-img-item" @click="insertEmoji(a.char || '😊', a.imageUrl)"
+                          class="emoji-item emoji-img-item" @click="insertEmoji(a.char || '😊', a.imageUrl, a.label)"
                           :title="a.label || a.char" @mouseenter="onEmojiHover($event, a.imageUrl)"
                           @mousemove="onEmojiMove($event)" @mouseleave="onEmojiLeave">
                           <img :src="mediaUrl(a.imageUrl)" :alt="a.label" loading="lazy" :data-fallback="a.char || '😊'" @error="onEmojiError" />
@@ -127,35 +127,10 @@
               <Icon :name="c.liked ? 'ph:thumbs-up-fill' : 'ph:thumbs-up-bold'" />
               <span>{{ c.likes || '' }}</span>
             </button>
-            <button type="button" class="comment-action-btn" @click="replyTo(c.id, c.name)">
+            <button v-if="c.name !== authUser?.username" type="button" class="comment-action-btn" @click="replyTo(c.id, c.id, c.name)">
               <Icon name="ph:arrow-bend-left-down-bold" />
               <span>回复</span>
             </button>
-          </div>
-          <div v-if="c.replies?.length" class="comment-replies">
-            <div v-for="(r, ri) in c.replies" :key="r.id || ri" class="reply-item">
-              <img class="reply-avatar" :src="mediaUrl(r.avatar)" :alt="r.name">
-              <div class="reply-body">
-                <div class="reply-meta-row">
-                  <span class="reply-author">{{ r.name }}</span>
-                  <span v-if="r.replyTo" class="reply-to-badge">回复 @{{ r.replyTo }}</span>
-                  <span class="reply-time">{{ r.time }}</span>
-                </div>
-                <div class="reply-text" v-html="renderContent(r.content)"></div>
-              </div>
-              <button type="button" class="reply-action-btn" @click="replyTo(c.id, r.name)" title="回复">
-                <Icon name="ph:arrow-bend-left-down-bold" />
-              </button>
-            </div>
-            <div v-if="c.replyCount && c.replyCount > c.replies.length" class="load-more-replies-wrap">
-              <button type="button" class="load-more-replies-btn" :disabled="loadingReplies[c.id]"
-                @click="loadMoreReplies(c)">
-                <Icon v-if="!loadingReplies[c.id]" name="ph:arrow-circle-down-bold" />
-                <Icon v-else name="ph:spinner-gap-bold" class="spinning" />
-                <template v-if="!loadingReplies[c.id]">加载更多回复 ({{ c.replies.length }}/{{ c.replyCount }})</template>
-                <template v-else>加载中...</template>
-              </button>
-            </div>
           </div>
           <div v-if="replyTargetId === c.id" class="comment-reply-form">
             <span v-if="replyToUser" class="reply-to-label">回复 @{{ replyToUser }}</span>
@@ -184,11 +159,11 @@
                       :class="{ active: replyEmojiPackIdx === pi }" @click="replyEmojiPackIdx = pi" :title="p.name">{{
                         p.name.replace(/[·.·\s]/g, '') }}</button>
                   </div>
-                  <div class="emoji-grid-wrap">
+                  <div class="emoji-grid-wrap" @scroll.passive="onEmojiScroll($event, replyEmojiPackIdx)">
                     <div class="emoji-grid">
                       <template v-if="emojiPacks[replyEmojiPackIdx]?.type === 'animated'">
                         <button v-for="a in emojiPacks[replyEmojiPackIdx].items" :key="a.id" type="button"
-                          class="emoji-item emoji-img-item" @click="insertReplyEmoji(a.char || '😊', a.imageUrl)"
+                          class="emoji-item emoji-img-item" @click="insertReplyEmoji(a.char || '😊', a.imageUrl, a.label)"
                           :title="a.label || a.char" @mouseenter="onEmojiHover($event, a.imageUrl)"
                           @mousemove="onEmojiMove($event)" @mouseleave="onEmojiLeave">
                           <img :src="mediaUrl(a.imageUrl)" :alt="a.label" loading="lazy" :data-fallback="a.char || '😊'" @error="onEmojiError" />
@@ -205,16 +180,38 @@
               </div>
             </transition>
           </div>
+          <div v-if="c.replies?.length" class="comment-replies">
+            <div v-for="(r, ri) in c.replies" :key="r.id || ri" class="reply-item">
+              <img class="reply-avatar" :src="mediaUrl(r.avatar)" :alt="r.name">
+              <div class="reply-body">
+                <div class="reply-meta-row">
+                  <span class="reply-author">{{ r.name }}</span>
+                  <span v-if="r.status === 'pending'" class="comment-badge pending">
+                    <Icon name="ph:spinner-gap-bold" class="spinning" /> 审核中
+                  </span>
+                  <span v-if="r.status === 'rejected'" class="comment-badge rejected">审核未通过</span>
+                  <span v-if="r.replyTo" class="reply-to-badge">回复 @{{ r.replyTo }}</span>
+                  <span class="reply-time">{{ r.time }}</span>
+                </div>
+                <div class="reply-text" v-html="renderContent(r.content)"></div>
+              </div>
+              <button v-if="r.name !== authUser?.username" type="button" class="reply-action-btn" @click="replyTo(c.id, r.id, r.name)" title="回复">
+                <Icon name="ph:arrow-bend-left-down-bold" />
+              </button>
+            </div>
+            <div v-if="c.replyCount && c.replyCount > c.replies.length" class="load-more-replies-wrap"
+              :ref="(el) => observeReplySentinel(el as Element | null, c)">
+              <Icon name="ph:spinner-gap-bold" class="spinning" />
+              <span>正在加载更多回复</span>
+            </div>
+          </div>
         </div>
       </div>
     </transition-group>
 
-    <div v-if="commentTotalPages > 1" class="comment-more">
-      <button type="button" class="load-more-btn" :disabled="commentPage >= commentTotalPages"
-        @click="goToPage(commentPage + 1)">
-        <Icon name="ph:arrow-circle-down-bold" />
-        {{ commentPage >= commentTotalPages ? '没有更多了' : '加载更多评论' }}
-      </button>
+    <div v-if="commentPage < commentTotalPages" ref="commentSentinelRef" class="comment-more" aria-live="polite">
+      <Icon name="ph:spinner-gap-bold" class="spinning" />
+      <span>{{ commentLoading ? '正在加载评论' : '继续浏览以加载更多评论' }}</span>
     </div>
   </section>
 </template>
@@ -230,11 +227,13 @@ const props = defineProps<{
   commentTotal: number
   commentPage: number
   commentTotalPages: number
+  commentLoading?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:comments': [comments: Comment[]]
   'update:commentPage': [page: number]
+  'load-more': []
 }>()
 
 const api = useApi()
@@ -246,11 +245,13 @@ const submitting = ref(false)
 const sortDesc = ref(false)
 const replySubmitting = ref(false)
 const replyTargetId = ref<string | null>(null)
+const replyParentId = ref<string | null>(null)
 const replyToUser = ref<string>('')
 const replyContent = ref('')
 const replyEmojiOpen = ref(false)
 const replyEmojiPackIdx = ref(0)
 const loadingReplies = ref<Record<string, boolean>>({})
+const replyPageMap = ref<Record<string, number>>({})
 const emojiOpen = ref(false)
 
 const editorRef = ref<HTMLDivElement | null>(null)
@@ -258,6 +259,11 @@ const editorWrapRef = ref<HTMLElement | null>(null)
 const replyEditorRef = ref<HTMLDivElement | null>(null)
 const emojiPacks = ref<any[]>([])
 const emojiPackIdx = ref(0)
+const emojiPageMap = ref<Record<string, number>>({})
+const loadingEmojiPacks = ref<Record<string, boolean>>({})
+const commentSentinelRef = ref<HTMLElement | null>(null)
+let commentObserver: IntersectionObserver | null = null
+const replyObservers = new Map<string, IntersectionObserver>()
 
 const previewEmojiUrl = ref('')
 const previewEmojiStyle = ref({})
@@ -294,8 +300,8 @@ const sortedComments = computed(() => {
 
 function renderContent(text: string) {
   const tokens: string[] = []
-  let r = text.replace(/◆emoji:([^◆]+)◆/g, (_, url) => {
-    tokens.push(url)
+  let r = text.replace(/(?:◆emoji:([^◆]+)◆|\[\[emoji:([^\]|]+)(?:\|[^\]]*)?\]\])/g, (_, oldUrl, newUrl) => {
+    tokens.push(oldUrl || newUrl)
     return `◆EMJ${tokens.length - 1}◆`
   })
   r = r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -348,7 +354,10 @@ function serializeEditor(): string {
         const el = node as HTMLElement
         if (el.tagName === 'IMG') {
           const src = (el as HTMLImageElement).dataset.emojiSrc || ''
-          if (src) parts.push(`◆emoji:${src}◆`)
+          if (src) {
+            const label = (el as HTMLImageElement).dataset.emojiLabel || '表情'
+            parts.push(`[[emoji:${src}|${label}]]`)
+          }
         } else if (el.tagName === 'BR') {
           parts.push('\n')
         } else if (el.tagName === 'DIV') {
@@ -377,7 +386,10 @@ function serializeReplyEditor(): string {
         const el = node as HTMLElement
         if (el.tagName === 'IMG') {
           const src = (el as HTMLImageElement).dataset.emojiSrc || ''
-          if (src) parts.push(`◆emoji:${src}◆`)
+          if (src) {
+            const label = (el as HTMLImageElement).dataset.emojiLabel || '表情'
+            parts.push(`[[emoji:${src}|${label}]]`)
+          }
         } else if (el.tagName === 'BR') {
           parts.push('\n')
         } else if (el.tagName === 'DIV') {
@@ -426,7 +438,7 @@ function onEditorPaste(e: ClipboardEvent) {
   autoResize()
 }
 
-function insertEmoji(emoji: string, imgSrc?: string) {
+function insertEmoji(emoji: string, imgSrc?: string, label?: string) {
   previewEmojiUrl.value = ''
   const editor = editorRef.value
   if (!editor) return
@@ -447,6 +459,7 @@ function insertEmoji(emoji: string, imgSrc?: string) {
     img.alt = 'emoji'
     img.className = 'inline-emoji'
     img.dataset.emojiSrc = imgSrc
+    img.dataset.emojiLabel = label || ''
     range.insertNode(img)
   } else {
     range.insertNode(document.createTextNode(emoji))
@@ -496,7 +509,7 @@ async function submitComment() {
   submitting.value = false
 }
 
-function pollCommentStatus(commentId: string, maxAttempts = 30) {
+function pollCommentStatus(commentId: string, maxAttempts = 60) {
   let attempts = 0
   const interval = setInterval(async () => {
     attempts++
@@ -505,20 +518,36 @@ function pollCommentStatus(commentId: string, maxAttempts = 30) {
       return
     }
     try {
-      const data = await api.get<any>(`/comments/post/${props.postId}`, { page: 1, limit: 10, replyLimit: 3 })
-      const found = data.items?.find((c: any) => c.id === commentId)
-      if (found && found.status !== 'pending') {
+      const data = await api.get<any>(`/comments/${commentId}/status`)
+      if (data && data.status !== 'pending') {
         clearInterval(interval)
+        const toast = useToast()
         const updated = props.comments.map((c) => {
           if (c.id === commentId) {
-            return { ...c, status: found.status }
+            return { ...c, status: data.status }
+          }
+          if (c.replies?.length) {
+            const updatedReplies = c.replies.map((r) => {
+              if (r.id === commentId) {
+                return { ...r, status: data.status }
+              }
+              return r
+            })
+            if (updatedReplies !== c.replies) {
+              return { ...c, replies: updatedReplies }
+            }
           }
           return c
         })
         emit('update:comments', updated)
+        if (data.status === 'approved') {
+          toast.success('你的评论已通过审核')
+        } else if (data.status === 'rejected') {
+          toast.error('你的评论未通过审核')
+        }
       }
     } catch { /* ignore */ }
-  }, 2000)
+  }, 5000)
 }
 
 async function likeComment(c: Comment) {
@@ -537,12 +566,13 @@ async function likeComment(c: Comment) {
   }
 }
 
-function replyTo(id: string, userName: string) {
+function replyTo(threadId: string, parentId: string, userName: string) {
   if (userName === authUser.value?.username) return
-  if (replyTargetId.value === id) {
+  if (replyTargetId.value === threadId && replyParentId.value === parentId) {
     cancelReply()
   } else {
-    replyTargetId.value = id
+    replyTargetId.value = threadId
+    replyParentId.value = parentId
     replyToUser.value = userName
     replyContent.value = ''
   }
@@ -550,18 +580,19 @@ function replyTo(id: string, userName: string) {
 
 function cancelReply() {
   replyTargetId.value = null
+  replyParentId.value = null
   replyToUser.value = ''
   replyContent.value = ''
   replyEmojiOpen.value = false
   const re = replyEditorRef.value; const reEl = Array.isArray(re) ? re[0] : re; if (reEl) reEl.innerHTML = ''
 }
 
-function insertReplyEmoji(emoji: string, imgSrc?: string) {
+function insertReplyEmoji(emoji: string, imgSrc?: string, label?: string) {
   previewEmojiUrl.value = ''
   const editor = replyEditorRef.value
   const ed = Array.isArray(editor) ? editor[0] : editor
   if (!ed) {
-    replyContent.value += imgSrc ? `◆emoji:${imgSrc}◆` : emoji
+    replyContent.value += imgSrc ? `[[emoji:${imgSrc}|${label || '表情'}]]` : emoji
     replyEmojiOpen.value = false
     return
   }
@@ -582,6 +613,7 @@ function insertReplyEmoji(emoji: string, imgSrc?: string) {
     img.alt = 'emoji'
     img.className = 'inline-emoji'
     img.dataset.emojiSrc = imgSrc
+    img.dataset.emojiLabel = label || ''
     range.insertNode(img)
   } else {
     range.insertNode(document.createTextNode(emoji))
@@ -596,7 +628,7 @@ async function loadMoreReplies(comment: Comment) {
   if (loadingReplies.value[comment.id]) return
   loadingReplies.value = { ...loadingReplies.value, [comment.id]: true }
   try {
-    const currentPage = Math.ceil((comment.replies?.length || 0) / 3) + 1
+    const currentPage = replyPageMap.value[comment.id] || 2
     const data = await api.get<any>(`/comments/${comment.id}/replies`, { page: currentPage, limit: 3 })
     const newReplies = data.items.map((r: any) => ({
       id: r.id,
@@ -604,18 +636,16 @@ async function loadMoreReplies(comment: Comment) {
       avatar: r.authorAvatar,
       time: formatTime(r.createdAt),
       content: r.content,
-      replyTo: r.parent?.authorName ?? undefined,
+      replyTo: r.replyToName ?? r.parent?.authorName ?? undefined,
+      status: r.status,
     }))
     if (!comment.replies) comment.replies = []
-    comment.replies.push(...newReplies)
+    const existingIds = new Set(comment.replies.map(r => r.id))
+    comment.replies.push(...newReplies.filter((r: any) => !existingIds.has(r.id)))
     comment.replyCount = data.total
+    replyPageMap.value[comment.id] = currentPage + 1
   } catch { /* ignore */ }
   loadingReplies.value = { ...loadingReplies.value, [comment.id]: false }
-}
-
-function goToPage(page: number) {
-  if (page < 1 || page > props.commentTotalPages) return
-  emit('update:commentPage', page)
 }
 
 async function submitReply(target: Comment) {
@@ -624,24 +654,27 @@ async function submitReply(target: Comment) {
   const toast = useToast()
   replySubmitting.value = true
   try {
-    await api.post<any>('/comments', {
+    const res = await api.post<any>('/comments', {
       postId: props.postId,
       content,
-      parentId: target.id,
+      parentId: replyParentId.value || target.id,
     })
-    const data = await api.get<any>(`/comments/${target.id}/replies`, { page: 1, limit: 100 })
-    target.replies = (data.items || []).map((item: any) => ({
-      id: item.id,
-      name: item.authorName ?? '匿名',
-      avatar: item.authorAvatar,
-      time: formatTime(item.createdAt),
-      content: item.content,
-      replyTo: item.parent?.authorName ?? undefined,
-    }))
-    target.replyCount = data.total
+    const newReply = {
+      id: res.id,
+      name: authUser.value?.username || '用户',
+      avatar: authUser.value?.avatar,
+      time: '刚刚',
+      content: res.content,
+      replyTo: replyToUser.value || undefined,
+      status: 'pending' as const,
+    }
+    if (!target.replies) target.replies = []
+    target.replies.push(newReply)
+    target.replyCount = (target.replyCount || 0) + 1
     replyContent.value = ''
     const re = replyEditorRef.value; const reEl = Array.isArray(re) ? re[0] : re; if (reEl) reEl.innerHTML = ''
-    toast.success('回复已提交')
+    toast.success('回复已提交，等待审核')
+    pollCommentStatus(res.id)
   } catch {
     toast.error('回复失败')
   }
@@ -666,14 +699,61 @@ async function loadEmojiPacks() {
   try {
     const data = await api.get<any[]>('/emoji-packs')
     emojiPacks.value = data.filter((p: any) => p.enabled)
+    emojiPageMap.value = Object.fromEntries(emojiPacks.value.map((p: any) => [p.id, 1]))
     emojiPackIdx.value = 0
   } catch {
     emojiPacks.value = []
   }
 }
 
+async function loadMoreEmojiPack(packIndex: number) {
+  const pack = emojiPacks.value[packIndex]
+  const total = pack?._count?.items ?? pack?.items?.length ?? 0
+  if (!pack || loadingEmojiPacks.value[pack.id] || pack.items.length >= total) return
+
+  loadingEmojiPacks.value = { ...loadingEmojiPacks.value, [pack.id]: true }
+  const nextPage = (emojiPageMap.value[pack.id] || 1) + 1
+  try {
+    const data = await api.get<any>(`/emoji-packs/${pack.id}/items`, { page: nextPage, limit: 48 })
+    const ids = new Set(pack.items.map((item: any) => item.id))
+    pack.items.push(...(data.items || []).filter((item: any) => !ids.has(item.id)))
+    emojiPageMap.value = { ...emojiPageMap.value, [pack.id]: nextPage }
+  } catch { /* keep the already loaded items */ }
+  loadingEmojiPacks.value = { ...loadingEmojiPacks.value, [pack.id]: false }
+}
+
+function onEmojiScroll(event: Event, packIndex: number) {
+  const el = event.currentTarget as HTMLElement
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 72) {
+    void loadMoreEmojiPack(packIndex)
+  }
+}
+
+function observeReplySentinel(el: Element | null, comment: Comment) {
+  replyObservers.get(comment.id)?.disconnect()
+  replyObservers.delete(comment.id)
+  if (!el || !import.meta.client) return
+  const observer = new IntersectionObserver((entries) => {
+    if (entries.some(entry => entry.isIntersecting)) void loadMoreReplies(comment)
+  }, { rootMargin: '120px 0px' })
+  observer.observe(el)
+  replyObservers.set(comment.id, observer)
+}
+
+function setupCommentObserver() {
+  commentObserver?.disconnect()
+  if (!commentSentinelRef.value || !import.meta.client) return
+  commentObserver = new IntersectionObserver((entries) => {
+    if (entries.some(entry => entry.isIntersecting) && !props.commentLoading && props.commentPage < props.commentTotalPages) {
+      emit('load-more')
+    }
+  }, { rootMargin: '240px 0px' })
+  commentObserver.observe(commentSentinelRef.value)
+}
+
 watch(emojiOpen, (v) => { if (!v) onEmojiLeave() })
 watch(replyEmojiOpen, (v) => { if (!v) { onEmojiLeave(); replyEmojiPackIdx.value = 0 } })
+watch([commentSentinelRef, () => props.commentPage, () => props.commentTotalPages], () => nextTick(setupCommentObserver))
 
 onMounted(() => {
   loadEmojiPacks()
@@ -693,6 +773,12 @@ onMounted(() => {
   }
   document.addEventListener('click', closeEmojiPicker)
   onUnmounted(() => document.removeEventListener('click', closeEmojiPicker))
+})
+
+onUnmounted(() => {
+  commentObserver?.disconnect()
+  replyObservers.forEach(observer => observer.disconnect())
+  replyObservers.clear()
 })
 </script>
 
@@ -1494,8 +1580,14 @@ onMounted(() => {
 }
 
 .load-more-replies-wrap {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 32px;
+  gap: 5px;
   margin-top: 6px;
+  color: var(--c-text-3);
+  font-size: 0.68rem;
 }
 
 .load-more-replies-btn {
@@ -1574,8 +1666,14 @@ onMounted(() => {
 }
 
 .comment-more {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 48px;
+  gap: 7px;
   margin-top: 14px;
+  color: var(--c-text-3);
+  font-size: 0.75rem;
 }
 
 .load-more-btn {

@@ -115,11 +115,8 @@
       </div>
 
       <ArticleComments :post-id="article.id" v-model:comments="comments"
-        :comment-total="commentTotal" v-model:comment-page="commentPage" :comment-total-pages="commentTotalPages" />
-
-      <ClientOnly>
-        <FloatingPagination v-if="showCommentPagination" v-model="commentPage" :total="commentTotalPages" />
-      </ClientOnly>
+        :comment-total="commentTotal" v-model:comment-page="commentPage" :comment-total-pages="commentTotalPages"
+        :comment-loading="commentsLoading" @load-more="loadMoreComments" />
     </main>
 
     <ArticleSidebar :editor-id="editorId" scroll-element="#main-content" :progress="readingProgress"
@@ -127,6 +124,10 @@
 
     <ArticleShare v-model:open="shareOpen" :article="article" />
     <ArticlePoster v-model:open="posterOpen" :article="article" />
+
+    <ClientOnly>
+      <AiPet mode="article" :article="articleContext" />
+    </ClientOnly>
   </div>
 </template>
 
@@ -151,7 +152,8 @@ const comments = ref<Comment[]>([])
 const commentPage = ref(1)
 const commentTotalPages = ref(1)
 const commentTotal = ref(0)
-const showCommentPagination = ref(false)
+const commentsLoading = ref(false)
+let ignoreCommentPageWatch = false
 
 const shareOpen = ref(false)
 const posterOpen = ref(false)
@@ -162,6 +164,11 @@ const articleMainRef = ref<HTMLElement | null>(null)
 
 const readingProgress = ref(0)
 const showBackTop = ref(false)
+const articleContext = computed(() => ({
+  title: article.value?.title || '',
+  content: article.value?.content || '',
+  slug,
+}))
 
 async function loadArticle() {
   try {
@@ -186,11 +193,12 @@ async function loadArticle() {
   } catch { /* keep empty */ }
 }
 
-async function loadComments(page = 1) {
-  if (!article.value?.id) return
+async function loadComments(page = 1, append = false) {
+  if (!article.value?.id || commentsLoading.value) return
+  commentsLoading.value = true
   try {
     const data = await api.get<any>(`/comments/post/${article.value.id}`, { page, limit: 10, replyLimit: 3 })
-    comments.value = data.items.map((c: any) => ({
+    const nextItems = data.items.map((c: any) => ({
       id: c.id,
       name: c.authorName ?? '匿名',
       avatar: c.authorAvatar,
@@ -206,12 +214,28 @@ async function loadComments(page = 1) {
         avatar: r.authorAvatar,
         time: formatTime(r.createdAt),
         content: r.content,
-        replyTo: r.parent?.authorName ?? undefined,
+        replyTo: r.replyToName ?? r.parent?.authorName ?? undefined,
+        status: r.status,
       })),
     }))
+    if (append) {
+      const ids = new Set(comments.value.map(comment => comment.id))
+      comments.value.push(...nextItems.filter((comment: Comment) => !ids.has(comment.id)))
+    } else {
+      comments.value = nextItems
+    }
     commentTotal.value = data.total
     commentTotalPages.value = data.totalPages
   } catch { /* keep empty */ }
+  finally { commentsLoading.value = false }
+}
+
+async function loadMoreComments() {
+  const nextPage = commentPage.value + 1
+  if (commentsLoading.value || nextPage > commentTotalPages.value) return
+  ignoreCommentPageWatch = true
+  commentPage.value = nextPage
+  await loadComments(nextPage, true)
 }
 
 
@@ -246,12 +270,6 @@ function handleArticleScroll() {
   const max = container.scrollHeight - container.clientHeight
   readingProgress.value = max > 0 ? Math.min(1, Math.max(0, container.scrollTop / max)) : 0
   showBackTop.value = container.scrollTop > 240
-  const commentSection = document.getElementById('comment')
-  if (container && commentSection) {
-    const offset = commentSection.offsetTop
-    const threshold = container.clientHeight * 0.6
-    showCommentPagination.value = container.scrollTop + threshold >= offset
-  }
 }
 
 function typeExcerpt() {
@@ -293,6 +311,10 @@ function checkOutdated() {
 }
 
 watch(commentPage, (page) => {
+  if (ignoreCommentPageWatch) {
+    ignoreCommentPageWatch = false
+    return
+  }
   loadComments(page)
 })
 

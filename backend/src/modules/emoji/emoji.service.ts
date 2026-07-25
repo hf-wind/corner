@@ -8,14 +8,34 @@ import { CreateEmojiItemDto } from './dto/create-emoji-item.dto';
 export class EmojiService {
   constructor(private prisma: PrismaService) {}
 
-  async getPacks(includeDisabled = false) {
+  async getPacks(includeDisabled = false, itemLimit?: number) {
     return this.prisma.emojiPack.findMany({
       where: includeDisabled ? {} : { enabled: true },
       include: {
-        items: { orderBy: { sort: 'asc' } },
+        _count: { select: { items: true } },
+        items: {
+          orderBy: { sort: 'asc' },
+          ...(itemLimit ? { take: itemLimit } : {}),
+        },
       },
       orderBy: { sort: 'asc' },
     });
+  }
+
+  async getPackItems(id: string, page = 1, limit = 48) {
+    await this.getPack(id);
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const [items, total] = await Promise.all([
+      this.prisma.emojiItem.findMany({
+        where: { packId: id },
+        orderBy: { sort: 'asc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+      }),
+      this.prisma.emojiItem.count({ where: { packId: id } }),
+    ]);
+    return { items, total, page: safePage, totalPages: Math.ceil(total / safeLimit) };
   }
 
   async getPack(id: string) {

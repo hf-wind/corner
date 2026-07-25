@@ -94,6 +94,9 @@ function saveScroll() {
   text-decoration: none;
   color: inherit;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  content-visibility: auto;
+  contain-intrinsic-size: 110px;
+  contain: layout paint style;
 }
 .article-card:hover {
   transform: translateY(-2px);

@@ -11,6 +11,14 @@ export interface ApiResponse<T> {
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
   intercept(context: ExecutionContext, next: CallHandler): Observable<ApiResponse<T>> {
+    const ctx = context.switchToHttp();
+    const response = ctx.getResponse();
+    const request = ctx.getRequest();
+
+    if (request.url?.includes('/stream')) {
+      return next.handle() as Observable<ApiResponse<T>>;
+    }
+
     return next.handle().pipe(
       map((data) => ({
         code: 200,

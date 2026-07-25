@@ -27,6 +27,9 @@
             </template>
           </template>
         </a-table>
+        <div v-if="totalPages > 1" class="table-pagination">
+          <a-pagination v-model:current="currentPage" :total="total" :pageSize="pageSize" size="small" @change="loadComments" />
+        </div>
       </a-card>
     </a-spin>
 
@@ -58,10 +61,10 @@
               {{ detail.item.post?.title || detail.item.postId }}
             </a>
           </div>
-          <div class="detail-row" v-if="detail.item.parent">
+          <div class="detail-row" v-if="detail.item.parent || detail.item.replyToName">
             <span class="detail-label">回复对象</span>
             <div class="detail-value">
-              <span class="reply-mention">@{{ detail.item.parent.authorName }}</span>
+              <span class="reply-mention">@{{ detail.item.replyToName || detail.item.parent?.authorName }}</span>
               <span class="detail-parent-preview">{{ detail.item.parent.content?.slice(0, 60) }}</span>
             </div>
           </div>
@@ -109,13 +112,17 @@ const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
 const comments = ref<any[]>([])
+const currentPage = ref(1)
+const total = ref(0)
+const totalPages = ref(1)
+const pageSize = 20
 const rejectDialog = reactive({ open: false, comment: null as any, reason: '', customReason: '' })
 const detail = reactive({ open: false, item: null as any })
 
 function renderContent(text: string) {
   const tokens: string[] = []
-  let r = text.replace(/◆emoji:([^◆]+)◆/g, (_, url) => {
-    tokens.push(url)
+  let r = text.replace(/(?:◆emoji:([^◆]+)◆|\[\[emoji:([^\]|]+)(?:\|[^\]]*)?\]\])/g, (_, oldUrl, newUrl) => {
+    tokens.push(oldUrl || newUrl)
     return `◆EMJ${tokens.length - 1}◆`
   })
   r = r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -143,16 +150,25 @@ const columns = [
 function statusColor(s: string) { return s === 'approved' ? 'green' : s === 'rejected' ? 'red' : 'default' }
 function statusText(s: string) { return s === 'approved' ? '已发布' : s === 'rejected' ? '已拒绝' : '待审核' }
 
-onMounted(async () => {
+async function loadComments() {
+  loading.value = true
   try {
-    const res = await api.get<any>('/comments')
+    const res = await api.get<any>('/comments', { page: currentPage.value, limit: pageSize })
     comments.value = res?.items ?? []
+    total.value = res?.total ?? 0
+    totalPages.value = res?.totalPages ?? 1
   } catch { comments.value = [] }
   loading.value = false
-})
+}
+
+onMounted(loadComments)
 
 async function handleApprove(c: any) {
-  try { await api.post(`/comments/${c.id}/approve`); c.status = 'approved'; toast.success('已通过') }
+  try {
+    const updated = await api.post<any>(`/comments/${c.id}/approve`)
+    Object.assign(c, updated)
+    toast.success('已通过并已通知评论作者')
+  }
   catch { toast.error('操作失败') }
 }
 
@@ -176,9 +192,9 @@ async function confirmReject() {
     toast.warning('请选择驳回理由'); return
   }
   try {
-    await api.post(`/comments/${rejectDialog.comment.id}/reject`, { reason })
-    rejectDialog.comment.status = 'rejected'
-    toast.success('已驳回')
+    const updated = await api.post<any>(`/comments/${rejectDialog.comment.id}/reject`, { reason })
+    Object.assign(rejectDialog.comment, updated)
+    toast.success('已驳回并已通知评论作者')
     rejectDialog.open = false; rejectDialog.reason = ''; rejectDialog.customReason = ''
   } catch { toast.error('操作失败') }
 }
@@ -186,6 +202,7 @@ async function confirmReject() {
 
 <style scoped>
 .list-card { border-radius:8px; }
+.table-pagination { display:flex; justify-content:center; padding:16px 0 4px; }
 .comment-author { font-weight:500; font-size:0.82rem; }
 .inline-emoji { display:inline; width:1.6em; height:1.6em; vertical-align:-0.35em; border-radius:4px; }
 .reply-mention { color:var(--c-primary); font-weight:600; }
@@ -212,4 +229,15 @@ async function confirmReject() {
 .detail-parent-preview { font-size:0.72rem; color:var(--c-text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:300px; }
 .detail-ai-review { font-size:0.78rem; color:var(--c-text-2); }
 .detail-actions { display:flex; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
+
+@media (max-width: 640px) {
+  .detail-header,
+  .detail-row {
+    align-items:flex-start;
+    flex-direction:column;
+    gap:6px;
+  }
+  .detail-status-group { align-items:flex-start; }
+  .detail-parent-preview { max-width:100%; white-space:normal; }
+}
 </style>

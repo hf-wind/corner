@@ -76,7 +76,7 @@ import avatarImg from '~/assets/images/avatar.jpg'
 const api = useApi()
 const router = useRouter()
 const toast = useToast()
-const theme = ref('light')
+const { theme, setTheme } = useTheme()
 const loginType = ref<'password' | 'code'>('password')
 const email = ref('')
 const password = ref('')
@@ -86,11 +86,6 @@ const success = ref('')
 const submitting = ref(false)
 const cooldown = ref(0)
 let cooldownTimer: NodeJS.Timeout | null = null
-
-function setTheme(mode: string) {
-  theme.value = mode
-  document.documentElement.classList.toggle('dark', mode === 'dark')
-}
 
 async function sendCode() {
   if (!email.value) {

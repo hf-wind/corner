@@ -11,6 +11,27 @@ const postInclude = {
   tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
 };
 
+const postListSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  excerpt: true,
+  coverImage: true,
+  authorId: true,
+  categoryId: true,
+  status: true,
+  viewCount: true,
+  likeCount: true,
+  featured: true,
+  publishedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  author: postInclude.author,
+  category: postInclude.category,
+  tags: postInclude.tags,
+  _count: { select: { comments: true } },
+} satisfies Prisma.PostSelect;
+
 @Injectable()
 export class PostService {
   constructor(private prisma: PrismaService) {}
@@ -48,7 +69,7 @@ export class PostService {
     const [items, total] = await Promise.all([
       this.prisma.post.findMany({
         where,
-        include: postInclude,
+        select: postListSelect,
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
@@ -100,7 +121,7 @@ export class PostService {
   async findFeatured() {
     const items = await this.prisma.post.findMany({
       where: { featured: true, status: 'published' },
-      include: postInclude,
+      select: postListSelect,
       orderBy: { publishedAt: 'desc' },
       take: 6,
     });

@@ -20,15 +20,22 @@
         </div>
       </template>
 
-      <TransitionGroup v-else name="card" tag="div" class="article-list">
-        <ArticleCard
-          v-for="(article, i) in articles"
-          :key="article.slug"
-          :eager="i < 5"
-          :priority="i === 0"
-          v-bind="article"
-        />
-      </TransitionGroup>
+      <div v-else class="article-list-wrap" :class="{ refreshing }" aria-live="polite">
+        <div v-if="refreshing" class="article-refresh-bar"><span /></div>
+        <div v-if="!articles.length" class="article-empty">
+          <Icon name="ph:article-bold" />
+          <span>暂时还没有文章</span>
+        </div>
+        <div v-else class="article-list">
+          <ArticleCard
+            v-for="(article, i) in articles"
+            :key="article.slug"
+            :eager="i < 2"
+            :priority="i === 0"
+            v-bind="article"
+          />
+        </div>
+      </div>
 
       <FloatingPagination v-model="page" :total="totalPages" @change="loadArticles" />
     </main>
@@ -38,7 +45,7 @@
     </aside>
 
     <ClientOnly>
-      <AiPet />
+      <AiPet mode="home" />
     </ClientOnly>
   </div>
 </template>
@@ -47,13 +54,18 @@
 const api = useApi()
 const articles = ref<any[]>([])
 const loading = ref(true)
+const refreshing = ref(false)
 const page = ref(1)
 const totalPages = ref(1)
+let requestId = 0
 
 async function loadArticles() {
-  loading.value = true
+  const id = ++requestId
+  if (articles.value.length) refreshing.value = true
+  else loading.value = true
   try {
     const res = await api.get<any>('/posts', { page: page.value, limit: 10, sort: 'latest' })
+    if (id !== requestId) return
     articles.value = (res.items ?? []).map((p: any) => ({
       slug: p.slug,
       cover: p.coverImage,
@@ -65,11 +77,15 @@ async function loadArticles() {
       author: p.author ? { name: p.author.username, avatar: p.author.avatar } : undefined,
       views: p.viewCount ?? 0,
       comments: p._count?.comments ?? 0,
-      readingTime: Math.max(1, Math.ceil((p.content?.length ?? 0) / 500)),
     }))
     totalPages.value = res.totalPages ?? 1
   } catch { /* keep empty */ }
-  loading.value = false
+  finally {
+    if (id === requestId) {
+      loading.value = false
+      refreshing.value = false
+    }
+  }
 }
 
 async function restoreScroll() {
@@ -106,7 +122,6 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overscroll-behavior: contain;
-  background: var(--c-bg);
 }
 
 .section-title {
@@ -129,6 +144,60 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
   position: relative;
+}
+
+.article-list-wrap {
+  position: relative;
+  min-height: 180px;
+}
+
+.article-list-wrap.refreshing .article-list {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.article-list-wrap .article-list {
+  transition: opacity 0.16s ease;
+}
+
+.article-refresh-bar {
+  position: absolute;
+  z-index: 2;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--c-primary-soft);
+}
+
+.article-refresh-bar span {
+  display: block;
+  width: 36%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--c-primary);
+  animation: article-loading 0.9s ease-in-out infinite alternate;
+}
+
+.article-empty {
+  min-height: 180px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--c-text-3);
+  font-size: 0.8rem;
+}
+
+.article-empty .icon {
+  font-size: 1.8rem;
+}
+
+@keyframes article-loading {
+  from { transform: translateX(-10%); }
+  to { transform: translateX(190%); }
 }
 
 .sidebar-right {
@@ -202,42 +271,12 @@ onMounted(() => {
 .skeleton-line-desc { width: 65%; height: 11px; }
 .skeleton-line-footer { width: 55%; height: 11px; }
 
-/* ===== TransitionGroup ===== */
-
-.card-enter-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-  will-change: opacity, transform;
-}
-
-.card-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  position: absolute;
-}
-
-.card-enter-from {
-  opacity: 0;
-  transform: translateY(24px) scale(0.97);
-}
-
-.card-leave-to {
-  opacity: 0;
-  transform: translateX(30px);
-}
-
-.card-move {
-  transition: transform 0.25s ease;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .skeleton-card::after {
     animation: none;
   }
 
-  .card-enter-active,
-  .card-leave-active,
-  .card-move {
-    transition: none;
-  }
+  .article-refresh-bar span { animation: none; }
 }
 
 @media (max-width: 640px) {

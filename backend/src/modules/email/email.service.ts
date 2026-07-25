@@ -74,7 +74,10 @@ export class EmailService {
     return code;
   }
 
-  async sendVerificationCode(email: string, type: 'register' | 'login' | 'change_password'): Promise<{ success: boolean; message: string }> {
+  async sendVerificationCode(
+    email: string,
+    type: 'register' | 'login' | 'change_password' | 'friend_remove',
+  ): Promise<{ success: boolean; message: string }> {
     const config = await this.getEmailConfig();
     if (!config.enabled) {
       return { success: false, message: '邮件服务未启用' };
@@ -105,7 +108,13 @@ export class EmailService {
       },
     });
 
-    const typeText = type === 'register' ? '注册' : type === 'login' ? '登录' : '修改密码';
+    const typeText = type === 'register'
+      ? '注册'
+      : type === 'login'
+        ? '登录'
+        : type === 'friend_remove'
+          ? '移除友链'
+          : '修改密码';
     const html = this.getVerificationCodeTemplate(code, typeText);
 
     await this.verificationQueue.add('send-verification', {
@@ -119,7 +128,11 @@ export class EmailService {
     return { success: true, message: '验证码已发送' };
   }
 
-  async verifyCode(email: string, code: string, type: 'register' | 'login' | 'change_password'): Promise<boolean> {
+  async verifyCode(
+    email: string,
+    code: string,
+    type: 'register' | 'login' | 'change_password' | 'friend_remove',
+  ): Promise<boolean> {
     const verification = await this.prisma.verificationCode.findFirst({
       where: {
         email,
@@ -266,7 +279,10 @@ export class EmailService {
 
   private renderEmailContent(text: string): string {
     return text
-      .replace(/◆emoji:([^◆]+)◆/g, '<img src="$1" alt="emoji" style="width:20px;height:20px;vertical-align:middle;display:inline;" />')
+      .replace(/(?:◆emoji:([^◆]+)◆|\[\[emoji:([^\]|]+)(?:\|[^]]*)?\]\])/g, (_, oldUrl, newUrl) => {
+        const url = oldUrl || newUrl
+        return `<img src="${url}" alt="emoji" style="width:20px;height:20px;vertical-align:middle;display:inline;" />`
+      })
       .replace(/\n/g, '<br>')
   }
 

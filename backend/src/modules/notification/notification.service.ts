@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationSseService } from './notification-sse.service';
 
 @Injectable()
 export class NotificationService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private sse: NotificationSseService,
+  ) {}
 
   async create(userId: string, data: { type: string; title: string; content?: string; link?: string }) {
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId,
         type: data.type,
@@ -15,6 +19,24 @@ export class NotificationService {
         link: data.link,
       },
     });
+
+    this.sse.emit(userId, {
+      type: 'notification',
+      data: {
+        id: notification.id,
+        title: notification.title,
+        type: notification.type,
+        content: notification.content,
+        link: notification.link,
+        read: notification.read,
+        createdAt: notification.createdAt,
+      },
+    });
+
+    const { count } = await this.getUnreadCount(userId);
+    this.sse.emit(userId, { type: 'unread-count', data: { count } });
+
+    return notification;
   }
 
   async findAll(userId: string, page = 1, limit = 20) {
@@ -45,17 +67,22 @@ export class NotificationService {
   }
 
   async markAsRead(userId: string, id: string) {
-    return this.prisma.notification.updateMany({
+    const result = await this.prisma.notification.updateMany({
       where: { id, userId },
       data: { read: true },
     });
+    const { count } = await this.getUnreadCount(userId);
+    this.sse.emit(userId, { type: 'unread-count', data: { count } });
+    return result;
   }
 
   async markAllAsRead(userId: string) {
-    return this.prisma.notification.updateMany({
+    const result = await this.prisma.notification.updateMany({
       where: { userId, read: false },
       data: { read: true },
     });
+    this.sse.emit(userId, { type: 'unread-count', data: { count: 0 } });
+    return result;
   }
 
   async remove(userId: string, id: string) {

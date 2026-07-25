@@ -9,11 +9,9 @@
 </template>
 
 <script setup lang="ts">
-const { init } = useTheme()
 const { init: initTypography } = useTypography()
 
 onMounted(() => {
-  init()
   initTypography()
 })
 

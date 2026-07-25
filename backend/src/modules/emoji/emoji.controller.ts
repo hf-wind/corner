@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { EmojiService } from './emoji.service';
 import { CreateEmojiPackDto } from './dto/create-emoji-pack.dto';
@@ -11,13 +11,22 @@ export class EmojiController {
 
   @Get()
   getPacks() {
-    return this.emoji.getPacks(false);
+    return this.emoji.getPacks(false, 48);
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Get('all')
   getAllPacks() {
     return this.emoji.getPacks(true);
+  }
+
+  @Get(':id/items')
+  getPackItems(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.emoji.getPackItems(id, page ? parseInt(page) : 1, limit ? parseInt(limit) : 48);
   }
 
   @UseGuards(AuthGuard('jwt'))

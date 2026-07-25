@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-pet" :class="{ open: chatOpen }">
+  <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isArticleMode }">
     <Transition name="pet-panel">
       <div v-if="chatOpen" class="pet-chat" role="dialog" aria-label="和哆啦A梦聊天">
         <header class="pet-chat-head">
@@ -8,9 +8,10 @@
             <div>
               <strong>{{ displayName }}</strong>
               <p>{{ description }}</p>
+              <span v-if="isArticleMode" class="pet-context-label">正在陪你读这篇文章</span>
             </div>
           </div>
-          <button type="button" class="pet-icon-btn" aria-label="关闭" @click="chatOpen = false">
+          <button type="button" class="pet-icon-btn" aria-label="关闭" @click="closeChat">
             <Icon name="ph:x-bold" />
           </button>
         </header>
@@ -26,13 +27,31 @@
           </div>
         </div>
 
+        <div class="pet-suggestions">
+          <button v-for="action in quickActions" :key="action.label" type="button"
+            :disabled="sending" @click="runQuickAction(action)">
+            <Icon :name="action.icon" />
+            <span>{{ action.label }}</span>
+          </button>
+        </div>
+
         <form class="pet-chat-form" @submit.prevent="send">
-          <input v-model="input" class="pet-input" type="text" maxlength="500" placeholder="和阿风聊点什么…"
+          <input v-model="input" class="pet-input" type="text" maxlength="500" :placeholder="inputPlaceholder"
             :disabled="sending" />
           <button type="submit" class="pet-send" :disabled="sending || !input.trim()" aria-label="发送">
             <Icon name="ph:paper-plane-right-fill" />
           </button>
         </form>
+      </div>
+    </Transition>
+
+    <Transition name="pet-actions">
+      <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
+        <button v-for="action in quickActions.slice(0, 3)" :key="action.label" type="button"
+          @click="runQuickAction(action)">
+          <Icon :name="action.icon" />
+          <span>{{ action.label }}</span>
+        </button>
       </div>
     </Transition>
 
@@ -52,6 +71,15 @@ const spriteUrl = '/dram/spritesheet.webp'
 
 type Role = 'user' | 'assistant'
 interface Msg { role: Role; content: string }
+type QuickAction = { label: string; icon: string; prompt: string; kind?: 'summary' }
+type ArticleContext = { title?: string; content?: string; slug?: string }
+
+const props = withDefaults(defineProps<{
+  mode?: 'home' | 'article'
+  article?: ArticleContext
+}>(), {
+  mode: 'home',
+})
 
 type AnimClip = { row: number; frames: number; fps: number }
 
@@ -78,13 +106,30 @@ const messages = ref<Msg[]>([])
 const listRef = ref<HTMLElement | null>(null)
 const showHint = ref(true)
 const showLoginBubble = ref(false)
+const historyLoaded = ref(false)
+const suppressActions = ref(false)
 
 const displayName = ref(meta.displayName || '哆啦A梦')
 const description = ref(meta.description || '阿风的伙伴 · 蓝色机器猫')
 const greetings = ref<string[]>([...(meta.greetings || [])])
 
 const isLoggedIn = computed(() => import.meta.client && !!localStorage.getItem('token'))
-const hintText = computed(() => greetings.value[0] || '你好呀～')
+const isArticleMode = computed(() => props.mode === 'article')
+const hintText = computed(() => isArticleMode.value ? '要我帮你读懂这篇吗？' : (greetings.value[0] || '你好呀～'))
+const inputPlaceholder = computed(() => isArticleMode.value ? '问问这篇文章…' : '问我文章推荐或本站内容…')
+const actionsVisible = computed(() => !chatOpen.value && !suppressActions.value && !showHint.value && !showLoginBubble.value)
+const quickActions = computed<QuickAction[]>(() => isArticleMode.value
+  ? [
+      { label: '三句话总结', icon: 'ph:magic-wand-bold', prompt: '请用三句话总结当前文章。', kind: 'summary' },
+      { label: '提炼核心要点', icon: 'ph:list-checks-bold', prompt: '请结合当前文章，提炼 4 到 6 个核心要点，表达简洁。' },
+      { label: '这篇适合谁', icon: 'ph:users-three-bold', prompt: '请说明这篇文章适合哪些读者，以及读完能获得什么。' },
+      { label: '解释难点', icon: 'ph:lightbulb-filament-bold', prompt: '请找出当前文章里最难理解的部分，并用通俗方式解释。' },
+    ]
+  : [
+      { label: '推荐一篇文章', icon: 'ph:sparkle-bold', prompt: '请根据本站最近发布的内容，推荐一篇值得先读的文章，并简要说明理由。' },
+      { label: '本站有什么内容', icon: 'ph:books-bold', prompt: '请简洁介绍这个博客主要有哪些内容方向，并各推荐一篇文章。' },
+      { label: '帮我发现内容', icon: 'ph:compass-bold', prompt: '我还没想好读什么，请用三个简短问题了解兴趣，再为我推荐本站文章。' },
+    ])
 
 async function loadPetMeta() {
   try {
@@ -145,25 +190,53 @@ const spriteStyle = computed(() => {
 
 let hintTimer: ReturnType<typeof setTimeout> | null = null
 let loginBubbleTimer: ReturnType<typeof setTimeout> | null = null
+let actionRevealTimer: ReturnType<typeof setTimeout> | null = null
+
+function openChat() {
+  if (actionRevealTimer) clearTimeout(actionRevealTimer)
+  suppressActions.value = true
+  chatOpen.value = true
+}
+
+function closeChat() {
+  chatOpen.value = false
+  if (actionRevealTimer) clearTimeout(actionRevealTimer)
+  actionRevealTimer = setTimeout(() => {
+    suppressActions.value = false
+  }, 160)
+}
 
 async function toggleChat() {
   showHint.value = false
   if (!isLoggedIn.value) {
-    showLoginBubble.value = true
-    if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
-    loginBubbleTimer = setTimeout(() => { showLoginBubble.value = false }, 3000)
+    showLoginNotice()
     return
   }
-  chatOpen.value = !chatOpen.value
   if (chatOpen.value) {
-    await loadHistory()
-    if (messages.value.length === 0) {
-      const list = greetings.value.length ? greetings.value : ['你好，我是哆啦A梦！']
-      const g = list[Math.floor(Math.random() * list.length)]
-      messages.value.push({ role: 'assistant', content: g })
-    }
-    await nextTick(scrollBottom)
+    closeChat()
+    return
   }
+  openChat()
+  await prepareChat()
+}
+
+function showLoginNotice() {
+  showLoginBubble.value = true
+  if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
+  loginBubbleTimer = setTimeout(() => { showLoginBubble.value = false }, 3000)
+}
+
+async function prepareChat() {
+  if (!historyLoaded.value) {
+    await loadHistory()
+    historyLoaded.value = true
+  }
+  if (messages.value.length === 0) {
+    const list = greetings.value.length ? greetings.value : ['你好，我是哆啦A梦！']
+    const fallback = isArticleMode.value ? '我已经准备好陪你读这篇文章啦！' : list[Math.floor(Math.random() * list.length)]
+    messages.value.push({ role: 'assistant', content: fallback })
+  }
+  await nextTick(scrollBottom)
 }
 
 async function loadHistory() {
@@ -181,13 +254,23 @@ async function loadHistory() {
 async function send() {
   const text = input.value.trim()
   if (!text || sending.value) return
-  messages.value.push({ role: 'user', content: text })
   input.value = ''
+  await sendMessage(text)
+}
+
+async function sendMessage(text: string) {
+  if (!text.trim() || sending.value) return
+  messages.value.push({ role: 'user', content: text })
   sending.value = true
   await nextTick(scrollBottom)
 
   try {
-    const res = await api.post<{ reply: string }>('/ai/chat', { message: text })
+    const article = isArticleMode.value ? {
+      title: props.article?.title || '',
+      content: String(props.article?.content || '').slice(0, 10000),
+      slug: props.article?.slug || '',
+    } : undefined
+    const res = await api.post<{ reply: string }>('/ai/chat', { message: text, article })
     messages.value.push({ role: 'assistant', content: res.reply || '……' })
   } catch {
     messages.value.push({
@@ -200,6 +283,39 @@ async function send() {
   }
 }
 
+async function summarizeArticle() {
+  if (sending.value) return
+  const title = props.article?.title || ''
+  const content = props.article?.content || ''
+  messages.value.push({ role: 'user', content: '请帮我快速总结这篇文章。' })
+  sending.value = true
+  await nextTick(scrollBottom)
+  try {
+    const res = await api.post<{ excerpt: string }>('/ai/summarize', { title, content })
+    messages.value.push({
+      role: 'assistant',
+      content: res.excerpt ? `文章小结：${res.excerpt}` : '这篇文章暂时没有可提取的正文内容。',
+    })
+  } catch {
+    messages.value.push({ role: 'assistant', content: '总结工具暂时开小差了，你可以直接问我文章里的具体问题。' })
+  } finally {
+    sending.value = false
+    await nextTick(scrollBottom)
+  }
+}
+
+async function runQuickAction(action: QuickAction) {
+  showHint.value = false
+  if (!isLoggedIn.value) {
+    showLoginNotice()
+    return
+  }
+  openChat()
+  await prepareChat()
+  if (action.kind === 'summary' && isArticleMode.value) await summarizeArticle()
+  else await sendMessage(action.prompt)
+}
+
 function scrollBottom() {
   const el = listRef.value
   if (el) el.scrollTop = el.scrollHeight
@@ -207,12 +323,13 @@ function scrollBottom() {
 
 onMounted(() => {
   loadPetMeta()
-  hintTimer = setTimeout(() => { showHint.value = false }, 8000)
+  hintTimer = setTimeout(() => { showHint.value = false }, isArticleMode.value ? 4200 : 6000)
 })
 
 onUnmounted(() => {
   if (hintTimer) clearTimeout(hintTimer)
   if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
+  if (actionRevealTimer) clearTimeout(actionRevealTimer)
 })
 </script>
 
@@ -231,6 +348,10 @@ onUnmounted(() => {
 
 .ai-pet > * {
   pointer-events: auto;
+}
+
+.ai-pet.is-article {
+  bottom: 78px;
 }
 
 .pet-fab {
@@ -357,6 +478,18 @@ onUnmounted(() => {
   line-height: 1.4;
 }
 
+.pet-context-label {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-size: 0.62rem;
+  line-height: 1.5;
+}
+
 .pet-icon-btn {
   width: 30px;
   height: 30px;
@@ -437,6 +570,84 @@ onUnmounted(() => {
 
 .pet-bubble.typing span:nth-child(3) {
   animation-delay: 0.3s;
+}
+
+.pet-suggestions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  background: var(--ld-bg-card);
+}
+
+.pet-suggestions button,
+.pet-actions button {
+  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
+  background: color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft));
+  color: var(--c-text-1);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.pet-suggestions button {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.pet-suggestions button:hover,
+.pet-actions button:hover {
+  color: var(--c-primary);
+  border-color: color-mix(in srgb, var(--c-primary) 48%, var(--border));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--c-primary) 12%, var(--ld-shadow));
+  transform: translateY(-1px);
+}
+
+.pet-suggestions button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+  transform: none;
+}
+
+.pet-suggestions :deep(.icon),
+.pet-actions :deep(.icon) {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  color: var(--c-primary);
+}
+
+.pet-actions {
+  position: absolute;
+  right: calc(100% + 8px);
+  bottom: 18px;
+  width: max-content;
+  max-width: min(230px, calc(100vw - 140px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.pet-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 7px 11px;
+  border-radius: 12px 12px 4px 12px;
+  box-shadow: 0 7px 18px var(--ld-shadow);
+  font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 .pet-chat-form {
@@ -524,19 +735,37 @@ onUnmounted(() => {
 
 .pet-panel-enter-active,
 .pet-panel-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transition: opacity 0.14s ease, transform 0.14s ease;
 }
 
 .pet-panel-enter-from,
 .pet-panel-leave-to {
   opacity: 0;
-  transform: translateY(12px) scale(0.98);
+  transform: translateY(7px);
+}
+
+.pet-actions-enter-active {
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.pet-actions-leave-active {
+  transition: none;
+}
+
+.pet-actions-enter-from,
+.pet-actions-leave-to {
+  opacity: 0;
+  transform: translateX(8px);
 }
 
 @media (max-width: 640px) {
   .ai-pet {
     right: max(10px, env(safe-area-inset-right));
     bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .ai-pet.is-article {
+    bottom: max(68px, calc(env(safe-area-inset-bottom) + 58px));
   }
 
   .pet-hint {
@@ -552,6 +781,20 @@ onUnmounted(() => {
     width: min(320px, calc(100vw - 24px));
     height: min(420px, calc(100dvh - 96px));
   }
+
+  .pet-actions {
+    right: 0;
+    bottom: 82px;
+    max-width: calc(100vw - 24px);
+    gap: 5px;
+  }
+
+  .pet-actions button {
+    min-height: 31px;
+    padding: 6px 9px;
+    border-radius: 11px;
+    font-size: 0.66rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -562,7 +805,9 @@ onUnmounted(() => {
   }
 
   .pet-panel-enter-active,
-  .pet-panel-leave-active {
+  .pet-panel-leave-active,
+  .pet-actions-enter-active,
+  .pet-actions-leave-active {
     transition: none;
   }
 }

@@ -24,7 +24,7 @@ export default defineNuxtConfig({
       ],
       script: [
         {
-          innerHTML: '!function(){try{var d=document.documentElement;d.classList.add("no-transition");var f=localStorage.getItem("font-preset");d.dataset.font=f||"rounded";var t=localStorage.getItem("theme");if(t==="dark"||(t==="auto"&&window.matchMedia("(prefers-color-scheme:dark)").matches)){d.classList.add("dark");var l=document.querySelector("link[rel=icon]");if(l)l.href="/logo-dark.svg"}}catch(e){}}()',
+          innerHTML: '!function(){try{var d=document.documentElement;d.classList.add("no-transition");var f=localStorage.getItem("font-preset");d.dataset.font=f||"rounded";var t=localStorage.getItem("theme")||"light";var r=t==="dark"||(t==="auto"&&window.matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light";d.classList.toggle("dark",r==="dark");d.dataset.theme=r;d.style.colorScheme=r;var l=document.querySelector("link[rel=icon]");if(l)l.href=r==="dark"?"/logo-dark.svg":"/logo.svg"}catch(e){}}()',
           tagPosition: 'head',
         },
       ],

@@ -43,9 +43,9 @@
               <Icon name="ph:caret-down-bold" />
             </button>
           </div>
-          <div class="smp-list-body">
+          <div class="smp-list-body" @scroll.passive="onTrackListScroll">
             <button
-              v-for="(t, i) in tracks"
+              v-for="(t, i) in visibleTracks"
               :key="`${t.url}-${i}`"
               type="button"
               class="smp-track"
@@ -59,6 +59,7 @@
               </span>
               <Icon v-if="i === index && playing" name="ph:waveform-bold" class="smp-track-wave" />
             </button>
+            <div v-if="hasMoreTracks" class="smp-list-loading">继续滚动以加载更多歌曲</div>
             <div v-if="!tracks.length" class="smp-empty">{{ loading ? '加载中…' : '暂无歌曲' }}</div>
           </div>
         </div>
@@ -164,8 +165,11 @@ const progress = ref(0)
 const duration = ref(0)
 const mode = ref<PlayMode>('order')
 const userInteracted = ref(false)
+const visibleTrackCount = ref(60)
 
 const current = computed(() => tracks.value[index.value] || null)
+const visibleTracks = computed(() => tracks.value.slice(0, visibleTrackCount.value))
+const hasMoreTracks = computed(() => visibleTrackCount.value < tracks.value.length)
 const coverStyle = computed(() => {
   if (!current.value?.pic) return {}
   return {
@@ -249,6 +253,7 @@ async function loadPlaylist(i: number, refresh = false) {
     }
     playlistIndex.value = i
     tracks.value = res.tracks || []
+    visibleTrackCount.value = Math.min(60, tracks.value.length)
     index.value = 0
     progress.value = 0
     await nextTick()
@@ -419,6 +424,13 @@ function toggleMute() {
 function toggleList() {
   listOpen.value = !listOpen.value
   if (listOpen.value) barOpen.value = true
+}
+
+function onTrackListScroll(event: Event) {
+  const el = event.currentTarget as HTMLElement
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 72 && hasMoreTracks.value) {
+    visibleTrackCount.value = Math.min(tracks.value.length, visibleTrackCount.value + 60)
+  }
 }
 
 function collapseBar() {
@@ -821,6 +833,13 @@ watch(listOpen, (v) => {
   padding: 20px 8px;
   text-align: center;
   font-size: 0.75rem;
+  color: var(--c-text-3);
+}
+
+.smp-list-loading {
+  padding: 8px;
+  text-align: center;
+  font-size: 0.65rem;
   color: var(--c-text-3);
 }
 

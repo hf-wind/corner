@@ -6,7 +6,7 @@
     </button>
     <Teleport to="body">
       <Transition name="notif-panel">
-        <div v-if="panelOpen" class="notif-panel" :style="panelStyle">
+        <div v-if="panelOpen" ref="panelRef" class="notif-panel" :style="panelStyle">
           <div class="notif-header">
             <span class="notif-title">通知</span>
             <button
@@ -53,35 +53,61 @@
 <script setup lang="ts">
 const { isLoggedIn } = useAuth()
 const api = useApi()
+const config = useRuntimeConfig()
 
 const bellRef = ref<HTMLElement>()
+const panelRef = ref<HTMLElement>()
 const panelOpen = ref(false)
 const loading = ref(false)
 const unreadCount = ref(0)
 const items = ref<any[]>([])
+const panelPos = ref<{ position: string; top: string; left: string }>({ position: 'fixed', top: '0px', left: '0px' })
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+let eventSource: EventSource | null = null
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let onScroll: (() => void) | null = null
+let onResize: (() => void) | null = null
 
 function onClickOutside(e: MouseEvent) {
-  if (bellRef.value && !bellRef.value.contains(e.target as Node)) {
+  if (bellRef.value && !bellRef.value.contains(e.target as Node) && !panelRef.value?.contains(e.target as Node)) {
     panelOpen.value = false
+  }
+}
+
+function updatePanelPosition() {
+  if (!bellRef.value) return
+  const rect = bellRef.value.getBoundingClientRect()
+  const panelWidth = Math.min(320, window.innerWidth - 24)
+  const left = Math.min(Math.max(12, rect.right - panelWidth), window.innerWidth - panelWidth - 12)
+  const estimatedHeight = 380
+  const top = rect.bottom + 8
+  panelPos.value = {
+    position: 'fixed',
+    top: `${Math.max(12, Math.min(top, window.innerHeight - estimatedHeight - 12))}px`,
+    left: `${left}px`,
   }
 }
 
 function togglePanel() {
   panelOpen.value = !panelOpen.value
-  if (panelOpen.value) loadNotifications()
+  if (panelOpen.value) {
+    updatePanelPosition()
+    loadNotifications()
+    onScroll = () => updatePanelPosition()
+    onResize = () => updatePanelPosition()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onResize)
+  } else {
+    stopPositionListeners()
+  }
 }
 
-const panelStyle = computed(() => {
-  if (!bellRef.value) return {}
-  const rect = bellRef.value.getBoundingClientRect()
-  return {
-    position: 'fixed',
-    bottom: `${window.innerHeight - rect.top + 8}px`,
-    right: `${window.innerWidth - rect.right}px`,
-  }
-})
+function stopPositionListeners() {
+  if (onScroll) { window.removeEventListener('scroll', onScroll); onScroll = null }
+  if (onResize) { window.removeEventListener('resize', onResize); onResize = null }
+}
+
+const panelStyle = computed(() => panelPos.value)
 
 async function loadNotifications() {
   loading.value = true
@@ -100,6 +126,38 @@ async function fetchUnreadCount() {
   } catch { /* ignore */ }
 }
 
+function connectSSE() {
+  if (!isLoggedIn.value || eventSource) return
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  eventSource = new EventSource(
+    `${config.public.apiBase}/notifications/stream?token=${token}`
+  )
+
+  eventSource.addEventListener('message', (e: MessageEvent) => {
+    try {
+      const event = JSON.parse(e.data)
+      if (event.type === 'unread-count') {
+        unreadCount.value = event.data?.count ?? 0
+      } else if (event.type === 'notification') {
+        if (panelOpen.value) loadNotifications()
+      }
+    } catch { /* ignore */ }
+  })
+
+  eventSource.onerror = () => {
+    eventSource?.close()
+    eventSource = null
+    reconnectTimer = setTimeout(connectSSE, 3000)
+  }
+}
+
+function disconnectSSE() {
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+  if (eventSource) { eventSource.close(); eventSource = null }
+}
+
 async function markAllRead() {
   try {
     await api.post('/notifications/read-all')
@@ -116,10 +174,8 @@ async function readItem(item: any) {
       unreadCount.value = Math.max(0, unreadCount.value - 1)
     } catch { /* ignore */ }
   }
-  if (item.link) {
-    panelOpen.value = false
-    navigateTo(item.link)
-  }
+  panelOpen.value = false
+  navigateTo('/admin/messages')
 }
 
 function formatTime(date: string) {
@@ -135,13 +191,23 @@ function formatTime(date: string) {
 
 onMounted(() => {
   fetchUnreadCount()
-  pollTimer = setInterval(fetchUnreadCount, 30000)
+  connectSSE()
   document.addEventListener('click', onClickOutside, true)
 })
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
+  disconnectSSE()
+  stopPositionListeners()
   document.removeEventListener('click', onClickOutside, true)
+})
+
+watch(panelOpen, (v) => {
+  if (!v) stopPositionListeners()
+})
+
+watch(isLoggedIn, (v) => {
+  if (v) connectSSE()
+  else disconnectSSE()
 })
 </script>
 
@@ -190,8 +256,8 @@ onUnmounted(() => {
 
 .notif-panel {
   position: fixed;
-  width: 300px;
-  max-height: 380px;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(380px, calc(100dvh - 24px));
   background: var(--c-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -234,7 +300,7 @@ onUnmounted(() => {
 .notif-list {
   flex: 1;
   overflow-y: auto;
-  max-height: 280px;
+  max-height: min(280px, calc(100dvh - 124px));
 }
 
 .notif-empty {
@@ -355,5 +421,15 @@ onUnmounted(() => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .notif-panel {
+    border-radius: 10px;
+  }
+
+  .notif-item {
+    padding: 11px 12px;
+  }
 }
 </style>

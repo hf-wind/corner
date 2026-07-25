@@ -1,12 +1,50 @@
-import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Body } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { JwtService } from '@nestjs/jwt';
+import { Observable } from 'rxjs';
 import { NotificationService } from './notification.service';
+import { NotificationSseService } from './notification-sse.service';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('notifications')
 export class NotificationController {
-  constructor(private notificationService: NotificationService) {}
+  private readonly logger = new Logger(NotificationController.name);
 
+  constructor(
+    private notificationService: NotificationService,
+    private sseService: NotificationSseService,
+    private jwtService: JwtService,
+  ) {}
+
+  @Get('stream')
+  async stream(@Query('token') token: string): Promise<Observable<any>> {
+    let userId: string;
+    try {
+      const payload = this.jwtService.verify(token);
+      userId = payload.sub || payload.id;
+    } catch {
+      throw new Error('Invalid token');
+    }
+
+    const subject = this.sseService.getClient(userId);
+    this.logger.log(`SSE client connected: ${userId}`);
+
+    return new Observable((observer) => {
+      const subscription = subject.subscribe({
+        next: (event) => observer.next(event),
+        error: (err) => observer.error(err),
+      });
+
+      this.notificationService.getUnreadCount(userId).then(({ count }) => {
+        observer.next({ type: 'unread-count', data: { count } });
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    });
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get()
   findAll(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string) {
     return this.notificationService.findAll(
@@ -16,21 +54,25 @@ export class NotificationController {
     );
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get('unread-count')
   getUnreadCount(@Req() req: any) {
     return this.notificationService.getUnreadCount(req.user.id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post(':id/read')
   markAsRead(@Req() req: any, @Param('id') id: string) {
     return this.notificationService.markAsRead(req.user.id, id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post('read-all')
   markAllAsRead(@Req() req: any) {
     return this.notificationService.markAllAsRead(req.user.id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
   remove(@Req() req: any, @Param('id') id: string) {
     return this.notificationService.remove(req.user.id, id);

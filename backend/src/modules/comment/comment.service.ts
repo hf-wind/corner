@@ -61,7 +61,13 @@ export class CommentService {
 
     if (topIds.length > 0) {
       const rawReplies = await this.prisma.comment.findMany({
-        where: { parentId: { in: topIds }, status: 'approved' },
+        where: {
+          parentId: { in: topIds },
+          OR: [
+            { status: 'approved' },
+            ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
+          ],
+        },
         orderBy: { createdAt: 'asc' },
         include: {
           parent: { select: { authorName: true } },
@@ -87,7 +93,7 @@ export class CommentService {
 
     const items = comments.map((c) => {
       const allReplies = repliesMap.get(c.id) || [];
-      const replyTotal = (c as any)._count?.replies ?? allReplies.length;
+      const replyTotal = allReplies.length;
       const shown = allReplies.slice(0, replyLimit);
 
       return {
@@ -108,6 +114,8 @@ export class CommentService {
           authorAvatar: r.user?.avatar ?? null,
           content: r.content,
           parentId: r.parentId,
+          replyToName: r.replyToName ?? r.parent?.authorName ?? null,
+          status: r.status,
           createdAt: r.createdAt,
           parent: r.parent ? { authorName: r.parent.authorName } : null,
           likesCount: r._count?.likes ?? 0,
@@ -127,9 +135,17 @@ export class CommentService {
   ) {
     const skip = (page - 1) * limit;
 
+    const where: any = {
+      parentId: commentId,
+      OR: [
+        { status: 'approved' },
+        ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
+      ],
+    };
+
     const [items, total] = await Promise.all([
       this.prisma.comment.findMany({
-        where: { parentId: commentId, status: 'approved' },
+        where,
         orderBy: { createdAt: 'asc' },
         skip,
         take: limit,
@@ -147,9 +163,7 @@ export class CommentService {
             : {}),
         },
       }),
-      this.prisma.comment.count({
-        where: { parentId: commentId, status: 'approved' },
-      }),
+      this.prisma.comment.count({ where }),
     ]);
 
     return {
@@ -159,6 +173,8 @@ export class CommentService {
         authorAvatar: r.user?.avatar ?? null,
         content: r.content,
         parentId: r.parentId,
+        replyToName: r.replyToName ?? r.parent?.authorName ?? null,
+        status: r.status,
         createdAt: r.createdAt,
         parent: r.parent ? { authorName: r.parent.authorName } : null,
         likesCount: r._count?.likes ?? 0,
@@ -215,6 +231,7 @@ export class CommentService {
         authorName: userName,
         content: dto.content,
         parentId: resolvedParentId,
+        replyToName: parentComment?.authorName ?? null,
         status: 'pending',
       },
       include: {
@@ -424,19 +441,75 @@ export class CommentService {
   }
 
   async approve(id: string) {
-    return this.prisma.comment.update({ where: { id }, data: { status: 'approved' } });
+    const existing = await this.prisma.comment.findUnique({
+      where: { id },
+      include: { post: { select: { title: true, slug: true } } },
+    });
+    if (!existing) throw new NotFoundException('Comment not found');
+
+    const comment = await this.prisma.comment.update({
+      where: { id },
+      data: {
+        status: 'approved',
+        aiReviewResult: 'approved',
+        aiReview: existing.aiReview || '管理员人工审核通过',
+        rejectReason: null,
+      },
+    });
+
+    if (existing.status !== 'approved' && existing.userId) {
+      await this.notificationService.create(existing.userId, {
+        type: 'system',
+        title: '评论审核通过',
+        content: `你的评论在《${existing.post.title}》已通过审核并发布`,
+        link: `/article/${existing.post.slug || existing.postId}`,
+      });
+    }
+
+    return comment;
   }
 
   async reject(id: string, reason?: string) {
-    return this.prisma.comment.update({
+    const existing = await this.prisma.comment.findUnique({
       where: { id },
-      data: { status: 'rejected', rejectReason: reason || null },
+      include: { post: { select: { title: true, slug: true } } },
     });
+    if (!existing) throw new NotFoundException('Comment not found');
+
+    const comment = await this.prisma.comment.update({
+      where: { id },
+      data: {
+        status: 'rejected',
+        rejectReason: reason || null,
+        aiReviewResult: 'rejected',
+        aiReview: reason || existing.aiReview || '管理员人工审核未通过',
+      },
+    });
+
+    if (existing.status !== 'rejected' && existing.userId) {
+      await this.notificationService.create(existing.userId, {
+        type: 'system',
+        title: '评论审核未通过',
+        content: `你的评论在《${existing.post.title}》未通过审核${reason ? `：${reason}` : ''}`,
+        link: `/article/${existing.post.slug || existing.postId}`,
+      });
+    }
+
+    return comment;
   }
 
   async remove(id: string) {
     const existing = await this.prisma.comment.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Comment not found');
     await this.prisma.comment.delete({ where: { id } });
+  }
+
+  async findStatus(id: string, userId: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id },
+      select: { id: true, status: true, aiReview: true, aiReviewResult: true, userId: true },
+    });
+    if (!comment || comment.userId !== userId) return null;
+    return comment;
   }
 }

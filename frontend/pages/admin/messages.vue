@@ -80,8 +80,8 @@ onMounted(() => {
 async function loadNotifications() {
   loading.value = true
   try {
-    const params: any = { page: currentPage.value, limit: pageSize }
-    const res = await api.get<any>('/notifications', { params })
+    const params: Record<string, any> = { page: currentPage.value, limit: pageSize }
+    const res = await api.get<any>('/notifications', params)
     let items = res.items || []
     if (filterType.value === 'unread') {
       items = items.filter((i: any) => !i.read)
@@ -157,12 +157,15 @@ function formatTime(date: string) {
 </script>
 
 <style scoped>
-.messages-page { max-width: 640px; }
-.section-card { border-radius: 10px; }
+.messages-page { width: 100%; }
+.section-card { border-radius: 10px; overflow: visible; }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 10px 0;
+  :deep(.ant-badge) { overflow: visible; }
+  :deep(.ant-badge-count) { box-shadow: 0 0 0 2px var(--c-bg, #fff); }
 }
 .empty {
   display: flex;
@@ -245,5 +248,12 @@ function formatTime(date: string) {
   display: flex;
   justify-content: center;
   padding: 16px 0 8px;
+}
+
+@media (max-width: 640px) {
+  .card-header { align-items:flex-start; flex-direction:column; gap:10px; }
+  .notification-item { gap:10px; padding:12px 4px; }
+  .notification-actions { flex-direction:row; }
+  .notification-text { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 }
 </style>

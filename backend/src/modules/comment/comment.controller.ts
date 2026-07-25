@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 
@@ -16,6 +17,7 @@ export class CommentController {
     });
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('post/:postId')
   findByPost(
     @Param('postId') postId: string,
@@ -34,6 +36,13 @@ export class CommentController {
     );
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/status')
+  findStatus(@Param('id') id: string, @Req() req: any) {
+    return this.comment.findStatus(id, req.user.id);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id/replies')
   findReplies(
     @Param('id') id: string,
