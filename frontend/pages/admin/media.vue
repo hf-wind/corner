@@ -86,11 +86,12 @@
 </template>
 
 <script setup lang="ts">
-import { message, Modal } from 'ant-design-vue'
+import { Modal } from 'ant-design-vue'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
 const items = ref<any[]>([])
@@ -182,8 +183,8 @@ function beforeUpload(file: File) {
   fd.append('file', file)
   fd.append('folder', uploadFolder.value)
   api.upload('/media/upload', fd)
-    .then(() => { message.success('上传成功'); loadMedia(); loadFolders() })
-    .catch(() => message.error('上传失败'))
+    .then(() => { toast.success('上传成功'); loadMedia(); loadFolders() })
+    .catch(() => toast.error('上传失败'))
   return false
 }
 
@@ -197,11 +198,11 @@ async function handleRemove(item: any) {
     onOk: async () => {
       try {
         await api.delete(`/media/${item.id}`)
-        message.success('已删除')
+        toast.success('已删除')
         loadMedia()
         loadFolders()
       } catch {
-        message.error('删除失败')
+        toast.error('删除失败')
       }
     },
   })
@@ -220,11 +221,11 @@ async function handleBatchRemove() {
     onOk: async () => {
       try {
         await api.post('/media/batch/delete', { ids: [...selectedIds] })
-        message.success(`已删除 ${selectedIds.size} 项`)
+        toast.success(`已删除 ${selectedIds.size} 项`)
         loadMedia()
         loadFolders()
       } catch {
-        message.error('删除失败')
+        toast.error('删除失败')
       }
     },
   })
@@ -238,31 +239,31 @@ function openMoveDialog() {
 }
 
 async function confirmMove() {
-  if (!moveDialog.target) { message.warning('请选择目标文件夹'); return }
+  if (!moveDialog.target) { toast.warning('请选择目标文件夹'); return }
   try {
     await api.put('/media/batch/move', { ids: [...selectedIds], folder: moveDialog.target })
-    message.success(`已移动 ${selectedIds.size} 项`)
+    toast.success(`已移动 ${selectedIds.size} 项`)
     moveDialog.open = false
     loadMedia()
     loadFolders()
   } catch {
-    message.error('移动失败')
+    toast.error('移动失败')
   }
 }
 
 async function createFolder() {
   if (!newFolderName.value.trim()) {
-    message.warning('请输入文件夹名称')
+    toast.warning('请输入文件夹名称')
     return
   }
   try {
     await api.post('/media/folders', { name: newFolderName.value.trim() })
-    message.success('已创建')
+    toast.success('已创建')
     showNewFolder.value = false
     newFolderName.value = ''
     loadFolders()
   } catch {
-    message.error('创建失败')
+    toast.error('创建失败')
   }
 }
 

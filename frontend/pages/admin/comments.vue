@@ -102,11 +102,10 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
-
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
 const comments = ref<any[]>([])
@@ -153,8 +152,8 @@ onMounted(async () => {
 })
 
 async function handleApprove(c: any) {
-  try { await api.post(`/comments/${c.id}/approve`); c.status = 'approved'; message.success('已通过') }
-  catch { message.error('操作失败') }
+  try { await api.post(`/comments/${c.id}/approve`); c.status = 'approved'; toast.success('已通过') }
+  catch { toast.error('操作失败') }
 }
 
 function openDetail(c: any) { detail.item = c; detail.open = true }
@@ -172,16 +171,16 @@ async function confirmReject() {
   let reason = rejectDialog.reason
   if (reason === '__other__') {
     reason = rejectDialog.customReason?.trim() || ''
-    if (!reason) { message.warning('请输入驳回理由'); return }
+    if (!reason) { toast.warning('请输入驳回理由'); return }
   } else if (!reason) {
-    message.warning('请选择驳回理由'); return
+    toast.warning('请选择驳回理由'); return
   }
   try {
     await api.post(`/comments/${rejectDialog.comment.id}/reject`, { reason })
     rejectDialog.comment.status = 'rejected'
-    message.success('已驳回')
+    toast.success('已驳回')
     rejectDialog.open = false; rejectDialog.reason = ''; rejectDialog.customReason = ''
-  } catch { message.error('操作失败') }
+  } catch { toast.error('操作失败') }
 }
 </script>
 

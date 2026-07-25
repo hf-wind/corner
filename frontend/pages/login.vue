@@ -75,6 +75,7 @@ import avatarImg from '~/assets/images/avatar.jpg'
 
 const api = useApi()
 const router = useRouter()
+const toast = useToast()
 const theme = ref('light')
 const loginType = ref<'password' | 'code'>('password')
 const email = ref('')
@@ -93,7 +94,7 @@ function setTheme(mode: string) {
 
 async function sendCode() {
   if (!email.value) {
-    error.value = '请先输入邮箱'
+    toast.warning('请先输入邮箱')
     return
   }
   
@@ -102,7 +103,7 @@ async function sendCode() {
   
   try {
     await api.post('/auth/send-code', { email: email.value, type: 'login' })
-    success.value = '验证码已发送，请查收邮箱'
+    toast.success('验证码已发送，请查收邮箱')
     cooldown.value = 60
     cooldownTimer = setInterval(() => {
       cooldown.value--
@@ -112,7 +113,7 @@ async function sendCode() {
       }
     }, 1000)
   } catch (e: any) {
-    error.value = e?.message || '发送验证码失败'
+    toast.error(e?.message || '发送验证码失败')
   }
 }
 
@@ -121,7 +122,7 @@ async function handleLogin() {
   success.value = ''
   
   if (loginType.value === 'code' && (!code.value || code.value.length !== 6)) {
-    error.value = '请输入6位验证码'
+    toast.warning('请输入6位验证码')
     return
   }
   
@@ -137,9 +138,10 @@ async function handleLogin() {
     const res = await api.post<any>('/auth/login', payload)
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
+    toast.success('登录成功')
     router.push(panelHome())
   } catch (e: any) {
-    error.value = e?.message || '登录失败，请检查邮箱和密码'
+    toast.error(e?.message || '登录失败，请检查邮箱和密码')
   }
   submitting.value = false
 }

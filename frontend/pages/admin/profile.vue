@@ -69,11 +69,10 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
-
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const { user, isAdmin, setSession, token, readStorage, refreshProfile } = useAuth()
 
@@ -106,13 +105,13 @@ let cooldownTimer: ReturnType<typeof setInterval> | null = null
 
 function sendChangePasswordCode() {
   if (!form.email) {
-    message.warning('请先加载个人信息')
+    toast.warning('请先加载个人信息')
     return
   }
   api.post('/auth/send-code', { email: form.email, type: 'change_password' })
     .then((res: any) => {
       if (res.success) {
-        message.success('验证码已发送')
+        toast.success('验证码已发送')
         codeCooldown.value = 60
         cooldownTimer = setInterval(() => {
           codeCooldown.value--
@@ -122,11 +121,11 @@ function sendChangePasswordCode() {
           }
         }, 1000)
       } else {
-        message.warning(res.message || '发送失败')
+        toast.warning(res.message || '发送失败')
       }
     })
     .catch((e: any) => {
-      message.error(e?.message || '发送验证码失败')
+      toast.error(e?.message || '发送验证码失败')
     })
 }
 
@@ -137,12 +136,12 @@ async function changePassword() {
       newPassword: pwdForm.newPassword,
       code: pwdForm.code,
     })
-    message.success('密码修改成功')
+    toast.success('密码修改成功')
     pwdForm.newPassword = ''
     pwdForm.confirmPassword = ''
     pwdForm.code = ''
   } catch (e: any) {
-    message.error(e?.message || '修改失败')
+    toast.error(e?.message || '修改失败')
   }
   pwdSaving.value = false
 }
@@ -167,7 +166,7 @@ onMounted(async () => {
       })
     }
   } catch {
-    message.error('加载个人信息失败')
+    toast.error('加载个人信息失败')
   }
   loading.value = false
 })
@@ -180,11 +179,11 @@ async function onAvatarPick(e: Event) {
 
   const okType = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)
   if (!okType) {
-    message.warning('仅支持 JPG / PNG 图片')
+    toast.warning('仅支持 JPG / PNG 图片')
     return
   }
   if (file.size > 8 * 1024 * 1024) {
-    message.warning('图片请小于 8MB')
+    toast.warning('图片请小于 8MB')
     return
   }
 
@@ -211,9 +210,9 @@ async function onAvatarPick(e: Event) {
         role: user.value?.role || 'user',
       })
     }
-    message.success('头像已更新')
+    toast.success('头像已更新')
   } catch (err: any) {
-    message.error(err?.message || '头像上传失败')
+    toast.error(err?.message || '头像上传失败')
   }
   avatarUploading.value = false
 }
@@ -239,9 +238,9 @@ async function save() {
         role: res.role || user.value?.role || 'user',
       })
     }
-    message.success('已保存')
+    toast.success('已保存')
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    toast.error(e?.message || '保存失败')
   }
   saving.value = false
 }

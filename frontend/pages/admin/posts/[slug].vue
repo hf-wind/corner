@@ -92,13 +92,14 @@
 <script setup lang="ts">
 import { MdEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
-import { message, Modal } from 'ant-design-vue'
+import { Modal } from 'ant-design-vue'
 import { ThunderboltOutlined } from '@ant-design/icons-vue'
 import { ensureSlug } from '~/utils/postMeta'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const route = useRoute()
 const router = useRouter()
@@ -209,13 +210,13 @@ async function onUploadImg(files: File[], callback: (urls: string[]) => void) {
     }
     callback(urls)
   } catch {
-    message.error('上传失败')
+    toast.error('上传失败')
   }
 }
 
 async function generateExcerpt() {
   if (!form.value.content?.trim() || form.value.content.trim().length < 20) {
-    message.warning('请先写一些正文再生成摘要')
+    toast.warning('请先写一些正文再生成摘要')
     return
   }
   const run = async () => {
@@ -226,9 +227,9 @@ async function generateExcerpt() {
         content: form.value.content,
       })
       form.value.excerpt = res.excerpt || ''
-      message.success(res.source === 'ai' ? '摘要已生成' : '已用本地方式生成摘要')
+      toast.success(res.source === 'ai' ? '摘要已生成' : '已用本地方式生成摘要')
     } catch (e: any) {
-      message.error('生成失败: ' + (e.message || ''))
+      toast.error('生成失败: ' + (e.message || ''))
     }
     generatingExcerpt.value = false
   }
@@ -246,12 +247,12 @@ async function generateExcerpt() {
 }
 
 async function save() {
-  if (!form.value.title) { message.warning('标题不能为空'); return }
+  if (!form.value.title) { toast.warning('标题不能为空'); return }
   form.value.slug = ensureSlug(form.value.slug, form.value.title)
   saving.value = true
   try {
     const res = await api.put<any>(`/posts/${route.params.slug}`, form.value)
-    message.success('保存成功')
+    toast.success('保存成功')
     originalContent = JSON.stringify(form.value)
     hasUnsaved = false
     if (res?.slug && res.slug !== route.params.slug) {
@@ -259,7 +260,7 @@ async function save() {
     }
     router.push('/admin/posts')
   } catch (e: any) {
-    message.error('保存失败: ' + (e.message || ''))
+    toast.error('保存失败: ' + (e.message || ''))
   }
   saving.value = false
 }

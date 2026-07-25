@@ -137,11 +137,10 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
-
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const settings = ref({ site_title: '', site_description: '', site_keywords: '' as any })
 const keywordText = ref('')
 const mediaNaming = ref('timestamp')
@@ -225,27 +224,27 @@ async function loadEmail() {
 async function saveEmailSetting(key: string) {
   try {
     await api.put('/settings', { key, value: (email as any)[key] })
-    message.success('已保存')
+    toast.success('已保存')
   } catch {
-    message.error('保存失败')
+    toast.error('保存失败')
   }
 }
 
 async function testEmail() {
   if (!emailTestTo.value) {
-    message.warning('请输入测试邮箱')
+    toast.warning('请输入测试邮箱')
     return
   }
   emailTesting.value = true
   try {
     const res = await api.post<any>('/email/test', { to: emailTestTo.value })
     if (res.success) {
-      message.success('测试邮件已发送')
+      toast.success('测试邮件已发送')
     } else {
-      message.error(res.message || '发送失败')
+      toast.error(res.message || '发送失败')
     }
   } catch (e: any) {
-    message.error(e?.message || '发送失败')
+    toast.error(e?.message || '发送失败')
   } finally {
     emailTesting.value = false
   }
@@ -254,18 +253,18 @@ async function testEmail() {
 async function saveMediaNaming() {
   try {
     await api.put('/settings', { key: 'media_naming', value: mediaNaming.value })
-    message.success('已保存')
+    toast.success('已保存')
   } catch {
-    message.error('保存失败')
+    toast.error('保存失败')
   }
 }
 
 async function saveSetting(key: string) {
   try {
     await api.put('/settings', { key, value: (settings.value as any)[key] })
-    message.success('已保存')
+    toast.success('已保存')
   } catch {
-    message.error('保存失败')
+    toast.error('保存失败')
   }
 }
 
@@ -274,9 +273,9 @@ async function saveKeywords() {
   settings.value.site_keywords = arr
   try {
     await api.put('/settings', { key: 'site_keywords', value: arr })
-    message.success('已保存')
+    toast.success('已保存')
   } catch {
-    message.error('保存失败')
+    toast.error('保存失败')
   }
 }
 
@@ -299,7 +298,7 @@ async function loadMusic() {
         : [{ name: '默认歌单', server: 'netease', type: 'playlist', id: '8043180114' }],
     })
   } catch {
-    message.error('加载音乐配置失败')
+    toast.error('加载音乐配置失败')
   } finally {
     musicLoading.value = false
   }
@@ -318,7 +317,7 @@ function addPlaylist() {
 
 function removePlaylist(i: number) {
   if (music.music_playlists.length <= 1) {
-    message.warning('至少保留一个歌单')
+    toast.warning('至少保留一个歌单')
     return
   }
   music.music_playlists.splice(i, 1)
@@ -326,7 +325,7 @@ function removePlaylist(i: number) {
 
 async function saveMusic() {
   if (!music.music_playlists.some((p) => p.id?.trim())) {
-    message.warning('请至少填写一个有效歌单 ID')
+    toast.warning('请至少填写一个有效歌单 ID')
     return
   }
   musicSaving.value = true
@@ -349,9 +348,9 @@ async function saveMusic() {
         music_playlists: music.music_playlists.filter((p) => p.id?.trim()),
       },
     })
-    message.success('音乐配置已保存')
+    toast.success('音乐配置已保存')
   } catch {
-    message.error('保存失败')
+    toast.error('保存失败')
   } finally {
     musicSaving.value = false
   }
@@ -362,9 +361,9 @@ async function refreshCache() {
   try {
     const res = await api.post<any>('/music/admin/refresh')
     const n = res?.tracks?.length ?? 0
-    message.success(`缓存已刷新，共 ${n} 首`)
+    toast.success(`缓存已刷新，共 ${n} 首`)
   } catch {
-    message.error('刷新失败，请检查 API / 歌单 ID')
+    toast.error('刷新失败，请检查 API / 歌单 ID')
   } finally {
     refreshing.value = false
   }

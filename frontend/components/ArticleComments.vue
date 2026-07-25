@@ -462,6 +462,7 @@ function insertEmoji(emoji: string, imgSrc?: string) {
 async function submitComment() {
   const content = serializeEditor()
   if (!content.trim() || !props.postId) return
+  const toast = useToast()
   submitting.value = true
   try {
     const c = await api.post<any>('/comments', {
@@ -487,8 +488,11 @@ async function submitComment() {
     if (props.commentPage > 1) {
       emit('update:commentPage', 1)
     }
+    toast.success('评论已提交，等待审核')
     pollCommentStatus(c.id)
-  } catch { /* ignore */ }
+  } catch {
+    toast.error('评论提交失败')
+  }
   submitting.value = false
 }
 
@@ -527,7 +531,10 @@ async function likeComment(c: Comment) {
     const res = await api.post<any>(`/comments/${c.id}/like`)
     c.liked = res.liked
     c.likes = res.likesCount
-  } catch { /* ignore */ }
+  } catch {
+    const toast = useToast()
+    toast.error('操作失败')
+  }
 }
 
 function replyTo(id: string, userName: string) {
@@ -614,6 +621,7 @@ function goToPage(page: number) {
 async function submitReply(target: Comment) {
   const content = serializeReplyEditor()
   if (!content.trim() || !props.postId || replySubmitting.value) return
+  const toast = useToast()
   replySubmitting.value = true
   try {
     await api.post<any>('/comments', {
@@ -633,7 +641,10 @@ async function submitReply(target: Comment) {
     target.replyCount = data.total
     replyContent.value = ''
     const re = replyEditorRef.value; const reEl = Array.isArray(re) ? re[0] : re; if (reEl) reEl.innerHTML = ''
-  } catch { /* ignore */ }
+    toast.success('回复已提交')
+  } catch {
+    toast.error('回复失败')
+  }
   replySubmitting.value = false
   cancelReply()
 }

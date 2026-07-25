@@ -78,6 +78,7 @@
             <span class="user-name">{{ user?.username ?? '用户' }}</span>
             <span v-if="isUserAdmin" class="user-badge">管</span>
           </button>
+          <NotificationBell />
           <button type="button" class="user-logout" title="退出登录" @click="handleLogout">
             <Icon name="ph:sign-out-bold" />
           </button>
@@ -229,7 +230,9 @@ function goPanel() {
 }
 
 function handleLogout() {
+  const toast = useToast()
   clearSession()
+  toast.success('已退出登录')
   router.push('/home')
 }
 

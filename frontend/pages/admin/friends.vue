@@ -30,11 +30,12 @@
 </template>
 
 <script setup lang="ts">
-import { message, Modal } from 'ant-design-vue'
+import { Modal } from 'ant-design-vue'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const friends = ref<any[]>([])
 const dialog = reactive({ open: false, isEdit: false, editIndex: -1, form: { name: '', url: '', avatar: '', description: '' } })
 
@@ -54,17 +55,17 @@ async function loadFriends() {
 }
 
 async function persistFriends() {
-  try { await api.put('/settings', { key: 'friends', value: friends.value }) } catch { message.error('保存失败') }
+  try { await api.put('/settings', { key: 'friends', value: friends.value }) } catch { toast.error('保存失败') }
 }
 
 function openAddFriend() { dialog.isEdit = false; dialog.editIndex = -1; dialog.form = { name: '', url: '', avatar: '', description: '' }; dialog.open = true }
 function editFriend(i: number) { dialog.isEdit = true; dialog.editIndex = i; dialog.form = { ...friends.value[i] }; dialog.open = true }
 
 async function saveFriend() {
-  if (!dialog.form.name || !dialog.form.url) { message.warning('名称和 URL 不能为空'); return }
+  if (!dialog.form.name || !dialog.form.url) { toast.warning('名称和 URL 不能为空'); return }
   if (dialog.isEdit && dialog.editIndex >= 0) friends.value[dialog.editIndex] = { ...dialog.form, _key: `friend_${dialog.editIndex}` }
   else friends.value.push({ ...dialog.form, _key: `friend_${Date.now()}` })
-  dialog.open = false; await persistFriends(); message.success('已保存')
+  dialog.open = false; await persistFriends(); toast.success('已保存')
 }
 
 async function removeFriend(i: number, name: string) {
@@ -74,7 +75,7 @@ async function removeFriend(i: number, name: string) {
     okText: '删除',
     okType: 'danger',
     cancelText: '取消',
-    onOk: async () => { friends.value.splice(i, 1); await persistFriends(); message.success('已删除') },
+    onOk: async () => { friends.value.splice(i, 1); await persistFriends(); toast.success('已删除') },
   })
 }
 </script>

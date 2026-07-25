@@ -3,6 +3,7 @@
     <NuxtPage />
   </NuxtLayout>
   <ClientOnly>
+    <GlobalToast />
     <SidebarMusicPlayer />
   </ClientOnly>
 </template>

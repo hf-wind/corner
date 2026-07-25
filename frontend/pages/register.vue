@@ -70,6 +70,7 @@ import avatarImg from '~/assets/images/avatar.jpg'
 
 const api = useApi()
 const router = useRouter()
+const toast = useToast()
 const theme = ref('light')
 const email = ref('')
 const code = ref('')
@@ -88,7 +89,7 @@ function setTheme(mode: string) {
 
 async function sendCode() {
   if (!email.value) {
-    error.value = '请先输入邮箱'
+    toast.warning('请先输入邮箱')
     return
   }
   
@@ -97,7 +98,7 @@ async function sendCode() {
   
   try {
     await api.post('/auth/send-code', { email: email.value, type: 'register' })
-    success.value = '验证码已发送，请查收邮箱'
+    toast.success('验证码已发送，请查收邮箱')
     cooldown.value = 60
     cooldownTimer = setInterval(() => {
       cooldown.value--
@@ -107,7 +108,7 @@ async function sendCode() {
       }
     }, 1000)
   } catch (e: any) {
-    error.value = e?.message || '发送验证码失败'
+    toast.error(e?.message || '发送验证码失败')
   }
 }
 
@@ -116,12 +117,12 @@ async function handleRegister() {
   success.value = ''
   
   if (password.value !== confirmPassword.value) {
-    error.value = '两次密码输入不一致'
+    toast.warning('两次密码输入不一致')
     return
   }
   
   if (!code.value || code.value.length !== 6) {
-    error.value = '请输入6位验证码'
+    toast.warning('请输入6位验证码')
     return
   }
   
@@ -134,9 +135,10 @@ async function handleRegister() {
     })
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
+    toast.success('注册成功，欢迎加入！')
     router.push(panelHome())
   } catch (e: any) {
-    error.value = e?.message || '注册失败，请检查邮箱是否已被注册'
+    toast.error(e?.message || '注册失败，请检查邮箱是否已被注册')
   }
   submitting.value = false
 }

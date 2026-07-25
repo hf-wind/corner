@@ -211,13 +211,12 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
-
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const route = useRoute()
 const router = useRouter()
 const api = useApi()
+const toast = useToast()
 
 const tab = ref((route.query.tab as string) === 'chats' ? 'chats' : 'settings')
 watch(tab, (v) => {
@@ -264,7 +263,7 @@ async function loadConfig() {
     apiConfigured.value = !!res.apiConfigured
     applyConfig(res.config || {})
   } catch {
-    message.error('加载 AI 配置失败')
+    toast.error('加载 AI 配置失败')
   } finally {
     cfgLoading.value = false
   }
@@ -283,9 +282,9 @@ async function saveConfig() {
     const res = await api.put<any>('/ai/admin/config', { config: payload })
     applyConfig(res.config || payload)
     apiConfigured.value = !!res.apiConfigured
-    message.success('已保存')
+    toast.success('已保存')
   } catch {
-    message.error('保存失败')
+    toast.error('保存失败')
   } finally {
     saving.value = false
   }
@@ -294,7 +293,7 @@ async function saveConfig() {
 function resetDefaults() {
   if (!defaults.value || !Object.keys(defaults.value).length) return
   applyConfig(defaults.value)
-  message.info('已填入默认值，请点击保存生效')
+  toast.info('已填入默认值，请点击保存生效')
 }
 
 async function runPreview() {
@@ -312,7 +311,7 @@ async function runPreview() {
     const res = await api.post<any>('/ai/admin/knowledge/preview', { query: previewQuery.value })
     previewText.value = res.context || ''
   } catch {
-    message.error('预览失败')
+    toast.error('预览失败')
   } finally {
     previewLoading.value = false
   }
@@ -325,7 +324,7 @@ async function loadConversations() {
       q: convQuery.value || undefined,
     })
   } catch {
-    message.error('加载会话失败')
+    toast.error('加载会话失败')
   } finally {
     convLoading.value = false
   }
@@ -345,7 +344,7 @@ async function loadDetail() {
       pageSize: 200,
     })
   } catch {
-    message.error('加载对话失败')
+    toast.error('加载对话失败')
   } finally {
     detailLoading.value = false
   }
@@ -355,12 +354,12 @@ async function clearConversation() {
   if (!selectedUserId.value) return
   try {
     await api.delete(`/ai/admin/conversations/${selectedUserId.value}`)
-    message.success('已清空')
+    toast.success('已清空')
     detail.value = null
     selectedUserId.value = ''
     await loadConversations()
   } catch {
-    message.error('清空失败')
+    toast.error('清空失败')
   }
 }
 

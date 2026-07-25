@@ -86,11 +86,12 @@
 </template>
 
 <script setup lang="ts">
-import { message, Modal } from 'ant-design-vue'
+import { Modal } from 'ant-design-vue'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const loading = ref(true)
 const categories = ref<any[]>([])
 const addDialog = reactive({ open: false, name: '', slug: '', icon: 'FolderOutlined', color: '', editing: false, editingSlug: '' })
@@ -156,19 +157,19 @@ async function openIconPickerAdd() {
 }
 
 async function confirmSave() {
-  if (!addDialog.name) { message.warning('请填写名称'); return }
+  if (!addDialog.name) { toast.warning('请填写名称'); return }
   const slug = addDialog.slug || addDialog.name.toLowerCase().replace(/\s+/g, '-')
   const payload = { name: addDialog.name, slug, icon: addDialog.icon || null, color: addDialog.color || null }
   try {
     if (addDialog.editing) {
       await api.put(`/categories/${addDialog.editingSlug}`, payload)
-      message.success('保存成功')
+      toast.success('保存成功')
     } else {
       await api.post('/categories', payload)
-      message.success('添加成功')
+      toast.success('添加成功')
     }
     addDialog.open = false; load()
-  } catch { message.error(addDialog.editing ? '保存失败' : '添加失败') }
+  } catch { toast.error(addDialog.editing ? '保存失败' : '添加失败') }
 }
 
 async function remove(slug: string, name: string) {
@@ -179,8 +180,8 @@ async function remove(slug: string, name: string) {
     okType: 'danger',
     cancelText: '取消',
     onOk: async () => {
-      try { await api.delete(`/categories/${slug}`); message.success('已删除'); load() }
-      catch { message.error('删除失败') }
+      try { await api.delete(`/categories/${slug}`); toast.success('已删除'); load() }
+      catch { toast.error('删除失败') }
     },
   })
 }
@@ -221,8 +222,8 @@ function onAssignChange() {
 async function confirmAssign() {
   try {
     await api.post(`/categories/${assignDialog.slug}/posts`, { postIds: assignDialog.selected })
-    message.success('分配成功'); assignDialog.open = false; assignDialog.selected = []; assignDialog.search = ''; assignDialog.dirty = false; load()
-  } catch { message.error('分配失败') }
+    toast.success('分配成功'); assignDialog.open = false; assignDialog.selected = []; assignDialog.search = ''; assignDialog.dirty = false; load()
+  } catch { toast.error('分配失败') }
 }
 </script>
 

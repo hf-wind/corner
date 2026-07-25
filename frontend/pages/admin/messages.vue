@@ -59,11 +59,10 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
-
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const loading = ref(true)
 const notifications = ref<any[]>([])
 const unreadCount = ref(0)
@@ -118,7 +117,7 @@ async function markRead(item: any) {
     item.read = true
     unreadCount.value = Math.max(0, unreadCount.value - 1)
   } catch {
-    message.error('操作失败')
+    toast.error('操作失败')
   }
 }
 
@@ -127,9 +126,9 @@ async function markAllRead() {
     await api.post('/notifications/read-all')
     notifications.value.forEach(i => i.read = true)
     unreadCount.value = 0
-    message.success('已全部标为已读')
+    toast.success('已全部标为已读')
   } catch {
-    message.error('操作失败')
+    toast.error('操作失败')
   }
 }
 
@@ -140,7 +139,7 @@ async function deleteNotification(item: any) {
     if (!item.read) unreadCount.value = Math.max(0, unreadCount.value - 1)
     total.value--
   } catch {
-    message.error('删除失败')
+    toast.error('删除失败')
   }
 }
 

@@ -63,8 +63,6 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
-
 const props = withDefaults(defineProps<{
   modelValue: boolean
   multiple?: boolean
@@ -79,6 +77,7 @@ const emit = defineEmits<{
 }>()
 
 const api = useApi()
+const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 
 const visible = ref(props.modelValue)
@@ -161,8 +160,8 @@ function handleUpload(file: File) {
     fd.append('compressAnimated', 'true')
   }
   api.upload('/media/upload', fd)
-    .then(() => { message.success('上传成功'); loadMedia() })
-    .catch(() => message.error('上传失败'))
+    .then(() => { toast.success('上传成功'); loadMedia() })
+    .catch(() => toast.error('上传失败'))
   return false
 }
 
@@ -170,11 +169,11 @@ async function handleDelete() {
   const ids = [...selectedIds.value]
   try {
     await Promise.all(ids.map((id) => api.delete(`/media/${id}`)))
-    message.success(`已删除 ${ids.length} 个文件`)
+    toast.success(`已删除 ${ids.length} 个文件`)
     selectedIds.value.clear()
     loadMedia()
   } catch {
-    message.error('删除失败')
+    toast.error('删除失败')
   }
 }
 

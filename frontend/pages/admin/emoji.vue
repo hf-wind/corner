@@ -95,11 +95,10 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue'
-
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
 const saving = ref(false)
@@ -114,7 +113,7 @@ async function loadPacks() {
   try {
     const data = await api.get<any[]>('/emoji-packs/all')
     packs.value = data
-  } catch { message.error('加载表情包失败') }
+  } catch { toast.error('加载表情包失败') }
   loading.value = false
 }
 
@@ -143,7 +142,7 @@ function openEditPack(pack: any) {
 }
 
 async function confirmPack() {
-  if (!packDialog.name.trim()) { message.warning('请输入名称'); return }
+  if (!packDialog.name.trim()) { toast.warning('请输入名称'); return }
   saving.value = true
   try {
       if (packDialog.editing) {
@@ -153,7 +152,7 @@ async function confirmPack() {
           sort: packDialog.sort,
           compressAnimated: packDialog.compressAnimated,
         })
-        message.success('已更新')
+        toast.success('已更新')
       } else {
         await api.post('/emoji-packs', {
           name: packDialog.name,
@@ -161,11 +160,11 @@ async function confirmPack() {
           sort: packDialog.sort,
           compressAnimated: packDialog.compressAnimated && packDialog.type === 'animated',
         })
-        message.success('已创建')
+        toast.success('已创建')
       }
     packDialog.open = false
     await loadPacks()
-  } catch { message.error('操作失败') }
+  } catch { toast.error('操作失败') }
   saving.value = false
 }
 
@@ -178,9 +177,9 @@ async function togglePack(pack: any) {
 async function removePack(pack: any) {
   try {
     await api.delete(`/emoji-packs/${pack.id}`)
-    message.success('已删除')
+    toast.success('已删除')
     await loadPacks()
-  } catch { message.error('删除失败') }
+  } catch { toast.error('删除失败') }
 }
 
 function openAddItem(pack: any) {
@@ -208,8 +207,8 @@ function openEditItem(pack: any, item: any) {
 }
 
 async function confirmItem() {
-  if (selectedPackType.value === 'static' && !itemDialog.char.trim()) { message.warning('请输入表情字符'); return }
-  if (selectedPackType.value === 'animated' && !itemDialog.imageUrl.trim()) { message.warning('请输入图片 URL'); return }
+  if (selectedPackType.value === 'static' && !itemDialog.char.trim()) { toast.warning('请输入表情字符'); return }
+  if (selectedPackType.value === 'animated' && !itemDialog.imageUrl.trim()) { toast.warning('请输入图片 URL'); return }
   saving.value = true
   try {
     if (itemDialog.editing) {
@@ -219,7 +218,7 @@ async function confirmItem() {
         imageUrl: itemDialog.imageUrl,
         sort: itemDialog.sort,
       })
-      message.success('已更新')
+      toast.success('已更新')
     } else {
       await api.post('/emoji-packs/items', {
         packId: itemDialog.packId,
@@ -228,11 +227,11 @@ async function confirmItem() {
         imageUrl: itemDialog.imageUrl,
         sort: itemDialog.sort,
       })
-      message.success('已添加')
+      toast.success('已添加')
     }
     itemDialog.open = false
     await loadPacks()
-  } catch { message.error('操作失败') }
+  } catch { toast.error('操作失败') }
   saving.value = false
 }
 
@@ -243,16 +242,16 @@ async function deleteItemFromDialog() {
     await api.delete(`/emoji-packs/items/${itemDialog.id}`)
     pack.items = pack.items.filter((i: any) => i.id !== itemDialog.id)
     itemDialog.open = false
-    message.success('已删除')
-  } catch { message.error('删除失败') }
+    toast.success('已删除')
+  } catch { toast.error('删除失败') }
 }
 
 async function removeItem(pack: any, item: any) {
   try {
     await api.delete(`/emoji-packs/items/${item.id}`)
     pack.items = pack.items.filter((i: any) => i.id !== item.id)
-    message.success('已删除')
-  } catch { message.error('删除失败') }
+    toast.success('已删除')
+  } catch { toast.error('删除失败') }
 }
 
 async function openMediaLibrary() {

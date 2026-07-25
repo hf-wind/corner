@@ -37,11 +37,12 @@
 </template>
 
 <script setup lang="ts">
-import { message, Modal } from 'ant-design-vue'
+import { Modal } from 'ant-design-vue'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
 const router = useRouter()
 const loading = ref(true)
 const posts = ref<any[]>([])
@@ -89,8 +90,8 @@ async function remove(slug: string, title: string) {
     cancelText: '取消',
     okType: 'danger',
     onOk: async () => {
-      try { await api.delete(`/posts/${slug}`); message.success('已删除'); posts.value = posts.value.filter((p: any) => p.slug !== slug) }
-      catch { message.error('删除失败') }
+      try { await api.delete(`/posts/${slug}`); toast.success('已删除'); posts.value = posts.value.filter((p: any) => p.slug !== slug) }
+      catch { toast.error('删除失败') }
     },
   })
 }
