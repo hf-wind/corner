@@ -13,31 +13,40 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   const passwordHash = await bcrypt.hash('874512lhf', 10);
 
-  const admin = await prisma.user.upsert({
-    where: { email: '1833079849@qq.com' },
-    update: { role: 'admin' },
-    create: {
-      username: 'admin',
-      email: '1833079849@qq.com',
-      passwordHash,
-      role: 'admin',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
-      bio: '博客管理员，热爱技术与写作。',
-    },
-  });
+  const existingAdmin = await prisma.user.findUnique({ where: { email: '1833079849@qq.com' } });
+  const admin = existingAdmin
+    ? await prisma.user.update({ where: { id: existingAdmin.id }, data: { role: 'admin' } })
+    : await prisma.user.create({
+        data: {
+          username: 'admin',
+          email: '1833079849@qq.com',
+          passwordHash,
+          role: 'admin',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
+          bio: '博客管理员，热爱技术与写作。',
+        },
+      });
 
-  const author = await prisma.user.upsert({
-    where: { email: 'huifeng0615@outlook.com' },
-    update: { role: 'user' },
-    create: {
-      username: 'writer',
-      email: 'huifeng0615@outlook.com',
-      passwordHash,
-      role: 'user',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=writer',
-      bio: '一个喜欢写代码也喜欢写文章的人。',
-    },
-  });
+  let author = await prisma.user.findUnique({ where: { email: 'huifeng0615@outlook.com' } });
+  if (!author) {
+    author = await prisma.user.findUnique({ where: { username: 'writer' } });
+    if (author) {
+      author = await prisma.user.update({ where: { id: author.id }, data: { email: 'huifeng0615@outlook.com', role: 'user' } });
+    } else {
+      author = await prisma.user.create({
+        data: {
+          username: 'writer',
+          email: 'huifeng0615@outlook.com',
+          passwordHash,
+          role: 'user',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=writer',
+          bio: '一个喜欢写代码也喜欢写文章的人。',
+        },
+      });
+    }
+  } else {
+    author = await prisma.user.update({ where: { id: author.id }, data: { role: 'user' } });
+  }
 
   const categories = [
     { name: '技术', slug: 'tech', description: '编程、架构、技术实践' },
