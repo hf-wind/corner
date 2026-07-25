@@ -107,7 +107,12 @@ function renderContent(text: string) {
   })
   r = r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   r = r.replace(/\n/g, '<br>')
-  r = r.replace(/https?:\/\/[^\s<]+/g, '<a href="$&" target="_blank" rel="noopener noreferrer">$&</a>')
+  r = r.replace(/https?:\/\/[^\s<]+/g, (url) => {
+    if (/\.(png|gif|jpg|jpeg|webp|svg|apng|avif)(\?[^\s<]*)?$/i.test(url) || url.includes('cdn.jsdelivr.net/gh/twitter/twemoji')) {
+      return `<img src="${mediaUrl(url)}" alt="emoji" class="inline-emoji" />`
+    }
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+  })
   r = r.replace(/@(\S+)/g, '<span class="reply-mention">@$1</span>')
   r = r.replace(/◆EMJ(\d+)◆/g, (_, idx) => `<img src="${mediaUrl(tokens[parseInt(idx)])}" alt="emoji" class="inline-emoji" />`)
   return r

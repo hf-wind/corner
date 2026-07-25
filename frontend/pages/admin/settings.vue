@@ -54,6 +54,10 @@
           <a-form-item label="发信人地址">
             <a-input v-model:value="email.email_from_address" placeholder="1833079849@qq.com" @blur="saveEmailSetting('email_from_address')" />
           </a-form-item>
+          <a-form-item label="站点URL">
+            <a-input v-model:value="email.site_url" placeholder="https://your-domain.com" @blur="saveEmailSetting('site_url')" />
+            <div class="hint">用于邮件模板中的「查看详情」链接，请填写完整URL，如 https://your-domain.com</div>
+          </a-form-item>
           <a-form-item label="测试发送">
             <a-input v-model:value="emailTestTo" placeholder="输入测试邮箱" style="width:200px;margin-right:8px" />
             <a-button type="primary" :loading="emailTesting" @click="testEmail">发送测试</a-button>
@@ -153,6 +157,7 @@ const email = reactive({
   email_smtp_pass: 'wncwabqengfubhbd',
   email_from_name: '清欢小筑',
   email_from_address: '1833079849@qq.com',
+  site_url: '',
 })
 
 const musicLoading = ref(true)
@@ -197,16 +202,22 @@ async function loadSettings() {
 
 async function loadEmail() {
   try {
-    const res = await api.get<any>('/email/config')
-    if (res) {
-      email.email_enabled = res.enabled ?? true
-      email.email_smtp_host = res.host || 'smtp.qq.com'
-      email.email_smtp_port = res.port || 465
-      email.email_smtp_secure = res.secure !== false
-      email.email_smtp_user = res.user || '1833079849@qq.com'
-      email.email_smtp_pass = res.pass || 'wncwabqengfubhbd'
-      email.email_from_name = res.fromName || '清欢小筑'
-      email.email_from_address = res.fromAddress || '1833079849@qq.com'
+    const [emailRes, siteUrlRes] = await Promise.all([
+      api.get<any>('/email/config'),
+      api.get<any>('/settings/site_url').catch(() => null),
+    ])
+    if (emailRes) {
+      email.email_enabled = emailRes.enabled ?? true
+      email.email_smtp_host = emailRes.host || 'smtp.qq.com'
+      email.email_smtp_port = emailRes.port || 465
+      email.email_smtp_secure = emailRes.secure !== false
+      email.email_smtp_user = emailRes.user || '1833079849@qq.com'
+      email.email_smtp_pass = emailRes.pass || 'wncwabqengfubhbd'
+      email.email_from_name = emailRes.fromName || '清欢小筑'
+      email.email_from_address = emailRes.fromAddress || '1833079849@qq.com'
+    }
+    if (siteUrlRes?.value) {
+      email.site_url = siteUrlRes.value
     }
   } catch {}
 }

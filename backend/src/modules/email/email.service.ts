@@ -39,7 +39,7 @@ export class EmailService {
   }
 
   async getEmailConfig() {
-    const [enabled, host, port, secure, user, pass, fromName, fromAddress] =
+    const [enabled, host, port, secure, user, pass, fromName, fromAddress, siteUrl] =
       await Promise.all([
         this.settings.get('email_enabled'),
         this.settings.get('email_smtp_host'),
@@ -49,6 +49,7 @@ export class EmailService {
         this.settings.get('email_smtp_pass'),
         this.settings.get('email_from_name'),
         this.settings.get('email_from_address'),
+        this.settings.get('site_url'),
       ]);
 
     return {
@@ -60,6 +61,7 @@ export class EmailService {
       pass: pass ?? 'wncwabqengfubhbd',
       fromName: fromName ?? '清欢小筑',
       fromAddress: fromAddress ?? '1833079849@qq.com',
+      siteUrl: (siteUrl as string) || 'https://corner.example.com',
     };
   }
 
@@ -147,8 +149,9 @@ export class EmailService {
     content: string;
     siteUrl?: string;
   }): Promise<void> {
-    const html = this.getCommentNotificationTemplate(data);
-    const siteUrl = data.siteUrl || 'https://corner.example.com';
+    const config = await this.getEmailConfig();
+    const siteUrl = data.siteUrl || config.siteUrl;
+    const html = this.getCommentNotificationTemplate({ ...data, siteUrl });
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
@@ -170,8 +173,9 @@ export class EmailService {
     content: string;
     siteUrl?: string;
   }): Promise<void> {
-    const html = this.getReplyNotificationTemplate(data);
-    const siteUrl = data.siteUrl || 'https://corner.example.com';
+    const config = await this.getEmailConfig();
+    const siteUrl = data.siteUrl || config.siteUrl;
+    const html = this.getReplyNotificationTemplate({ ...data, siteUrl });
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
@@ -192,8 +196,9 @@ export class EmailService {
     postId: string;
     siteUrl?: string;
   }): Promise<void> {
-    const html = this.getLikeNotificationTemplate(data);
-    const siteUrl = data.siteUrl || 'https://corner.example.com';
+    const config = await this.getEmailConfig();
+    const siteUrl = data.siteUrl || config.siteUrl;
+    const html = this.getLikeNotificationTemplate({ ...data, siteUrl });
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
@@ -259,6 +264,12 @@ export class EmailService {
     };
   }
 
+  private renderEmailContent(text: string): string {
+    return text
+      .replace(/◆emoji:([^◆]+)◆/g, '<img src="$1" alt="emoji" style="width:20px;height:20px;vertical-align:middle;display:inline;" />')
+      .replace(/\n/g, '<br>')
+  }
+
   private getVerificationCodeTemplate(code: string, type: string): string {
     return `
 <!DOCTYPE html>
@@ -322,23 +333,23 @@ export class EmailService {
       <strong>${data.senderName}</strong> 评论了你的文章 <strong>${data.postTitle}</strong>
     </p>
     
-    <div style="background:#f8f9fa;border-left:4px solid #5b8def;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
-      <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
-        "${data.content}"
-      </p>
+      <div style="background:#f8f9fa;border-left:4px solid #5b8def;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
+        <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
+          "${this.renderEmailContent(data.content)}"
+        </p>
+      </div>
+      
+      <div style="text-align:center;margin-top:32px;">
+        <a href="${siteUrl}/article/${data.postId}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
+          查看详情
+        </a>
+      </div>
+      
+      <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eee;text-align:center;">
+        <p style="color:#999;font-size:12px;margin:0;">此邮件由系统自动发送，请勿直接回复</p>
+      </div>
     </div>
-    
-    <div style="text-align:center;margin-top:32px;">
-      <a href="${siteUrl}/article/${data.postId}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
-        查看详情
-      </a>
-    </div>
-    
-    <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eee;text-align:center;">
-      <p style="color:#999;font-size:12px;margin:0;">此邮件由系统自动发送，请勿直接回复</p>
-    </div>
-  </div>
-</body>
+  </body>
 </html>`;
   }
 
@@ -371,11 +382,11 @@ export class EmailService {
       <strong>${data.senderName}</strong> 回复了你在 <strong>${data.postTitle}</strong> 的评论
     </p>
     
-    <div style="background:#f8f9fa;border-left:4px solid #7c6bef;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
-      <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
-        "${data.content}"
-      </p>
-    </div>
+      <div style="background:#f8f9fa;border-left:4px solid #7c6bef;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
+        <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
+          "${this.renderEmailContent(data.content)}"
+        </p>
+      </div>
     
     <div style="text-align:center;margin-top:32px;">
       <a href="${siteUrl}/article/${data.postId}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">

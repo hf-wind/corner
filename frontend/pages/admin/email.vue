@@ -31,6 +31,12 @@
             <template v-if="column.key === 'status'">
               <a-tag :color="getStatusColor(record.status)">{{ getStatusLabel(record.status) }}</a-tag>
             </template>
+            <template v-if="column.key === 'content'">
+              <a-tooltip v-if="record.content" :title="stripHtml(record.content)">
+                <span class="content-text">{{ truncate(stripHtml(record.content), 50) }}</span>
+              </a-tooltip>
+              <span v-else>-</span>
+            </template>
             <template v-if="column.key === 'createdAt'">
               {{ formatDate(record.createdAt) }}
             </template>
@@ -68,13 +74,14 @@ const pagination = reactive({
 })
 
 const columns = [
-  { title: '收件人', dataIndex: 'to', key: 'to', width: 200 },
-  { title: '主题', dataIndex: 'subject', key: 'subject', width: 250 },
-  { title: '类型', dataIndex: 'type', key: 'type', width: 120 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
-  { title: '发送时间', dataIndex: 'sentAt', key: 'sentAt', width: 160 },
-  { title: '错误信息', dataIndex: 'error', key: 'error', width: 200 },
+  { title: '收件人', dataIndex: 'to', key: 'to', width: 180 },
+  { title: '主题', dataIndex: 'subject', key: 'subject', width: 220 },
+  { title: '类型', dataIndex: 'type', key: 'type', width: 110 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
+  { title: '内容', dataIndex: 'content', key: 'content', width: 300 },
+  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
+  { title: '发送时间', dataIndex: 'sentAt', key: 'sentAt', width: 150 },
+  { title: '错误信息', dataIndex: 'error', key: 'error', width: 180 },
 ]
 
 onMounted(() => {
@@ -162,6 +169,11 @@ function truncate(text: string, length: number) {
   if (!text) return ''
   return text.length > length ? text.substring(0, length) + '...' : text
 }
+
+function stripHtml(html: string) {
+  if (!html) return ''
+  return html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+}
 </script>
 
 <style scoped>
@@ -182,5 +194,15 @@ function truncate(text: string, length: number) {
 .error-text {
   color: #ef4444;
   font-size: 0.82rem;
+}
+
+.content-text {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary, #666);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
 }
 </style>
