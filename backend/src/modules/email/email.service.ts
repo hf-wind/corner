@@ -123,7 +123,7 @@ export class EmailService {
     const verification = await this.prisma.verificationCode.findFirst({
       where: {
         email,
-        code,
+        code: { equals: code, mode: 'insensitive' },
         type,
         used: false,
         expiresAt: { gte: new Date() },
