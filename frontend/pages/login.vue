@@ -24,16 +24,38 @@
         <div class="login-subtitle">登录你的账号</div>
       </div>
 
+      <div class="login-tabs">
+        <button class="tab-btn" :class="{ active: loginType === 'password' }" @click="loginType = 'password'">
+          密码登录
+        </button>
+        <button class="tab-btn" :class="{ active: loginType === 'code' }" @click="loginType = 'code'">
+          验证码登录
+        </button>
+      </div>
+
       <form class="login-form" @submit.prevent="handleLogin">
         <div class="form-group">
           <label class="form-label">邮箱</label>
           <input v-model="email" class="form-input" type="email" placeholder="请输入邮箱地址" required>
         </div>
-        <div class="form-group">
+        
+        <div v-if="loginType === 'password'" class="form-group">
           <label class="form-label">密码</label>
           <input v-model="password" class="form-input" type="password" placeholder="请输入密码" required>
         </div>
+        
+        <div v-else class="form-group">
+          <label class="form-label">验证码</label>
+          <div class="code-input-row">
+            <input v-model="code" class="form-input code-input" type="text" placeholder="请输入6位验证码" required maxlength="6">
+            <button type="button" class="send-code-btn" @click="sendCode" :disabled="cooldown > 0">
+              {{ cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
+            </button>
+          </div>
+        </div>
+        
         <div v-if="error" class="form-error">{{ error }}</div>
+        <div v-if="success" class="form-success">{{ success }}</div>
         <button class="login-btn" type="submit" :disabled="submitting">{{ submitting ? '登录中...' : '登录' }}</button>
       </form>
 
@@ -54,21 +76,65 @@ import avatarImg from '~/assets/images/avatar.jpg'
 const api = useApi()
 const router = useRouter()
 const theme = ref('light')
+const loginType = ref<'password' | 'code'>('password')
 const email = ref('')
 const password = ref('')
+const code = ref('')
 const error = ref('')
+const success = ref('')
 const submitting = ref(false)
+const cooldown = ref(0)
+let cooldownTimer: NodeJS.Timeout | null = null
 
 function setTheme(mode: string) {
   theme.value = mode
   document.documentElement.classList.toggle('dark', mode === 'dark')
 }
 
+async function sendCode() {
+  if (!email.value) {
+    error.value = '请先输入邮箱'
+    return
+  }
+  
+  error.value = ''
+  success.value = ''
+  
+  try {
+    await api.post('/auth/send-code', { email: email.value, type: 'login' })
+    success.value = '验证码已发送，请查收邮箱'
+    cooldown.value = 60
+    cooldownTimer = setInterval(() => {
+      cooldown.value--
+      if (cooldown.value <= 0 && cooldownTimer) {
+        clearInterval(cooldownTimer)
+        cooldownTimer = null
+      }
+    }, 1000)
+  } catch (e: any) {
+    error.value = e?.message || '发送验证码失败'
+  }
+}
+
 async function handleLogin() {
   error.value = ''
+  success.value = ''
+  
+  if (loginType.value === 'code' && (!code.value || code.value.length !== 6)) {
+    error.value = '请输入6位验证码'
+    return
+  }
+  
   submitting.value = true
   try {
-    const res = await api.post<any>('/auth/login', { email: email.value, password: password.value })
+    const payload: any = { email: email.value }
+    if (loginType.value === 'password') {
+      payload.password = password.value
+    } else {
+      payload.code = code.value
+    }
+    
+    const res = await api.post<any>('/auth/login', payload)
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
     router.push(panelHome())
@@ -226,6 +292,37 @@ async function handleLogin() {
   color: var(--c-text-2);
 }
 
+.login-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--c-text-2);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+
+.tab-btn.active {
+  background: var(--c-primary);
+  border-color: var(--c-primary);
+  color: #fff;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -267,8 +364,46 @@ async function handleLogin() {
   color: var(--c-text-3);
 }
 
+.code-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input {
+  flex: 1;
+}
+
+.send-code-btn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--c-primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.send-code-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.send-code-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .form-error {
   color: #ef4444;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.form-success {
+  color: #22c55e;
   font-size: 0.78rem;
   text-align: center;
 }

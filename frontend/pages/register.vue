@@ -29,6 +29,17 @@
           <label class="form-label">邮箱</label>
           <input v-model="email" class="form-input" type="email" placeholder="请输入邮箱地址" required>
         </div>
+        
+        <div class="form-group">
+          <label class="form-label">验证码</label>
+          <div class="code-input-row">
+            <input v-model="code" class="form-input code-input" type="text" placeholder="请输入6位验证码" required maxlength="6">
+            <button type="button" class="send-code-btn" @click="sendCode" :disabled="cooldown > 0">
+              {{ cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
+            </button>
+          </div>
+        </div>
+        
         <div class="form-group">
           <label class="form-label">密码</label>
           <input v-model="password" class="form-input" type="password" placeholder="至少 6 位密码" required minlength="6">
@@ -39,6 +50,7 @@
         </div>
         <div class="form-hint">注册后系统将自动为你分配昵称和头像，后续可在个人中心修改。</div>
         <div v-if="error" class="form-error">{{ error }}</div>
+        <div v-if="success" class="form-success">{{ success }}</div>
         <button class="login-btn" type="submit" :disabled="submitting">{{ submitting ? '注册中...' : '注册' }}</button>
       </form>
 
@@ -60,25 +72,66 @@ const api = useApi()
 const router = useRouter()
 const theme = ref('light')
 const email = ref('')
+const code = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const error = ref('')
+const success = ref('')
 const submitting = ref(false)
+const cooldown = ref(0)
+let cooldownTimer: NodeJS.Timeout | null = null
 
 function setTheme(mode: string) {
   theme.value = mode
   document.documentElement.classList.toggle('dark', mode === 'dark')
 }
 
+async function sendCode() {
+  if (!email.value) {
+    error.value = '请先输入邮箱'
+    return
+  }
+  
+  error.value = ''
+  success.value = ''
+  
+  try {
+    await api.post('/auth/send-code', { email: email.value, type: 'register' })
+    success.value = '验证码已发送，请查收邮箱'
+    cooldown.value = 60
+    cooldownTimer = setInterval(() => {
+      cooldown.value--
+      if (cooldown.value <= 0 && cooldownTimer) {
+        clearInterval(cooldownTimer)
+        cooldownTimer = null
+      }
+    }, 1000)
+  } catch (e: any) {
+    error.value = e?.message || '发送验证码失败'
+  }
+}
+
 async function handleRegister() {
   error.value = ''
+  success.value = ''
+  
   if (password.value !== confirmPassword.value) {
     error.value = '两次密码输入不一致'
     return
   }
+  
+  if (!code.value || code.value.length !== 6) {
+    error.value = '请输入6位验证码'
+    return
+  }
+  
   submitting.value = true
   try {
-    const res = await api.post<any>('/auth/register', { email: email.value, password: password.value })
+    const res = await api.post<any>('/auth/register', {
+      email: email.value,
+      password: password.value,
+      code: code.value,
+    })
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
     router.push(panelHome())
@@ -276,6 +329,38 @@ async function handleRegister() {
   color: var(--c-text-3);
 }
 
+.code-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input {
+  flex: 1;
+}
+
+.send-code-btn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--c-primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.send-code-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.send-code-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .form-hint {
   font-size: 0.7rem;
   color: var(--c-text-3);
@@ -285,6 +370,12 @@ async function handleRegister() {
 
 .form-error {
   color: #ef4444;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.form-success {
+  color: #22c55e;
   font-size: 0.78rem;
   text-align: center;
 }

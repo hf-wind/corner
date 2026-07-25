@@ -179,6 +179,7 @@ const adminFullNav = [
   { to: '/admin/media', icon: 'ph:image-bold', label: '文件' },
   { to: '/admin/friends', icon: 'ph:handshake-bold', label: '友链' },
   { to: '/admin/ai', icon: 'ph:robot-bold', label: 'AI' },
+  { to: '/admin/email', icon: 'ph:envelope-bold', label: '邮件' },
   { to: '/admin/settings', icon: 'ph:gear-bold', label: '设置' },
   { to: '/admin/emoji', icon: 'ph:smiley-bold', label: '表情' },
   { to: '/admin/info', icon: 'ph:info-bold', label: '系统信息' },

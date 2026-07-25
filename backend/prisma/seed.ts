@@ -11,14 +11,14 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const passwordHash = await bcrypt.hash('admin123', 10);
+  const passwordHash = await bcrypt.hash('874512lhf', 10);
 
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@corner.dev' },
+    where: { email: '1833079849@qq.com' },
     update: { role: 'admin' },
     create: {
       username: 'admin',
-      email: 'admin@corner.dev',
+      email: '1833079849@qq.com',
       passwordHash,
       role: 'admin',
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
@@ -27,11 +27,11 @@ async function main() {
   });
 
   const author = await prisma.user.upsert({
-    where: { email: 'author@corner.dev' },
+    where: { email: 'huifeng0615@outlook.com' },
     update: { role: 'user' },
     create: {
       username: 'writer',
-      email: 'author@corner.dev',
+      email: 'huifeng0615@outlook.com',
       passwordHash,
       role: 'user',
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=writer',
@@ -1212,37 +1212,26 @@ const qqItems = [
 
 const animalItems = [
   { char: '🐱', imageUrl: '/uploads/emoji/cat.png', label: '猫咪', sort: 1 },
-  { char: '🐶', imageUrl: '/uploads/emoji/dog.png', label: '小狗', sort: 2 },
-  { char: '🐰', imageUrl: '/uploads/emoji/rabbit.png', label: '兔子', sort: 3 },
-  { char: '🐼', imageUrl: '/uploads/emoji/panda.png', label: '熊猫', sort: 4 },
-  { char: '🦊', imageUrl: '/uploads/emoji/fox.png', label: '狐狸', sort: 5 },
-  { char: '🐸', imageUrl: '/uploads/emoji/frog.png', label: '青蛙', sort: 6 },
-  { char: '🐯', imageUrl: '/uploads/emoji/tiger.png', label: '老虎', sort: 7 },
-  { char: '🦁', imageUrl: '/uploads/emoji/lion.png', label: '狮子', sort: 8 },
-  { char: '🐵', imageUrl: '/uploads/emoji/monkey.png', label: '猴子', sort: 9 },
-  { char: '🐧', imageUrl: '/uploads/emoji/penguin.png', label: '企鹅', sort: 10 },
-  { char: '🦄', imageUrl: '/uploads/emoji/unicorn.png', label: '独角兽', sort: 11 },
-  { char: '🐨', imageUrl: '/uploads/emoji/koala.png', label: '考拉', sort: 12 },
 ];
 
 
 const emojiPacks = [
   {
-    name: 'Twemoji 合集',
+    name: 'Twemoji',
     type: 'animated',
     sort: 1,
     compressAnimated: false,
     items: twemojiItems,
   },
   {
-    name: 'QQ 表情',
+    name: 'QQ',
     type: 'animated',
     sort: 2,
     compressAnimated: false,
     items: qqItems,
   },
   {
-    name: '动物上传',
+    name: '动物',
     type: 'animated',
     sort: 3,
     compressAnimated: false,

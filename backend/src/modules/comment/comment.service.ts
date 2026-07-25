@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 
 @Injectable()
 export class CommentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
   async findByPost(
     postId: string,
@@ -39,7 +43,6 @@ export class CommentService {
       }),
     ]);
 
-    // load replies separately with limit
     const topIds = comments.map((c) => c.id);
     const repliesMap = new Map<string, any[]>();
 
@@ -181,11 +184,13 @@ export class CommentService {
     if (!post) throw new NotFoundException('Post not found');
 
     let resolvedParentId = dto.parentId;
+    let parentComment = null;
+
     if (resolvedParentId) {
-      const parent = await this.prisma.comment.findUnique({ where: { id: resolvedParentId } });
-      if (!parent) throw new NotFoundException('Parent comment not found');
-      if (parent.parentId) {
-        resolvedParentId = parent.parentId;
+      parentComment = await this.prisma.comment.findUnique({ where: { id: resolvedParentId } });
+      if (!parentComment) throw new NotFoundException('Parent comment not found');
+      if (parentComment.parentId) {
+        resolvedParentId = parentComment.parentId;
       }
     }
 
@@ -204,7 +209,56 @@ export class CommentService {
       },
     });
 
+    this.sendCommentNotification(post, comment, parentComment, userId).catch((err) => {
+      console.error('发送评论通知失败:', err);
+    });
+
     return comment;
+  }
+
+  private async sendCommentNotification(
+    post: any,
+    comment: any,
+    parentComment: any | null,
+    currentUserId: string,
+  ) {
+    try {
+      const postAuthor = await this.prisma.user.findUnique({
+        where: { id: post.authorId },
+        select: { id: true, username: true, email: true },
+      });
+
+      if (!postAuthor || postAuthor.id === currentUserId) return;
+
+      if (parentComment && parentComment.userId) {
+        const parentAuthor = await this.prisma.user.findUnique({
+          where: { id: parentComment.userId },
+          select: { id: true, username: true, email: true },
+        });
+
+        if (parentAuthor && parentAuthor.id !== currentUserId && parentAuthor.email) {
+          await this.emailService.sendReplyNotification({
+            to: parentAuthor.email,
+            toName: parentAuthor.username,
+            senderName: comment.authorName || '匿名用户',
+            postTitle: post.title,
+            postId: post.id,
+            content: comment.content,
+          });
+        }
+      } else if (postAuthor.email) {
+        await this.emailService.sendCommentNotification({
+          to: postAuthor.email,
+          toName: postAuthor.username,
+          senderName: comment.authorName || '匿名用户',
+          postTitle: post.title,
+          postId: post.id,
+          content: comment.content,
+        });
+      }
+    } catch (error) {
+      console.error('发送评论通知失败:', error);
+    }
   }
 
   async toggleLike(commentId: string, userId: string) {
@@ -219,10 +273,49 @@ export class CommentService {
       await this.prisma.commentLike.delete({ where: { id: existing.id } });
     } else {
       await this.prisma.commentLike.create({ data: { userId, commentId } });
+
+      this.sendLikeNotification(comment, userId).catch((err) => {
+        console.error('发送点赞通知失败:', err);
+      });
     }
 
     const count = await this.prisma.commentLike.count({ where: { commentId } });
     return { liked: !existing, likesCount: count };
+  }
+
+  private async sendLikeNotification(comment: any, currentUserId: string) {
+    try {
+      if (!comment.userId || comment.userId === currentUserId) return;
+
+      const commentAuthor = await this.prisma.user.findUnique({
+        where: { id: comment.userId },
+        select: { id: true, username: true, email: true },
+      });
+
+      if (!commentAuthor || !commentAuthor.email) return;
+
+      const liker = await this.prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { username: true },
+      });
+
+      const post = await this.prisma.post.findUnique({
+        where: { id: comment.postId },
+        select: { id: true, title: true },
+      });
+
+      if (!post) return;
+
+      await this.emailService.sendLikeNotification({
+        to: commentAuthor.email,
+        toName: commentAuthor.username,
+        senderName: liker?.username || '匿名用户',
+        postTitle: post.title,
+        postId: post.id,
+      });
+    } catch (error) {
+      console.error('发送点赞通知失败:', error);
+    }
   }
 
   async approve(id: string) {

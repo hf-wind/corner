@@ -1,6 +1,7 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcryptjs';
@@ -18,9 +19,29 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private emailService: EmailService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async sendVerificationCode(email: string, type: 'register' | 'login') {
+    if (type === 'register') {
+      const existing = await this.prisma.user.findUnique({ where: { email } });
+      if (existing) throw new ConflictException('该邮箱已被注册');
+    }
+
+    if (type === 'login') {
+      const user = await this.prisma.user.findUnique({ where: { email } });
+      if (!user) throw new BadRequestException('该邮箱未注册');
+    }
+
+    return this.emailService.sendVerificationCode(email, type);
+  }
+
+  async register(dto: RegisterDto & { code?: string }) {
+    if (dto.code) {
+      const valid = await this.emailService.verifyCode(dto.email, dto.code, 'register');
+      if (!valid) throw new BadRequestException('验证码无效或已过期');
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already exists');
 
@@ -40,12 +61,19 @@ export class AuthService {
     return this.token(user);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto & { code?: string }) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (dto.code) {
+      const valid = await this.emailService.verifyCode(dto.email, dto.code, 'login');
+      if (!valid) throw new BadRequestException('验证码无效或已过期');
+    } else if (dto.password) {
+      const valid = await bcrypt.compare(dto.password, user.passwordHash);
+      if (!valid) throw new UnauthorizedException('Invalid credentials');
+    } else {
+      throw new BadRequestException('请提供密码或验证码');
+    }
 
     return this.token(user);
   }

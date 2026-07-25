@@ -28,6 +28,39 @@
         </a-form>
       </a-card>
 
+      <a-card :bordered="false" class="section-card" size="small" title="邮件配置">
+        <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '108px' } }">
+          <a-form-item label="启用邮件">
+            <a-switch v-model:checked="email.email_enabled" @change="saveEmailSetting('email_enabled')" />
+          </a-form-item>
+          <a-form-item label="SMTP服务器">
+            <a-input v-model:value="email.email_smtp_host" placeholder="smtp.qq.com" @blur="saveEmailSetting('email_smtp_host')" />
+          </a-form-item>
+          <a-form-item label="端口">
+            <a-input-number v-model:value="email.email_smtp_port" :min="1" :max="65535" style="width:120px" @blur="saveEmailSetting('email_smtp_port')" />
+          </a-form-item>
+          <a-form-item label="SSL加密">
+            <a-switch v-model:checked="email.email_smtp_secure" @change="saveEmailSetting('email_smtp_secure')" />
+          </a-form-item>
+          <a-form-item label="发信地址">
+            <a-input v-model:value="email.email_smtp_user" placeholder="1833079849@qq.com" @blur="saveEmailSetting('email_smtp_user')" />
+          </a-form-item>
+          <a-form-item label="SMTP密钥">
+            <a-input-password v-model:value="email.email_smtp_pass" placeholder="wncwabqengfubhbd" @blur="saveEmailSetting('email_smtp_pass')" />
+          </a-form-item>
+          <a-form-item label="显示名称">
+            <a-input v-model:value="email.email_from_name" placeholder="清欢小筑" @blur="saveEmailSetting('email_from_name')" />
+          </a-form-item>
+          <a-form-item label="发信人地址">
+            <a-input v-model:value="email.email_from_address" placeholder="1833079849@qq.com" @blur="saveEmailSetting('email_from_address')" />
+          </a-form-item>
+          <a-form-item label="测试发送">
+            <a-input v-model:value="emailTestTo" placeholder="输入测试邮箱" style="width:200px;margin-right:8px" />
+            <a-button type="primary" :loading="emailTesting" @click="testEmail">发送测试</a-button>
+          </a-form-item>
+        </a-form>
+      </a-card>
+
       <a-card :bordered="false" class="section-card" size="small" title="音乐播放器">
         <a-spin :spinning="musicLoading">
           <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '108px' } }">
@@ -109,6 +142,19 @@ const settings = ref({ site_title: '', site_description: '', site_keywords: '' a
 const keywordText = ref('')
 const mediaNaming = ref('timestamp')
 
+const emailTesting = ref(false)
+const emailTestTo = ref('')
+const email = reactive({
+  email_enabled: true,
+  email_smtp_host: 'smtp.qq.com',
+  email_smtp_port: 465,
+  email_smtp_secure: true,
+  email_smtp_user: '1833079849@qq.com',
+  email_smtp_pass: 'wncwabqengfubhbd',
+  email_from_name: '清欢小筑',
+  email_from_address: '1833079849@qq.com',
+})
+
 const musicLoading = ref(true)
 const musicSaving = ref(false)
 const refreshing = ref(false)
@@ -132,6 +178,7 @@ const volumePercent = computed({
 onMounted(() => {
   loadSettings()
   loadMusic()
+  loadEmail()
 })
 
 async function loadSettings() {
@@ -146,6 +193,51 @@ async function loadSettings() {
       mediaNaming.value = (res.media_naming as string) || 'timestamp'
     }
   } catch {}
+}
+
+async function loadEmail() {
+  try {
+    const res = await api.get<any>('/email/config')
+    if (res) {
+      email.email_enabled = res.enabled ?? true
+      email.email_smtp_host = res.host || 'smtp.qq.com'
+      email.email_smtp_port = res.port || 465
+      email.email_smtp_secure = res.secure !== false
+      email.email_smtp_user = res.user || '1833079849@qq.com'
+      email.email_smtp_pass = res.pass || 'wncwabqengfubhbd'
+      email.email_from_name = res.fromName || '清欢小筑'
+      email.email_from_address = res.fromAddress || '1833079849@qq.com'
+    }
+  } catch {}
+}
+
+async function saveEmailSetting(key: string) {
+  try {
+    await api.put('/settings', { key, value: (email as any)[key] })
+    message.success('已保存')
+  } catch {
+    message.error('保存失败')
+  }
+}
+
+async function testEmail() {
+  if (!emailTestTo.value) {
+    message.warning('请输入测试邮箱')
+    return
+  }
+  emailTesting.value = true
+  try {
+    const res = await api.post<any>('/email/test', { to: emailTestTo.value })
+    if (res.success) {
+      message.success('测试邮件已发送')
+    } else {
+      message.error(res.message || '发送失败')
+    }
+  } catch (e: any) {
+    message.error(e?.message || '发送失败')
+  } finally {
+    emailTesting.value = false
+  }
 }
 
 async function saveMediaNaming() {
@@ -228,7 +320,6 @@ async function saveMusic() {
   }
   musicSaving.value = true
   try {
-    // keep default id in sync with first playlist
     if (music.music_playlists[0]?.id) {
       music.music_id = music.music_playlists[0].id
       music.music_server = music.music_playlists[0].server

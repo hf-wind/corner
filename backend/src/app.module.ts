@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { BullModule } from '@nestjs/bull';
 import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -18,6 +19,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { MusicModule } from './modules/music/music.module';
 import { EmojiModule } from './modules/emoji/emoji.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -28,6 +30,13 @@ import { EmojiModule } from './modules/emoji/emoji.module';
         index: false,
         maxAge: '1y',
         immutable: true,
+      },
+    }),
+    BullModule.forRoot({
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: process.env.REDIS_PASS,
       },
     }),
     PrismaModule,
@@ -45,6 +54,7 @@ import { EmojiModule } from './modules/emoji/emoji.module';
     SettingsModule,
     MusicModule,
     EmojiModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
