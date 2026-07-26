@@ -22,6 +22,7 @@ import { EmojiModule } from './modules/emoji/emoji.module';
 import { EmailModule } from './modules/email/email.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { FriendLinkModule } from './modules/friend-link/friend-link.module';
+import { LibraryModule } from './modules/library/library.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { FriendLinkModule } from './modules/friend-link/friend-link.module';
     EmailModule,
     NotificationModule,
     FriendLinkModule,
+    LibraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -259,3 +259,45 @@ model FriendApplication {
 
   @@map("friend_applications")
 }
+
+model LibraryItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  type            String    @db.VarChar(20)
+  title           String    @db.VarChar(255)
+  originalTitle   String?   @map("original_title") @db.VarChar(255)
+  slug            String    @unique @db.VarChar(255)
+  coverImage      String?   @map("cover_image") @db.Text
+  creator         String?   @db.VarChar(255)
+  summary         String?   @db.Text
+  reflection      String?   @db.Text
+  highlights      Json      @default("[]")
+  quotes          Json      @default("[]")
+  genres          Json      @default("[]")
+  cast            Json      @default("[]")
+  publishStatus   String    @default("draft") @map("publish_status") @db.VarChar(20)
+  progressStatus  String?   @map("progress_status") @db.VarChar(30)
+  rating          Float?
+  rank            Int?
+  recommended     Boolean   @default(false)
+  startDate       DateTime? @map("start_date") @db.Date
+  finishDate      DateTime? @map("finish_date") @db.Date
+  releaseYear     Int?      @map("release_year")
+  country         String?   @db.VarChar(100)
+  language        String?   @db.VarChar(100)
+  publisher       String?   @db.VarChar(255)
+  isbn            String?   @db.VarChar(30)
+  totalPages      Int?      @map("total_pages")
+  director        String?   @db.VarChar(255)
+  runtimeMinutes  Int?      @map("runtime_minutes")
+  episodeCount    Int?      @map("episode_count")
+  platform        String?   @db.VarChar(100)
+  sourceUrl       String?   @map("source_url") @db.Text
+  viewCount       Int       @default(0) @map("view_count")
+  publishedAt     DateTime? @map("published_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([type, publishStatus])
+  @@index([recommended, publishedAt])
+  @@map("library_items")
+}

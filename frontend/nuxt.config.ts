@@ -44,6 +44,7 @@ export default defineNuxtConfig({
     '/archive': { ssr: false },
     '/friends': { ssr: false },
     '/about': { ssr: false },
+    '/library/**': { ssr: false },
     '/login': { ssr: false },
     '/admin/**': { ssr: false },
   },
