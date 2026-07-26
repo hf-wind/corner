@@ -237,6 +237,28 @@
             </a-form>
           </a-card>
 
+          <a-card size="small" title="当前知识库文章" :bordered="false" class="section-card">
+            <template #extra>
+              <a-button size="small" :loading="knowledgeListLoading" @click="loadKnowledgeList">刷新</a-button>
+            </template>
+            <a-spin :spinning="knowledgeListLoading">
+              <div v-if="knowledgeList.items.length" class="knowledge-list">
+                <div v-for="item in knowledgeList.items" :key="item.id" class="knowledge-item">
+                  <div class="knowledge-title">
+                    <NuxtLink :to="'/article/' + item.slug" target="_blank">{{ item.title }}</NuxtLink>
+                  </div>
+                  <div class="knowledge-meta">
+                    <a-tag v-for="tag in item.tags" :key="tag" size="small">{{ tag }}</a-tag>
+                    <span class="knowledge-category">{{ item.category }}</span>
+                    <span class="knowledge-date">{{ item.publishedAt?.slice(0, 10) }}</span>
+                  </div>
+                  <div v-if="item.excerpt" class="knowledge-excerpt">{{ item.excerpt }}</div>
+                </div>
+              </div>
+              <a-empty v-else description="暂无已发布文章" />
+            </a-spin>
+          </a-card>
+
           <div class="actions">
             <a-button type="primary" :loading="saving" @click="saveConfig">保存配置</a-button>
             <a-button :loading="testing" @click="testConnection">测试连接</a-button>
@@ -341,8 +363,12 @@ const selectedUserId = ref('')
 const detailLoading = ref(false)
 const detail = ref<any>(null)
 
+const knowledgeListLoading = ref(false)
+const knowledgeList = ref<{ total: number; items: any[] }>({ total: 0, items: [] })
+
 onMounted(async () => {
   await loadConfig()
+  await loadKnowledgeList()
   if (tab.value === 'chats') await loadConversations()
 })
 
@@ -435,6 +461,18 @@ async function runPreview() {
     toast.error('预览失败')
   } finally {
     previewLoading.value = false
+  }
+}
+
+async function loadKnowledgeList() {
+  knowledgeListLoading.value = true
+  try {
+    const res = await api.get<any>('/ai/admin/knowledge/list')
+    knowledgeList.value = { total: res.total || 0, items: res.items || [] }
+  } catch {
+    toast.error('加载知识库文章失败')
+  } finally {
+    knowledgeListLoading.value = false
   }
 }
 
@@ -570,5 +608,61 @@ function formatTime(v?: string) {
 }
 @media (max-width: 800px) {
   .chats-layout { grid-template-columns: 1fr; }
+}
+
+.knowledge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.knowledge-item {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--c-bg-1);
+}
+
+.knowledge-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.knowledge-title a {
+  color: var(--c-primary);
+  text-decoration: none;
+}
+
+.knowledge-title a:hover {
+  text-decoration: underline;
+}
+
+.knowledge-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  color: var(--c-text-2);
+}
+
+.knowledge-category {
+  color: var(--c-text-3);
+}
+
+.knowledge-date {
+  color: var(--c-text-3);
+}
+
+.knowledge-excerpt {
+  font-size: 0.82rem;
+  color: var(--c-text-2);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 </style>

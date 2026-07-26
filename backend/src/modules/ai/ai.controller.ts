@@ -8,10 +8,11 @@ import {
   Put,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AiService } from './ai.service';
 import { SummarizeDto } from './dto/summarize.dto';
 import { ChatDto } from './dto/chat.dto';
@@ -41,6 +42,42 @@ export class AiController {
   chat(@Body() dto: ChatDto, @Req() req: Request) {
     const userId = (req.user as any).id;
     return this.ai.petChat(userId, dto.message, dto.article);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('chat/stream')
+  async chatStream(
+    @Body() dto: ChatDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const userId = (req.user as any).id;
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const writeEvent = (event: string, data: unknown) => {
+      if (!res.writableEnded && !res.destroyed) {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      }
+    };
+
+    try {
+      const result = await this.ai.petChatStream(
+        userId,
+        dto.message,
+        dto.article,
+        (token) => writeEvent('token', token),
+      );
+      writeEvent('done', result);
+    } catch {
+      writeEvent('error', { message: 'AI 回复暂时不可用' });
+    } finally {
+      if (!res.writableEnded && !res.destroyed) res.end();
+    }
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -93,6 +130,13 @@ export class AiController {
   @Roles('admin')
   previewKnowledge(@Body() dto: PreviewKnowledgeDto) {
     return this.ai.previewKnowledge(dto.query || '');
+  }
+
+  @Get('admin/knowledge/list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  getKnowledgeList() {
+    return this.ai.getKnowledgeList();
   }
 
   @Get('admin/conversations')

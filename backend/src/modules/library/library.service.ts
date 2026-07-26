@@ -235,6 +235,7 @@ export class LibraryService {
     } = item;
     return {
       ...visible,
+      publishStatus: item.publishStatus,
       experienceDate: finishDate || startDate || null,
     };
   }

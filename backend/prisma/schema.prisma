@@ -19,6 +19,7 @@ model User {
   posts        Post[]
   media        Media[]
   chatMessages ChatMessage[]
+  chatDailyQuotas ChatDailyQuota[]
   comments     Comment[]
   commentLikes CommentLike[]
 
@@ -192,6 +193,18 @@ model ChatMessage {
 
   @@index([userId, createdAt])
   @@map("chat_messages")
+}
+
+model ChatDailyQuota {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  date      DateTime @db.Date
+  count     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("chat_daily_quota")
 }
 
 model VerificationCode {

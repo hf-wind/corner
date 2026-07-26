@@ -38,6 +38,7 @@ export const AI_SETTING_KEYS = [
   'ai_friend_moderate_prompt',
   'ai_friend_moderate_temperature',
   'ai_friend_moderate_max_tokens',
+  'ai_daily_quota',
 ] as const;
 
 export type AiSettingKey = (typeof AI_SETTING_KEYS)[number];
@@ -82,6 +83,7 @@ export type AiConfig = {
   ai_friend_moderate_prompt: string;
   ai_friend_moderate_temperature: number;
   ai_friend_moderate_max_tokens: number;
+  ai_daily_quota: number;
 };
 
 export const AI_DEFAULTS: AiConfig = {
@@ -172,4 +174,5 @@ export const AI_DEFAULTS: AiConfig = {
   ].join('\n'),
   ai_friend_moderate_temperature: 0.1,
   ai_friend_moderate_max_tokens: 300,
+  ai_daily_quota: 100,
 };

@@ -185,6 +185,82 @@ export class AiService {
     return content;
   }
 
+  async chatStream(
+    messages: ChatMessage[],
+    options: ChatOptions = {},
+    onToken: (token: string) => void,
+  ) {
+    const cfg = await this.getConfig();
+    const apiKey = this.resolveApiKey(cfg);
+    const baseUrl = this.resolveBaseUrl(cfg);
+    if (!this.hasProviderConfig(cfg)) {
+      throw new ServiceUnavailableException('AI 未配置或已关闭，请在后台完成服务商连接配置');
+    }
+
+    const timeout = Math.max(3000, Math.min(120000, cfg.ai_request_timeout_ms || 30000));
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.resolveModel(cfg, options.model),
+        messages,
+        stream: true,
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? 1024,
+        thinking: { type: options.thinking || 'disabled' },
+      }),
+      signal: AbortSignal.timeout(timeout),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      this.logger.error(`AI provider stream error ${res.status}: ${text.slice(0, 400)}`);
+      throw new ServiceUnavailableException(`AI 请求失败 (${res.status})`);
+    }
+    if (!res.body) throw new ServiceUnavailableException('AI 服务未返回可读取的数据流');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let output = '';
+
+    const consumeLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) return;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === '[DONE]') return;
+      try {
+        const data = JSON.parse(payload) as {
+          choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>;
+        };
+        const token = data.choices?.[0]?.delta?.content
+          ?? data.choices?.[0]?.message?.content
+          ?? '';
+        if (token) {
+          output += token;
+          onToken(token);
+        }
+      } catch {
+        // Providers may send keepalive/non-JSON SSE frames; safely ignore them.
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+      lines.forEach(consumeLine);
+    }
+    buffer += decoder.decode();
+    if (buffer) consumeLine(buffer);
+    return output.trim();
+  }
+
   localExcerpt(title: string, content: string, maxLen = 100) {
     const plain = this.toPlainText(content);
     const base = plain || String(title || '').trim();
@@ -550,6 +626,40 @@ export class AiService {
     };
   }
 
+  async getKnowledgeList() {
+    const cfg = await this.getConfig();
+    const catalogLimit = Math.max(1, Math.min(50, cfg.ai_knowledge_catalog_limit || 20));
+
+    const posts = await this.prisma.post.findMany({
+      where: { status: 'published' },
+      orderBy: { publishedAt: 'desc' },
+      take: catalogLimit,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        publishedAt: true,
+        tags: { include: { tag: { select: { name: true } } } },
+        category: { select: { name: true } },
+      },
+    });
+
+    return {
+      enabled: cfg.ai_knowledge_enabled,
+      total: posts.length,
+      items: posts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        slug: p.slug,
+        excerpt: (p.excerpt || '').slice(0, 120),
+        category: p.category?.name || '未分类',
+        tags: p.tags.map((t) => t.tag.name),
+        publishedAt: p.publishedAt?.toISOString() || '',
+      })),
+    };
+  }
+
   async saveMessage(userId: string, role: 'user' | 'assistant', content: string) {
     return this.prisma.chatMessage.create({
       data: { userId, role, content },
@@ -570,6 +680,50 @@ export class AiService {
   async clearHistory(userId: string) {
     const result = await this.prisma.chatMessage.deleteMany({ where: { userId } });
     return { deleted: result.count };
+  }
+
+  async checkDailyQuota(userId: string): Promise<{ allowed: boolean; remaining: number }> {
+    const cfg = await this.getConfig();
+    const dailyLimit = cfg.ai_daily_quota || 100;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const quota = await this.prisma.chatDailyQuota.findUnique({
+      where: { userId_date: { userId, date: today } },
+    });
+    
+    const currentCount = quota?.count || 0;
+    const remaining = Math.max(0, dailyLimit - currentCount);
+    
+    return { allowed: currentCount < dailyLimit, remaining };
+  }
+
+  async incrementDailyQuota(userId: string): Promise<void> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    await this.prisma.chatDailyQuota.upsert({
+      where: { userId_date: { userId, date: today } },
+      update: { count: { increment: 1 } },
+      create: { userId, date: today, count: 1 },
+    });
+  }
+
+  private getQuotaExhaustedMessage(): string {
+    const messages = [
+      '哆啦A梦的四次元口袋今天装满啦！明天再来找我玩吧～',
+      '阿风说今天让我休息一下，聊天额度用完了呢，明天见！',
+      '铜锣烧吃完了，能量不足！今天的聊天额度已经用完啦～',
+      '任意门今天需要充电，明天再带你去冒险吧！',
+      '时间包袱皮用完了，今天的聊天次数到限额了，明天继续～',
+      '阿风说我今天太话痨了，让我少说点，明天再来聊天吧！',
+      '竹蜻蜓没电了，今天的聊天额度已经用完啦，休息一下明天见～',
+      '放大灯故障了，今天不能再继续聊天了，额度已用完，明天再来！',
+      '如果电话亭今天打烊了，聊天额度用完了，明天请早～',
+      '记忆面包吃完了，今天的聊天额度已经用完，让我消化一下明天继续！',
+    ];
+    return messages[Math.floor(Math.random() * messages.length)];
   }
 
   async listConversations(q?: string) {
@@ -649,7 +803,7 @@ export class AiService {
     };
   }
 
-  async petChat(
+  private async preparePetChat(
     userId: string,
     message: string,
     article?: { title?: string; content?: string; slug?: string },
@@ -716,6 +870,23 @@ export class AiService {
       { role: 'user', content: userText },
     ];
 
+    return { cfg, messages };
+  }
+
+  async petChat(
+    userId: string,
+    message: string,
+    article?: { title?: string; content?: string; slug?: string },
+  ) {
+    const { cfg, messages } = await this.preparePetChat(userId, message, article);
+
+    const quota = await this.checkDailyQuota(userId);
+    if (!quota.allowed) {
+      const quotaMessage = this.getQuotaExhaustedMessage();
+      await this.saveMessage(userId, 'assistant', quotaMessage);
+      return { reply: quotaMessage, source: 'quota' as const };
+    }
+
     if (!cfg.ai_pet_chat_enabled || !this.hasProviderConfig(cfg)) {
       const fallback = cfg.ai_fallback_unconfigured;
       await this.saveMessage(userId, 'assistant', fallback);
@@ -731,11 +902,65 @@ export class AiService {
       });
       const text = reply || '嗯……四次元口袋卡住了，再说一次好不好？';
       await this.saveMessage(userId, 'assistant', text);
+      await this.incrementDailyQuota(userId);
       return { reply: text, source: 'ai' as const };
     } catch {
       const fallback = cfg.ai_fallback_error;
       await this.saveMessage(userId, 'assistant', fallback);
       return { reply: fallback, source: 'fallback' as const };
+    }
+  }
+
+  async petChatStream(
+    userId: string,
+    message: string,
+    article: { title?: string; content?: string; slug?: string } | undefined,
+    onToken: (token: string) => void,
+  ) {
+    const { cfg, messages } = await this.preparePetChat(userId, message, article);
+
+    const quota = await this.checkDailyQuota(userId);
+    if (!quota.allowed) {
+      const quotaMessage = this.getQuotaExhaustedMessage();
+      onToken(quotaMessage);
+      await this.saveMessage(userId, 'assistant', quotaMessage);
+      return { source: 'quota' as const };
+    }
+
+    if (!cfg.ai_pet_chat_enabled || !this.hasProviderConfig(cfg)) {
+      const fallback = cfg.ai_fallback_unconfigured;
+      onToken(fallback);
+      await this.saveMessage(userId, 'assistant', fallback);
+      return { source: 'fallback' as const };
+    }
+
+    let partial = '';
+    try {
+      const reply = await this.chatStream(messages, {
+        model: cfg.ai_chat_model || cfg.ai_model,
+        temperature: cfg.ai_chat_temperature,
+        maxTokens: cfg.ai_chat_max_tokens,
+        thinking: 'disabled',
+      }, (token) => {
+        partial += token;
+        onToken(token);
+      });
+      const text = reply || '嗯……四次元口袋卡住了，再说一次好不好？';
+      if (!reply) onToken(text);
+      await this.saveMessage(userId, 'assistant', text);
+      await this.incrementDailyQuota(userId);
+      return { source: 'ai' as const };
+    } catch (error) {
+      if (partial.trim()) {
+        this.logger.warn(`AI stream ended after partial response: ${error}`);
+        await this.saveMessage(userId, 'assistant', partial);
+        await this.incrementDailyQuota(userId);
+        return { source: 'ai' as const, partial: true };
+      }
+      const fallback = cfg.ai_fallback_error;
+      onToken(fallback);
+      await this.saveMessage(userId, 'assistant', fallback);
+      return { source: 'fallback' as const };
     }
   }
 }

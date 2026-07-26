@@ -1,64 +1,65 @@
 <template>
-  <div v-if="!loading && featured.length" class="swiper-3d-wrap" ref="swiperRef" :class="{ mounted }"
+  <div v-if="loading || featured.length" ref="swiperRef" class="swiper-3d-wrap" :class="{ mounted }"
     @mouseenter="pauseTimer" @mouseleave="restartTimer">
     <div class="section-title">· 精选推荐</div>
-    <div class="swiper-3d-track" :style="{ transform: `translateX(${trackOffset}px)` }">
-      <NuxtLink v-for="(item, i) in featured" :key="item.slug" :to="'/article/' + item.slug" class="swiper-card-3d"
-        :class="{ ...slideClasses(i), hovered: hoveredIndex === i }"
-        @pointerenter="onPointerEnter(i)" @pointerleave="onPointerLeave">
-        <img
-          :src="coverUrl(item.cover)"
-          :alt="item.title"
-          :loading="i < 3 ? 'eager' : 'lazy'"
-          :fetchpriority="i === currentIndex ? 'high' : 'low'"
-          decoding="async"
-          width="480"
-          height="320"
-        >
-        <div class="swiper-overlay">
-          <span v-if="i === currentIndex" class="feat-badge">精选</span>
-          <h3>{{ item.title }}</h3>
-          <span>{{ item.date }}</span>
-        </div>
-      </NuxtLink>
+    <div v-if="loading" class="swiper-skeleton" aria-hidden="true">
+      <span v-for="i in 3" :key="i" />
     </div>
-    <div class="swiper-dots">
-      <span v-for="(item, i) in featured" :key="i" class="dot" :class="{ active: i === currentIndex }"
-        @click="goTo(i)" />
-    </div>
+    <template v-else>
+      <div class="swiper-3d-track" :style="{ transform: `translate3d(${trackOffset}px, 0, 0)` }">
+        <NuxtLink v-for="(item, i) in featured" :key="item.slug" :to="'/article/' + item.slug" class="swiper-card-3d"
+          :class="slideClasses(i)">
+          <img
+            :src="coverUrl(item.cover)"
+            :alt="item.title"
+            :loading="i < 3 ? 'eager' : 'lazy'"
+            :fetchpriority="i === currentIndex ? 'high' : 'low'"
+            decoding="async"
+            width="480"
+            height="320"
+          >
+          <div class="swiper-overlay">
+            <span v-if="i === currentIndex" class="feat-badge">精选</span>
+            <h3>{{ item.title }}</h3>
+            <span>{{ item.date }}</span>
+          </div>
+        </NuxtLink>
+      </div>
+      <div class="swiper-dots">
+        <span v-for="(item, i) in featured" :key="i" class="dot" :class="{ active: i === currentIndex }"
+          @click="goTo(i)" />
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getDisplayImageUrl } from '~/utils/imagePerformance'
 
-const props = withDefaults(defineProps<{ ready?: boolean }>(), { ready: true })
 const api = useApi()
 const featured = ref<any[]>([])
 const loading = ref(true)
 
-const currentIndex = ref(0)
+const currentIndex = ref(1)
 const dir = ref(1)
 const cardWidth = ref(220)
+const containerWidth = ref(0)
 const swiperRef = ref<HTMLElement>()
 const mounted = ref(false)
 const initialized = ref(false)
-const hoveredIndex = ref(-1)
 let autoTimer: ReturnType<typeof setInterval>
-let hoverTimer: ReturnType<typeof setTimeout>
 let pointerInside = false
+let resizeObserver: ResizeObserver | null = null
 
 function coverUrl(source: string) {
   return getDisplayImageUrl(source, 480, 320)
 }
 
 const trackOffset = computed(() => {
-  if (!swiperRef.value) return 0
   const cw = cardWidth.value
   const gap = 16
-  const containerW = swiperRef.value.clientWidth
-  return -(currentIndex.value * (cw + gap)) + (containerW - cw) / 2
+  return -(currentIndex.value * (cw + gap)) + (containerWidth.value - cw) / 2
 })
 
 function slideClasses(i: number) {
@@ -75,12 +76,12 @@ function goTo(index: number) {
 
 function nextSlide() {
   const last = featured.value.length - 1
-  if (last < 2) return
+  if (last <= 1) return
   const next = currentIndex.value + dir.value
-  if (next >= last) {
+  if (next > last - 1) {
     dir.value = -1
     currentIndex.value = last - 1
-  } else if (next <= 0) {
+  } else if (next < 1) {
     dir.value = 1
     currentIndex.value = 1
   } else {
@@ -100,16 +101,6 @@ function restartTimer() {
   startAutoScroll()
 }
 
-function onPointerEnter(i: number) {
-  clearTimeout(hoverTimer)
-  hoverTimer = setTimeout(() => { hoveredIndex.value = i }, 100)
-}
-
-function onPointerLeave() {
-  clearTimeout(hoverTimer)
-  hoverTimer = setTimeout(() => { hoveredIndex.value = -1 }, 100)
-}
-
 function startAutoScroll() {
   if (
     featured.value.length > 2
@@ -127,32 +118,26 @@ function onVisibilityChange() {
 }
 
 function tryInit() {
-  if (props.ready && !loading.value && !initialized.value) {
+  if (!loading.value && !initialized.value && featured.value.length) {
     initialized.value = true
     nextTick(() => {
       updateCardWidth()
-      if (featured.value.length >= 3) currentIndex.value = 1
-      mounted.value = true
       startAutoScroll()
-      window.addEventListener('resize', recalcWidth)
+      resizeObserver = new ResizeObserver(updateCardWidth)
+      if (swiperRef.value) resizeObserver.observe(swiperRef.value)
     })
   }
 }
 
-let resizeTimer: ReturnType<typeof setTimeout>
 function updateCardWidth() {
   if (!swiperRef.value) return
-  const containerWidth = swiperRef.value.clientWidth
+  const width = swiperRef.value.clientWidth
+  containerWidth.value = width
   if (window.matchMedia('(max-width: 640px)').matches) {
-    cardWidth.value = Math.min(420, Math.max(240, containerWidth - 32))
+    cardWidth.value = Math.min(420, Math.max(240, width - 32))
     return
   }
-  cardWidth.value = Math.max(180, (containerWidth - 48) / 3)
-}
-
-function recalcWidth() {
-  clearTimeout(resizeTimer)
-  resizeTimer = setTimeout(updateCardWidth, 100)
+  cardWidth.value = Math.max(180, (width - 32) / 3)
 }
 
 async function fetchFeatured() {
@@ -166,21 +151,21 @@ async function fetchFeatured() {
     }))
   } catch { /* keep empty */ }
   loading.value = false
+  if (featured.value.length <= 1) {
+    currentIndex.value = 0
+  }
   tryInit()
 }
 
-watch(() => props.ready, tryInit)
-
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
-  fetchFeatured()
+  requestAnimationFrame(() => { mounted.value = true })
+  void fetchFeatured()
 })
 
 onUnmounted(() => {
   clearInterval(autoTimer)
-  clearTimeout(hoverTimer)
-  clearTimeout(resizeTimer)
-  window.removeEventListener('resize', recalcWidth)
+  resizeObserver?.disconnect()
   document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
@@ -190,7 +175,6 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   padding: 24px 0 32px;
-  perspective: 800px;
   user-select: none;
   opacity: 0;
   transform: translateY(12px);
@@ -213,8 +197,27 @@ onUnmounted(() => {
 .swiper-3d-track {
   display: flex;
   gap: 16px;
-  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.36s cubic-bezier(0.2, 0.75, 0.25, 1);
   will-change: transform;
+}
+
+.swiper-skeleton {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  height: 160px;
+}
+
+.swiper-skeleton span {
+  border-radius: 14px;
+  background: linear-gradient(110deg, var(--c-bg-2) 28%, var(--c-bg-3) 45%, var(--c-bg-2) 62%);
+  background-size: 220% 100%;
+  animation: swiper-skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes swiper-skeleton {
+  0%, 100% { background-position: 100% 0; opacity: 0.68; }
+  50% { background-position: 0 0; opacity: 1; }
 }
 
 .swiper-card-3d {
@@ -231,8 +234,8 @@ onUnmounted(() => {
   transform-origin: center center;
   transform: scale(0.7);
   opacity: 0.4;
-  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 0.5s ease;
+  contain: layout paint;
+  transition: transform 0.28s ease-out, opacity 0.24s ease-out;
 }
 
 .swiper-card-3d.prev,
@@ -243,27 +246,25 @@ onUnmounted(() => {
 }
 
 .swiper-card-3d.prev {
-  transform: scale(0.86) rotateY(6deg);
+  transform: scale(0.86);
 }
 
 .swiper-card-3d.next {
-  transform: scale(0.86) rotateY(-6deg);
+  transform: scale(0.86);
 }
 
 .swiper-card-3d.active {
   z-index: 3;
   transform: scale(1);
   opacity: 1;
-  box-shadow: 0 12px 40px color-mix(in srgb, var(--c-primary) 22%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--c-primary) 22%, transparent);
 }
 
-.swiper-card-3d.hovered {
-  z-index: 4;
-  transform: scale(1.02);
-}
-
-.swiper-card-3d.hovered.active {
-  box-shadow: 0 16px 48px color-mix(in srgb, var(--c-primary) 30%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .swiper-card-3d:hover {
+    opacity: 1;
+    outline-color: color-mix(in srgb, var(--c-primary) 48%, transparent);
+  }
 }
 
 .swiper-card-3d img {
@@ -335,14 +336,13 @@ onUnmounted(() => {
   border-radius: 50%;
   background: var(--border);
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: width 0.25s ease, background-color 0.25s ease;
 }
 
 .dot.active {
   width: 22px;
   border-radius: 4px;
   background: var(--c-primary);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--c-primary) 40%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -358,7 +358,6 @@ onUnmounted(() => {
 @media (max-width: 640px) {
   .swiper-3d-wrap {
     padding: 4px 0 24px;
-    perspective: none;
   }
 
   .swiper-3d-wrap .section-title {
@@ -377,15 +376,21 @@ onUnmounted(() => {
     opacity: 0.56;
   }
 
-  .swiper-card-3d.active,
-  .swiper-card-3d.hovered,
-  .swiper-card-3d.hovered.active {
+  .swiper-card-3d.active {
     transform: scale(1);
   }
 
   .swiper-card-3d img {
     height: 148px;
   }
+
+  .swiper-skeleton {
+    grid-template-columns: 1fr;
+    height: 148px;
+    padding: 0 16px;
+  }
+
+  .swiper-skeleton span:not(:first-child) { display: none; }
 
   .swiper-overlay {
     padding: 13px;
