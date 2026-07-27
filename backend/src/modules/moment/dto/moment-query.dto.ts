@@ -1,7 +1,7 @@
-import { IsOptional, IsString, IsInt, Min, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
-export class PostQueryDto {
+export class MomentQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -20,24 +20,7 @@ export class PostQueryDto {
 
   @IsOptional()
   @IsString()
-  category?: string;
-
-  @IsOptional()
-  @IsString()
-  tag?: string;
-
-  @IsOptional()
-  @IsString()
   search?: string;
-
-  @IsOptional()
-  @IsString()
-  archive?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  @Type(() => Boolean)
-  featured?: boolean;
 
   @IsOptional()
   @IsString()
@@ -47,5 +30,4 @@ export class PostQueryDto {
   @IsBoolean()
   @Type(() => Boolean)
   needsPublish?: boolean;
-
 }

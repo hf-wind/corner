@@ -18,6 +18,8 @@ import { SummarizeDto } from './dto/summarize.dto';
 import { ChatDto } from './dto/chat.dto';
 import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
 import { PreviewKnowledgeDto } from './dto/preview-knowledge.dto';
+import { GenerateArticleDto } from './dto/generate-article.dto';
+import { PolishMomentDto } from './dto/polish-moment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -35,6 +37,28 @@ export class AiController {
   @Post('summarize')
   summarize(@Body() dto: SummarizeDto) {
     return this.ai.summarize(dto.title || '', dto.content || '');
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('generate-article')
+  generateArticle(@Body() dto: GenerateArticleDto, @Req() req: Request) {
+    const userId = (req.user as any)?.id;
+    return this.ai.generateArticle(dto.outline, userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('polish-moment')
+  polishMoment(@Body() dto: PolishMomentDto) {
+    return this.ai.polishMomentWithConfig(dto.inspiration);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('wallpapers')
+  wallpapers(@Query('page') page?: string, @Query('rows') rows?: string) {
+    return this.ai.listWallpapers(
+      page ? Number(page) : 1,
+      rows ? Number(rows) : 9,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))

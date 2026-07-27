@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -22,6 +22,18 @@ export class PostController {
   @Get('archive')
   findArchive() {
     return this.post.findArchive();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':slug/preview')
+  preview(@Param('slug') slug: string) {
+    return this.post.preview(slug);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':slug/publish')
+  publish(@Param('slug') slug: string) {
+    return this.post.publish(slug);
   }
 
   @Get(':slug')

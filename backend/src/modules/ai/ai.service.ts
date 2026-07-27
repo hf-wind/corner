@@ -1,6 +1,13 @@
-import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { MediaService } from '../media/media.service';
 import { AI_DEFAULTS, AI_SETTING_KEYS, type AiConfig, type AiSettingKey } from './ai-defaults';
 
 export interface ChatMessage {
@@ -22,6 +29,7 @@ export class AiService {
   constructor(
     private prisma: PrismaService,
     private settings: SettingsService,
+    private media: MediaService,
   ) {}
 
   private resolveApiKey(cfg: AiConfig) {
@@ -280,6 +288,195 @@ export class AiService {
       .trim();
   }
 
+  private localMomentContent(inspiration: string) {
+    const lines = String(inspiration || '')
+      .replace(/\r/g, '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const blocks: string[] = [];
+    let paragraph: string[] = [];
+
+    const flushParagraph = () => {
+      if (!paragraph.length) return;
+      blocks.push(paragraph.join(' '));
+      paragraph = [];
+    };
+
+    for (const line of lines) {
+      if (/^!\[[^\]]*]\([^)]+\)$/.test(line)) {
+        flushParagraph();
+        blocks.push(line);
+        continue;
+      }
+      paragraph.push(line);
+    }
+
+    flushParagraph();
+    return blocks.join('\n\n').trim();
+  }
+
+  private localMomentTitle(content: string) {
+    const plain = this.toPlainText(content).replace(/\s+/g, ' ').trim();
+    if (!plain) return `瞬间 ${new Date().toISOString().slice(0, 10)}`;
+    return plain.slice(0, 28);
+  }
+
+  async polishMoment(inspiration: string) {
+    const text = String(inspiration || '').trim();
+    if (text.length < 2) {
+      throw new BadRequestException('请先写一点灵感或想法');
+    }
+
+    const fallbackContent = this.localMomentContent(text);
+    const fallbackTitle = this.localMomentTitle(fallbackContent);
+    const fallbackExcerpt = this.localExcerpt(fallbackTitle, fallbackContent, 120);
+    const cfg = await this.getConfig();
+
+    if (!this.hasProviderConfig(cfg)) {
+      return {
+        title: fallbackTitle,
+        content: fallbackContent,
+        excerpt: fallbackExcerpt,
+        source: 'fallback' as const,
+      };
+    }
+
+    try {
+      const result = await this.chat(
+        [
+          {
+            role: 'system',
+            content:
+              '你是一个中文社交内容编辑助手。请把用户的灵感润色成适合发布在个人站点“瞬间”栏目的一段或几段内容。' +
+              '保留原意和真实语气，允许更顺滑、更有画面感，但不要编造事实。' +
+              '如果原文里包含 Markdown 图片语法 ![alt](url)，必须完整保留原样，不要改写 URL。' +
+              '请只返回 JSON，格式为 {"title":"...","content":"...","excerpt":"..."}。',
+          },
+          {
+            role: 'user',
+            content: `请润色下面这段瞬间灵感：\n${text.slice(0, 6000)}`,
+          },
+        ],
+        {
+          temperature: 0.9,
+          maxTokens: 1200,
+          thinking: 'disabled',
+        },
+      );
+
+      const parsed = this.parseJsonObject(result);
+      const content = String(parsed?.content || '').trim() || fallbackContent;
+      const title = String(parsed?.title || '').trim() || this.localMomentTitle(content);
+      const excerpt = String(parsed?.excerpt || '').trim() || this.localExcerpt(title, content, 120);
+
+      return {
+        title: title.slice(0, 80),
+        content,
+        excerpt: excerpt.slice(0, 160),
+        source: 'ai' as const,
+      };
+    } catch (e) {
+      this.logger.warn(`polish moment fallback: ${e}`);
+      return {
+        title: fallbackTitle,
+        content: fallbackContent,
+        excerpt: fallbackExcerpt,
+        source: 'fallback' as const,
+      };
+    }
+  }
+
+  async polishMomentWithConfig(inspiration: string) {
+    const text = String(inspiration || '').trim();
+    if (text.length < 2) {
+      throw new BadRequestException('请先写一点灵感或想法');
+    }
+
+    const fallbackContent = this.localMomentContent(text);
+    const cleanedFallback = fallbackContent.replace(/\[\[emoji:[^\]|]+(?:\|[^\]]*)?\]\]/g, ' ');
+    const fallbackTitle = this.localMomentTitle(cleanedFallback);
+    const fallbackExcerpt = this.localExcerpt(fallbackTitle, cleanedFallback, 120);
+    const cfg = await this.getConfig();
+
+    if (!cfg.ai_moment_enabled || !this.hasProviderConfig(cfg)) {
+      return {
+        title: fallbackTitle,
+        content: fallbackContent,
+        excerpt: fallbackExcerpt,
+        source: 'fallback' as const,
+      };
+    }
+
+    try {
+      const result = await this.chat(
+        [
+          { role: 'system', content: cfg.ai_moment_prompt },
+          {
+            role: 'user',
+            content: `请润色下面这段瞬间灵感：\n${text.slice(0, 6000)}`,
+          },
+        ],
+        {
+          model: cfg.ai_moment_model || cfg.ai_model,
+          temperature: cfg.ai_moment_temperature,
+          maxTokens: cfg.ai_moment_max_tokens,
+          thinking: 'disabled',
+        },
+      );
+
+      const parsed = this.parseJsonObject(result);
+      const content = String(parsed?.content || '').trim() || fallbackContent;
+      const title = String(parsed?.title || '').trim() || this.localMomentTitle(content);
+      let excerpt = String(parsed?.excerpt || '').trim();
+
+      if (!excerpt && cfg.ai_moment_summary_prompt.trim()) {
+        try {
+          excerpt = (
+            await this.chat(
+              [
+                { role: 'system', content: cfg.ai_moment_summary_prompt },
+                {
+                  role: 'user',
+                  content: `标题：${title || '瞬间'}\n\n正文：\n${content.slice(0, 4000)}`,
+                },
+              ],
+              {
+                model: cfg.ai_moment_model || cfg.ai_model,
+                temperature: Math.max(cfg.ai_moment_temperature, 0.8),
+                maxTokens: 180,
+                thinking: 'disabled',
+              },
+            )
+          ).trim();
+        } catch (error) {
+          this.logger.warn(`moment summary fallback: ${error}`);
+        }
+      }
+
+      if (!excerpt) {
+        const cleanedContent = content.replace(/\[\[emoji:[^\]|]+(?:\|[^\]]*)?\]\]/g, ' ');
+        excerpt = this.localExcerpt(title, cleanedContent, 120);
+      }
+
+      return {
+        title: title.slice(0, 80),
+        content,
+        excerpt: excerpt.slice(0, 160),
+        source: 'ai' as const,
+      };
+    } catch (error) {
+      this.logger.warn(`polish moment config fallback: ${error}`);
+      return {
+        title: fallbackTitle,
+        content: fallbackContent,
+        excerpt: fallbackExcerpt,
+        source: 'fallback' as const,
+      };
+    }
+  }
+
   async summarize(title: string, content: string) {
     const cfg = await this.getConfig();
     const fallback = this.localExcerpt(title, content, 100);
@@ -318,6 +515,248 @@ export class AiService {
       this.logger.warn(`summarize fallback: ${e}`);
       return { excerpt: fallback, source: 'fallback' as const };
     }
+  }
+
+  private parseJsonObject(text: string): Record<string, unknown> | null {
+    if (!text) return null;
+    const cleaned = text
+      .replace(/```json\s*/gi, '')
+      .replace(/```/g, '')
+      .trim();
+    try {
+      const direct = JSON.parse(cleaned);
+      if (direct && typeof direct === 'object') return direct as Record<string, unknown>;
+    } catch { /* fall through */ }
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeMetaSlug(raw?: string, title?: string) {
+    const base = String(raw || title || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\u4e00-\u9fff-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80);
+    return base || `p-${Date.now().toString(36)}`;
+  }
+
+  private async ensureCategoryByName(name: string) {
+    const n = String(name || '').trim();
+    if (!n) return null;
+    const existing = await this.prisma.category.findFirst({
+      where: { name: { equals: n, mode: 'insensitive' } },
+    });
+    if (existing) return existing;
+    const slugBase = this.normalizeMetaSlug(n);
+    let slug = slugBase;
+    let i = 2;
+    while (await this.prisma.category.findUnique({ where: { slug } })) {
+      slug = `${slugBase.slice(0, 70)}-${i++}`;
+      if (i > 30) {
+        slug = `c-${Date.now().toString(36)}`;
+        break;
+      }
+    }
+    return this.prisma.category.create({
+      data: { name: n, slug },
+    });
+  }
+
+  private async ensureTagsByNames(names: string[]) {
+    const result: { id: string; name: string; slug: string }[] = [];
+    const seen = new Set<string>();
+    for (const raw of names) {
+      const n = String(raw || '').trim();
+      if (!n) continue;
+      const key = n.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      let tag = await this.prisma.tag.findFirst({
+        where: { name: { equals: n, mode: 'insensitive' } },
+      });
+      if (!tag) {
+        const slugBase = this.normalizeMetaSlug(n);
+        let slug = slugBase;
+        let i = 2;
+        while (await this.prisma.tag.findUnique({ where: { slug } })) {
+          slug = `${slugBase.slice(0, 70)}-${i++}`;
+          if (i > 30) {
+            slug = `t-${Date.now().toString(36)}`;
+            break;
+          }
+        }
+        tag = await this.prisma.tag.create({ data: { name: n, slug } });
+      }
+      result.push({ id: tag.id, name: tag.name, slug: tag.slug });
+      if (result.length >= 8) break;
+    }
+    return result;
+  }
+
+  async listWallpapers(page = 1, rows = 9) {
+    const p = Math.max(1, page || 1);
+    const r = Math.min(24, Math.max(1, rows || 9));
+    const pageUrl = `https://haowallpaper.com/?page=${p}&sortType=7&wpType=1&rows=${r}`;
+
+    try {
+      const res = await fetch(pageUrl, {
+        signal: AbortSignal.timeout(20000),
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml',
+          Referer: 'https://haowallpaper.com/',
+        },
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const items = this.parseWallpapersFromHtml(html).slice(0, r);
+        if (items.length) return { items, source: pageUrl };
+      }
+    } catch (e) {
+      this.logger.warn(`wallpaper html scrape fail: ${e}`);
+    }
+
+    // Fallback: known CDN image pattern with IDs extracted from homepage once
+    return { items: [] as { id: string; url: string; thumb: string }[], source: null };
+  }
+
+  private parseWallpapersFromHtml(html: string): { id: string; url: string; thumb: string }[] {
+    const re = /https:\/\/haowallpaper\.com\/link\/common\/file\/(?:getCroppingImg|previewImg)\/(\d+)/g;
+    const seen = new Set<string>();
+    const out: { id: string; url: string; thumb: string }[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html))) {
+      const id = m[1];
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const url = `https://haowallpaper.com/link/common/file/getCroppingImg/${id}`;
+      out.push({ id, url, thumb: url });
+    }
+    return out;
+  }
+
+  async pickAndImportCover(userId?: string) {
+    try {
+      const { items } = await this.listWallpapers(1, 9);
+      if (!items.length) return '';
+      const pick = items[Math.floor(Math.random() * items.length)];
+      const media = await this.media.importFromUrl(pick.url, userId, 'cover');
+      return media.path || '';
+    } catch (e) {
+      this.logger.warn(`pick cover failed: ${e}`);
+      return '';
+    }
+  }
+
+  async generateArticle(outline: string, userId?: string) {
+    const text = String(outline || '').trim();
+    if (text.length < 4) {
+      throw new BadRequestException('请输入更完整的灵感或要点');
+    }
+
+    const cfg = await this.getConfig();
+    if (!cfg.ai_article_enabled) {
+      throw new ServiceUnavailableException('AI 文章生成已关闭');
+    }
+    if (!this.hasProviderConfig(cfg)) {
+      throw new ServiceUnavailableException('AI 未配置或已关闭');
+    }
+
+    const bodyText = await this.chat(
+      [
+        { role: 'system', content: cfg.ai_article_prompt },
+        { role: 'user', content: `灵感/要点：\n${text}` },
+      ],
+      {
+        model: cfg.ai_article_model || cfg.ai_model,
+        temperature: cfg.ai_article_temperature,
+        maxTokens: cfg.ai_article_max_tokens,
+        thinking: 'disabled',
+      },
+    );
+
+    const bodyJson = this.parseJsonObject(bodyText);
+    const title = String(bodyJson?.title || '').trim() || text.slice(0, 40);
+    const content = String(bodyJson?.content || '').trim();
+    if (!content) {
+      throw new ServiceUnavailableException('AI 未返回有效正文，请重试');
+    }
+
+    const [categories, tags] = await Promise.all([
+      this.prisma.category.findMany({ select: { id: true, name: true, slug: true }, take: 200 }),
+      this.prisma.tag.findMany({ select: { id: true, name: true, slug: true }, take: 300 }),
+    ]);
+
+    let slug = this.normalizeMetaSlug(title);
+    let categoryId: string | undefined;
+    let categoryName = '';
+    let tagIds: string[] = [];
+    let tagNames: string[] = [];
+
+    try {
+      const metaText = await this.chat(
+        [
+          { role: 'system', content: cfg.ai_article_meta_prompt },
+          {
+            role: 'user',
+            content: [
+              `标题：${title}`,
+              `正文：\n${content.slice(0, 6000)}`,
+              `已有分类：${categories.map((c) => c.name).join('、') || '无'}`,
+              `已有标签：${tags.map((t) => t.name).join('、') || '无'}`,
+            ].join('\n'),
+          },
+        ],
+        {
+          model: cfg.ai_article_model || cfg.ai_model,
+          temperature: 0.4,
+          maxTokens: 512,
+          thinking: 'disabled',
+        },
+      );
+      const meta = this.parseJsonObject(metaText);
+      if (meta?.slug) slug = this.normalizeMetaSlug(String(meta.slug), title);
+      categoryName = String(meta?.categoryName || '').trim();
+      const rawTags = Array.isArray(meta?.tagNames) ? meta!.tagNames.map(String) : [];
+      if (categoryName) {
+        const cat = await this.ensureCategoryByName(categoryName);
+        if (cat) {
+          categoryId = cat.id;
+          categoryName = cat.name;
+        }
+      }
+      if (rawTags.length) {
+        const ensured = await this.ensureTagsByNames(rawTags);
+        tagIds = ensured.map((t) => t.id);
+        tagNames = ensured.map((t) => t.name);
+      }
+    } catch (e) {
+      this.logger.warn(`article meta fallback: ${e}`);
+    }
+
+    const summary = await this.summarize(title, content);
+    const coverImage = await this.pickAndImportCover(userId);
+
+    return {
+      title,
+      content,
+      excerpt: summary.excerpt,
+      slug,
+      coverImage,
+      categoryId,
+      categoryName,
+      tagIds,
+      tagNames,
+    };
   }
 
   async moderateComment(content: string, postTitle?: string): Promise<{ approved: boolean; reason: string }> {

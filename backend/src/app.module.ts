@@ -23,6 +23,7 @@ import { EmailModule } from './modules/email/email.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { FriendLinkModule } from './modules/friend-link/friend-link.module';
 import { LibraryModule } from './modules/library/library.module';
+import { MomentModule } from './modules/moment/moment.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { LibraryModule } from './modules/library/library.module';
     NotificationModule,
     FriendLinkModule,
     LibraryModule,
+    MomentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

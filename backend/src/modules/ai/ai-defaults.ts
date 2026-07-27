@@ -39,6 +39,18 @@ export const AI_SETTING_KEYS = [
   'ai_friend_moderate_temperature',
   'ai_friend_moderate_max_tokens',
   'ai_daily_quota',
+  'ai_article_enabled',
+  'ai_article_prompt',
+  'ai_article_meta_prompt',
+  'ai_article_model',
+  'ai_article_temperature',
+  'ai_article_max_tokens',
+  'ai_moment_enabled',
+  'ai_moment_prompt',
+  'ai_moment_summary_prompt',
+  'ai_moment_model',
+  'ai_moment_temperature',
+  'ai_moment_max_tokens',
 ] as const;
 
 export type AiSettingKey = (typeof AI_SETTING_KEYS)[number];
@@ -84,6 +96,18 @@ export type AiConfig = {
   ai_friend_moderate_temperature: number;
   ai_friend_moderate_max_tokens: number;
   ai_daily_quota: number;
+  ai_article_enabled: boolean;
+  ai_article_prompt: string;
+  ai_article_meta_prompt: string;
+  ai_article_model: string;
+  ai_article_temperature: number;
+  ai_article_max_tokens: number;
+  ai_moment_enabled: boolean;
+  ai_moment_prompt: string;
+  ai_moment_summary_prompt: string;
+  ai_moment_model: string;
+  ai_moment_temperature: number;
+  ai_moment_max_tokens: number;
 };
 
 export const AI_DEFAULTS: AiConfig = {
@@ -115,11 +139,11 @@ export const AI_DEFAULTS: AiConfig = {
   ].join(' '),
 
   ai_summarize_prompt: [
-    '你是哆啦A梦（Doraemon）。你的好友「阿风」又把一篇新文章丢给你让你整理摘要，',
-    '你用轻松活泼的口吻整理一段，像是在给伙伴的作业写评语那样亲切自然。',
-    '要求：80到120字；纯文本；不要标题、引号、前缀（如「摘要：」）；',
-    '客观概括主题与要点；不编造正文没有的信息；可以带上一点对阿风的轻微吐槽。',
-  ].join(''),
+    '你是哆啦A梦（Doraemon）。你的好友「阿风」又把一篇新文章丢给你让你整理摘要。',
+    '请用轻松、自然、略带陪伴感的口吻，写一段 80 到 120 字的纯文本摘要。',
+    '不要写标题、不要加引号、不要出现“摘要：”。',
+    '概括主题与要点，不编造正文没有的信息，可以对阿风轻轻吐槽一下。',
+  ].join(' '),
 
   ai_moderate_prompt: [
     '你是一个评论审核助手。请审核以下评论内容是否适合公开发布。',
@@ -175,4 +199,41 @@ export const AI_DEFAULTS: AiConfig = {
   ai_friend_moderate_temperature: 0.1,
   ai_friend_moderate_max_tokens: 300,
   ai_daily_quota: 100,
+
+  ai_article_enabled: true,
+  ai_article_prompt: [
+    '你是一名中文博客作者助手。',
+    '请根据用户提供的灵感、要点或大纲，写成一篇完整、可读的 Markdown 文章。',
+    '要求：结构清晰；语气自然；不编造具体数据或未给出的事实；只返回 JSON。',
+    '严格输出 {"title":"文章标题","content":"Markdown 正文"}。',
+  ].join(' '),
+  ai_article_meta_prompt: [
+    '你是博客元数据助手。',
+    '请根据文章标题、正文，以及给定的已有分类/标签列表，推荐 slug、分类与标签。',
+    'slug 使用小写英文和连字符；categoryName 优先从已有分类中选择；tagNames 输出 2 到 5 个。',
+    '只返回 JSON：{"slug":"english-slug","categoryName":"分类名","tagNames":["标签1","标签2"]}。',
+  ].join(' '),
+  ai_article_model: '',
+  ai_article_temperature: 0.7,
+  ai_article_max_tokens: 4096,
+
+  ai_moment_enabled: true,
+  ai_moment_prompt: [
+    '你是一位很会写中文个人动态的幕后编辑，正在帮站长阿风整理“瞬间”。',
+    '请把用户给出的灵感润色成适合个人站点发布的短内容，必须使用第一人称，像本人刚刚认真写下来的碎片记录。',
+    '文风要自然、松弛、有画面感，允许一点有趣和幽默，但不要油腻，不要端着，不要像 AI，也不要解释自己在润色。',
+    '不要编造事实，不要强行升华，不要写成文章腔。可以保留口语、停顿和小情绪。',
+    '如果原文里有 Markdown 图片语法 ![alt](url)，必须原样保留，不要改写 URL。',
+    '如果原文里有 [[emoji:url|label]] 这种表情占位，也必须完整保留。',
+    '请只返回 JSON，格式必须是 {"title":"...","content":"...","excerpt":"..."}。',
+    'title 要像瞬间标题，短一点、有记忆点；content 是正文；excerpt 是一句情景化摘要，用哆啦A梦视角写，带一点吐槽和陪伴感，但别每次都一个句式。',
+  ].join(' '),
+  ai_moment_summary_prompt: [
+    '你是哆啦A梦，要替阿风刚写好的瞬间补一句情景化摘要。',
+    '请用第一人称旁观口吻，写一句 20 到 50 字的短摘要，带点陪伴感、碎碎念和轻微吐槽，像在记录阿风又做了什么。',
+    '不要写成标题，不要加引号，不要提到 AI，不要重复正文原句。',
+  ].join(' '),
+  ai_moment_model: '',
+  ai_moment_temperature: 0.9,
+  ai_moment_max_tokens: 1200,
 };

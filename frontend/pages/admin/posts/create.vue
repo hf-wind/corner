@@ -1,483 +1,265 @@
 <template>
-  <div class="editor-page">
-    <div class="editor-layout">
-      <div class="editor-main">
-        <div class="editor-field">
-          <a-input v-model:value="form.title" placeholder="输入文章标题…" class="title-input" :bordered="false"
-            @input="onTitleInput" />
-        </div>
+  <div class="article-create-page">
+    <section class="article-create-hero">
+      <div class="hero-copy">
+        <p class="hero-eyebrow">Article Draft</p>
+        <h1>把灵感整理成一篇文章</h1>
+        <p class="hero-desc">
+          先写想法、片段、要点或结构，AI 会帮你生成一篇完整草稿，再进入预览和后续编辑。
+        </p>
+      </div>
+      <div class="hero-badges">
+        <span>灵感输入</span>
+        <span>AI 成稿</span>
+        <span>自动建草稿</span>
+      </div>
+    </section>
 
-        <div class="editor-field editor-field-grow">
-          <client-only>
-            <MdEditor :key="editorKey" v-model="form.content" language="zh-CN" :toolbars="toolbars" :theme="editorTheme"
-              @upload-img="onUploadImg" class="md-editor" />
-          </client-only>
+    <section class="article-create-card">
+      <div class="card-head">
+        <div>
+          <p class="card-eyebrow">灵感容器</p>
+          <h2>不用一开始就写完整，先把最想表达的东西放进来</h2>
         </div>
+        <span class="card-count">{{ outline.trim().length }} 字</span>
       </div>
 
-      <div class="editor-sidebar">
-        <a-card :bordered="false" class="meta-card" size="small" title="发布设置">
-          <div class="meta-row">
-            <label>Slug</label>
-            <a-input v-model:value="form.slug" placeholder="自动生成" size="small" @input="slugManual = true" />
-          </div>
-          <div class="meta-row">
-            <label>状态</label>
-            <a-select v-model:value="form.status" size="small" style="width:100%">
-              <a-select-option value="draft">草稿</a-select-option>
-              <a-select-option value="published">发布</a-select-option>
-            </a-select>
-          </div>
-          <div class="meta-row meta-row-inline">
-            <label>推荐</label>
-            <a-switch v-model:checked="form.featured" />
-            <a-button type="primary" size="small" @click="publish" :loading="saving" style="margin-left:auto">
-              {{ saving ? '发布中…' : '发布' }}
-            </a-button>
-          </div>
-        </a-card>
+      <a-textarea
+        v-model:value="outline"
+        :rows="14"
+        :disabled="generating"
+        class="outline-input"
+        placeholder="比如：想写一篇关于最近生活节奏变化的文章。前半部分写为什么开始慢下来，中间写散步、读书、听歌这些具体细节，结尾写自己现在更喜欢这种状态。"
+      />
 
-        <a-card :bordered="false" class="meta-card" size="small" title="分类">
-          <a-tree-select v-model:value="form.categoryId" :tree-data="categoryTree"
-            :fieldNames="{ label: 'name', value: 'id', children: 'children' }" placeholder="选择分类" allow-clear
-            size="small" style="width:100%" />
-        </a-card>
-
-        <a-card :bordered="false" class="meta-card" size="small" title="标签">
-          <a-select v-model:value="form.tagIds" mode="multiple" size="small" style="width:100%" placeholder="选择标签">
-            <a-select-option v-for="t in tags" :key="t.id" :value="t.id">{{ t.name }}</a-select-option>
-          </a-select>
-        </a-card>
-
-        <a-card :bordered="false" class="meta-card" size="small" title="摘要">
-          <a-textarea v-model:value="form.excerpt" :rows="4" placeholder="文章摘要（可选，可 AI 生成）" />
-          <a-button block size="small" class="gen-excerpt-btn" :loading="generatingExcerpt" @click="generateExcerpt">
-            <template v-if="!generatingExcerpt">
-              <ThunderboltOutlined /> 生成摘要
-            </template>
-            <template v-else>生成中…</template>
-          </a-button>
-        </a-card>
-
-        <a-card :bordered="false" class="meta-card" size="small" title="封面图">
-          <div class="cover-setter" @click="coverOpen = true">
-            <div v-if="form.coverImage" class="cover-preview">
-              <img :src="mediaUrl(form.coverImage)" class="cover-img" />
-              <div class="cover-overlay">点击修改</div>
-            </div>
-            <div v-else class="cover-placeholder">
-              <PictureOutlined /> 点击设置封面
-            </div>
-          </div>
-        </a-card>
+      <div class="idea-presets">
+        <button v-for="preset in presets" :key="preset.title" type="button" @click="applyPreset(preset.body)">
+          {{ preset.title }}
+        </button>
       </div>
-    </div>
 
-    <a-modal v-model:open="coverOpen" title="设置封面" width="420px" :footer="null" @cancel="coverOpen = false"
-      destroyOnClose>
-      <div class="cover-modal-body">
-        <a-button block size="large" @click="coverUpload" class="cover-modal-btn">
-          <UploadOutlined /> 上传图片
+      <div class="action-row">
+        <a-button size="large" @click="$router.push('/admin/posts')">返回列表</a-button>
+        <a-button
+          type="primary"
+          size="large"
+          :loading="generating"
+          :disabled="!outline.trim()"
+          @click="aiGenerate"
+        >
+          {{ generating ? '生成中...' : 'AI 生成全文' }}
         </a-button>
-        <div class="cover-modal-divider"><span>或</span></div>
-        <div class="cover-modal-url">
-          <a-input v-model:value="coverUrlInput" placeholder="输入图片 URL" allow-clear @keyup.enter="coverConfirmUrl" />
-          <a-button type="primary" :disabled="!coverUrlInput.trim()" @click="coverConfirmUrl">确定</a-button>
-        </div>
       </div>
-    </a-modal>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { MdEditor } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
 import { Modal } from 'ant-design-vue'
-import { ThunderboltOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons-vue'
-import { buildSlug, ensureSlug } from '~/utils/postMeta'
+import { buildSlug } from '~/utils/postMeta'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
-const { mediaUrl } = useMediaUrl()
 const router = useRouter()
-const saving = ref(false)
-const generatingExcerpt = ref(false)
-const categories = ref<any[]>([])
-const tags = ref<any[]>([])
-const form = ref({
-  title: '',
-  slug: '',
-  content: '',
-  excerpt: '',
-  coverImage: '',
-  categoryId: undefined as string | undefined,
-  status: 'draft',
-  tagIds: [] as string[],
-  featured: false,
-})
-const editorKey = ref(0)
-const coverOpen = ref(false)
-const coverUrlInput = ref('')
-const slugManual = ref(false)
-const createdSlug = ref('')
+const generating = ref(false)
+const outline = ref('')
 
-const categoryTree = computed(() => buildTree(categories.value))
-
-function buildTree(items: any[]): any[] {
-  return items.map((c: any) => ({ ...c, children: c.children?.length ? buildTree(c.children) : undefined }))
-}
-
-const toolbars = [
-  'bold', 'underline', 'italic', 'strikeThrough', 'title', 'sub', 'sup',
-  'quote', 'unorderedList', 'orderedList', 'task', 'codeRow', 'code',
-  'link', 'image', 'table', 'mermaid', 'katex', 'revoke', 'next',
-  'save', 'pageFullscreen', 'fullscreen', 'preview',
+const presets = [
+  {
+    title: '生活随笔',
+    body: '想写一篇生活随笔。先从今天的一个具体场景写起，再展开最近的心境变化，结尾落在一个小而真实的感受上。',
+  },
+  {
+    title: '观影读书',
+    body: '想写一篇读后感或观后感。先概括最打动我的一点，再写为什么会被触动，最后联系到自己的生活经验。',
+  },
+  {
+    title: '阶段复盘',
+    body: '想写一篇阶段复盘。按“发生了什么、我学到了什么、接下来打算怎么做”三个层次展开。',
+  },
 ]
 
-const editorTheme = computed(() => {
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-})
-
-let autoSaveTimer: ReturnType<typeof setInterval> | null = null
-let hasUnsaved = false
-let originalContent = ''
-
-function onTitleInput() {
-  if (!slugManual.value) {
-    form.value.slug = buildSlug(form.value.title)
-  }
+function applyPreset(text: string) {
+  outline.value = text
 }
 
-onMounted(async () => {
-  const [catRes, tagRes] = await Promise.all([
-    api.get<any>('/categories').catch(() => []),
-    api.get<any>('/tags').catch(() => []),
-  ])
-  categories.value = Array.isArray(catRes) ? catRes : []
-  tags.value = Array.isArray(tagRes) ? tagRes : []
-  const obs = new MutationObserver(() => { editorKey.value++ })
-  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-
-  originalContent = JSON.stringify(form.value)
-  autoSaveTimer = setInterval(autoSave, 30000)
-  window.addEventListener('beforeunload', handleBeforeUnload)
-})
-
-onUnmounted(() => {
-  if (autoSaveTimer) clearInterval(autoSaveTimer)
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-})
-
-watch(() => form.value, () => { hasUnsaved = JSON.stringify(form.value) !== originalContent }, { deep: true })
-
-function handleBeforeUnload(e: BeforeUnloadEvent) {
-  if (hasUnsaved) { e.preventDefault(); e.returnValue = '' }
-}
-
-async function autoSave() {
-  if (!hasUnsaved || !form.value.title) return
-  form.value.slug = ensureSlug(form.value.slug, form.value.title)
-  try {
-    if (createdSlug.value) {
-      await api.put(`/posts/${createdSlug.value}`, { ...form.value, status: 'draft' })
-      if (form.value.slug && form.value.slug !== createdSlug.value) {
-        createdSlug.value = form.value.slug
-      }
-    } else {
-      const res = await api.post<any>('/posts', { ...form.value, status: 'draft' })
-      createdSlug.value = res?.slug || form.value.slug
-      if (res?.slug) form.value.slug = res.slug
-    }
-    originalContent = JSON.stringify(form.value)
-    hasUnsaved = false
-  } catch { /* silent */ }
-}
-
-function coverConfirmUrl() {
-  const v = coverUrlInput.value.trim()
-  if (v) { form.value.coverImage = v; coverOpen.value = false; coverUrlInput.value = '' }
-}
-
-async function coverUpload() {
-  const { open } = useMediaLibrary()
-  const urls = await open({ multiple: false, folder: 'cover' })
-  if (urls.length) { form.value.coverImage = urls[0]; coverOpen.value = false }
-}
-
-async function onUploadImg(files: File[], callback: (urls: string[]) => void) {
-  try {
-    const urls: string[] = []
-    for (const file of files) {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('folder', 'article')
-      const res = await api.upload<any>('/media/upload', fd)
-      urls.push(res.path || '')
-    }
-    callback(urls)
-  } catch {
-    toast.error('上传失败')
-  }
-}
-
-async function generateExcerpt() {
-  if (!form.value.content?.trim() || form.value.content.trim().length < 20) {
-    toast.warning('请先写一些正文再生成摘要')
+async function aiGenerate() {
+  const content = outline.value.trim()
+  if (content.length < 4) {
+    toast.warning('请先填写灵感或要点')
     return
   }
-  const run = async () => {
-    generatingExcerpt.value = true
-    try {
-      const res = await api.post<{ excerpt: string; source?: string }>('/ai/summarize', {
-        title: form.value.title,
-        content: form.value.content,
-      })
-      form.value.excerpt = res.excerpt || ''
-      toast.success(res.source === 'ai' ? '摘要已生成' : '已用本地方式生成摘要')
-    } catch (e: any) {
-      toast.error('生成失败: ' + (e.message || ''))
-    }
-    generatingExcerpt.value = false
-  }
 
-  if (form.value.excerpt?.trim()) {
-    Modal.confirm({
-      title: '覆盖现有摘要？',
-      content: '将用 AI 重新生成摘要并覆盖当前内容。',
-      okText: '覆盖',
-      cancelText: '取消',
-      onOk: run,
-    })
-  } else {
-    await run()
-  }
-}
-
-async function publish() {
-  if (!form.value.title) { toast.warning('标题不能为空'); return }
-  form.value.slug = ensureSlug(form.value.slug, form.value.title)
-  form.value.status = 'published'
-  saving.value = true
+  generating.value = true
   try {
-    if (createdSlug.value) {
-      const res = await api.put<any>(`/posts/${createdSlug.value}`, form.value)
-      if (res?.slug) form.value.slug = res.slug
-    } else {
-      const res = await api.post<any>('/posts', form.value)
-      createdSlug.value = res?.slug || form.value.slug
-    }
-    toast.success('发布成功')
-    hasUnsaved = false
-    router.push('/admin/posts')
+    const res = await api.post<any>('/ai/generate-article', { outline: content })
+    const title = res.title || content.slice(0, 40)
+    const slug = res.slug || buildSlug(title)
+    const post = await api.post<any>('/posts', {
+      title,
+      slug,
+      content: res.content || '',
+      excerpt: res.excerpt || '',
+      coverImage: res.coverImage || '',
+      categoryId: res.categoryId || undefined,
+      tagIds: res.tagIds || [],
+      featured: false,
+      type: 'article',
+    })
+
+    const finalSlug = post?.slug || slug
+    Modal.confirm({
+      title: '生成完成',
+      content: `《${title}》已保存为草稿，是否前往预览？`,
+      okText: '去预览',
+      cancelText: '返回列表',
+      onOk: () => router.push(`/admin/posts/preview?slug=${encodeURIComponent(finalSlug)}`),
+      onCancel: () => router.push('/admin/posts'),
+    })
   } catch (e: any) {
-    toast.error('发布失败: ' + (e.message || ''))
+    toast.error(`AI 生成失败: ${e.message || ''}`)
+  } finally {
+    generating.value = false
   }
-  saving.value = false
 }
 </script>
 
 <style scoped>
-.editor-field-grow :deep(.md-editor) {
-  position: absolute;
-  inset: 0;
-  height: auto;
-  /* ← 覆盖 md-editor-v3 的 height: 500px */
-  overflow: hidden;
-}
-
-.editor-page {
+.article-create-page {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  background: transparent;
+  gap: 20px;
+  padding: 6px 4px 22px;
 }
 
-.editor-layout {
+.article-create-hero,
+.article-create-card {
+  border-radius: 30px;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--c-primary) 16%, transparent), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, var(--ld-bg-card) 96%, white 4%), color-mix(in srgb, var(--c-bg-2) 86%, transparent));
+  box-shadow: 0 28px 56px color-mix(in srgb, #000 10%, transparent);
+}
+
+.article-create-hero {
   display: flex;
-  flex: 1;
-  min-height: 0;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 28px;
 }
 
-.editor-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  padding-right: 16px;
+.hero-copy {
+  max-width: 620px;
 }
 
-.editor-sidebar {
-  width: 300px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-}
-
-.editor-field-grow {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-}
-
-.editor-field-grow :deep(.md-editor) {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-
-.title-input {
-  font-size: 1.15rem;
-  font-weight: 600;
-  padding-left: 0;
-}
-
-.meta-card {
-  border-radius: 8px;
-}
-
-.meta-row {
-  margin-bottom: 10px;
-}
-
-.meta-row label {
-  display: block;
-  font-size: 0.72rem;
+.hero-eyebrow,
+.card-eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--c-text-3);
-  margin-bottom: 4px;
 }
 
-.meta-row-inline {
+.hero-copy h1,
+.card-head h2 {
+  margin: 0;
+  color: var(--c-text);
+}
+
+.hero-desc {
+  margin: 14px 0 0;
+  color: var(--c-text-2);
+  line-height: 1.85;
+}
+
+.hero-badges {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 0;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
 }
 
-.meta-row-inline label {
-  margin-bottom: 0;
+.hero-badges span {
+  display: inline-flex;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 64%);
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  color: var(--c-text-2);
+  font-size: 0.8rem;
 }
 
-.gen-excerpt-btn {
-  margin-top: 8px;
+.article-create-card {
+  padding: 24px;
 }
 
-.cover-setter {
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.card-count {
+  color: var(--c-text-3);
+  font-size: 0.82rem;
+}
+
+.outline-input {
+  margin-top: 18px;
+}
+
+.idea-presets {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.idea-presets button {
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--c-bg-2) 82%, transparent);
+  color: var(--c-text-2);
   cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  transition: border-color 0.2s;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
-.cover-setter:hover {
-  border-color: var(--c-primary);
+.idea-presets button:hover {
+  color: var(--c-primary);
+  background: color-mix(in srgb, var(--c-primary) 10%, var(--c-bg-2));
+  transform: translateY(-1px);
 }
 
-.cover-preview {
-  position: relative;
-}
-
-.cover-img {
-  display: block;
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-}
-
-.cover-overlay {
-  position: absolute;
-  inset: 0;
+.action-row {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-  font-size: 0.82rem;
-  opacity: 0;
-  transition: opacity 0.2s;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
 }
 
-.cover-preview:hover .cover-overlay {
-  opacity: 1;
-}
+@media (max-width: 700px) {
+  .article-create-hero,
+  .article-create-card {
+    border-radius: 22px;
+  }
 
-.cover-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 80px;
-  color: var(--c-text-3);
-  font-size: 0.82rem;
-}
+  .article-create-hero {
+    flex-direction: column;
+    padding: 22px 18px;
+  }
 
-.cover-modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+  .article-create-card {
+    padding: 18px;
+  }
 
-.cover-modal-btn {
-  height: 44px;
-}
-
-.cover-modal-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--c-text-4);
-  font-size: 0.78rem;
-}
-
-.cover-modal-divider::before,
-.cover-modal-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-.cover-modal-url {
-  display: flex;
-  gap: 8px;
-}
-</style>
-
-<style>
-.editor-field-grow :deep(.md-editor) {
-  position: absolute;
-  inset: 0;
-  height: auto;
-  overflow: hidden;
-}
-
-:root .md-editor {
-  --md-bk-color: #fff;
-  --md-bk-color-outstand: #f6f8fa;
-  --md-bk-color-hover: #f0f2f5;
-  --md-bk-color-block: #fafbfc;
-  --md-bk-color-code: #f0f2f5;
-  --md-border-color: #e8eaed;
-  --md-color: #1f2328;
-  --md-color-secondary: #656d76;
-  --md-primary-color: #1677ff;
-}
-
-:root.dark .md-editor {
-  --md-bk-color: #161b22;
-  --md-bk-color-outstand: #1c2333;
-  --md-bk-color-hover: #1f2838;
-  --md-bk-color-block: #1c2333;
-  --md-bk-color-code: #1c2333;
-  --md-border-color: #30363d;
-  --md-color: #e6edf3;
-  --md-color-secondary: #8b949e;
-  --md-primary-color: #58a6ff;
+  .action-row {
+    flex-direction: column;
+  }
 }
 </style>

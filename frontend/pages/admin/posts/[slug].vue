@@ -3,6 +3,13 @@
     <a-spin :spinning="loading" class="table-spin">
       <div class="editor-layout" v-if="!loading">
         <div class="editor-main">
+          <a-alert
+            v-if="needsPublish"
+            type="warning"
+            show-icon
+            class="pending-alert"
+            message="有未发布修改，请到文章列表点击「发布」后前台才会更新"
+          />
           <div class="editor-field">
             <a-input v-model:value="form.title" placeholder="输入文章标题…" class="title-input" :bordered="false" />
           </div>
@@ -16,23 +23,17 @@
         </div>
 
         <div class="editor-sidebar">
-          <a-card :bordered="false" class="meta-card" size="small" title="发布设置">
+          <a-card :bordered="false" class="meta-card" size="small" title="草稿设置">
             <div class="meta-row">
               <label>Slug</label>
               <a-input v-model:value="form.slug" placeholder="URL 标识" size="small" />
             </div>
-            <div class="meta-row">
-              <label>状态</label>
-              <a-select v-model:value="form.status" size="small" style="width:100%">
-                <a-select-option value="draft">草稿</a-select-option>
-                <a-select-option value="published">发布</a-select-option>
-              </a-select>
-            </div>
             <div class="meta-row meta-row-inline">
               <label>推荐</label>
               <a-switch v-model:checked="form.featured" />
-              <a-button type="primary" size="small" @click="save" :loading="saving" style="margin-left:auto">{{ saving ?
-                '保存中…' : '保存' }}</a-button>
+              <a-button type="primary" size="small" @click="save" :loading="saving" style="margin-left:auto">
+                {{ saving ? '保存中…' : '保存' }}
+              </a-button>
             </div>
           </a-card>
 
@@ -79,6 +80,9 @@
         <a-button block size="large" @click="coverUpload" class="cover-modal-btn">
           <UploadOutlined /> 上传图片
         </a-button>
+        <a-button block size="large" :loading="pickingCover" @click="pickWallpaper" class="cover-modal-btn">
+          换一张壁纸
+        </a-button>
         <div class="cover-modal-divider"><span>或</span></div>
         <div class="cover-modal-url">
           <a-input v-model:value="coverUrlInput" placeholder="输入图片 URL" allow-clear @keyup.enter="coverConfirmUrl" />
@@ -93,7 +97,7 @@
 import { MdEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 import { Modal } from 'ant-design-vue'
-import { ThunderboltOutlined } from '@ant-design/icons-vue'
+import { ThunderboltOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { ensureSlug } from '~/utils/postMeta'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
@@ -106,9 +110,20 @@ const router = useRouter()
 const loading = ref(true)
 const saving = ref(false)
 const generatingExcerpt = ref(false)
+const pickingCover = ref(false)
+const needsPublish = ref(false)
 const categories = ref<any[]>([])
 const tags = ref<any[]>([])
-const form = ref({ title: '', slug: '', content: '', excerpt: '', coverImage: '', categoryId: undefined, status: 'draft', tagIds: [] as string[], featured: false })
+const form = ref({
+  title: '',
+  slug: '',
+  content: '',
+  excerpt: '',
+  coverImage: '',
+  categoryId: undefined as string | undefined,
+  tagIds: [] as string[],
+  featured: false,
+})
 const editorKey = ref(0)
 const coverOpen = ref(false)
 const coverUrlInput = ref('')
@@ -137,7 +152,7 @@ let originalContent = ''
 onMounted(async () => {
   const slug = route.params.slug as string
   const [post, catRes, tagRes] = await Promise.all([
-    api.get<any>(`/posts/${slug}`).catch(() => null),
+    api.get<any>(`/posts/${slug}/preview`).catch(() => null),
     api.get<any>('/categories').catch(() => []),
     api.get<any>('/tags').catch(() => []),
   ])
@@ -151,10 +166,10 @@ onMounted(async () => {
       excerpt: post.excerpt || '',
       coverImage: post.coverImage || '',
       categoryId: post.categoryId || undefined,
-      status: post.status || 'draft',
       tagIds: post.tagIds || [],
       featured: post.featured || false,
     }
+    needsPublish.value = !!post.needsPublish
     originalContent = JSON.stringify(form.value)
   }
   loading.value = false
@@ -179,12 +194,15 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
 
 async function autoSave() {
   if (!hasUnsaved || !form.value.title || !form.value.slug) return
-  const payload = { ...form.value, status: 'draft' }
   try {
-    await api.put(`/posts/${route.params.slug}`, payload)
+    const res = await api.put<any>(`/posts/${route.params.slug}`, form.value)
+    needsPublish.value = res?.needsPublish ?? true
     originalContent = JSON.stringify(form.value)
     hasUnsaved = false
-  } catch { }
+    if (res?.slug && res.slug !== route.params.slug) {
+      await router.replace(`/admin/posts/${res.slug}`)
+    }
+  } catch { /* silent */ }
 }
 
 function coverConfirmUrl() {
@@ -196,6 +214,28 @@ async function coverUpload() {
   const { open } = useMediaLibrary()
   const urls = await open({ multiple: false, folder: 'cover' })
   if (urls.length) { form.value.coverImage = urls[0]; coverOpen.value = false }
+}
+
+async function pickWallpaper() {
+  pickingCover.value = true
+  try {
+    const list = await api.get<any>('/ai/wallpapers', { page: 1, rows: 9 })
+    const items = list?.items || []
+    if (!items.length) {
+      toast.warning('暂无可用壁纸，请手动上传')
+      return
+    }
+    const pick = items[Math.floor(Math.random() * items.length)]
+    const media = await api.post<any>('/media/import-url', { url: pick.url, folder: 'cover' })
+    if (media?.path) {
+      form.value.coverImage = media.path
+      coverOpen.value = false
+      toast.success('封面已更新')
+    }
+  } catch (e: any) {
+    toast.error('获取壁纸失败: ' + (e.message || ''))
+  }
+  pickingCover.value = false
 }
 
 async function onUploadImg(files: File[], callback: (urls: string[]) => void) {
@@ -252,13 +292,13 @@ async function save() {
   saving.value = true
   try {
     const res = await api.put<any>(`/posts/${route.params.slug}`, form.value)
+    needsPublish.value = res?.needsPublish ?? true
     toast.success('保存成功')
     originalContent = JSON.stringify(form.value)
     hasUnsaved = false
     if (res?.slug && res.slug !== route.params.slug) {
       await router.replace(`/admin/posts/${res.slug}`)
     }
-    router.push('/admin/posts')
   } catch (e: any) {
     toast.error('保存失败: ' + (e.message || ''))
   }
@@ -267,6 +307,10 @@ async function save() {
 </script>
 
 <style scoped>
+.pending-alert {
+  margin-bottom: 8px;
+}
+
 .md-editor-preview ::deep(pre) {
   border-radius: 0px;
 }
