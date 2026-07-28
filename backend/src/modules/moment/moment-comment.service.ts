@@ -18,7 +18,7 @@ export class MomentCommentService {
     momentId: string,
     currentUserId?: string,
     page = 1,
-    limit = 10,
+    limit = 5,
     replyLimit = 3,
   ) {
     const skip = (page - 1) * limit;
@@ -240,7 +240,7 @@ export class MomentCommentService {
             type: 'system',
             title: '瞬间评论已通过',
             content: `你在「${moment.title}」下的评论已通过审核并展示出来了。`,
-            link: `/moments/${moment.slug || moment.id}`,
+            link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
           });
         }
       } else if (comment.userId) {
@@ -248,7 +248,7 @@ export class MomentCommentService {
           type: 'system',
           title: '瞬间评论未通过',
           content: `你在「${moment.title}」下的评论未通过审核：${review.reason}`,
-          link: `/moments/${moment.slug || moment.id}`,
+          link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
         });
       }
 
@@ -286,7 +286,7 @@ export class MomentCommentService {
         type: 'reply',
         title: '有人回复了你的瞬间评论',
         content: `${comment.authorName || '匿名用户'} 回复了你在「${moment.title}」下的评论。`,
-        link: `/moments/${moment.slug || moment.id}`,
+        link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
       });
       return;
     }
@@ -296,7 +296,7 @@ export class MomentCommentService {
         type: 'comment',
         title: '有人评论了你的瞬间',
         content: `${comment.authorName || '匿名用户'} 在「${moment.title}」下留言了。`,
-        link: `/moments/${moment.slug || moment.id}`,
+        link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
       });
     }
   }
@@ -339,7 +339,7 @@ export class MomentCommentService {
       type: 'like',
       title: '你的瞬间评论收到了赞',
       content: `${liker?.username || '匿名用户'} 赞了你在「${moment.title}」下的评论。`,
-      link: `/moments/${moment.slug || moment.id}`,
+      link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
     });
   }
 
@@ -365,7 +365,7 @@ export class MomentCommentService {
         type: 'system',
         title: '瞬间评论已通过',
         content: `你在「${existing.moment.title}」下的评论已通过审核。`,
-        link: `/moments/${existing.moment.slug || existing.momentId}`,
+        link: `/moments?focus=${encodeURIComponent(existing.moment.slug || existing.momentId)}`,
       });
     }
 
@@ -394,7 +394,7 @@ export class MomentCommentService {
         type: 'system',
         title: '瞬间评论未通过',
         content: `你在「${existing.moment.title}」下的评论未通过审核${reason ? `：${reason}` : ''}`,
-        link: `/moments/${existing.moment.slug || existing.momentId}`,
+        link: `/moments?focus=${encodeURIComponent(existing.moment.slug || existing.momentId)}`,
       });
     }
 

@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { AiService } from '../ai/ai.service';
 import { EmailService } from '../email/email.service';
 import { NotificationService } from '../notification/notification.service';
@@ -24,6 +26,15 @@ type SiteInfo = {
   description?: string;
   avatar?: string;
   rssUrl?: string;
+};
+
+type InspectedSiteInfo = {
+  name: string;
+  url: string;
+  description: string;
+  avatar: string;
+  rssUrl: string;
+  friendPageUrl: string;
 };
 
 @Injectable()
@@ -60,6 +71,20 @@ export class FriendLinkService {
     };
     await this.settings.set('my_site_info', info);
     return info;
+  }
+
+  async inspectSite(value: unknown): Promise<InspectedSiteInfo> {
+    const requestedUrl = this.validUrl(value, '站点地址');
+    const { html, finalUrl } = await this.fetchPublicHtml(requestedUrl);
+    const metadata = this.extractSiteMetadata(html, finalUrl);
+    return {
+      name: metadata.name || new URL(finalUrl).hostname.replace(/^www\./i, ''),
+      url: finalUrl,
+      description: metadata.description,
+      avatar: metadata.avatar,
+      rssUrl: metadata.rssUrl,
+      friendPageUrl: metadata.friendPageUrl,
+    };
   }
 
   async createApplication(dto: CreateFriendApplicationDto) {
@@ -405,6 +430,196 @@ export class FriendLinkService {
   </main>
 </body>
 </html>`;
+  }
+
+  private async fetchPublicHtml(initialUrl: string) {
+    let currentUrl = initialUrl;
+    const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+
+    for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
+      await this.assertPublicUrl(currentUrl);
+      let response: Response;
+      try {
+        response = await fetch(currentUrl, {
+          redirect: 'manual',
+          signal: AbortSignal.timeout(8000),
+          headers: {
+            Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.2',
+            'User-Agent': 'CornerFriendLinkInspector/1.0 (+public-site-metadata)',
+          },
+        });
+      } catch (error) {
+        this.logger.warn(`读取友链站点失败 ${currentUrl}: ${error}`);
+        throw new BadRequestException('无法访问该站点，请确认地址可公开访问');
+      }
+
+      if (redirectStatuses.has(response.status)) {
+        const location = response.headers.get('location');
+        if (!location) throw new BadRequestException('站点返回了无效跳转');
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+      if (!response.ok) {
+        throw new BadRequestException(`站点访问失败（HTTP ${response.status}）`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType && !/(?:text\/html|application\/xhtml\+xml)/i.test(contentType)) {
+        throw new BadRequestException('该地址返回的不是网页内容');
+      }
+      if (!response.body) throw new BadRequestException('站点没有返回网页内容');
+
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      const maxBytes = 512 * 1024;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        size += value.byteLength;
+        if (size > maxBytes) {
+          await reader.cancel();
+          throw new BadRequestException('站点首页内容过大，无法自动识别');
+        }
+        chunks.push(value);
+      }
+
+      const bytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+      const headerCharset = contentType.match(/charset\s*=\s*["']?([^;\s"']+)/i)?.[1];
+      const headerText = bytes.subarray(0, 8192).toString('latin1');
+      const metaCharset = headerText.match(/<meta[^>]+charset\s*=\s*["']?([^\s"'/>]+)/i)?.[1]
+        || headerText.match(/<meta[^>]+content=["'][^"']*charset=([^\s;"']+)/i)?.[1];
+      let html = '';
+      try {
+        html = new TextDecoder(headerCharset || metaCharset || 'utf-8').decode(bytes);
+      } catch {
+        html = new TextDecoder('utf-8').decode(bytes);
+      }
+      return { html, finalUrl: currentUrl };
+    }
+
+    throw new BadRequestException('站点跳转次数过多');
+  }
+
+  private async assertPublicUrl(value: string) {
+    const url = new URL(value);
+    if (url.username || url.password) throw new BadRequestException('站点地址不能包含账号信息');
+    if (url.port && !['80', '443'].includes(url.port)) {
+      throw new BadRequestException('站点地址仅支持标准 HTTP/HTTPS 端口');
+    }
+    const hostname = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+      throw new BadRequestException('仅支持可公开访问的站点地址');
+    }
+
+    const addresses = isIP(hostname)
+      ? [{ address: hostname }]
+      : await lookup(hostname, { all: true, verbatim: true }).catch(() => []);
+    if (!addresses.length || addresses.some(({ address }) => this.isPrivateAddress(address))) {
+      throw new BadRequestException('仅支持可公开访问的站点地址');
+    }
+  }
+
+  private isPrivateAddress(value: string): boolean {
+    const address = value.toLowerCase().split('%')[0];
+    if (isIP(address) === 4) {
+      const [a, b] = address.split('.').map(Number);
+      return a === 0
+        || a === 10
+        || a === 127
+        || (a === 100 && b >= 64 && b <= 127)
+        || (a === 169 && b === 254)
+        || (a === 172 && b >= 16 && b <= 31)
+        || (a === 192 && b === 168)
+        || (a === 198 && (b === 18 || b === 19))
+        || a >= 224;
+    }
+    if (isIP(address) === 6) {
+      const mapped = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+      if (mapped) return this.isPrivateAddress(mapped);
+      return address === '::'
+        || address === '::1'
+        || address.startsWith('::ffff:')
+        || address.startsWith('fc')
+        || address.startsWith('fd')
+        || /^fe[89ab]/.test(address)
+        || address.startsWith('ff');
+    }
+    return true;
+  }
+
+  private extractSiteMetadata(html: string, baseUrl: string) {
+    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
+    const linkTags = html.match(/<link\b[^>]*>/gi) || [];
+    const metas = metaTags.map((tag) => this.htmlAttributes(tag));
+    const links = linkTags.map((tag) => this.htmlAttributes(tag));
+    const metaValue = (...keys: string[]) => {
+      const wanted = keys.map((key) => key.toLowerCase());
+      const found = metas.find((meta) => wanted.includes((meta.property || meta.name || '').toLowerCase()));
+      return this.cleanHtmlText(found?.content || '');
+    };
+    const title = this.cleanHtmlText(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '');
+    const icon = links.find((link) => /(?:^|\s)(?:apple-touch-icon|icon|shortcut icon)(?:\s|$)/i.test(link.rel || '') && link.href);
+    const feed = links.find((link) => /alternate/i.test(link.rel || '') && /application\/(?:rss|atom)\+xml/i.test(link.type || '') && link.href);
+    const socialImage = metaValue('og:image', 'twitter:image', 'twitter:image:src');
+
+    return {
+      name: metaValue('og:site_name', 'application-name', 'og:title', 'twitter:title') || title,
+      description: (metaValue('description', 'og:description', 'twitter:description') || '').slice(0, 500),
+      avatar: this.absoluteHttpUrl(icon?.href || socialImage, baseUrl),
+      rssUrl: this.absoluteHttpUrl(feed?.href || '', baseUrl),
+      friendPageUrl: this.findFriendPage(html, baseUrl),
+    };
+  }
+
+  private htmlAttributes(tag: string) {
+    const result: Record<string, string> = {};
+    const pattern = /([^\s=<>`]+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+    for (const match of tag.matchAll(pattern)) {
+      const key = match[1].replace(/^</, '').toLowerCase();
+      if (['meta', 'link', 'a'].includes(key)) continue;
+      result[key] = this.decodeHtmlEntities(match[2] ?? match[3] ?? match[4] ?? '');
+    }
+    return result;
+  }
+
+  private findFriendPage(html: string, baseUrl: string) {
+    const base = new URL(baseUrl);
+    const anchors = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+    for (const anchor of anchors.slice(0, 400)) {
+      const attrs = this.htmlAttributes(anchor.match(/<a\b[^>]*>/i)?.[0] || '');
+      const text = this.cleanHtmlText(anchor.replace(/<a\b[^>]*>|<\/a>/gi, ''));
+      const candidate = this.absoluteHttpUrl(attrs.href || '', baseUrl);
+      if (!candidate) continue;
+      const url = new URL(candidate);
+      if (url.origin !== base.origin) continue;
+      if (/(?:友链|友情链接|朋友|邻居|friend\s*links?|blogroll)/i.test(`${text} ${url.pathname}`)) return candidate;
+    }
+    return '';
+  }
+
+  private absoluteHttpUrl(value: string, baseUrl: string) {
+    if (!value || /^(?:data|javascript|mailto):/i.test(value)) return '';
+    try {
+      const url = new URL(value, baseUrl);
+      return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
+    } catch {
+      return '';
+    }
+  }
+
+  private cleanHtmlText(value: string) {
+    return this.decodeHtmlEntities(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+  }
+
+  private decodeHtmlEntities(value: string) {
+    const named: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ' };
+    return value.replace(/&(?:#(\d+)|#x([\da-f]+)|([a-z]+));/gi, (_, decimal, hexadecimal, name) => {
+      if (decimal) return String.fromCodePoint(Number(decimal));
+      if (hexadecimal) return String.fromCodePoint(parseInt(hexadecimal, 16));
+      return named[String(name).toLowerCase()] ?? `&${name};`;
+    });
   }
 
   private parseValue(value: unknown): unknown {

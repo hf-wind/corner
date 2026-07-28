@@ -30,7 +30,7 @@ export class MomentCommentController {
       momentId,
       req.user?.id,
       page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 10,
+      limit ? parseInt(limit, 10) : 5,
       replyLimit ? parseInt(replyLimit, 10) : 3,
     );
   }

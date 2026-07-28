@@ -25,6 +25,7 @@ export class SettingsController {
       'site_description',
       'site_keywords',
       'site_url',
+      'about_profile',
     ]);
     if (!publicKeys.has(key)) return null;
     const value = await this.settings.get(key);

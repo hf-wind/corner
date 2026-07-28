@@ -450,7 +450,7 @@ export class PostService {
         name: String(tag.name),
         slug: String(tag.slug),
       }))
-      .sort((a, b) => a.slug.localeCompare(b.slug));
+      .sort((a: any, b: any) => a.slug.localeCompare(b.slug));
 
     return {
       title: post.title,

@@ -8,5 +8,6 @@ import { SettingsModule } from '../settings/settings.module';
   imports: [MulterModule.register({ dest: './uploads' }), SettingsModule],
   controllers: [MediaController],
   providers: [MediaService],
+  exports: [MediaService],
 })
 export class MediaModule {}

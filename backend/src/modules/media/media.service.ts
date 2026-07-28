@@ -212,6 +212,59 @@ export class MediaService {
     }
   }
 
+  async importFromUrl(url: string, userId?: string, folderInput = 'cover') {
+    const src = String(url || '').trim();
+    if (!/^https?:\/\//i.test(src)) {
+      throw new BadRequestException('无效的图片 URL');
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(src, {
+        signal: AbortSignal.timeout(30000),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CornerBot/1.0)',
+          Accept: 'image/*,*/*',
+        },
+      });
+    } catch {
+      throw new BadRequestException('下载图片失败');
+    }
+
+    if (!res.ok) {
+      throw new BadRequestException(`下载图片失败 (${res.status})`);
+    }
+
+    const contentType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.length) throw new BadRequestException('图片内容为空');
+    if (buf.length > 15 * 1024 * 1024) throw new BadRequestException('图片过大');
+
+    let mime = contentType;
+    if (!mime.startsWith('image/')) {
+      const magic = buf.slice(0, 12);
+      if (magic[0] === 0xff && magic[1] === 0xd8) mime = 'image/jpeg';
+      else if (magic[0] === 0x89 && magic[1] === 0x50) mime = 'image/png';
+      else if (magic[0] === 0x47 && magic[1] === 0x49) mime = 'image/gif';
+      else if (magic.toString('ascii', 0, 4) === 'RIFF' && magic.toString('ascii', 8, 12) === 'WEBP') {
+        mime = 'image/webp';
+      } else {
+        throw new BadRequestException('URL 不是有效图片');
+      }
+    }
+
+    const ext = this.extFromMime(mime) || '.jpg';
+    const nameFromUrl = src.split('?')[0].split('/').pop() || `wallpaper${ext}`;
+    const file = {
+      buffer: buf,
+      originalname: nameFromUrl.includes('.') ? nameFromUrl : `${nameFromUrl}${ext}`,
+      mimetype: mime,
+      size: buf.length,
+    } as Express.Multer.File;
+
+    return this.create(file, userId, folderInput, false);
+  }
+
   async create(file: Express.Multer.File, userId?: string, folderInput?: string, compressAnimated?: boolean) {
     if (!file?.buffer?.length && !(file as any)?.path) {
       throw new BadRequestException('No file uploaded');

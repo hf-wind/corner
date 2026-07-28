@@ -20,6 +20,11 @@ export class FriendLinkController {
     return this.friendLinkService.createApplication(dto);
   }
 
+  @Post('inspect-site')
+  inspectSite(@Body('url') url: string) {
+    return this.friendLinkService.inspectSite(url);
+  }
+
   @Post('remove/send-code')
   sendRemoveCode(@Body() dto: SendRemoveCodeDto) {
     return this.friendLinkService.sendRemoveCode(dto.email);

@@ -33,6 +33,12 @@ export class CommentService {
         ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
       ],
     };
+    const visibleReplyWhere: any = {
+      OR: [
+        { status: 'approved' },
+        ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
+      ],
+    };
 
     const [comments, total] = await Promise.all([
       this.prisma.comment.findMany({
@@ -40,8 +46,31 @@ export class CommentService {
         skip,
         take: limit,
         include: {
-          _count: { select: { likes: true, replies: true } },
+          _count: {
+            select: {
+              likes: true,
+              replies: { where: visibleReplyWhere },
+            },
+          },
           user: { select: { avatar: true } },
+          replies: {
+            where: visibleReplyWhere,
+            orderBy: { createdAt: 'asc' },
+            take: replyLimit,
+            include: {
+              parent: { select: { authorName: true } },
+              _count: { select: { likes: true } },
+              user: { select: { avatar: true } },
+              ...(currentUserId
+                ? {
+                    likes: {
+                      where: { userId: currentUserId },
+                      select: { id: true },
+                    },
+                  }
+                : {}),
+            },
+          },
           ...(currentUserId
             ? {
                 likes: {
@@ -56,45 +85,8 @@ export class CommentService {
       this.prisma.comment.count({ where }),
     ]);
 
-    const topIds = comments.map((c) => c.id);
-    const repliesMap = new Map<string, any[]>();
-
-    if (topIds.length > 0) {
-      const rawReplies = await this.prisma.comment.findMany({
-        where: {
-          parentId: { in: topIds },
-          OR: [
-            { status: 'approved' },
-            ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
-          ],
-        },
-        orderBy: { createdAt: 'asc' },
-        include: {
-          parent: { select: { authorName: true } },
-          _count: { select: { likes: true } },
-          user: { select: { avatar: true } },
-          ...(currentUserId
-            ? {
-                likes: {
-                  where: { userId: currentUserId },
-                  select: { id: true },
-                },
-              }
-            : {}),
-        },
-      });
-
-      for (const r of rawReplies) {
-        const pid = r.parentId!;
-        if (!repliesMap.has(pid)) repliesMap.set(pid, []);
-        repliesMap.get(pid)!.push(r);
-      }
-    }
-
     const items = comments.map((c) => {
-      const allReplies = repliesMap.get(c.id) || [];
-      const replyTotal = allReplies.length;
-      const shown = allReplies.slice(0, replyLimit);
+      const shown = (c as any).replies || [];
 
       return {
         id: c.id,
@@ -107,7 +99,7 @@ export class CommentService {
         createdAt: c.createdAt,
         likesCount: c._count?.likes ?? 0,
         liked: (c as any).likes?.length > 0,
-        replyCount: replyTotal,
+        replyCount: c._count?.replies ?? 0,
         replies: shown.map((r: any) => ({
           id: r.id,
           authorName: r.authorName,

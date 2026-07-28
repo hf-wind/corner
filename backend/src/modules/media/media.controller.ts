@@ -42,6 +42,12 @@ export class MediaController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Post('import-url')
+  importUrl(@Body() body: { url?: string; folder?: string }, @Req() req: any) {
+    return this.media.importFromUrl(body?.url || '', req.user?.id, body?.folder || 'cover');
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Put('batch/move')
   batchMove(@Body() body: { ids: string[]; folder: string }) {
     return this.media.batchMove(body.ids, body.folder);
