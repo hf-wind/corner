@@ -5,7 +5,9 @@ export interface Reply {
   time: string
   content: string
   replyTo?: string
+  replyToId?: string
   status?: 'pending' | 'approved' | 'rejected'
+  createdAt?: string
 }
 
 export interface Comment {
@@ -20,6 +22,7 @@ export interface Comment {
   liked?: boolean
   likes?: number
   replies?: Reply[]
+  pendingReplies?: Reply[]
   replyCount?: number
 }
 

@@ -64,13 +64,8 @@
               >
                 发布
               </a-button>
-              <a-button
-                v-if="record.published"
-                type="link"
-                size="small"
-                @click="$router.push(`/moments/${record.slug}`)"
-              >
-                查看前台
+              <a-button type="link" size="small" @click="$router.push(`/admin/moments/preview?slug=${encodeURIComponent(record.slug)}`)">
+                预览
               </a-button>
               <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
             </div>
@@ -223,12 +218,8 @@ onMounted(() => {
   justify-content: space-between;
   gap: 18px;
   padding: 22px 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 26px;
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, #ffb347 16%, transparent), transparent 36%),
-    linear-gradient(145deg, color-mix(in srgb, var(--ld-bg-card) 98%, white 2%), color-mix(in srgb, var(--c-bg-2) 84%, transparent));
-  box-shadow: 0 20px 44px color-mix(in srgb, var(--ld-shadow) 18%, transparent);
+  border-bottom: 1px solid var(--border);
+  background: var(--c-bg);
 }
 
 .page-eyebrow {
@@ -261,8 +252,8 @@ onMounted(() => {
 }
 
 .moment-table-card {
-  border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 8px;
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 

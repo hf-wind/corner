@@ -1,13 +1,28 @@
 <template>
   <div class="page-layout article-page">
-    <main id="main-content" class="article-main" ref="articleMainRef" @scroll="handleArticleScroll">
+    <main id="main-content" ref="articleMainRef" class="article-main" :class="{ 'article-ready': articleReady }"
+      @scroll.passive="handleArticleScroll">
+      <div v-if="articleLoading" class="article-loading-state" aria-label="正在加载文章">
+        <div class="article-skeleton-line skeleton-back" />
+        <div class="article-skeleton-cover" />
+        <div class="article-skeleton-line skeleton-meta" />
+        <div class="article-skeleton-line skeleton-title" />
+        <div class="article-skeleton-line skeleton-title short" />
+        <div class="article-skeleton-excerpt" />
+        <div class="article-skeleton-body">
+          <span v-for="i in 7" :key="i" :style="{ width: `${88 - (i % 3) * 9}%` }" />
+        </div>
+      </div>
+
+      <template v-else>
       <NuxtLink to="/home" class="back-btn">
         <Icon name="ph:arrow-left-bold" />
         返回首页
       </NuxtLink>
 
       <div class="post-header article-anim" :class="{ 'has-cover': article.hero }">
-        <img v-if="article.hero" :src="coverUrl(article.hero)" class="post-cover" :alt="article.title" />
+        <img v-if="article.hero" :src="coverUrl(article.hero)" class="post-cover" :alt="article.title"
+          decoding="async" fetchpriority="high" />
 
         <div class="post-nav">
           <div class="operations">
@@ -60,7 +75,7 @@
         <span class="notice-text"></span>
       </div>
 
-      <div class="article-shell article-anim">
+      <div ref="articleContentRef" class="article-shell article-anim">
         <ArticleMarkdown :content="article.content" :editor-id="editorId" />
       </div>
 
@@ -84,7 +99,7 @@
         </section>
       </div>
 
-      <div class="surround-post article-anim">
+      <div v-if="adjacentLoaded" class="surround-post article-anim">
         <NuxtLink v-if="prevArticle" :to="'/article/' + prevArticle.slug" class="surround-link">
           <Icon name="solar:rewind-back-bold-duotone" />
           <div class="surround-text">
@@ -114,19 +129,23 @@
         </div>
       </div>
 
-      <ArticleComments :post-id="article.id" v-model:comments="comments"
+      <div v-if="!commentsInitialLoaded" class="comment-section-skeleton article-anim">
+        <span /><span /><span />
+      </div>
+      <ArticleComments v-else class="comments-enter" :post-id="article.id" v-model:comments="comments"
         :comment-total="commentTotal" v-model:comment-page="commentPage" :comment-total-pages="commentTotalPages"
         :comment-loading="commentsLoading" @load-more="loadMoreComments" />
+      </template>
     </main>
 
-    <ArticleSidebar :editor-id="editorId" scroll-element="#main-content" :progress="readingProgress"
+    <ArticleSidebar v-if="!articleLoading" :editor-id="editorId" scroll-element="#main-content" :progress="readingProgress"
       :show-top="showBackTop" @scroll-top="scrollToTop" @scroll-comment="scrollToComment" />
 
     <ArticleShare v-model:open="shareOpen" :article="article" />
     <ArticlePoster v-model:open="posterOpen" :article="article" />
 
     <ClientOnly>
-      <AiPet mode="article" :article="articleContext" />
+      <AiPet v-if="!articleLoading" mode="article" :article="articleContext" />
     </ClientOnly>
   </div>
 </template>
@@ -153,6 +172,7 @@ const commentPage = ref(1)
 const commentTotalPages = ref(1)
 const commentTotal = ref(0)
 const commentsLoading = ref(false)
+const commentsInitialLoaded = ref(false)
 let ignoreCommentPageWatch = false
 
 const shareOpen = ref(false)
@@ -161,7 +181,11 @@ const posterOpen = ref(false)
 const excerptRef = ref<HTMLElement | null>(null)
 const noticeRef = ref<HTMLElement | null>(null)
 const articleMainRef = ref<HTMLElement | null>(null)
+const articleContentRef = ref<HTMLElement | null>(null)
 
+const articleLoading = ref(true)
+const articleReady = ref(false)
+const adjacentLoaded = ref(false)
 const readingProgress = ref(0)
 const showBackTop = ref(false)
 const articleContext = computed(() => ({
@@ -171,6 +195,7 @@ const articleContext = computed(() => ({
 }))
 
 async function loadArticle() {
+  articleLoading.value = true
   try {
     const p = await api.get<any>(`/posts/${slug}`)
     article.value = {
@@ -186,11 +211,17 @@ async function loadArticle() {
       tags: (p.tags ?? []).map((t: any) => t.name),
       id: p.id,
     }
+  } catch { /* keep empty */ }
+  finally { articleLoading.value = false }
+}
 
+async function loadAdjacent() {
+  try {
     const adj = await api.get<any>(`/posts/${slug}/adjacent`)
     prevArticle.value = adj.prev ? { title: adj.prev.title, slug: adj.prev.slug, date: adj.prev.publishedAt?.slice(0, 10) } : null
     nextArticle.value = adj.next ? { title: adj.next.title, slug: adj.next.slug, date: adj.next.publishedAt?.slice(0, 10) } : null
   } catch { /* keep empty */ }
+  finally { adjacentLoaded.value = true }
 }
 
 async function loadComments(page = 1, append = false) {
@@ -227,7 +258,10 @@ async function loadComments(page = 1, append = false) {
     commentTotal.value = data.total
     commentTotalPages.value = data.totalPages
   } catch { /* keep empty */ }
-  finally { commentsLoading.value = false }
+  finally {
+    commentsLoading.value = false
+    if (page === 1) commentsInitialLoaded.value = true
+  }
 }
 
 async function loadMoreComments() {
@@ -264,12 +298,33 @@ function scrollToComment() {
   container.scrollBy({ top: tRect.top - cRect.top - 16, behavior: 'smooth' })
 }
 
-function handleArticleScroll() {
+let scrollFrame: number | null = null
+let articleResizeObserver: ResizeObserver | null = null
+
+function updateArticleScrollState() {
   const container = articleMainRef.value
   if (!container) return
-  const max = container.scrollHeight - container.clientHeight
-  readingProgress.value = max > 0 ? Math.min(1, Math.max(0, container.scrollTop / max)) : 0
   showBackTop.value = container.scrollTop > 240
+
+  const content = articleContentRef.value
+  if (!content) {
+    readingProgress.value = 0
+    return
+  }
+  const containerRect = container.getBoundingClientRect()
+  const contentRect = content.getBoundingClientRect()
+  const contentTop = contentRect.top - containerRect.top + container.scrollTop
+  const readingDistance = Math.max(1, content.offsetHeight - container.clientHeight)
+  const contentScroll = container.scrollTop - contentTop
+  readingProgress.value = Math.min(1, Math.max(0, contentScroll / readingDistance))
+}
+
+function handleArticleScroll() {
+  if (scrollFrame !== null) return
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = null
+    updateArticleScrollState()
+  })
 }
 
 function typeExcerpt() {
@@ -318,14 +373,25 @@ watch(commentPage, (page) => {
   loadComments(page)
 })
 
-onMounted(() => {
-  loadArticle().then(async () => {
-    await loadComments(1)
-    await nextTick()
-    typeExcerpt()
-    checkOutdated()
-    handleArticleScroll()
-  })
+onMounted(async () => {
+  await loadArticle()
+  await nextTick()
+  requestAnimationFrame(() => { articleReady.value = true })
+  typeExcerpt()
+  checkOutdated()
+  updateArticleScrollState()
+
+  if (articleContentRef.value) {
+    articleResizeObserver = new ResizeObserver(updateArticleScrollState)
+    articleResizeObserver.observe(articleContentRef.value)
+  }
+  void loadAdjacent()
+  void loadComments(1)
+})
+
+onUnmounted(() => {
+  articleResizeObserver?.disconnect()
+  if (scrollFrame !== null) cancelAnimationFrame(scrollFrame)
 })
 </script>
 
@@ -342,6 +408,52 @@ onMounted(() => {
   overflow-y: auto;
   padding: 28px 32px;
   min-width: 0;
+  scrollbar-gutter: stable;
+}
+
+.article-loading-state {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding-top: 4px;
+  animation: article-skeleton-pulse 1.35s ease-in-out infinite alternate;
+}
+
+.article-skeleton-line,
+.article-skeleton-cover,
+.article-skeleton-excerpt,
+.article-skeleton-body span {
+  display: block;
+  border-radius: 9px;
+  background: var(--c-bg-2);
+}
+
+.article-skeleton-line { height: 14px; }
+.skeleton-back { width: 88px; height: 12px; }
+.article-skeleton-cover { width: 100%; height: clamp(180px, 34vh, 340px); border-radius: 16px; }
+.skeleton-meta { width: min(420px, 68%); height: 12px; }
+.skeleton-title { width: min(720px, 82%); height: 28px; }
+.skeleton-title.short { width: min(480px, 56%); }
+.article-skeleton-excerpt { width: 100%; height: 70px; border-radius: 14px; }
+.article-skeleton-body { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+.article-skeleton-body span { height: 12px; }
+
+.comment-section-skeleton {
+  display: grid;
+  gap: 10px;
+  margin: 34px 0 24px;
+}
+
+.comment-section-skeleton span {
+  display: block;
+  height: 74px;
+  border-radius: 14px;
+  background: var(--c-bg-1);
+}
+
+@keyframes article-skeleton-pulse {
+  from { opacity: 0.55; }
+  to { opacity: 0.92; }
 }
 
 .article-main::-webkit-scrollbar {
@@ -523,6 +635,11 @@ onMounted(() => {
 }
 
 .article-anim {
+  opacity: 0;
+}
+
+.article-ready .article-anim,
+.comments-enter {
   animation: article-fade-up 0.5s ease both;
 }
 
@@ -680,6 +797,9 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
+  .article-skeleton-cover { height: 210px; border-radius: 12px; }
+  .skeleton-title { height: 23px; width: 92%; }
+
   .back-btn {
     margin-bottom: 14px;
   }
@@ -741,5 +861,12 @@ onMounted(() => {
     width: 100%;
     padding: 12px;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article-loading-state { animation: none; }
+  .article-anim { opacity: 1; }
+  .article-ready .article-anim,
+  .comments-enter { animation: none; }
 }
 </style>

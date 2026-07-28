@@ -23,6 +23,9 @@
         <a-card :bordered="false" class="section-card" size="small">
           <template #title><span class="section-title">快速入口</span></template>
           <div class="quick-grid">
+            <a-button type="text" class="quick-btn" @click="$router.push('/admin/moments/create')">
+              <EditOutlined /> 写瞬间
+            </a-button>
             <a-button type="text" class="quick-btn" @click="$router.push('/admin/posts/create')">
               <EditOutlined /> 写文章
             </a-button>

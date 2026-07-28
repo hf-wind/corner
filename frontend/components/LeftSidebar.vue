@@ -99,6 +99,7 @@
           <Icon name="ph:monitor-bold" />
         </button>
       </div>
+      <!-- 字体切换暂不展示，保留结构与样式便于后续恢复。
       <div v-if="!isPanel" class="font-pill" role="group" aria-label="全局字体">
         <button
           v-for="option in fontPresets"
@@ -112,6 +113,7 @@
           {{ option.short }}
         </button>
       </div>
+      -->
     </div>
   </aside>
 </template>
@@ -125,7 +127,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ openSearch: [] }>()
 const { theme, setTheme } = useTheme()
-const { fontPreset, fontPresets, setFontPreset } = useTypography()
+// 字体切换入口暂时隐藏：const { fontPreset, fontPresets, setFontPreset } = useTypography()
 const { registerSlot, unregisterSlot } = useMusicPlayerSlot()
 const {
   user,
@@ -163,6 +165,7 @@ onBeforeUnmount(() => {
 })
 
 const siteNav = [
+  { to: '/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/home', icon: 'ph:house-bold', label: '首页' },
   { to: '/library', icon: 'ph:books-bold', label: '书影音' },
   { to: '/archive', icon: 'ph:archive-bold', label: '归档' },
@@ -173,6 +176,7 @@ const siteNav = [
 ]
 
 const adminFullNav = [
+  { to: '/admin/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/admin', icon: 'ph:gauge-bold', label: '仪表盘' },
   { to: '/admin/posts', icon: 'ph:article-bold', label: '文章' },
   { to: '/admin/library', icon: 'ph:books-bold', label: '书影音' },
@@ -184,6 +188,7 @@ const adminFullNav = [
   { to: '/admin/friend-applications', icon: 'ph:link-bold', label: '友联申请' },
   { to: '/admin/ai', icon: 'ph:robot-bold', label: 'AI' },
   { to: '/admin/email', icon: 'ph:envelope-bold', label: '邮件' },
+  { to: '/admin/about', icon: 'ph:identification-card-bold', label: '关于我' },
   { to: '/admin/settings', icon: 'ph:gear-bold', label: '设置' },
   { to: '/admin/emoji', icon: 'ph:smiley-bold', label: '表情' },
   { to: '/admin/info', icon: 'ph:info-bold', label: '系统信息' },

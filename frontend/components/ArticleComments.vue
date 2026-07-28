@@ -132,7 +132,9 @@
               <span>回复</span>
             </button>
           </div>
-          <div v-if="replyTargetId === c.id" class="comment-reply-form">
+          <div :ref="(el) => setReplyAnchor(el, c.id)" class="reply-form-anchor" />
+          <Teleport v-if="replyTargetId === c.id && replyMountTarget" :to="replyMountTarget">
+            <div class="comment-reply-form">
             <span v-if="replyToUser" class="reply-to-label">回复 @{{ replyToUser }}</span>
             <div class="reply-form-row">
               <button type="button" class="reply-emoji-btn" :class="{ active: replyEmojiOpen }"
@@ -179,9 +181,25 @@
                 </template>
               </div>
             </transition>
-          </div>
-          <div v-if="c.replies?.length" class="comment-replies">
-            <div v-for="(r, ri) in c.replies" :key="r.id || ri" class="reply-item">
+            </div>
+          </Teleport>
+          <div v-if="hasVisibleReplies(c)" class="comment-replies">
+            <div v-for="r in pendingRepliesFor(c, c.id)" :key="r.id" class="reply-item optimistic-reply"
+              :class="{ 'pending-local': r.status === 'pending' }">
+              <img class="reply-avatar" :src="mediaUrl(r.avatar)" :alt="r.name">
+              <div class="reply-body">
+                <div class="reply-meta-row">
+                  <span class="reply-author">{{ r.name }}</span>
+                  <span v-if="r.status === 'pending'" class="comment-badge pending"><Icon name="ph:spinner-gap-bold" class="spinning" /> 审核中</span>
+                  <span v-if="r.status === 'rejected'" class="comment-badge rejected">审核未通过</span>
+                  <span v-if="r.replyTo" class="reply-to-badge">回复 @{{ r.replyTo }}</span>
+                  <span class="reply-time">{{ r.time }}</span>
+                </div>
+                <div class="reply-text" v-html="renderContent(r.content)"></div>
+              </div>
+            </div>
+            <template v-for="(r, ri) in c.replies" :key="r.id || ri">
+            <div class="reply-item">
               <img class="reply-avatar" :src="mediaUrl(r.avatar)" :alt="r.name">
               <div class="reply-body">
                 <div class="reply-meta-row">
@@ -199,19 +217,41 @@
                 <Icon name="ph:arrow-bend-left-down-bold" />
               </button>
             </div>
-            <div v-if="c.replyCount && c.replyCount > c.replies.length" class="load-more-replies-wrap"
-              :ref="(el) => observeReplySentinel(el as Element | null, c)">
-              <Icon name="ph:spinner-gap-bold" class="spinning" />
-              <span>正在加载更多回复</span>
+            <div :ref="(el) => setReplyAnchor(el, r.id)" class="reply-form-anchor reply-form-anchor-nested" />
+            <div v-for="pending in pendingRepliesFor(c, r.id)" :key="pending.id" class="reply-item optimistic-reply"
+              :class="{ 'pending-local': pending.status === 'pending' }">
+              <img class="reply-avatar" :src="mediaUrl(pending.avatar)" :alt="pending.name">
+              <div class="reply-body">
+                <div class="reply-meta-row">
+                  <span class="reply-author">{{ pending.name }}</span>
+                  <span v-if="pending.status === 'pending'" class="comment-badge pending"><Icon name="ph:spinner-gap-bold" class="spinning" /> 审核中</span>
+                  <span v-if="pending.status === 'rejected'" class="comment-badge rejected">审核未通过</span>
+                  <span v-if="pending.replyTo" class="reply-to-badge">回复 @{{ pending.replyTo }}</span>
+                  <span class="reply-time">{{ pending.time }}</span>
+                </div>
+                <div class="reply-text" v-html="renderContent(pending.content)"></div>
+              </div>
+            </div>
+            </template>
+            <div v-if="remainingReplies(c) > 0" class="load-more-replies-wrap">
+              <button type="button" class="load-more-replies-btn" :disabled="loadingReplies[c.id]"
+                @click="loadMoreReplies(c)">
+                <Icon :name="loadingReplies[c.id] ? 'ph:spinner-gap-bold' : 'ph:chats-circle-bold'"
+                  :class="{ spinning: loadingReplies[c.id] }" />
+                <span>{{ loadingReplies[c.id] ? '正在加载' : `查看更多回复（${Math.min(3, remainingReplies(c))} 条）` }}</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
     </transition-group>
 
-    <div v-if="commentPage < commentTotalPages" ref="commentSentinelRef" class="comment-more" aria-live="polite">
-      <Icon name="ph:spinner-gap-bold" class="spinning" />
-      <span>{{ commentLoading ? '正在加载评论' : '继续浏览以加载更多评论' }}</span>
+    <div v-if="commentPage < commentTotalPages" class="comment-more" aria-live="polite">
+      <button type="button" class="load-more-btn" :disabled="commentLoading" @click="emit('load-more')">
+        <Icon :name="commentLoading ? 'ph:spinner-gap-bold' : 'ph:chat-circle-dots-bold'"
+          :class="{ spinning: commentLoading }" />
+        <span>{{ commentLoading ? '正在加载评论' : '查看更多评论' }}</span>
+      </button>
     </div>
   </section>
 </template>
@@ -246,6 +286,8 @@ const sortDesc = ref(false)
 const replySubmitting = ref(false)
 const replyTargetId = ref<string | null>(null)
 const replyParentId = ref<string | null>(null)
+const replyMountTarget = shallowRef<HTMLElement | null>(null)
+const replyAnchors = new Map<string, HTMLElement>()
 const replyToUser = ref<string>('')
 const replyContent = ref('')
 const replyEmojiOpen = ref(false)
@@ -261,10 +303,6 @@ const emojiPacks = ref<any[]>([])
 const emojiPackIdx = ref(0)
 const emojiPageMap = ref<Record<string, number>>({})
 const loadingEmojiPacks = ref<Record<string, boolean>>({})
-const commentSentinelRef = ref<HTMLElement | null>(null)
-let commentObserver: IntersectionObserver | null = null
-const replyObservers = new Map<string, IntersectionObserver>()
-
 const previewEmojiUrl = ref('')
 const previewEmojiStyle = ref({})
 const previewContent = ref('')
@@ -297,6 +335,29 @@ const sortedComments = computed(() => {
   const list = [...props.comments]
   return sortDesc.value ? list.reverse() : list
 })
+
+function hasVisibleReplies(comment: Comment) {
+  return Boolean(comment.replies?.length || comment.pendingReplies?.length)
+}
+
+function remainingReplies(comment: Comment) {
+  const visible = (comment.replies?.length || 0) + (comment.pendingReplies?.length || 0)
+  return Math.max(0, (comment.replyCount || 0) - visible)
+}
+
+function pendingRepliesFor(comment: Comment, targetId: string) {
+  return (comment.pendingReplies || []).filter(reply => reply.replyToId === targetId)
+}
+
+function setReplyAnchor(element: any, targetId: string) {
+  if (element instanceof HTMLElement) {
+    replyAnchors.set(targetId, element)
+    if (replyParentId.value === targetId) replyMountTarget.value = element
+  } else {
+    const existing = replyAnchors.get(targetId)
+    if (existing && !document.contains(existing)) replyAnchors.delete(targetId)
+  }
+}
 
 function renderContent(text: string) {
   const tokens: string[] = []
@@ -533,8 +594,14 @@ function pollCommentStatus(commentId: string, maxAttempts = 60) {
               }
               return r
             })
-            if (updatedReplies !== c.replies) {
+            if (updatedReplies.some((reply, index) => reply !== c.replies?.[index])) {
               return { ...c, replies: updatedReplies }
+            }
+          }
+          if (c.pendingReplies?.length) {
+            const pendingReplies = c.pendingReplies.map((r) => r.id === commentId ? { ...r, status: data.status } : r)
+            if (pendingReplies.some((reply, index) => reply !== c.pendingReplies?.[index])) {
+              return { ...c, pendingReplies }
             }
           }
           return c
@@ -571,16 +638,23 @@ function replyTo(threadId: string, parentId: string, userName: string) {
   if (replyTargetId.value === threadId && replyParentId.value === parentId) {
     cancelReply()
   } else {
+    replyMountTarget.value = replyAnchors.get(parentId) || null
     replyTargetId.value = threadId
     replyParentId.value = parentId
     replyToUser.value = userName
     replyContent.value = ''
+    nextTick(() => {
+      const editor = replyEditorRef.value
+      const element = Array.isArray(editor) ? editor[0] : editor
+      element?.focus()
+    })
   }
 }
 
 function cancelReply() {
   replyTargetId.value = null
   replyParentId.value = null
+  replyMountTarget.value = null
   replyToUser.value = ''
   replyContent.value = ''
   replyEmojiOpen.value = false
@@ -638,10 +712,12 @@ async function loadMoreReplies(comment: Comment) {
       content: r.content,
       replyTo: r.replyToName ?? r.parent?.authorName ?? undefined,
       status: r.status,
+      createdAt: r.createdAt,
     }))
     if (!comment.replies) comment.replies = []
     const existingIds = new Set(comment.replies.map(r => r.id))
-    comment.replies.push(...newReplies.filter((r: any) => !existingIds.has(r.id)))
+    const optimisticIds = new Set((comment.pendingReplies || []).map(reply => reply.id))
+    comment.replies.push(...newReplies.filter((r: any) => !existingIds.has(r.id) && !optimisticIds.has(r.id)))
     comment.replyCount = data.total
     replyPageMap.value[comment.id] = currentPage + 1
   } catch { /* ignore */ }
@@ -651,13 +727,15 @@ async function loadMoreReplies(comment: Comment) {
 async function submitReply(target: Comment) {
   const content = serializeReplyEditor()
   if (!content.trim() || !props.postId || replySubmitting.value) return
+  const parentId = replyParentId.value || target.id
+  const replyName = replyToUser.value || undefined
   const toast = useToast()
   replySubmitting.value = true
   try {
     const res = await api.post<any>('/comments', {
       postId: props.postId,
       content,
-      parentId: replyParentId.value || target.id,
+      parentId,
     })
     const newReply = {
       id: res.id,
@@ -665,11 +743,14 @@ async function submitReply(target: Comment) {
       avatar: authUser.value?.avatar,
       time: '刚刚',
       content: res.content,
-      replyTo: replyToUser.value || undefined,
+      replyTo: replyName,
+      replyToId: parentId,
       status: 'pending' as const,
+      createdAt: res.createdAt,
     }
     if (!target.replies) target.replies = []
-    target.replies.push(newReply)
+    if (!target.pendingReplies) target.pendingReplies = []
+    target.pendingReplies.push(newReply)
     target.replyCount = (target.replyCount || 0) + 1
     replyContent.value = ''
     const re = replyEditorRef.value; const reEl = Array.isArray(re) ? re[0] : re; if (reEl) reEl.innerHTML = ''
@@ -729,31 +810,8 @@ function onEmojiScroll(event: Event, packIndex: number) {
   }
 }
 
-function observeReplySentinel(el: Element | null, comment: Comment) {
-  replyObservers.get(comment.id)?.disconnect()
-  replyObservers.delete(comment.id)
-  if (!el || !import.meta.client) return
-  const observer = new IntersectionObserver((entries) => {
-    if (entries.some(entry => entry.isIntersecting)) void loadMoreReplies(comment)
-  }, { rootMargin: '120px 0px' })
-  observer.observe(el)
-  replyObservers.set(comment.id, observer)
-}
-
-function setupCommentObserver() {
-  commentObserver?.disconnect()
-  if (!commentSentinelRef.value || !import.meta.client) return
-  commentObserver = new IntersectionObserver((entries) => {
-    if (entries.some(entry => entry.isIntersecting) && !props.commentLoading && props.commentPage < props.commentTotalPages) {
-      emit('load-more')
-    }
-  }, { rootMargin: '240px 0px' })
-  commentObserver.observe(commentSentinelRef.value)
-}
-
 watch(emojiOpen, (v) => { if (!v) onEmojiLeave() })
 watch(replyEmojiOpen, (v) => { if (!v) { onEmojiLeave(); replyEmojiPackIdx.value = 0 } })
-watch([commentSentinelRef, () => props.commentPage, () => props.commentTotalPages], () => nextTick(setupCommentObserver))
 
 onMounted(() => {
   loadEmojiPacks()
@@ -776,10 +834,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  commentObserver?.disconnect()
-  replyObservers.forEach(observer => observer.disconnect())
-  replyObservers.clear()
+  replyAnchors.clear()
+  replyMountTarget.value = null
 })
+
 </script>
 
 <style scoped>
@@ -799,10 +857,11 @@ onUnmounted(() => {
 
 .comment-form-card {
   background: var(--ld-bg-card);
-  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 16px;
   padding: 18px;
   margin-bottom: 20px;
-  box-shadow: 0 8px 24px var(--ld-shadow);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ld-shadow) 55%, transparent);
 }
 
 .comment-form-header {
@@ -1317,21 +1376,22 @@ onUnmounted(() => {
 .comment-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .comment-item {
   display: flex;
   gap: 14px;
-  padding: 18px 16px;
+  padding: 17px 16px;
   background: var(--ld-bg-card);
-  border-radius: 14px;
-  box-shadow: 0 6px 18px var(--ld-shadow);
-  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 16px;
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--ld-shadow) 48%, transparent);
 }
 
 .comment-item.comment-hot {
-  box-shadow: 0 6px 18px var(--ld-shadow), inset 3px 0 0 #f59e0b;
+  border-left-color: #f59e0b;
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--ld-shadow) 48%, transparent), inset 3px 0 0 #f59e0b;
 }
 
 .comment-avatar {
@@ -1341,6 +1401,8 @@ onUnmounted(() => {
   object-fit: cover;
   flex-shrink: 0;
   margin-top: 2px;
+  background: var(--c-bg-2);
+  box-shadow: 0 0 0 3px var(--c-bg-1);
 }
 
 .comment-body {
@@ -1353,11 +1415,11 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: 7px;
 }
 
 .comment-author {
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 700;
   color: var(--c-text);
 }
@@ -1401,10 +1463,10 @@ onUnmounted(() => {
 }
 
 .comment-text {
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   color: var(--c-text-1);
-  line-height: 1.7;
-  margin-bottom: 12px;
+  line-height: 1.78;
+  margin-bottom: 10px;
 }
 
 .comment-text :deep(.reply-mention) {
@@ -1414,8 +1476,8 @@ onUnmounted(() => {
 
 :deep(.inline-emoji) {
   display: inline;
-  width: 6em;
-  height: 6em;
+  width: 3.6em;
+  height: 3.6em;
   vertical-align: -0.35em;
   border-radius: 4px;
 }
@@ -1440,7 +1502,7 @@ onUnmounted(() => {
 
 .comment-actions {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   margin-top: 2px;
 }
 
@@ -1448,9 +1510,11 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 0;
+  min-height: 27px;
+  padding: 3px 9px;
   border: none;
-  background: none;
+  border-radius: 999px;
+  background: var(--c-bg-1);
   color: var(--c-text-3);
   font-family: inherit;
   font-size: 0.68rem;
@@ -1460,22 +1524,40 @@ onUnmounted(() => {
 
 .comment-action-btn:hover {
   color: var(--c-primary);
+  background: var(--c-primary-soft);
 }
 
 .comment-replies {
   margin-top: 14px;
-  padding: 14px 0 0 12px;
+  padding: 10px 11px 11px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--border) 80%, transparent);
+  gap: 3px;
+  border-left: 3px solid color-mix(in srgb, var(--c-primary) 28%, var(--border));
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--c-bg-1) 82%, transparent);
 }
 
 .reply-item {
   display: flex;
-  gap: 8px;
-  margin: 6px 0;
+  gap: 9px;
+  margin: 0;
+  padding: 8px 6px;
   align-items: flex-start;
+  border-radius: 9px;
+  animation: reply-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.reply-item.pending-local {
+  background: color-mix(in srgb, var(--c-primary-soft) 38%, transparent);
+}
+
+.reply-item.optimistic-reply {
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--c-primary) 55%, transparent);
+}
+
+@keyframes reply-enter {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
 }
 
 .reply-avatar {
@@ -1497,7 +1579,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin: 8px 0 10px 0;
+  margin: 0 0 4px;
 }
 
 .reply-author {
@@ -1519,10 +1601,10 @@ onUnmounted(() => {
 }
 
 .reply-text {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--c-text-1);
-  line-height: 1.5;
-  margin-top: 2px;
+  line-height: 1.68;
+  margin-top: 0;
 }
 
 .reply-mention {
@@ -1544,8 +1626,8 @@ onUnmounted(() => {
   font-size: 0.7rem;
   cursor: pointer;
   flex-shrink: 0;
-  opacity: 0;
-  transition: all 0.15s;
+  opacity: 0.46;
+  transition: opacity 0.15s, color 0.15s, background-color 0.15s;
 }
 
 .reply-item:hover .reply-action-btn {
@@ -1610,9 +1692,27 @@ onUnmounted(() => {
   background: var(--c-primary-soft);
 }
 
+.load-more-replies-btn:disabled,
+.load-more-btn:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .comment-reply-form {
-  margin-top: 8px;
+  margin: 8px 0 5px;
+  padding: 10px;
   position: relative;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 24%, var(--border));
+  border-radius: 11px;
+  background: var(--ld-bg-card);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ld-shadow) 48%, transparent);
+  animation: reply-form-enter 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reply-form-anchor { min-width: 0; }
+
+@keyframes reply-form-enter {
+  from { opacity: 0; transform: translate3d(0, -4px, 0); }
 }
 
 .reply-to-label {
@@ -1699,7 +1799,7 @@ onUnmounted(() => {
 
 .comment-fade-enter-active,
 .comment-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .comment-fade-enter-from {
@@ -1733,7 +1833,7 @@ onUnmounted(() => {
 
   .comment-item {
     gap: 9px;
-    padding: 12px 10px;
+    padding: 13px 10px;
     border-radius: 12px;
   }
 
@@ -1752,7 +1852,29 @@ onUnmounted(() => {
   }
 
   .comment-replies {
-    padding-left: 6px;
+    margin-left: -32px;
+    padding: 8px 7px 9px;
+  }
+
+  .reply-item {
+    padding: 8px 4px;
+  }
+
+  .reply-action-btn {
+    opacity: 0.72;
+  }
+
+  .reply-form-row {
+    align-items: flex-end;
+  }
+
+  .comment-reply-form {
+    padding: 8px;
+  }
+
+  :deep(.inline-emoji) {
+    width: 3em;
+    height: 3em;
   }
 
   .emoji-loading {
@@ -1773,5 +1895,10 @@ onUnmounted(() => {
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -8px 32px var(--ld-shadow);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reply-item,
+  .comment-reply-form { animation: none; }
 }
 </style>

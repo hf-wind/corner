@@ -5,22 +5,46 @@
       <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
     </button>
     <Teleport to="body">
+      <Transition name="notif-backdrop">
+        <button
+          v-if="panelOpen"
+          type="button"
+          class="notif-backdrop"
+          aria-label="关闭通知"
+          @click="panelOpen = false"
+        />
+      </Transition>
       <Transition name="notif-panel">
-        <div v-if="panelOpen" ref="panelRef" class="notif-panel" :style="panelStyle">
+        <section v-if="panelOpen" ref="panelRef" class="notif-panel" :style="panelStyle" role="dialog" aria-label="消息通知">
           <div class="notif-header">
-            <span class="notif-title">通知</span>
-            <button
-              v-if="unreadCount > 0"
-              class="notif-read-all"
-              type="button"
-              @click="markAllRead"
-            >全部已读</button>
+            <div class="notif-heading">
+              <span class="notif-heading-icon"><Icon name="ph:bell-ringing-bold" /></span>
+              <div>
+                <span class="notif-title">消息通知</span>
+                <span class="notif-subtitle">{{ unreadCount > 0 ? `${unreadCount} 条未读消息` : '所有消息都已读' }}</span>
+              </div>
+            </div>
+            <div class="notif-header-actions">
+              <button
+                v-if="unreadCount > 0"
+                class="notif-read-all"
+                type="button"
+                @click="markAllRead"
+              >全部已读</button>
+              <button type="button" class="notif-close" aria-label="关闭通知" @click="panelOpen = false">
+                <Icon name="ph:x-bold" />
+              </button>
+            </div>
           </div>
         <div class="notif-list">
           <div v-if="loading" class="notif-loading">
             <div class="notif-spinner" />
           </div>
-          <div v-else-if="items.length === 0" class="notif-empty">暂无通知</div>
+          <div v-else-if="items.length === 0" class="notif-empty">
+            <span class="notif-empty-icon"><Icon name="ph:tray-bold" /></span>
+            <strong>暂时没有新消息</strong>
+            <span>有新动态时会在这里提醒你</span>
+          </div>
           <div
             v-for="item in items"
             :key="item.id"
@@ -44,7 +68,7 @@
         <NuxtLink v-if="items.length > 0" to="/admin/messages" class="notif-footer" @click="panelOpen = false">
           查看全部
         </NuxtLink>
-      </div>
+      </section>
     </Transition>
     </Teleport>
   </div>
@@ -260,26 +284,80 @@ watch(isLoggedIn, (v) => {
   max-height: min(380px, calc(100dvh - 24px));
   background: var(--c-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px var(--ld-shadow);
+  border-radius: 18px;
+  box-shadow: 0 22px 64px color-mix(in srgb, #000 22%, var(--ld-shadow));
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  z-index: 9998;
+  z-index: 12020;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.notif-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 12019;
+  padding: 0;
+  border: 0;
+  background: rgb(8 15 30 / 38%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .notif-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 14px 15px;
   border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--c-primary-soft), transparent 75%);
+}
+
+.notif-heading,
+.notif-header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.notif-heading {
+  gap: 10px;
+  min-width: 0;
+}
+
+.notif-heading-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary) 76%, #fff), var(--c-primary));
+  box-shadow: 0 7px 16px color-mix(in srgb, var(--c-primary) 25%, transparent);
+}
+
+.notif-heading > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notif-header-actions {
+  gap: 5px;
 }
 
 .notif-title {
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 700;
   color: var(--c-text);
+}
+
+.notif-subtitle {
+  margin-top: 2px;
+  color: var(--c-text-3);
+  font-size: 10px;
 }
 
 .notif-read-all {
@@ -297,6 +375,24 @@ watch(isLoggedIn, (v) => {
   background: var(--c-primary-soft);
 }
 
+.notif-close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: var(--c-text-3);
+  background: transparent;
+  cursor: pointer;
+}
+
+.notif-close:hover {
+  color: var(--c-text);
+  background: var(--c-bg-2);
+}
+
 .notif-list {
   flex: 1;
   overflow-y: auto;
@@ -304,10 +400,33 @@ watch(isLoggedIn, (v) => {
 }
 
 .notif-empty {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   text-align: center;
-  padding: 24px 0;
+  padding: 28px 16px;
   color: var(--c-text-3);
+  font-size: 11px;
+}
+
+.notif-empty strong {
+  color: var(--c-text-2);
   font-size: 13px;
+}
+
+.notif-empty-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-size: 20px;
 }
 
 .notif-loading {
@@ -419,17 +538,41 @@ watch(isLoggedIn, (v) => {
   transform: translateY(4px) scale(0.98);
 }
 
+.notif-backdrop-enter-active,
+.notif-backdrop-leave-active {
+  transition: opacity 0.18s ease;
+}
+
+.notif-backdrop-enter-from,
+.notif-backdrop-leave-to {
+  opacity: 0;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
+  .notif-backdrop {
+    display: block;
+  }
+
   .notif-panel {
-    border-radius: 10px;
+    top: auto !important;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left)) !important;
+    width: auto;
+    max-height: min(72dvh, 560px);
+    border-radius: 22px;
+  }
+
+  .notif-list {
+    max-height: min(52dvh, 400px);
   }
 
   .notif-item {
-    padding: 11px 12px;
+    padding: 12px 14px;
   }
 }
 </style>

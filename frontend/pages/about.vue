@@ -1,436 +1,707 @@
 <template>
-  <div class="page-layout">
-    <main class="main-content">
-      <div class="section-title">· 关于</div>
-
-      <div class="about-hero">
-        <img class="about-avatar" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face" alt="avatar">
-        <div class="about-name">清欢小筑</div>
-        <div class="about-slogan">「雨过天晴云破处，这般颜色做将来」</div>
-        <div class="about-social">
-          <a href="#" title="GitHub"><Icon name="ph:github-logo-bold" /></a>
-          <a href="#" title="Twitter"><Icon name="ph:twitter-logo-bold" /></a>
-          <a href="#" title="Email"><Icon name="ph:envelope-bold" /></a>
-          <a href="#" title="RSS"><Icon name="ph:rss-bold" /></a>
-        </div>
-      </div>
-
-      <div class="about-section">
-        <h3><Icon name="ph:hand-waving-bold" /> Hi there</h3>
-        <p>我是一个热爱技术与生活的开发者。白天写代码，晚上写文字。相信代码可以改变世界，文字可以温暖人心。</p>
-        <p>这个博客是我的数字花园，记录着技术探索、生活感悟、旅行见闻。希望这些文字能给你带来一些启发或共鸣。</p>
-        <p>如果你也喜欢安静地写点东西，欢迎常来坐坐。</p>
-      </div>
-
-      <div class="about-section">
-        <h3><Icon name="ph:wrench-bold" /> 技能栈</h3>
-        <div class="skills-grid">
-          <div v-for="s in skills" :key="s.name" class="skill-item">
-            <div class="skill-name">{{ s.name }}</div>
-            <div class="skill-bar"><div class="skill-fill" :style="{ width: s.level + '%' }"></div></div>
-            <div class="skill-percent">{{ s.level }}%</div>
+  <div class="about-shell">
+    <main class="about-scroll">
+      <div class="about-page">
+        <header class="profile-header">
+          <div class="profile-index" aria-hidden="true">
+            <span>PROFILE</span>
+            <strong>01</strong>
           </div>
-        </div>
-      </div>
 
-      <div class="about-section">
-        <h3><Icon name="ph:calendar-bold" /> 时间线</h3>
-        <div class="about-timeline">
-          <div v-for="item in timeline" :key="item.year" class="about-timeline-item">
-            <div class="about-timeline-date">{{ item.year }}</div>
-            <div class="about-timeline-title">{{ item.title }}</div>
-            <div class="about-timeline-desc">{{ item.desc }}</div>
+          <div class="portrait-wrap">
+            <div class="portrait-frame">
+              <img :src="avatarSrc" :alt="`${profile.name}的头像`" class="portrait">
+            </div>
+            <span class="portrait-caption">THIS IS ME · {{ currentYear }}</span>
           </div>
+
+          <div class="profile-intro">
+            <p class="eyebrow">ABOUT / 关于我</p>
+            <h1>{{ profile.name }}</h1>
+            <p class="role">{{ profile.role }}</p>
+            <blockquote>“{{ profile.motto }}”</blockquote>
+
+            <div class="status-row">
+              <span><Icon name="ph:map-pin-bold" /> {{ profile.location }}</span>
+              <span class="available"><i />{{ profile.availability }}</span>
+            </div>
+
+            <div v-if="profile.socialLinks.length" class="social-row">
+              <a
+                v-for="link in profile.socialLinks"
+                :key="`${link.label}-${link.url}`"
+                :href="safeUrl(link.url)"
+                :title="link.label"
+                :aria-label="link.label"
+                :target="isExternalLink(link.url) ? '_blank' : undefined"
+                :rel="isExternalLink(link.url) ? 'noopener noreferrer' : undefined"
+              >
+                <Icon :name="link.icon || 'ph:link-bold'" />
+              </a>
+            </div>
+          </div>
+        </header>
+
+        <div class="profile-body">
+          <div class="story-column">
+            <section class="story-section">
+              <div class="section-marker"><span>01</span><i /></div>
+              <div class="section-content">
+                <p class="section-kicker">HELLO, STRANGER</p>
+                <h2>关于此刻的我</h2>
+                <div class="introduction">
+                  <p v-for="paragraph in introductionParagraphs" :key="paragraph">{{ paragraph }}</p>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="profile.timeline.length" class="story-section timeline-section">
+              <div class="section-marker"><span>02</span><i /></div>
+              <div class="section-content">
+                <p class="section-kicker">MILESTONES</p>
+                <h2>一路走来</h2>
+                <ol class="timeline-list">
+                  <li v-for="item in profile.timeline" :key="`${item.year}-${item.title}`">
+                    <time>{{ item.year }}</time>
+                    <div>
+                      <h3>{{ item.title }}</h3>
+                      <p>{{ item.description }}</p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+            </section>
+          </div>
+
+          <aside class="profile-notes">
+            <section v-if="profile.facts.length" class="notes-block facts-block">
+              <p class="notes-label">QUICK NOTES</p>
+              <dl>
+                <div v-for="fact in profile.facts" :key="fact.label">
+                  <dt>{{ fact.label }}</dt>
+                  <dd>{{ fact.value }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section v-if="profile.skills.length" class="notes-block skills-block">
+              <p class="notes-label">WHAT I DO</p>
+              <div class="skill-list">
+                <div v-for="skill in profile.skills" :key="skill.name" class="skill-row">
+                  <div><span>{{ skill.name }}</span><strong>{{ skill.level }}</strong></div>
+                  <span class="skill-track"><i :style="{ width: `${skill.level}%` }" /></span>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="profile.tools.length" class="notes-block tools-block">
+              <p class="notes-label">CURRENTLY USING</p>
+              <div class="tool-list">
+                <span v-for="(tool, index) in profile.tools" :key="tool"><b>{{ padIndex(index + 1) }}</b>{{ tool }}</span>
+              </div>
+            </section>
+
+            <footer class="signature">
+              <span>Thanks for stopping by.</span>
+              <strong>{{ profile.name }}</strong>
+            </footer>
+          </aside>
         </div>
       </div>
     </main>
-
-    <aside class="sidebar-right">
-      <div class="right-card">
-        <div class="right-card-title">联系方式</div>
-        <div class="contact-list">
-          <div v-for="c in contacts" :key="c.label" class="contact-item">
-            <span style="width:20px;text-align:center;display:inline-flex;align-items:center;justify-content:center;"><Icon :name="c.icon" /></span>
-            <span style="color:var(--text-secondary);">{{ c.value }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="right-card">
-        <div class="right-card-title">站点信息</div>
-        <div class="site-info-list">
-          <div v-for="info in siteInfo" :key="info.label" class="site-info-item">
-            <span>{{ info.label }}</span>
-            <span>{{ info.value }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="right-card">
-        <div class="right-card-title">使用工具</div>
-        <div class="tools-wrap">
-          <span v-for="t in tools" :key="t" class="tool-tag">{{ t }}</span>
-        </div>
-      </div>
-    </aside>
   </div>
 </template>
 
 <script setup lang="ts">
-const skills = [
-  { name: 'Vue / Nuxt', level: 90 },
-  { name: 'Rust', level: 75 },
-  { name: 'TypeScript', level: 88 },
-  { name: 'Node.js', level: 82 },
-  { name: 'PostgreSQL', level: 70 },
-  { name: 'Docker', level: 65 },
-]
+import avatarFallback from '~/assets/images/avatar.jpg'
+import { normalizeAboutProfile } from '~/types/about'
 
-const timeline = [
-  { year: '2025', title: '博客 v3.0 上线', desc: '全新设计，Nuxt 3 + NestJS 重构完成' },
-  { year: '2024', title: '开始学习 Rust', desc: '从 Web 开发转向系统编程，探索更多可能' },
-  { year: '2023', title: '博客 v2.0', desc: '从 Hexo 迁移到 Vue 自建系统' },
-  { year: '2022', title: '开始写博客', desc: '用 Hexo 搭建了第一个博客' },
-]
+const api = useApi()
+const { mediaUrl } = useMediaUrl()
+const profile = ref(normalizeAboutProfile(null))
+const currentYear = new Date().getFullYear()
 
-const contacts = [
-  { icon: 'ph:envelope-bold', label: 'Email', value: 'hello@corner.ink' },
-  { icon: 'ph:github-logo-bold', label: 'GitHub', value: 'github.com/corner' },
-  { icon: 'ph:twitter-logo-bold', label: 'Twitter', value: '@corner_ink' },
-]
+const avatarSrc = computed(() => profile.value.avatarUrl ? mediaUrl(profile.value.avatarUrl) : avatarFallback)
+const introductionParagraphs = computed(() => profile.value.introduction.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean))
 
-const siteInfo = [
-  { label: '建站时间', value: '2022 年' },
-  { label: '运行天数', value: '365 天' },
-  { label: '文章总数', value: '128 篇' },
-  { label: '总字数', value: '28 万' },
-]
+function isExternalLink(url: string) {
+  return /^https?:\/\//i.test(url)
+}
 
-const tools = ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Redis', 'Docker', 'Vercel']
+function safeUrl(url: string) {
+  const trimmed = url.trim()
+  return /^(https?:\/\/|mailto:|tel:|\/)/i.test(trimmed) ? trimmed : '#'
+}
+
+function padIndex(index: number) {
+  return String(index).padStart(2, '0')
+}
+
+onMounted(async () => {
+  try {
+    profile.value = normalizeAboutProfile(await api.get('/settings/about_profile'))
+  } catch {
+    // The built-in profile keeps the page useful before the first admin save.
+  }
+})
+
+useHead(() => ({
+  title: `关于我 - ${profile.value.name}`,
+  meta: [{ name: 'description', content: profile.value.motto }],
+}))
 </script>
 
 <style scoped>
-.page-layout {
+.about-shell {
   display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 32px;
+  width: 100%;
   min-width: 0;
-}
-
-.section-title {
-  font-size: 0.82rem;
-  color: var(--c-text-2);
-  letter-spacing: 0.12em;
-  margin-bottom: 14px;
-  padding-left: 4px;
-}
-
-.about-hero {
-  background: var(--ld-bg-card);
-  border-radius: 14px;
-  padding: 40px;
-  box-shadow: 0 2px 4px var(--ld-shadow);
-  margin-bottom: 28px;
-  text-align: center;
-  transition: all 0.2s;
-}
-
-.about-avatar {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--c-primary);
-  box-shadow: 0 0 0 6px var(--c-primary-soft);
-  margin-bottom: 20px;
-}
-
-.about-name {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--c-text);
-}
-
-.about-slogan {
-  font-size: 0.92rem;
-  color: var(--c-text-2);
-  font-style: italic;
-  margin-bottom: 20px;
-}
-
-.about-social {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-}
-
-.about-social a {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  font-size: 1.1rem;
-  transition: all 0.2s;
-}
-
-.about-social a:hover {
-  border-color: var(--c-primary);
-  color: var(--c-primary);
-  background: var(--c-primary-soft);
-}
-
-.about-section {
-  background: var(--ld-bg-card);
-  border-radius: 14px;
-  padding: 28px;
-  box-shadow: 0 2px 4px var(--ld-shadow);
-  margin-bottom: 20px;
-  transition: box-shadow 0.3s;
-}
-
-.about-section:hover {
-  box-shadow: 0 8px 24px var(--ld-shadow-md);
-}
-
-
-
-.about-section h3 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--c-text);
-}
-
-.about-section p {
-  font-size: 0.88rem;
-  color: var(--c-text-2);
-  line-height: 1.8;
-  margin-bottom: 12px;
-}
-
-.about-section p:last-child {
-  margin-bottom: 0;
-}
-
-.skills-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-
-.skill-item {
-  padding: 16px;
-  background: var(--c-bg-1);
-  border-radius: 10px;
-  transition: background 0.3s;
-}
-
-.skill-item:hover {
-  background: var(--c-bg-2);
-}
-
-.skill-name {
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--c-text);
-}
-
-.skill-bar {
-  height: 6px;
-  background: var(--border);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.skill-fill {
   height: 100%;
-  background: var(--c-primary);
-  border-radius: 3px;
+  background: var(--c-bg-1);
 }
 
-.skill-percent {
-  font-size: 0.68rem;
-  color: var(--c-text-2);
-  text-align: right;
-  margin-top: 4px;
-}
-
-.about-timeline {
-  position: relative;
-  padding-left: 20px;
-}
-
-.about-timeline::before {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--border);
-}
-
-.about-timeline-item {
-  position: relative;
-  margin-bottom: 20px;
-  padding-left: 16px;
-  transition: transform 0.2s;
-}
-
-.about-timeline-item:hover {
-  transform: translateX(4px);
-}
-
-.about-timeline-item::before {
-  content: '';
-  position: absolute;
-  left: -20px;
-  top: 6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--c-primary);
-  box-shadow: 0 0 0 2px var(--c-primary-soft);
-}
-
-.about-timeline-date {
-  font-size: 0.7rem;
-  color: var(--c-primary);
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.about-timeline-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  margin-bottom: 4px;
-  color: var(--c-text);
-}
-
-.about-timeline-desc {
-  font-size: 0.78rem;
-  color: var(--c-text-2);
-  line-height: 1.6;
-}
-
-.sidebar-right {
-  width: var(--right-w);
-  flex-shrink: 0;
-  padding: 24px 16px;
+.about-scroll {
+  width: 100%;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  overscroll-behavior-y: contain;
 }
 
-.right-card {
-  background: var(--ld-bg-card);
-  border-radius: 12px;
-  padding: 18px;
-  box-shadow: 0 2px 4px var(--ld-shadow);
-  transition: all 0.2s;
+.about-page {
+  width: min(1120px, calc(100% - 64px));
+  margin: 32px auto 72px;
+  border: 1px solid var(--border);
+  background: var(--c-bg);
+  box-shadow: 0 18px 60px color-mix(in srgb, var(--c-text) 8%, transparent);
 }
 
-.right-card-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  margin-bottom: 14px;
-  padding-bottom: 10px;
+.profile-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: 92px minmax(220px, 320px) minmax(0, 1fr);
+  min-height: 430px;
   border-bottom: 1px solid var(--border);
-  letter-spacing: 0.05em;
-  color: var(--c-text);
 }
 
-.contact-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.contact-item {
+.profile-index {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 0.78rem;
-  color: var(--c-text);
-}
-
-.site-info-list {
-  display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-size: 0.78rem;
-  color: var(--c-text-2);
+  gap: 20px;
+  padding-top: 42px;
+  border-right: 1px solid var(--border);
+  color: var(--c-text-3);
 }
 
-.site-info-item {
+.profile-index span {
+  font-size: .6rem;
+  letter-spacing: .2em;
+  writing-mode: vertical-rl;
+}
+
+.profile-index strong {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+}
+
+.portrait-wrap {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  padding: 44px 32px;
+  background: color-mix(in srgb, var(--c-primary-soft) 28%, var(--c-bg));
 }
 
-.tools-wrap {
+.portrait-frame {
+  position: relative;
+  width: min(230px, 100%);
+  aspect-ratio: 4 / 5;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 48%, var(--border));
+  background: var(--c-bg);
+}
+
+.portrait-frame::before,
+.portrait-frame::after {
+  position: absolute;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-color: var(--c-primary);
+  content: '';
+  pointer-events: none;
+}
+
+.portrait-frame::before {
+  top: -6px;
+  left: -6px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.portrait-frame::after {
+  right: -6px;
+  bottom: -6px;
+  border-right: 2px solid;
+  border-bottom: 2px solid;
+}
+
+.portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(.9) contrast(1.03);
+}
+
+.portrait-caption {
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  letter-spacing: .13em;
+}
+
+.profile-intro {
+  align-self: center;
+  padding: 52px clamp(34px, 6vw, 82px);
+}
+
+.eyebrow,
+.section-kicker,
+.notes-label {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.profile-intro h1 {
+  margin: 14px 0 8px;
+  color: var(--c-text);
+  font-size: 4.7rem;
+  line-height: 1.06;
+}
+
+.role {
+  color: var(--c-text-2);
+  font-size: .84rem;
+  letter-spacing: .08em;
+}
+
+.profile-intro blockquote {
+  max-width: 590px;
+  margin: 38px 0 26px;
+  padding-left: 18px;
+  border-left: 3px solid var(--c-primary);
+  color: var(--c-text-1);
+  font-family: var(--font-wenkai);
+  font-size: 1.12rem;
+  line-height: 1.8;
+}
+
+.status-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px 20px;
+  color: var(--c-text-2);
+  font-size: .72rem;
 }
 
-.tool-tag {
-  padding: 4px 10px;
-  border-radius: 16px;
+.status-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-row .available {
+  color: #1e8b59;
+}
+
+.available i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.social-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 26px;
+}
+
+.social-row a {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  color: var(--c-text-1);
+  font-size: 1rem;
+  place-items: center;
+  transition: background .18s, border-color .18s, color .18s, transform .18s;
+}
+
+.social-row a:hover {
+  border-color: var(--c-primary);
   background: var(--c-primary-soft);
   color: var(--c-primary);
-  font-size: 0.7rem;
+  transform: translateY(-2px);
 }
 
-@media (max-width: 640px) {
-  .about-hero {
-    padding: 28px 16px;
-    margin-bottom: 20px;
+.profile-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.story-column {
+  padding: 60px clamp(34px, 6vw, 76px);
+  border-right: 1px solid var(--border);
+}
+
+.story-section {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 26px;
+}
+
+.story-section + .story-section {
+  margin-top: 72px;
+}
+
+.section-marker {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  font-size: .65rem;
+}
+
+.section-marker i {
+  width: 1px;
+  min-height: 92px;
+  flex: 1;
+  background: var(--border);
+}
+
+.section-content h2 {
+  margin: 7px 0 24px;
+  color: var(--c-text);
+  font-size: 1.55rem;
+}
+
+.introduction {
+  color: var(--c-text-2);
+  font-size: .88rem;
+  line-height: 2;
+}
+
+.introduction p + p {
+  margin-top: 14px;
+}
+
+.timeline-list {
+  list-style: none;
+}
+
+.timeline-list li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 66px 1fr;
+  gap: 20px;
+  padding: 0 0 28px 18px;
+  border-left: 1px solid var(--border);
+}
+
+.timeline-list li:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-list li::before {
+  position: absolute;
+  top: 5px;
+  left: -4px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--c-bg);
+  border-radius: 50%;
+  background: var(--c-primary);
+  box-shadow: 0 0 0 1px var(--c-primary);
+  content: '';
+}
+
+.timeline-list time {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.timeline-list h3 {
+  margin-bottom: 5px;
+  color: var(--c-text);
+  font-size: .88rem;
+}
+
+.timeline-list p {
+  color: var(--c-text-2);
+  font-size: .76rem;
+  line-height: 1.7;
+}
+
+.profile-notes {
+  background: var(--c-bg-1);
+}
+
+.notes-block {
+  padding: 34px 30px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notes-label {
+  margin-bottom: 22px;
+}
+
+.facts-block dl {
+  display: grid;
+  gap: 15px;
+}
+
+.facts-block dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.facts-block dt {
+  color: var(--c-text-3);
+  font-size: .7rem;
+}
+
+.facts-block dd {
+  color: var(--c-text-1);
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.skill-list {
+  display: grid;
+  gap: 18px;
+}
+
+.skill-row > div {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--c-text-1);
+  font-size: .72rem;
+}
+
+.skill-row strong {
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+}
+
+.skill-track {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  background: var(--c-bg-3);
+}
+
+.skill-track i {
+  display: block;
+  height: 100%;
+  background: var(--c-primary);
+}
+
+.tool-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tool-list span {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  color: var(--c-text-2);
+  font-size: .7rem;
+}
+
+.tool-list b {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: .55rem;
+}
+
+.signature {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
+  padding: 36px 30px 46px;
+  color: var(--c-text-3);
+  font-size: .62rem;
+}
+
+.signature strong {
+  color: var(--c-text-1);
+  font-family: var(--font-wenkai);
+  font-size: 1.45rem;
+  font-weight: 400;
+}
+
+@media (max-width: 980px) {
+  .about-page {
+    width: min(100% - 32px, 820px);
   }
 
-  .about-avatar {
-    width: 82px;
-    height: 82px;
-    margin-bottom: 16px;
+  .profile-header {
+    grid-template-columns: 70px 250px minmax(0, 1fr);
   }
 
-  .about-name {
-    font-size: 1.3rem;
+  .profile-body {
+    grid-template-columns: minmax(0, 1fr) 270px;
   }
 
-  .about-slogan {
-    font-size: 0.84rem;
+  .story-column {
+    padding-right: 36px;
+    padding-left: 36px;
+  }
+}
+
+@media (max-width: 900px) {
+  .about-scroll {
+    padding-top: max(64px, calc(env(safe-area-inset-top) + 58px));
   }
 
-  .about-section {
-    padding: 20px 16px;
-    margin-bottom: 14px;
+  .profile-intro h1 {
+    font-size: 3.3rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .about-page {
+    width: 100%;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
   }
 
-  .skills-grid {
+  .profile-header {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .profile-index {
+    grid-row: span 2;
+  }
+
+  .portrait-wrap {
+    padding: 32px 24px 24px;
+  }
+
+  .portrait-frame {
+    width: min(210px, 72vw);
+  }
+
+  .profile-intro {
+    padding: 32px 26px 42px;
+  }
+
+  .profile-intro h1 {
+    font-size: 2.5rem;
+  }
+
+  .profile-intro blockquote {
+    margin-top: 28px;
+  }
+
+  .profile-body {
     grid-template-columns: 1fr;
-    gap: 10px;
   }
 
-  .skill-item {
-    padding: 13px;
+  .story-column {
+    padding: 44px 24px;
+    border-right: 0;
+  }
+
+  .profile-notes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--border);
+  }
+
+  .notes-block,
+  .signature {
+    border-right: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 520px) {
+  .profile-header {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .profile-index {
+    padding-top: 26px;
+  }
+
+  .profile-index span {
+    font-size: .5rem;
+  }
+
+  .portrait-wrap {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .profile-intro {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .profile-intro h1 {
+    font-size: 2.1rem;
+  }
+
+  .story-column {
+    padding-right: 18px;
+    padding-left: 14px;
+  }
+
+  .story-section {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 15px;
+  }
+
+  .timeline-list li {
+    grid-template-columns: 52px 1fr;
+    gap: 12px;
+  }
+
+  .profile-notes {
+    grid-template-columns: 1fr;
+  }
+
+  .notes-block,
+  .signature {
+    border-right: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social-row a {
+    transition: none;
   }
 }
 </style>

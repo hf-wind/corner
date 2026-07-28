@@ -4,9 +4,14 @@
       <div v-if="chatOpen" class="pet-chat" role="dialog" aria-label="和哆啦A梦聊天">
         <header class="pet-chat-head">
           <div class="pet-chat-title">
-            <span class="pet-dot" />
+            <span class="pet-chat-avatar" aria-hidden="true">
+              <Icon name="ph:sparkle-fill" />
+            </span>
             <div>
-              <strong>{{ displayName }}</strong>
+              <div class="pet-name-row">
+                <strong>{{ displayName }}</strong>
+                <span class="pet-online">在线</span>
+              </div>
               <p>{{ description }}</p>
               <span v-if="isArticleMode" class="pet-context-label">正在陪你读这篇文章</span>
             </div>
@@ -18,9 +23,13 @@
 
         <div ref="listRef" class="pet-chat-list">
           <div v-for="(m, i) in messages" :key="i" class="pet-msg" :class="m.role">
-            <div class="pet-bubble">{{ m.content }}</div>
+            <template v-if="m.role === 'assistant'">
+              <div v-if="m.streaming && m.content" class="pet-bubble pet-streaming">{{ m.content }}</div>
+              <div v-else-if="!m.streaming" class="pet-bubble pet-markdown" v-html="renderMarkdown(m.content)" />
+            </template>
+            <div v-else class="pet-bubble">{{ m.content }}</div>
           </div>
-          <div v-if="sending" class="pet-msg assistant">
+          <div v-if="sending && !streamStarted" class="pet-msg assistant">
             <div class="pet-bubble typing">
               <span /><span /><span />
             </div>
@@ -66,11 +75,30 @@
 </template>
 
 <script setup lang="ts">
+import MarkdownIt from 'markdown-it'
 import petMeta from '~/assets/dram/pet.json'
 const spriteUrl = '/dram/spritesheet.webp'
 
+const markdown = new MarkdownIt({
+  html: false,
+  breaks: true,
+  linkify: true,
+  typographer: true,
+})
+
+const defaultLinkOpen = markdown.renderer.rules.link_open
+markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  tokens[idx].attrSet('target', '_blank')
+  tokens[idx].attrSet('rel', 'noopener noreferrer')
+  return defaultLinkOpen ? defaultLinkOpen(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options)
+}
+
+function renderMarkdown(content: string) {
+  return markdown.render(content || '')
+}
+
 type Role = 'user' | 'assistant'
-interface Msg { role: Role; content: string }
+interface Msg { role: Role; content: string; streaming?: boolean }
 type QuickAction = { label: string; icon: string; prompt: string; kind?: 'summary' }
 type ArticleContext = { title?: string; content?: string; slug?: string }
 
@@ -101,6 +129,7 @@ const api = useApi()
 const { playing: musicPlaying } = useMusicPlayerState()
 const chatOpen = ref(false)
 const sending = ref(false)
+const streamStarted = ref(false)
 const input = ref('')
 const messages = ref<Msg[]>([])
 const listRef = ref<HTMLElement | null>(null)
@@ -108,6 +137,12 @@ const showHint = ref(true)
 const showLoginBubble = ref(false)
 const historyLoaded = ref(false)
 const suppressActions = ref(false)
+let streamController: AbortController | null = null
+let scrollFrame: number | null = null
+let typingBuffer = ''
+let typingTimer: ReturnType<typeof setTimeout> | null = null
+let typingMessageIndex = -1
+let typingDrainResolvers: Array<() => void> = []
 
 const displayName = ref(meta.displayName || '哆啦A梦')
 const description = ref(meta.description || '阿风的伙伴 · 蓝色机器猫')
@@ -262,7 +297,14 @@ async function sendMessage(text: string) {
   if (!text.trim() || sending.value) return
   messages.value.push({ role: 'user', content: text })
   sending.value = true
+  streamStarted.value = false
   await nextTick(scrollBottom)
+
+  const assistantIndex = messages.value.length
+  messages.value.push({ role: 'assistant', content: '', streaming: true })
+  resetTypingBuffer(assistantIndex)
+  streamController?.abort()
+  streamController = new AbortController()
 
   try {
     const article = isArticleMode.value ? {
@@ -270,15 +312,29 @@ async function sendMessage(text: string) {
       content: String(props.article?.content || '').slice(0, 10000),
       slug: props.article?.slug || '',
     } : undefined
-    const res = await api.post<{ reply: string }>('/ai/chat', { message: text, article })
-    messages.value.push({ role: 'assistant', content: res.reply || '……' })
-  } catch {
-    messages.value.push({
-      role: 'assistant',
-      content: '呜，任意门开小差了。稍后再试，或者先逛逛文章吧～',
-    })
+    await api.postStream('/ai/chat/stream', { message: text, article }, ({ event, data }) => {
+      if (event === 'token' && typeof data === 'string') {
+        enqueueTyping(data, assistantIndex)
+      }
+      if (event === 'error') throw new Error(data?.message || 'Stream failed')
+    }, streamController.signal)
+    await waitForTypingDrain()
+    if (!messages.value[assistantIndex].content) {
+      enqueueTyping('……', assistantIndex)
+      await waitForTypingDrain()
+    }
+  } catch (error: any) {
+    if (error?.name !== 'AbortError') {
+      if (!messages.value[assistantIndex].content && !typingBuffer) {
+        enqueueTyping('呜，任意门开小差了。稍后再试，或者先逛逛文章吧～', assistantIndex)
+      }
+      await waitForTypingDrain()
+    }
   } finally {
+    if (messages.value[assistantIndex]) messages.value[assistantIndex].streaming = false
     sending.value = false
+    streamStarted.value = false
+    streamController = null
     await nextTick(scrollBottom)
   }
 }
@@ -321,6 +377,66 @@ function scrollBottom() {
   if (el) el.scrollTop = el.scrollHeight
 }
 
+function queueScrollBottom() {
+  if (scrollFrame !== null) return
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = null
+    scrollBottom()
+  })
+}
+
+function resolveTypingDrain() {
+  const resolvers = typingDrainResolvers
+  typingDrainResolvers = []
+  resolvers.forEach(resolve => resolve())
+}
+
+function resetTypingBuffer(messageIndex: number) {
+  if (typingTimer) clearTimeout(typingTimer)
+  typingTimer = null
+  typingBuffer = ''
+  typingMessageIndex = messageIndex
+  resolveTypingDrain()
+}
+
+function enqueueTyping(text: string, messageIndex: number) {
+  if (!text) return
+  if (typingMessageIndex !== messageIndex) resetTypingBuffer(messageIndex)
+  typingBuffer += text
+  streamStarted.value = true
+  if (!typingTimer) typeNextCharacter()
+}
+
+function typeNextCharacter() {
+  if (!typingBuffer || typingMessageIndex < 0) {
+    typingTimer = null
+    resolveTypingDrain()
+    return
+  }
+
+  const codePoint = typingBuffer.codePointAt(0)
+  if (codePoint === undefined) return
+  const character = String.fromCodePoint(codePoint)
+  typingBuffer = typingBuffer.slice(character.length)
+  const message = messages.value[typingMessageIndex]
+  if (message) message.content += character
+  queueScrollBottom()
+
+  const delay = /[。！？.!?\n]/u.test(character)
+    ? 72
+    : /[，、；：,;:]/u.test(character)
+      ? 38
+      : typingBuffer.length > 120
+        ? 12
+        : 22
+  typingTimer = setTimeout(typeNextCharacter, delay)
+}
+
+function waitForTypingDrain() {
+  if (!typingBuffer && !typingTimer) return Promise.resolve()
+  return new Promise<void>((resolve) => typingDrainResolvers.push(resolve))
+}
+
 onMounted(() => {
   loadPetMeta()
   hintTimer = setTimeout(() => { showHint.value = false }, isArticleMode.value ? 4200 : 6000)
@@ -330,6 +446,12 @@ onUnmounted(() => {
   if (hintTimer) clearTimeout(hintTimer)
   if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
   if (actionRevealTimer) clearTimeout(actionRevealTimer)
+  streamController?.abort()
+  if (scrollFrame !== null) cancelAnimationFrame(scrollFrame)
+  if (typingTimer) clearTimeout(typingTimer)
+  typingTimer = null
+  typingBuffer = ''
+  resolveTypingDrain()
 })
 </script>
 
@@ -429,15 +551,16 @@ onUnmounted(() => {
 }
 
 .pet-chat {
-  width: min(300px, calc(100vw - 32px));
-  height: min(380px, calc(100vh - 140px));
+  width: min(326px, calc(100vw - 32px));
+  height: min(430px, calc(100dvh - 150px));
   display: flex;
   flex-direction: column;
   border-radius: 18px;
-  background: var(--ld-bg-card);
-  box-shadow: 0 18px 48px color-mix(in srgb, #000 22%, var(--ld-shadow));
+  background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-primary-soft));
+  box-shadow: 0 18px 46px color-mix(in srgb, #000 20%, var(--ld-shadow)),
+    0 1px 0 color-mix(in srgb, #fff 60%, transparent) inset;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
 }
 
 .pet-chat-head {
@@ -445,8 +568,11 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-  padding: 14px 14px 12px;
-  background: linear-gradient(135deg, var(--c-primary-soft), transparent 70%);
+  padding: 13px 14px 11px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--c-primary) 16%, transparent), transparent 48%),
+    linear-gradient(135deg, var(--c-primary-soft), transparent 72%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 
 .pet-chat-title {
@@ -455,14 +581,44 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.pet-dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: var(--c-primary);
-  box-shadow: 0 0 0 4px var(--c-primary-soft);
+.pet-chat-avatar {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary) 78%, #fff), var(--c-primary));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--c-primary) 28%, transparent);
   flex-shrink: 0;
+}
+
+.pet-chat-avatar :deep(.icon) {
+  font-size: 1rem;
+}
+
+.pet-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pet-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #22a06b;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.pet-online::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgb(34 197 94 / 12%);
 }
 
 .pet-chat-title strong {
@@ -511,11 +667,13 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px 14px;
+  padding: 12px 13px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: color-mix(in srgb, var(--c-bg-1) 70%, transparent);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--c-primary) 7%, transparent), transparent 35%),
+    color-mix(in srgb, var(--c-bg-1) 74%, transparent);
 }
 
 .pet-msg {
@@ -527,25 +685,109 @@ onUnmounted(() => {
 }
 
 .pet-bubble {
-  max-width: 86%;
-  padding: 9px 12px;
-  border-radius: 14px;
-  font-size: 0.8rem;
-  line-height: 1.55;
+  max-width: 88%;
+  padding: 10px 13px;
+  border-radius: 16px;
+  font-size: 0.81rem;
+  line-height: 1.65;
   word-break: break-word;
 }
 
 .pet-msg.assistant .pet-bubble {
   background: var(--ld-bg-card);
   color: var(--c-text-1);
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 4px 12px var(--ld-shadow);
+  border: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
+  border-bottom-left-radius: 5px;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ld-shadow) 80%, transparent);
 }
 
 .pet-msg.user .pet-bubble {
   background: var(--c-primary);
   color: #fff;
   border-bottom-right-radius: 4px;
+}
+
+.pet-markdown {
+  max-width: 94%;
+}
+
+.pet-streaming {
+  white-space: pre-wrap;
+}
+
+.pet-markdown :deep(> :first-child) {
+  margin-top: 0;
+}
+
+.pet-markdown :deep(> :last-child) {
+  margin-bottom: 0;
+}
+
+.pet-markdown :deep(p) {
+  margin: 0 0 0.62em;
+}
+
+.pet-markdown :deep(ol),
+.pet-markdown :deep(ul) {
+  margin: 0.5em 0 0.65em;
+  padding-left: 1.55em;
+}
+
+.pet-markdown :deep(li) {
+  padding-left: 0.15em;
+}
+
+.pet-markdown :deep(li + li) {
+  margin-top: 0.42em;
+}
+
+.pet-markdown :deep(li::marker) {
+  color: var(--c-primary);
+  font-weight: 700;
+}
+
+.pet-markdown :deep(strong) {
+  color: var(--c-text);
+  font-weight: 750;
+}
+
+.pet-markdown :deep(a) {
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--c-primary) 35%, transparent);
+  text-underline-offset: 2px;
+}
+
+.pet-markdown :deep(code) {
+  padding: 0.12em 0.38em;
+  border-radius: 5px;
+  background: var(--c-bg-2);
+  color: var(--c-primary);
+  font-size: 0.9em;
+}
+
+.pet-markdown :deep(pre) {
+  max-width: 100%;
+  margin: 0.65em 0;
+  padding: 10px;
+  overflow-x: auto;
+  border-radius: 10px;
+  background: var(--code-bg);
+}
+
+.pet-markdown :deep(pre code) {
+  padding: 0;
+  background: transparent;
+  color: var(--c-text-1);
+}
+
+.pet-markdown :deep(blockquote) {
+  margin: 0.6em 0;
+  padding: 0.35em 0.75em;
+  border-left: 3px solid var(--c-primary);
+  border-radius: 0 7px 7px 0;
+  background: var(--c-primary-soft);
+  color: var(--c-text-2);
 }
 
 .pet-bubble.typing {
@@ -765,7 +1007,8 @@ onUnmounted(() => {
   }
 
   .ai-pet.is-article {
-    bottom: max(68px, calc(env(safe-area-inset-bottom) + 58px));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(64px, calc(env(safe-area-inset-bottom) + 56px));
   }
 
   .pet-hint {
@@ -773,13 +1016,14 @@ onUnmounted(() => {
   }
 
   .pet-fab {
-    scale: 0.86;
+    scale: 0.78;
     transform-origin: right bottom;
   }
 
   .pet-chat {
-    width: min(320px, calc(100vw - 24px));
-    height: min(420px, calc(100dvh - 96px));
+    width: min(326px, calc(100vw - 20px));
+    height: min(420px, calc(62dvh - env(safe-area-inset-bottom)));
+    border-radius: 16px;
   }
 
   .pet-actions {

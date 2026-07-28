@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="page-layout">
     <main class="main-content">
-      <FeaturedSwiper :ready="!loading" />
+      <FeaturedSwiper />
 
       <div class="section-title">· 最新文章</div>
 
@@ -30,6 +30,7 @@
           <ArticleCard
             v-for="(article, i) in articles"
             :key="article.slug"
+            :style="{ '--article-index': i }"
             :eager="i < 2"
             :priority="i === 0"
             v-bind="article"
@@ -37,11 +38,11 @@
         </div>
       </div>
 
-      <FloatingPagination v-model="page" :total="totalPages" @change="loadArticles" />
+      <FloatingPagination v-model="page" :total="totalPages" variant="articles" @change="loadArticles" />
     </main>
 
     <aside class="sidebar-right">
-      <RadarChart />
+      <HomeSidebar />
     </aside>
 
     <ClientOnly>
@@ -122,6 +123,8 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-behavior: auto;
 }
 
 .section-title {

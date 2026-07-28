@@ -89,18 +89,19 @@ function saveScroll() {
   border-radius: 10px;
   overflow: hidden;
   background: var(--ld-bg-card);
+  border: 1px solid transparent;
   box-shadow: 0 1px 3px var(--ld-shadow);
   cursor: pointer;
   text-decoration: none;
   color: inherit;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  content-visibility: auto;
-  contain-intrinsic-size: 110px;
-  contain: layout paint style;
+  contain: layout paint;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+  animation: article-card-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--article-index, 0) * 36ms);
 }
 .article-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px var(--ld-shadow), 0 0 0 1px color-mix(in srgb, var(--c-primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--c-primary) 28%, transparent);
+  background: color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft));
 }
 
 .card-cover {
@@ -125,10 +126,13 @@ function saveScroll() {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.4s ease;
 }
-.article-card:hover .card-cover img {
-  transform: scale(1.06);
+
+.article-card:hover .card-title { color: var(--c-primary); }
+
+@keyframes article-card-enter {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 .card-body {
@@ -170,6 +174,7 @@ function saveScroll() {
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  transition: color 0.18s ease;
 }
 
 .card-desc {
@@ -231,8 +236,9 @@ function saveScroll() {
 
 @media (prefers-reduced-motion: reduce) {
   .article-card,
-  .card-cover img {
+  .card-title {
     transition: none;
+    animation: none;
   }
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <AdminMomentComposer />
+  <AdminAiCreator initial-mode="moment" />
 </template>
 
 <script setup lang="ts">

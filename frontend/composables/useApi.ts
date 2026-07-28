@@ -39,6 +39,51 @@ export function useApi() {
       })
       return handleResponse<T>(res)
     },
+    async postStream(
+      path: string,
+      body: any,
+      onEvent: (event: { event: string; data: any }) => void,
+      signal?: AbortSignal,
+    ): Promise<void> {
+      const response = await fetch(`${base()}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(body),
+        signal,
+      })
+      if (!response.ok) throw new Error(`Request failed (${response.status})`)
+      if (!response.body) throw new Error('Streaming response is not supported')
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      const dispatch = (block: string) => {
+        if (!block.trim()) return
+        let event = 'message'
+        const dataLines: string[] = []
+        for (const line of block.split(/\r?\n/)) {
+          if (line.startsWith('event:')) event = line.slice(6).trim()
+          else if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart())
+        }
+        const raw = dataLines.join('\n')
+        if (!raw) return
+        let data: any = raw
+        try { data = JSON.parse(raw) } catch { /* plain text SSE payload */ }
+        onEvent({ event, data })
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const blocks = buffer.split(/\r?\n\r?\n/)
+        buffer = blocks.pop() || ''
+        blocks.forEach(dispatch)
+      }
+      buffer += decoder.decode()
+      if (buffer) dispatch(buffer)
+    },
     async put<T = any>(path: string, body?: any): Promise<T> {
       const res = await $fetch(`${base()}${path}`, {
         method: 'PUT',

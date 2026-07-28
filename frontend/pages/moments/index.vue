@@ -1,127 +1,137 @@
 <template>
-  <div class="moments-page">
-    <section class="moments-hero">
-      <div class="hero-copy">
-        <p class="hero-eyebrow">Moments</p>
-        <h1>把零碎日常，认真摆放在一起</h1>
-        <p>
-          这里不是首页的附属分页，而是一条单独的动态流。会放一些短想法、日常切片、
-          图片记录和临时冒出来的小情绪。
-        </p>
+  <div class="page-layout">
+    <main class="main-content moments-main">
+      <div class="ambient ambient-one" aria-hidden="true" />
+      <div class="moments-shell">
+        <section class="moments-hero">
+          <div class="hero-copy">
+            <span class="hero-kicker"><i /> MOMENTS · 日常手记</span>
+            <h1>日常不必完整，<em>记住一瞬就好。</em></h1>
+            <p>随手收藏生活里的光线、声音和没有说完的话。</p>
+          </div>
+          <div class="hero-count"><strong>{{ total }}</strong><span>篇生活切片</span></div>
+          <div class="hero-mark" aria-hidden="true"><Icon name="ph:sparkle" /></div>
+          <span class="hero-stamp">DAILY<br>JOURNAL</span>
+        </section>
+
+        <div class="content-grid">
+          <section class="feed-section" aria-labelledby="moment-stream-title">
+            <header class="stream-header">
+              <div><span>RECENT NOTES</span><h2 id="moment-stream-title">最近记录</h2></div>
+              <small><Icon name="ph:arrow-down" /> 从新到旧</small>
+            </header>
+
+            <div v-if="loading && !moments.length" class="moment-skeletons" aria-label="正在加载瞬间">
+              <div v-for="i in 5" :key="i" class="moment-skeleton"><i /><div><b /><span /><em /></div></div>
+            </div>
+
+            <div v-else-if="!moments.length" class="moment-empty">
+              <span><Icon name="ph:paper-plane-tilt" /></span>
+              <h3>这一页还很安静</h3>
+              <p>下一段值得记住的小事，会从这里开始。</p>
+            </div>
+
+            <div v-else class="moment-list">
+              <MomentCard
+                v-for="moment in moments"
+                :key="moment.slug"
+                :moment="moment"
+                :initially-expanded-comments="moment.slug === focusSlug"
+              />
+            </div>
+
+            <div v-if="page < totalPages" class="load-more">
+              <button type="button" :disabled="loadingMore" @click="loadMore">
+                <Icon :name="loadingMore ? 'ph:spinner-gap' : 'ph:plus'" :class="{ spinning: loadingMore }" />
+                {{ loadingMore ? '加载中…' : '再看一些' }}
+              </button>
+            </div>
+          </section>
+
+          <aside class="moments-sidebar">
+            <section class="side-card overview-card">
+              <header><span><Icon name="ph:chart-donut" />记录概览</span><small>当前加载</small></header>
+              <div class="overview-grid">
+                <div><strong>{{ total }}</strong><span>全部记录</span></div>
+                <div><strong>{{ visibleImageCount }}</strong><span>图片切片</span></div>
+                <div><strong>{{ visibleCommentCount }}</strong><span>收到回应</span></div>
+              </div>
+              <p v-if="latestDate"><i />最近更新于 {{ latestDate }}</p>
+            </section>
+
+            <section v-if="recentIndex.length" class="side-card index-card">
+              <header><span><Icon name="ph:list-dashes" />这一页</span><small>{{ recentIndex.length }} 条</small></header>
+              <button v-for="(moment, index) in recentIndex" :key="moment.slug" type="button" @click="scrollToMoment(moment.slug)">
+                <em>{{ String(index + 1).padStart(2, '0') }}</em>
+                <span>{{ moment.title }}</span>
+                <Icon name="ph:arrow-up-right" />
+              </button>
+            </section>
+
+            <section class="side-card note-card">
+              <Icon name="ph:quotes-fill" />
+              <p>生活的大部分，本来就由不值得发朋友圈的小事组成。</p>
+              <span>把它们留在这里。</span>
+            </section>
+          </aside>
+        </div>
       </div>
-
-      <div class="hero-stats">
-        <article>
-          <strong>{{ total }}</strong>
-          <span>公开瞬间</span>
-        </article>
-        <article>
-          <strong>{{ sort === 'popular' ? '热度' : '时间' }}</strong>
-          <span>{{ sort === 'popular' ? '按互动排序' : '按最新时间线' }}</span>
-        </article>
-      </div>
-    </section>
-
-    <section class="toolbar-card">
-      <div class="toolbar-copy">
-        <span class="toolbar-title">浏览方式</span>
-        <p>切换一下节奏，看看是按时间翻，还是按热度翻。</p>
-      </div>
-      <a-segmented
-        v-model:value="sort"
-        :options="sortOptions"
-        @change="changeSort"
-      />
-    </section>
-
-    <div v-if="loading && !moments.length" class="moment-skeletons">
-      <div v-for="i in 4" :key="i" class="moment-skeleton" />
-    </div>
-
-    <div v-else-if="!moments.length" class="moment-empty">
-      <Icon name="ph:sparkle-bold" />
-      <strong>还没有瞬间</strong>
-      <span>晚点再来看看，也许会多出一张生活便签。</span>
-    </div>
-
-    <div v-else class="moment-list">
-      <MomentCard v-for="moment in moments" :key="moment.slug" :moment="moment" />
-    </div>
-
-    <div v-if="totalPages > 1" class="load-more">
-      <a-button
-        size="large"
-        :loading="loadingMore"
-        :disabled="page >= totalPages"
-        @click="loadMore"
-      >
-        {{ page >= totalPages ? '已经翻到底了' : loadingMore ? '正在加载...' : '继续往下翻' }}
-      </a-button>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
+import { extractMomentImages } from '~/utils/moment'
+
 const api = useApi()
+const route = useRoute()
 const loading = ref(true)
 const loadingMore = ref(false)
 const page = ref(1)
 const total = ref(0)
 const totalPages = ref(1)
-const sort = ref<'latest' | 'popular'>('latest')
 const moments = ref<any[]>([])
+const focusSlug = computed(() => String(route.query.focus || ''))
+const visibleImageCount = computed(() => moments.value.reduce((sum, item) => sum + extractMomentImages(item.content).length, 0))
+const visibleCommentCount = computed(() => moments.value.reduce((sum, item) => sum + Number(item.commentCount || 0), 0))
+const recentIndex = computed(() => moments.value.slice(0, 5))
+const latestDate = computed(() => formatSidebarDate(moments.value[0]?.publishedAt || moments.value[0]?.createdAt))
 
-const sortOptions = [
-  { label: '最新', value: 'latest' },
-  { label: '热门', value: 'popular' },
-]
+function formatSidebarDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
+}
+
+function scrollToMoment(slug: string) {
+  document.getElementById(`moment-${slug}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
 
 async function fetchMoments(targetPage = 1, append = false) {
   if (append) loadingMore.value = true
   else loading.value = true
-
   try {
-    const res = await api.get<any>('/moments', {
-      page: targetPage,
-      limit: 10,
-      sort: sort.value,
-    })
-
+    const res = await api.get<any>('/moments', { page: targetPage, limit: 10, sort: 'latest' })
     const nextItems = (res.items ?? []).map((item: any) => ({
-      slug: item.slug,
-      title: item.title,
-      content: item.content,
-      excerpt: item.excerpt,
-      publishedAt: item.publishedAt,
-      createdAt: item.createdAt,
-      likeCount: item.likeCount ?? 0,
-      commentCount: item.commentCount ?? item._count?.comments ?? 0,
-      viewCount: item.viewCount ?? 0,
+      id: item.id, slug: item.slug, title: item.title, content: item.content, excerpt: item.excerpt,
+      publishedAt: item.publishedAt, createdAt: item.createdAt, likeCount: item.likeCount ?? 0,
+      commentCount: item.commentCount ?? item._count?.comments ?? 0, liked: !!item.liked,
     }))
-
     if (append) {
       const existing = new Set(moments.value.map((item) => item.slug))
       moments.value.push(...nextItems.filter((item: any) => !existing.has(item.slug)))
-    } else {
-      moments.value = nextItems
-    }
-
+    } else moments.value = nextItems
     page.value = targetPage
     total.value = res.total ?? moments.value.length
     totalPages.value = res.totalPages ?? 1
+    if (!append && focusSlug.value) {
+      await nextTick()
+      document.getElementById(`moment-${focusSlug.value}`)?.scrollIntoView({ block: 'start' })
+    }
   } catch {
-    if (!append) moments.value = []
-    total.value = append ? total.value : 0
-    totalPages.value = append ? totalPages.value : 1
-  } finally {
-    loading.value = false
-    loadingMore.value = false
-  }
-}
-
-async function changeSort() {
-  page.value = 1
-  await fetchMoments(1)
+    if (!append) { moments.value = []; total.value = 0; totalPages.value = 1 }
+  } finally { loading.value = false; loadingMore.value = false }
 }
 
 async function loadMore() {
@@ -130,180 +140,34 @@ async function loadMore() {
   await fetchMoments(nextPage, true)
 }
 
-onMounted(() => {
-  void fetchMoments(1)
-})
-
+onMounted(() => { void fetchMoments(1) })
 useHead({ title: '我的瞬间' })
 </script>
 
 <style scoped>
-.moments-page {
-  width: min(1100px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 28px 0 42px;
-}
-
-.moments-hero,
-.toolbar-card {
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, #ffcc70 18%, transparent), transparent 34%),
-    radial-gradient(circle at bottom right, color-mix(in srgb, var(--c-primary) 12%, transparent), transparent 32%),
-    linear-gradient(145deg, color-mix(in srgb, var(--ld-bg-card) 98%, white 2%), color-mix(in srgb, var(--c-bg-2) 85%, transparent));
-  box-shadow: 0 24px 54px color-mix(in srgb, var(--ld-shadow) 16%, transparent);
-}
-
-.moments-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
-  gap: 22px;
-  padding: 30px;
-  border-radius: 34px;
-}
-
-.hero-eyebrow {
-  margin: 0 0 10px;
-  color: var(--c-text-3);
-  font-size: 0.74rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.hero-copy h1 {
-  margin: 0;
-  color: var(--c-text);
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.08;
-}
-
-.hero-copy p:last-child {
-  margin: 16px 0 0;
-  max-width: 640px;
-  color: var(--c-text-2);
-  line-height: 1.9;
-}
-
-.hero-stats {
-  display: grid;
-  gap: 12px;
-  align-content: end;
-}
-
-.hero-stats article {
-  padding: 18px 20px;
-  border-radius: 24px;
-  background: rgb(255 255 255 / 68%);
-  backdrop-filter: blur(12px);
-}
-
-.hero-stats strong {
-  display: block;
-  color: var(--c-text);
-  font-size: 1.8rem;
-}
-
-.hero-stats span {
-  color: var(--c-text-3);
-  font-size: 0.82rem;
-}
-
-.toolbar-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 18px;
-  padding: 18px 20px;
-  border-radius: 26px;
-}
-
-.toolbar-title {
-  display: inline-block;
-  margin-bottom: 4px;
-  color: var(--c-text);
-  font-weight: 700;
-}
-
-.toolbar-copy p {
-  margin: 0;
-  color: var(--c-text-3);
-}
-
-.moment-list {
-  display: grid;
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.moment-empty,
-.moment-skeletons {
-  margin-top: 20px;
-}
-
-.moment-empty {
-  display: grid;
-  min-height: 260px;
-  place-items: center;
-  justify-items: center;
-  gap: 10px;
-  border: 1px dashed color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 28px;
-  color: var(--c-text-3);
-}
-
-.moment-empty strong {
-  color: var(--c-text);
-}
-
-.moment-empty .icon {
-  font-size: 1.8rem;
-}
-
-.moment-skeletons {
-  display: grid;
-  gap: 14px;
-}
-
-.moment-skeleton {
-  height: 200px;
-  border-radius: 26px;
-  background: linear-gradient(90deg, var(--c-bg-2), color-mix(in srgb, var(--c-bg-2) 70%, white 30%), var(--c-bg-2));
-  background-size: 220% 100%;
-  animation: skeleton-wave 1.2s linear infinite;
-}
-
-.load-more {
-  display: flex;
-  justify-content: center;
-  margin-top: 22px;
-}
-
-@keyframes skeleton-wave {
-  from {
-    background-position: 100% 0;
-  }
-
-  to {
-    background-position: -100% 0;
-  }
-}
-
-@media (max-width: 860px) {
-  .moments-page {
-    width: min(100%, calc(100% - 24px));
-    padding-top: max(76px, calc(env(safe-area-inset-top) + 64px));
-  }
-
-  .moments-hero {
-    grid-template-columns: 1fr;
-    padding: 24px;
-    border-radius: 28px;
-  }
-
-  .toolbar-card {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
+.page-layout { display:flex; flex:1; min-height:0; overflow:hidden; }
+.moments-main { position:relative; flex:1; min-width:0; min-height:0; padding:24px 28px 52px; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; }
+.ambient { position:absolute; border-radius:50%; pointer-events:none; }.ambient-one { top:-180px; right:-130px; width:470px; height:470px; background:radial-gradient(circle,color-mix(in srgb,var(--c-primary) 8%,transparent),transparent 69%); }
+.moments-shell { position:relative; width:100%; margin:0 auto; }
+.moments-hero { position:relative; display:flex; min-height:176px; align-items:center; justify-content:space-between; gap:34px; padding:30px 34px; overflow:hidden; border:1px solid color-mix(in srgb,var(--border) 72%,transparent); border-radius:18px; background:linear-gradient(135deg,color-mix(in srgb,var(--c-primary-soft) 46%,var(--ld-bg-card)),var(--ld-bg-card) 68%); box-shadow:0 8px 30px color-mix(in srgb,var(--ld-shadow) 30%,transparent); }
+.moments-hero::before { position:absolute; top:30px; bottom:30px; left:0; width:3px; background:linear-gradient(var(--c-primary),transparent); content:''; }
+.hero-copy { position:relative; z-index:1; }.hero-kicker { display:flex; align-items:center; gap:8px; color:var(--c-primary); font-size:.56rem; font-weight:700; letter-spacing:.18em; }.hero-kicker i { width:6px; height:6px; border:2px solid var(--c-primary); border-radius:50%; }
+.hero-copy h1 { margin:12px 0 0; color:var(--c-text); font-size:clamp(1.7rem,3.1vw,2.45rem); line-height:1.25; }.hero-copy h1 em { color:var(--c-primary); font-style:normal; }.hero-copy p { margin:10px 0 0; color:var(--c-text-2); font-size:.74rem; }
+.hero-count { position:relative; z-index:1; display:flex; min-width:112px; flex-direction:column; align-items:flex-end; padding-left:26px; border-left:1px solid var(--border); }.hero-count strong { color:var(--c-text); font-size:2rem; font-variant-numeric:tabular-nums; line-height:1; }.hero-count span { margin-top:7px; color:var(--c-text-3); font-size:.58rem; }
+.hero-mark { position:absolute; right:105px; bottom:-42px; color:var(--c-primary); font-size:8.5rem; opacity:.045; transform:rotate(-9deg); }.hero-stamp { position:absolute; right:8px; bottom:8px; color:var(--c-text-3); font-size:.43rem; letter-spacing:.15em; line-height:1.5; text-align:right; opacity:.55; }
+.content-grid { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:22px; align-items:start; margin-top:24px; }
+.feed-section { min-width:0; }.stream-header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:0 0 12px 62px; }.stream-header span { color:var(--c-primary); font-size:.52rem; font-weight:700; letter-spacing:.18em; }.stream-header h2 { margin:4px 0 0; color:var(--c-text); font-size:1.08rem; }.stream-header small { display:flex; align-items:center; gap:5px; color:var(--c-text-3); font-size:.62rem; }
+.moment-list,.moment-skeletons { display:grid; gap:11px; }
+.moment-skeleton { display:grid; grid-template-columns:50px minmax(0,1fr); gap:12px; }.moment-skeleton>i { width:38px; height:9px; margin-top:17px; border-radius:999px; }.moment-skeleton>div { height:112px; padding:18px; border:1px solid var(--border); border-radius:15px; background:var(--ld-bg-card); }.moment-skeleton>i,.moment-skeleton b,.moment-skeleton span,.moment-skeleton em { display:block; background:linear-gradient(90deg,var(--c-bg-2),var(--ld-bg-card),var(--c-bg-2)); background-size:220% 100%; animation:skeleton-wave 1.25s linear infinite; }.moment-skeleton b { width:38%; height:11px; border-radius:5px; }.moment-skeleton span { width:78%; height:8px; margin-top:14px; border-radius:5px; }.moment-skeleton em { width:58px; height:7px; margin-top:16px; border-radius:5px; }
+.moment-empty { display:flex; min-height:280px; flex-direction:column; align-items:center; justify-content:center; padding:30px; border:1px dashed var(--border); border-radius:16px; color:var(--c-text-3); text-align:center; }.moment-empty>span { display:grid; width:48px; height:48px; margin-bottom:12px; place-items:center; border-radius:15px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.25rem; }.moment-empty h3 { margin:0; color:var(--c-text-2); font-size:.9rem; }.moment-empty p { margin:7px 0 0; font-size:.68rem; }
+.moments-sidebar { position:sticky; top:0; display:grid; gap:12px; }.side-card { padding:16px; border:1px solid color-mix(in srgb,var(--border) 74%,transparent); border-radius:16px; background:color-mix(in srgb,var(--ld-bg-card) 96%,transparent); box-shadow:0 7px 24px color-mix(in srgb,var(--ld-shadow) 30%,transparent); }.side-card header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }.side-card header>span { display:flex; align-items:center; gap:6px; color:var(--c-text-2); font-size:.72rem; font-weight:650; }.side-card header small { color:var(--c-text-3); font-size:.56rem; }
+.overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }.overview-grid div { display:flex; min-width:0; flex-direction:column; padding:9px 5px; border-radius:9px; background:var(--c-bg-1); text-align:center; }.overview-grid strong { color:var(--c-text); font-size:.95rem; font-variant-numeric:tabular-nums; }.overview-grid span { margin-top:3px; color:var(--c-text-3); font-size:.5rem; white-space:nowrap; }.overview-card>p { display:flex; align-items:center; gap:6px; margin:12px 0 0; color:var(--c-text-3); font-size:.57rem; }.overview-card>p i { width:5px; height:5px; border-radius:50%; background:var(--c-primary); box-shadow:0 0 0 3px var(--c-primary-soft); }
+.index-card { padding-bottom:9px; }.index-card button { display:grid; width:100%; grid-template-columns:22px minmax(0,1fr) 14px; align-items:center; gap:7px; padding:8px 2px; border:0; border-top:1px solid color-mix(in srgb,var(--border) 62%,transparent); background:transparent; color:var(--c-text-2); cursor:pointer; text-align:left; font:inherit; }.index-card button:hover { color:var(--c-primary); }.index-card button em { color:var(--c-text-3); font-size:.53rem; font-style:normal; font-variant-numeric:tabular-nums; }.index-card button span { overflow:hidden; font-size:.65rem; text-overflow:ellipsis; white-space:nowrap; }.index-card button :deep(svg) { color:var(--c-text-3); font-size:.7rem; }
+.note-card { position:relative; overflow:hidden; background:linear-gradient(145deg,var(--c-primary-soft),var(--ld-bg-card)); }.note-card> :deep(svg) { color:var(--c-primary); font-size:1.2rem; opacity:.75; }.note-card p { margin:11px 0 0; color:var(--c-text-2); font-size:.68rem; line-height:1.75; }.note-card span { display:block; margin-top:7px; color:var(--c-text-3); font-size:.57rem; }
+.load-more { display:flex; justify-content:center; margin-top:18px; }.load-more button { display:flex; align-items:center; gap:6px; padding:7px 12px; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); color:var(--c-text-3); cursor:pointer; font:inherit; font-size:.67rem; }.load-more button:hover:not(:disabled) { color:var(--c-primary); }.load-more button:disabled { cursor:wait; opacity:.6; }.spinning { animation:spin .8s linear infinite; }
+@keyframes skeleton-wave { from { background-position:100% 0; } to { background-position:-100% 0; } } @keyframes spin { to { transform:rotate(360deg); } }
+@media (max-width:980px) { .content-grid { grid-template-columns:minmax(0,1fr) 230px; } }
+@media (max-width:900px) { .moments-main { padding:max(76px,calc(env(safe-area-inset-top) + 64px)) 18px 38px; }.content-grid { grid-template-columns:1fr; }.moments-sidebar { position:static; grid-template-columns:repeat(2,minmax(0,1fr)); }.note-card { display:none; } }
+@media (max-width:640px) { .moments-hero { min-height:168px; align-items:flex-start; padding:26px 21px; border-radius:16px; }.hero-copy h1 { max-width:270px; font-size:1.7rem; }.hero-copy p { max-width:255px; font-size:.68rem; line-height:1.7; }.hero-count { position:absolute; right:20px; bottom:20px; min-width:auto; padding-left:0; border:0; }.hero-count strong { font-size:1.45rem; }.hero-mark { right:25px; }.content-grid { margin-top:20px; }.stream-header { margin-left:1px; }.moments-sidebar { display:none; }.moment-list,.moment-skeletons { gap:9px; }.moment-skeleton { grid-template-columns:1fr; }.moment-skeleton>i { display:none; } }
+@media (prefers-reduced-motion:reduce) { .moment-skeleton>i,.moment-skeleton b,.moment-skeleton span,.moment-skeleton em,.spinning { animation:none; } }
 </style>
