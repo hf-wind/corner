@@ -238,10 +238,14 @@ function goPanel() {
 }
 
 function handleLogout() {
-  const toast = useToast()
   clearSession()
-  toast.success('已退出登录')
-  router.push('/home')
+  try {
+    const toast = useToast()
+    toast.success('已退出登录')
+  } catch {
+    // ignore
+  }
+  router.replace('/home')
 }
 
 onMounted(() => {

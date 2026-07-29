@@ -138,7 +138,7 @@ async function loadLogs() {
     if (filterType.value) params.type = filterType.value
     if (filterStatus.value) params.status = filterStatus.value
 
-    const res = await api.get<any>('/email/logs', { params })
+    const res = await api.get<any>('/email/logs', params)
     logs.value = res.items || []
     pagination.total = res.total || 0
   } catch (e: any) {
@@ -164,6 +164,7 @@ function getTypeColor(type: string) {
     verification: 'blue',
     comment_notification: 'green',
     reply_notification: 'purple',
+    comment_moderation_notification: 'cyan',
     like_notification: 'red',
   }
   return colors[type] || 'default'
@@ -174,6 +175,7 @@ function getTypeLabel(type: string) {
     verification: '验证码',
     comment_notification: '评论通知',
     reply_notification: '回复通知',
+    comment_moderation_notification: '评论审核',
     like_notification: '点赞通知',
   }
   return labels[type] || type

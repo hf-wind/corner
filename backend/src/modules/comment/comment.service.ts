@@ -1,7 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { NotificationService } from '../notification/notification.service';
+import { contentPreview } from '../../common/utils/content-preview';
 import { AiService } from '../ai/ai.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 
@@ -90,6 +91,7 @@ export class CommentService {
 
       return {
         id: c.id,
+        userId: c.userId,
         postId: c.postId,
         authorName: c.authorName,
         authorAvatar: c.user?.avatar ?? null,
@@ -102,6 +104,7 @@ export class CommentService {
         replyCount: c._count?.replies ?? 0,
         replies: shown.map((r: any) => ({
           id: r.id,
+          userId: r.userId,
           authorName: r.authorName,
           authorAvatar: r.user?.avatar ?? null,
           content: r.content,
@@ -161,6 +164,7 @@ export class CommentService {
     return {
       items: items.map((r: any) => ({
         id: r.id,
+        userId: r.userId,
         authorName: r.authorName,
         authorAvatar: r.user?.avatar ?? null,
         content: r.content,
@@ -211,6 +215,12 @@ export class CommentService {
     if (resolvedParentId) {
       parentComment = await this.prisma.comment.findUnique({ where: { id: resolvedParentId } });
       if (!parentComment) throw new NotFoundException('Parent comment not found');
+      if (parentComment.postId !== dto.postId) {
+        throw new BadRequestException('Parent comment does not belong to this post');
+      }
+      if (parentComment.userId === userId || (!parentComment.userId && parentComment.authorName === userName)) {
+        throw new ForbiddenException('You cannot reply to your own comment');
+      }
       if (parentComment.parentId) {
         resolvedParentId = parentComment.parentId;
       }
@@ -247,9 +257,13 @@ export class CommentService {
     userName: string,
   ) {
     this.logger.log(`开始审核评论: ${comment.id}`);
+    let approved = true;
+    let reason = 'AI 审核异常，自动通过';
     try {
       const review = await this.aiService.moderateComment(comment.content, post.title);
       this.logger.log(`AI 审核结果: ${JSON.stringify(review)}`);
+      approved = review.approved;
+      reason = review.reason;
 
       await this.prisma.comment.update({
         where: { id: comment.id },
@@ -261,48 +275,79 @@ export class CommentService {
         },
       });
       this.logger.log(`评论 ${comment.id} 状态已更新为: ${review.approved ? 'approved' : 'rejected'}`);
+    } catch (error) {
+      this.logger.error('AI 审核流程异常:', error);
+      approved = true;
+      await this.prisma.comment.update({
+        where: { id: comment.id },
+        data: { status: 'approved', aiReviewResult: 'approved', aiReview: reason, rejectReason: null },
+      });
+    }
 
-      if (review.approved) {
-        await this.sendCommentNotification(post, { ...comment, status: 'approved' }, parentComment, currentUserId);
-
-        if (comment.userId) {
-          await this.notificationService.create(comment.userId, {
-            type: 'system',
-            title: '评论审核通过',
-            content: `你的评论在《${post.title}》已通过审核并发布`,
-            link: `/article/${post.slug || post.id}`,
-          });
-        }
-      } else {
-        if (comment.userId) {
-          await this.notificationService.create(comment.userId, {
-            type: 'system',
-            title: '评论审核未通过',
-            content: `你的评论在《${post.title}》未通过审核：${review.reason}`,
-            link: `/article/${post.slug || post.id}`,
-          });
-        }
-
-        const admins = await this.prisma.user.findMany({
-          where: { role: 'admin' },
-          select: { id: true },
+    const adminEmails = await this.notifyAdminsOfModeration(post, comment, userName, approved, reason);
+    if (approved) {
+      await this.sendCommentNotification(post, { ...comment, status: 'approved' }, parentComment, currentUserId, adminEmails);
+      if (comment.userId) {
+        await this.notificationService.create(comment.userId, {
+          type: 'system',
+          title: '评论审核通过',
+          content: `文章：《${post.title}》\n你的评论：${contentPreview(comment.content)}\n审核结果：已通过并发布`,
+          link: `/article/${post.slug || post.id}`,
         });
-        for (const admin of admins) {
+      }
+    } else if (comment.userId) {
+      await this.notificationService.create(comment.userId, {
+        type: 'system',
+        title: '评论审核未通过',
+        content: `文章：《${post.title}》\n你的评论：${contentPreview(comment.content)}\n审核结果：未通过\n原因：${reason}`,
+        link: `/article/${post.slug || post.id}`,
+      });
+    }
+  }
+
+  private async notifyAdminsOfModeration(
+    post: any,
+    comment: any,
+    userName: string,
+    approved: boolean,
+    reason: string,
+  ): Promise<Set<string>> {
+    const adminEmails = new Set<string>();
+    try {
+      const admins = await this.prisma.user.findMany({
+        where: { role: 'admin' },
+        select: { id: true, username: true, email: true },
+      });
+      await Promise.allSettled(admins.map(async (admin) => {
+        if (!approved) {
           await this.notificationService.create(admin.id, {
             type: 'comment',
             title: '评论审核未通过',
-            content: `${userName} 的评论在《${post.title}》被 AI 拒绝：${review.reason}`,
-            link: `/admin/comments`,
+            content: `文章：《${post.title}》\n评论人：${userName}\n评论内容：${contentPreview(comment.content)}\n拦截原因：${reason}`,
+            link: '/admin/comments',
+          }).catch((error) => {
+            this.logger.error(`发送管理员站内通知失败: ${admin.id}`, error);
           });
         }
-      }
+        if (!admin.email) return;
+        adminEmails.add(admin.email.toLowerCase());
+        await this.emailService.sendCommentModerationNotification({
+          to: admin.email,
+          toName: admin.username,
+          authorName: userName,
+          sourceType: '文章',
+          sourceTitle: post.title,
+          sourceId: post.id,
+          content: comment.content,
+          approved,
+          reason: approved ? undefined : reason,
+          link: '/admin/comments',
+        });
+      }));
     } catch (error) {
-      this.logger.error('AI 审核流程异常:', error);
-      await this.prisma.comment.update({
-        where: { id: comment.id },
-        data: { status: 'approved', aiReview: 'AI 审核异常，自动通过' },
-      });
+      this.logger.error('发送管理员评论审核通知失败:', error);
     }
+    return adminEmails;
   }
 
   private async sendCommentNotification(
@@ -310,14 +355,13 @@ export class CommentService {
     comment: any,
     parentComment: any | null,
     currentUserId: string,
+    excludedEmails = new Set<string>(),
   ) {
     try {
       const postAuthor = await this.prisma.user.findUnique({
         where: { id: post.authorId },
         select: { id: true, username: true, email: true },
       });
-
-      if (!postAuthor || postAuthor.id === currentUserId) return;
 
       if (parentComment && parentComment.userId) {
         const parentAuthor = await this.prisma.user.findUnique({
@@ -329,10 +373,10 @@ export class CommentService {
           await this.notificationService.create(parentAuthor.id, {
             type: 'reply',
             title: '新回复通知',
-            content: `${comment.authorName || '匿名用户'} 回复了你在《${post.title}》的评论`,
+            content: `文章：《${post.title}》\n回复人：${comment.authorName || '匿名用户'}\n你的评论：${contentPreview(parentComment.content)}\n回复内容：${contentPreview(comment.content)}`,
             link: `/article/${post.slug || post.id}`,
           });
-          if (parentAuthor.email) {
+          if (parentAuthor.email && !excludedEmails.has(parentAuthor.email.toLowerCase())) {
             await this.emailService.sendReplyNotification({
               to: parentAuthor.email,
               toName: parentAuthor.username,
@@ -343,14 +387,14 @@ export class CommentService {
             });
           }
         }
-      } else {
+      } else if (postAuthor && postAuthor.id !== currentUserId) {
         await this.notificationService.create(postAuthor.id, {
           type: 'comment',
           title: '新评论通知',
-          content: `${comment.authorName || '匿名用户'} 评论了你的文章《${post.title}》`,
+          content: `文章：《${post.title}》\n评论人：${comment.authorName || '匿名用户'}\n评论内容：${contentPreview(comment.content)}`,
           link: `/article/${post.slug || post.id}`,
         });
-        if (postAuthor.email) {
+        if (postAuthor.email && !excludedEmails.has(postAuthor.email.toLowerCase())) {
           await this.emailService.sendCommentNotification({
             to: postAuthor.email,
             toName: postAuthor.username,
@@ -369,6 +413,7 @@ export class CommentService {
   async toggleLike(commentId: string, userId: string) {
     const comment = await this.prisma.comment.findUnique({ where: { id: commentId } });
     if (!comment) throw new NotFoundException('Comment not found');
+    if (comment.userId === userId) throw new ForbiddenException('You cannot like your own comment');
 
     const existing = await this.prisma.commentLike.findUnique({
       where: { userId_commentId: { userId, commentId } },
@@ -414,7 +459,7 @@ export class CommentService {
       await this.notificationService.create(commentAuthor.id, {
         type: 'like',
         title: '点赞通知',
-        content: `${liker?.username || '匿名用户'} 赞了你在《${post.title}》的评论`,
+        content: `文章：《${post.title}》\n点赞人：${liker?.username || '匿名用户'}\n被点赞的评论：${contentPreview(comment.content)}`,
         link: `/article/${post.slug || post.id}`,
       });
 
@@ -453,7 +498,7 @@ export class CommentService {
       await this.notificationService.create(existing.userId, {
         type: 'system',
         title: '评论审核通过',
-        content: `你的评论在《${existing.post.title}》已通过审核并发布`,
+        content: `文章：《${existing.post.title}》\n你的评论：${contentPreview(existing.content)}\n审核结果：已通过并发布`,
         link: `/article/${existing.post.slug || existing.postId}`,
       });
     }
@@ -482,7 +527,7 @@ export class CommentService {
       await this.notificationService.create(existing.userId, {
         type: 'system',
         title: '评论审核未通过',
-        content: `你的评论在《${existing.post.title}》未通过审核${reason ? `：${reason}` : ''}`,
+        content: `文章：《${existing.post.title}》\n你的评论：${contentPreview(existing.content)}\n审核结果：未通过${reason ? `\n原因：${reason}` : ''}`,
         link: `/article/${existing.post.slug || existing.postId}`,
       });
     }

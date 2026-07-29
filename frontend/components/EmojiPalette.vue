@@ -1,6 +1,13 @@
 <template>
-  <transition name="emoji-panel-fade">
-    <div v-if="open" class="emoji-picker">
+  <span ref="anchorRef" class="emoji-palette-anchor" aria-hidden="true" />
+  <Teleport to="body">
+    <transition name="emoji-panel-fade">
+      <div v-if="open" class="emoji-popover-layer">
+        <div ref="pickerRef" class="emoji-palette-panel" :class="`placement-${resolvedPlacement}`" :style="pickerStyle" role="dialog" aria-label="选择表情">
+          <header class="emoji-picker-head">
+            <strong>{{ activePack?.name || '表情' }}</strong>
+            <button type="button" title="关闭" aria-label="关闭表情面板" @click="emit('close')"><Icon name="ph:x-bold" /></button>
+          </header>
       <div v-if="loading && !packs.length" class="emoji-loading">加载中...</div>
       <template v-else>
         <div class="emoji-sidebar">
@@ -54,8 +61,10 @@
       <div v-show="previewUrl" class="emoji-hover-preview" :style="previewStyle">
         <img :src="mediaUrl(previewUrl)" alt="">
       </div>
-    </div>
-  </transition>
+        </div>
+      </div>
+    </transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -76,10 +85,13 @@ type EmojiPack = {
 
 const props = defineProps<{
   open: boolean
+  placement?: 'auto' | 'top' | 'bottom'
+  anchor?: HTMLElement | null
 }>()
 
 const emit = defineEmits<{
   select: [payload: { char?: string; imageUrl?: string; label?: string }]
+  close: []
 }>()
 
 const api = useApi()
@@ -91,12 +103,127 @@ const pageMap = ref<Record<string, number>>({})
 const loadingMap = ref<Record<string, boolean>>({})
 const previewUrl = ref('')
 const previewStyle = ref<Record<string, string>>({})
+const anchorRef = ref<HTMLElement | null>(null)
+const pickerRef = ref<HTMLElement | null>(null)
+const pickerStyle = ref<Record<string, string>>({})
+const resolvedPlacement = ref<'top' | 'bottom'>('top')
 
 const activePack = computed(() => packs.value[activePackIndex.value] || null)
 
+let positionRetryTimer: ReturnType<typeof setTimeout> | null = null
+
 watch(() => props.open, (value) => {
-  if (value && !packs.value.length) void loadPacks()
-  if (!value) onLeave()
+  if (value) {
+    if (!packs.value.length) void loadPacks()
+    updatePosition()
+  }
+  if (!value) {
+    onLeave()
+    if (positionRetryTimer) { clearTimeout(positionRetryTimer); positionRetryTimer = null }
+  }
+})
+
+function findAnchor(): HTMLElement | null {
+  if (props.anchor) return props.anchor
+  const anchor = anchorRef.value
+  if (!anchor) return null
+  const sibling = anchor.previousElementSibling as HTMLElement | null
+  if (sibling) return sibling
+  const parent = anchor.parentElement
+  if (parent) return parent
+  return anchor
+}
+
+function updatePosition() {
+  if (!props.open) {
+    pickerStyle.value = {}
+    return
+  }
+  const el = findAnchor()
+  if (!el) { useFallbackPosition(); return }
+  const rect = el.getBoundingClientRect()
+  if (rect.width === 0 && rect.height === 0) {
+    if (!positionRetryTimer) {
+      positionRetryTimer = setTimeout(() => {
+        positionRetryTimer = null
+        updatePosition()
+      }, 50)
+    }
+    useFallbackPosition()
+    return
+  }
+
+  positionFromRect(rect)
+}
+
+function positionFromRect(rect: DOMRect) {
+  const viewport = window.visualViewport
+  const viewportLeft = viewport?.offsetLeft ?? 0
+  const viewportTop = viewport?.offsetTop ?? 0
+  const viewportWidth = viewport?.width ?? window.innerWidth
+  const viewportHeight = viewport?.height ?? window.innerHeight
+  const margin = 10
+  const gap = 8
+  const width = Math.min(344, Math.max(0, viewportWidth - margin * 2))
+  const preferredHeight = Math.min(292, Math.max(0, viewportHeight - margin * 2))
+  const spaceAbove = Math.max(0, rect.top - viewportTop - margin - gap)
+  const spaceBelow = Math.max(0, viewportTop + viewportHeight - rect.bottom - margin - gap)
+  const placement = props.placement === 'top' || props.placement === 'bottom'
+    ? props.placement
+    : (spaceAbove >= preferredHeight || spaceAbove > spaceBelow ? 'top' : 'bottom')
+  resolvedPlacement.value = placement
+
+  const height = Math.min(preferredHeight, placement === 'top' ? spaceAbove : spaceBelow)
+  const left = Math.min(
+    viewportLeft + viewportWidth - width - margin,
+    Math.max(viewportLeft + margin, rect.right - width),
+  )
+  const top = placement === 'top'
+    ? rect.top - height - gap
+    : rect.bottom + gap
+  pickerStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  }
+}
+
+function useFallbackPosition() {
+  const anchor = anchorRef.value
+  if (anchor?.parentElement) {
+    const parentRect = anchor.parentElement.getBoundingClientRect()
+    if (parentRect.width > 0 && parentRect.height > 0) {
+      positionFromRect(parentRect)
+      return
+    }
+  }
+  pickerStyle.value = {}
+}
+
+function onDocumentPointerDown(event: PointerEvent) {
+  if (!props.open) return
+  const target = event.target as Node
+  const trigger = findAnchor()
+  if (pickerRef.value?.contains(target) || trigger?.contains(target)) return
+  emit('close')
+}
+
+onMounted(() => {
+  window.addEventListener('resize', updatePosition)
+  window.addEventListener('scroll', updatePosition, true)
+  window.visualViewport?.addEventListener('resize', updatePosition)
+  window.visualViewport?.addEventListener('scroll', updatePosition)
+  document.addEventListener('pointerdown', onDocumentPointerDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updatePosition)
+  window.removeEventListener('scroll', updatePosition, true)
+  window.visualViewport?.removeEventListener('resize', updatePosition)
+  window.visualViewport?.removeEventListener('scroll', updatePosition)
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
+  if (positionRetryTimer) { clearTimeout(positionRetryTimer); positionRetryTimer = null }
 })
 
 async function loadPacks() {
@@ -129,6 +256,7 @@ function emitSelect(item: EmojiItem) {
     imageUrl: item.imageUrl,
     label: item.label,
   })
+  emit('close')
 }
 
 async function onScroll(event: Event) {
@@ -180,20 +308,39 @@ function onLeave() {
 </script>
 
 <style scoped>
-.emoji-picker {
+.emoji-palette-anchor {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 70;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+}
+
+.emoji-popover-layer {
+  position: fixed;
+  z-index: 2400;
+  inset: 0;
+  pointer-events: none;
+}
+
+.emoji-palette-panel {
+  position: fixed;
+  z-index: 1;
   display: flex;
-  width: min(420px, 88vw);
-  height: 380px;
+  width: 344px;
+  height: 292px;
   overflow: hidden;
-  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
   background: var(--ld-bg-card);
+  pointer-events: auto;
   box-shadow:
-    0 22px 44px color-mix(in srgb, var(--ld-shadow) 45%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--border) 65%, transparent);
+    0 18px 46px color-mix(in srgb, var(--ld-shadow) 58%, transparent),
+    0 2px 8px color-mix(in srgb, #000 10%, transparent);
+}
+
+.emoji-picker-head {
+  display: none;
 }
 
 .emoji-panel-fade-enter-active,
@@ -217,24 +364,24 @@ function onLeave() {
 
 .emoji-sidebar {
   display: flex;
-  width: 72px;
+  width: 62px;
   flex-shrink: 0;
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
   background: var(--c-bg-2);
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 .emoji-sidebar button {
-  height: 42px;
+  height: 36px;
   border: 0;
   background: transparent;
   color: var(--c-text-2);
   cursor: pointer;
   font: inherit;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
+  font-size: 0.66rem;
+  letter-spacing: 0;
   transition: background 0.12s ease, color 0.12s ease;
 }
 
@@ -253,26 +400,26 @@ function onLeave() {
 .emoji-grid-wrap {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 8px;
 }
 
 .emoji-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-content: flex-start;
 }
 
 .emoji-item {
   display: grid;
-  width: 56px;
-  height: 56px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border: 0;
-  border-radius: 10px;
+  border-radius: 6px;
   background: transparent;
   cursor: pointer;
-  font-size: 1.8rem;
+  font-size: 1.35rem;
   transition: background 0.12s ease;
 }
 
@@ -281,15 +428,15 @@ function onLeave() {
 }
 
 .emoji-img-item img {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 5px;
   object-fit: contain;
 }
 
 .emoji-hover-preview {
   position: fixed;
-  z-index: 999;
+  z-index: 2;
   pointer-events: none;
 }
 
@@ -300,15 +447,43 @@ function onLeave() {
 }
 
 @media (max-width: 640px) {
-  .emoji-picker {
-    position: fixed;
-    top: auto;
+  .emoji-popover-layer {
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .emoji-palette-panel {
+    border-width: 1px;
+    border-radius: 8px;
+    box-shadow: 0 14px 38px rgb(0 0 0 / 24%);
+  }
+
+  .emoji-picker-head {
+    position: absolute;
+    z-index: 2;
+    top: 0;
     right: 0;
-    bottom: 0;
     left: 0;
-    width: 100%;
-    max-height: 44vh;
-    border-radius: 18px 18px 0 0;
+    display: flex;
+    height: 42px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--ld-bg-card);
+  }
+
+  .emoji-picker-head strong { color: var(--c-text-2); font-size: .75rem; }
+  .emoji-picker-head button { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--c-text-2); cursor: pointer; }
+  .emoji-sidebar, .emoji-grid-wrap { margin-top: 42px; }
+  .emoji-sidebar { width: 68px; padding-bottom: 10px; }
+  .emoji-grid-wrap { padding: 8px 10px 14px; }
+  .emoji-grid { gap: 6px; }
+  .emoji-item { width: 44px; height: 44px; }
+  .emoji-img-item img { width: 36px; height: 36px; }
+
+  .emoji-hover-preview {
+    display: none;
   }
 }
 </style>

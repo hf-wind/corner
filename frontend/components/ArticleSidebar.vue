@@ -75,6 +75,9 @@
             <Icon name="ph:x-bold" />
           </button>
         </header>
+        <div class="mobile-catalog-progress" aria-hidden="true">
+          <i :style="{ width: `${percent}%` }" />
+        </div>
         <div ref="mobileCatalogWrapRef" class="mobile-catalog-content" @click="handleMobileCatalogClick">
           <ClientOnly>
             <MdCatalog
@@ -518,7 +521,9 @@ onUnmounted(() => {
     z-index: 1;
     padding: 0;
     border: 0;
-    background: rgb(8 15 30 / 40%);
+    background: rgb(8 15 30 / 46%);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
   }
 
   .mobile-catalog-panel {
@@ -528,15 +533,15 @@ onUnmounted(() => {
     bottom: auto;
     left: auto;
     z-index: 2;
-    width: min(360px, calc(100vw - 24px));
-    max-height: min(72dvh, 560px);
+    width: min(360px, calc(100vw - 20px));
+    max-height: min(74dvh, 580px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
-    border-radius: 18px;
-    background: var(--ld-bg-card);
-    box-shadow: 0 20px 54px rgb(0 0 0 / 22%);
+    border: 1px solid color-mix(in srgb, var(--c-primary) 12%, var(--border));
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-bg-1));
+    box-shadow: 0 24px 64px rgb(0 0 0 / 28%), 0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset;
     transform: translateY(-50%);
   }
 
@@ -545,9 +550,8 @@ onUnmounted(() => {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 14px 15px;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-    background: linear-gradient(135deg, var(--c-primary-soft), transparent 72%);
+    padding: 15px 16px 13px;
+    background: color-mix(in srgb, var(--c-primary-soft) 42%, transparent);
   }
 
   .mobile-catalog-head > div {
@@ -563,7 +567,7 @@ onUnmounted(() => {
 
   .mobile-catalog-head strong {
     color: var(--c-text);
-    font-size: 0.86rem;
+    font-size: 0.9rem;
   }
 
   .mobile-catalog-head > div > div span {
@@ -573,14 +577,15 @@ onUnmounted(() => {
   }
 
   .mobile-catalog-icon {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     display: grid;
     place-items: center;
-    border-radius: 12px;
-    color: #fff;
-    background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary) 78%, #fff), var(--c-primary));
-    box-shadow: 0 8px 20px color-mix(in srgb, var(--c-primary) 24%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c-primary) 18%, transparent);
+    border-radius: 10px;
+    color: var(--c-primary);
+    background: var(--ld-bg-card);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 14%, transparent);
   }
 
   .mobile-catalog-head > button {
@@ -596,10 +601,23 @@ onUnmounted(() => {
     cursor: pointer;
   }
 
+  .mobile-catalog-progress {
+    height: 2px;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--border) 62%, transparent);
+  }
+
+  .mobile-catalog-progress i {
+    display: block;
+    height: 100%;
+    background: var(--c-primary);
+    transition: width 0.25s ease;
+  }
+
   .mobile-catalog-content {
     min-height: 92px;
     overflow-y: auto;
-    padding: 13px 12px 18px;
+    padding: 12px 12px 17px;
     overscroll-behavior: contain;
   }
 
@@ -615,8 +633,9 @@ onUnmounted(() => {
     min-height: 34px;
     display: flex;
     align-items: center;
-    padding: 6px 8px;
-    border-radius: 9px;
+    position: relative;
+    padding: 6px 9px;
+    border-radius: 7px;
     color: var(--c-text-2) !important;
     font-size: 0.76rem;
     line-height: 1.45;
@@ -628,10 +647,20 @@ onUnmounted(() => {
     font-weight: 700;
   }
 
-  .mobile-catalog-content :deep(.md-editor-catalog-indicator) {
+  .mobile-catalog-content :deep(.md-editor-catalog-active > span::before) {
+    content: '';
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: -1px;
     width: 3px;
     border-radius: 999px;
-    background-color: var(--c-primary) !important;
+    background: var(--c-primary);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--c-primary) 32%, transparent);
+  }
+
+  .mobile-catalog-content :deep(.md-editor-catalog-indicator) {
+    display: none;
   }
 
   .mobile-tool-menu-enter-active,

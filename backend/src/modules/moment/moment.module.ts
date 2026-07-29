@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
 import { NotificationModule } from '../notification/notification.module';
+import { EmailModule } from '../email/email.module';
 import { MomentController } from './moment.controller';
 import { MomentService } from './moment.service';
 import { MomentCommentController } from './moment-comment.controller';
 import { MomentCommentService } from './moment-comment.service';
 
 @Module({
-  imports: [AiModule, NotificationModule],
+  imports: [AiModule, EmailModule, NotificationModule],
   controllers: [MomentController, MomentCommentController],
   providers: [MomentService, MomentCommentService],
   exports: [MomentService, MomentCommentService],

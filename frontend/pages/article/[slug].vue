@@ -129,12 +129,7 @@
         </div>
       </div>
 
-      <div v-if="!commentsInitialLoaded" class="comment-section-skeleton article-anim">
-        <span /><span /><span />
-      </div>
-      <ArticleComments v-else class="comments-enter" :post-id="article.id" v-model:comments="comments"
-        :comment-total="commentTotal" v-model:comment-page="commentPage" :comment-total-pages="commentTotalPages"
-        :comment-loading="commentsLoading" @load-more="loadMoreComments" />
+      <ArticleComments :post-id="article.id" />
       </template>
     </main>
 
@@ -151,7 +146,6 @@
 </template>
 
 <script setup lang="ts">
-import type { Comment } from '~/types/article'
 import avatarImg from '~/assets/images/avatar.jpg'
 import { getDisplayImageUrl } from '~/utils/imagePerformance'
 
@@ -167,13 +161,6 @@ const editorId = 'article-preview'
 const article = ref<any>({})
 const prevArticle = ref<any>(null)
 const nextArticle = ref<any>(null)
-const comments = ref<Comment[]>([])
-const commentPage = ref(1)
-const commentTotalPages = ref(1)
-const commentTotal = ref(0)
-const commentsLoading = ref(false)
-const commentsInitialLoaded = ref(false)
-let ignoreCommentPageWatch = false
 
 const shareOpen = ref(false)
 const posterOpen = ref(false)
@@ -222,67 +209,6 @@ async function loadAdjacent() {
     nextArticle.value = adj.next ? { title: adj.next.title, slug: adj.next.slug, date: adj.next.publishedAt?.slice(0, 10) } : null
   } catch { /* keep empty */ }
   finally { adjacentLoaded.value = true }
-}
-
-async function loadComments(page = 1, append = false) {
-  if (!article.value?.id || commentsLoading.value) return
-  commentsLoading.value = true
-  try {
-    const data = await api.get<any>(`/comments/post/${article.value.id}`, { page, limit: 10, replyLimit: 3 })
-    const nextItems = data.items.map((c: any) => ({
-      id: c.id,
-      name: c.authorName ?? '匿名',
-      avatar: c.authorAvatar,
-      time: formatTime(c.createdAt),
-      content: c.content,
-      status: c.status,
-      likes: c.likesCount ?? 0,
-      liked: c.liked ?? false,
-      replyCount: c.replyCount ?? 0,
-      replies: (c.replies ?? []).map((r: any) => ({
-        id: r.id,
-        name: r.authorName ?? '匿名',
-        avatar: r.authorAvatar,
-        time: formatTime(r.createdAt),
-        content: r.content,
-        replyTo: r.replyToName ?? r.parent?.authorName ?? undefined,
-        status: r.status,
-      })),
-    }))
-    if (append) {
-      const ids = new Set(comments.value.map(comment => comment.id))
-      comments.value.push(...nextItems.filter((comment: Comment) => !ids.has(comment.id)))
-    } else {
-      comments.value = nextItems
-    }
-    commentTotal.value = data.total
-    commentTotalPages.value = data.totalPages
-  } catch { /* keep empty */ }
-  finally {
-    commentsLoading.value = false
-    if (page === 1) commentsInitialLoaded.value = true
-  }
-}
-
-async function loadMoreComments() {
-  const nextPage = commentPage.value + 1
-  if (commentsLoading.value || nextPage > commentTotalPages.value) return
-  ignoreCommentPageWatch = true
-  commentPage.value = nextPage
-  await loadComments(nextPage, true)
-}
-
-
-
-function formatTime(iso: string) {
-  const d = new Date(iso)
-  const now = new Date()
-  const diff = Math.floor((now.getTime() - d.getTime()) / 1000)
-  if (diff < 60) return '刚刚'
-  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`
-  if (diff < 2592000) return `${Math.floor(diff / 86400)} 天前`
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function scrollToTop() {
@@ -365,14 +291,6 @@ function checkOutdated() {
   }
 }
 
-watch(commentPage, (page) => {
-  if (ignoreCommentPageWatch) {
-    ignoreCommentPageWatch = false
-    return
-  }
-  loadComments(page)
-})
-
 onMounted(async () => {
   await loadArticle()
   await nextTick()
@@ -386,7 +304,6 @@ onMounted(async () => {
     articleResizeObserver.observe(articleContentRef.value)
   }
   void loadAdjacent()
-  void loadComments(1)
 })
 
 onUnmounted(() => {

@@ -1,5 +1,6 @@
 export interface Reply {
   id: string
+  userId?: string
   name: string
   avatar: string
   time: string
@@ -12,17 +13,19 @@ export interface Reply {
 
 export interface Comment {
   id: string
+  userId?: string
   name: string
   avatar: string
   time: string
   content: string
+  createdAt?: string
   status?: 'pending' | 'approved' | 'rejected'
   hot?: boolean
   author?: boolean
   liked?: boolean
   likes?: number
   replies?: Reply[]
-  pendingReplies?: Reply[]
+  localReplies?: Reply[]
   replyCount?: number
 }
 

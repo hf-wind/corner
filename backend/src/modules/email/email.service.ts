@@ -160,6 +160,8 @@ export class EmailService {
     postTitle: string;
     postId: string;
     content: string;
+    sourceType?: '文章' | '瞬间';
+    link?: string;
     siteUrl?: string;
   }): Promise<void> {
     const config = await this.getEmailConfig();
@@ -168,7 +170,7 @@ export class EmailService {
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【清欢小筑】${data.senderName} 评论了你的文章`,
+      subject: `【清欢小筑】${data.senderName} 评论了你的${data.sourceType || '文章'}`,
       html,
       type: 'comment_notification',
       postId: data.postId,
@@ -184,6 +186,7 @@ export class EmailService {
     postTitle: string;
     postId: string;
     content: string;
+    link?: string;
     siteUrl?: string;
   }): Promise<void> {
     const config = await this.getEmailConfig();
@@ -199,6 +202,32 @@ export class EmailService {
     });
 
     this.logger.log(`回复通知已加入队列: ${data.to}`);
+  }
+
+  async sendCommentModerationNotification(data: {
+    to: string;
+    toName: string;
+    authorName: string;
+    sourceType: '文章' | '瞬间';
+    sourceTitle: string;
+    sourceId: string;
+    content: string;
+    approved: boolean;
+    reason?: string;
+    link: string;
+  }): Promise<void> {
+    const config = await this.getEmailConfig();
+    const html = this.getCommentModerationTemplate({ ...data, siteUrl: config.siteUrl });
+
+    await this.notificationQueue.add('send-notification', {
+      to: data.to,
+      subject: `【清欢小筑】评论审核${data.approved ? '通过' : '未通过'}：${data.sourceTitle}`,
+      html,
+      type: 'comment_moderation_notification',
+      postId: data.sourceId,
+    });
+
+    this.logger.log(`管理员评论审核通知已加入队列: ${data.to}`);
   }
 
   async sendLikeNotification(data: {
@@ -326,6 +355,8 @@ export class EmailService {
     postTitle: string;
     postId: string;
     content: string;
+    sourceType?: '文章' | '瞬间';
+    link?: string;
     siteUrl?: string;
   }): string {
     const siteUrl = data.siteUrl || 'https://corner.example.com';
@@ -346,7 +377,7 @@ export class EmailService {
     
     <p style="color:#666;line-height:1.6;">Hi <strong>${data.toName}</strong>，</p>
     <p style="color:#666;line-height:1.6;">
-      <strong>${data.senderName}</strong> 评论了你的文章 <strong>${data.postTitle}</strong>
+      <strong>${data.senderName}</strong> 评论了你的${data.sourceType || '文章'} <strong>${data.postTitle}</strong>
     </p>
     
       <div style="background:#f8f9fa;border-left:4px solid #5b8def;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
@@ -356,7 +387,7 @@ export class EmailService {
       </div>
       
       <div style="text-align:center;margin-top:32px;">
-        <a href="${siteUrl}/article/${data.postId}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
+        <a href="${data.link ? `${siteUrl}${data.link}` : `${siteUrl}/article/${data.postId}`}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
           查看详情
         </a>
       </div>
@@ -375,6 +406,7 @@ export class EmailService {
     postTitle: string;
     postId: string;
     content: string;
+    link?: string;
     siteUrl?: string;
   }): string {
     const siteUrl = data.siteUrl || 'https://corner.example.com';
@@ -405,7 +437,7 @@ export class EmailService {
       </div>
     
     <div style="text-align:center;margin-top:32px;">
-      <a href="${siteUrl}/article/${data.postId}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
+      <a href="${data.link ? `${siteUrl}${data.link}` : `${siteUrl}/article/${data.postId}`}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
         查看详情
       </a>
     </div>
@@ -413,6 +445,47 @@ export class EmailService {
     <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eee;text-align:center;">
       <p style="color:#999;font-size:12px;margin:0;">此邮件由系统自动发送，请勿直接回复</p>
     </div>
+  </div>
+</body>
+</html>`;
+  }
+
+  private getCommentModerationTemplate(data: {
+    toName: string;
+    authorName: string;
+    sourceType: '文章' | '瞬间';
+    sourceTitle: string;
+    content: string;
+    approved: boolean;
+    reason?: string;
+    link: string;
+    siteUrl: string;
+  }): string {
+    const statusText = data.approved ? '审核通过' : '审核未通过';
+    const statusColor = data.approved ? '#15803d' : '#b91c1c';
+    const statusBackground = data.approved ? '#dcfce7' : '#fee2e2';
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;background:#fff;border-radius:16px;padding:36px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <h1 style="color:#334155;margin:0 0 24px;font-size:22px;">清欢小筑 · 评论审核</h1>
+    <p style="color:#666;line-height:1.6;">Hi <strong>${data.toName}</strong>，以下评论已完成审核。</p>
+    <div style="margin:20px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
+      <p style="margin:0 0 10px;color:#475569;line-height:1.6;">${data.sourceType}：<strong>${data.sourceTitle}</strong></p>
+      <p style="margin:0 0 10px;color:#475569;line-height:1.6;">评论人：<strong>${data.authorName}</strong></p>
+      <div style="padding:12px;background:#f8fafc;border-radius:8px;color:#334155;line-height:1.7;">${this.renderEmailContent(data.content)}</div>
+    </div>
+    <p style="margin:0 0 18px;"><span style="display:inline-block;padding:5px 10px;border-radius:6px;background:${statusBackground};color:${statusColor};font-weight:700;">${statusText}</span></p>
+    ${!data.approved && data.reason ? `<p style="color:#b91c1c;line-height:1.6;">原因：${data.reason}</p>` : ''}
+    <div style="text-align:center;margin-top:28px;">
+      <a href="${data.siteUrl}${data.link}" style="display:inline-block;background:#334155;color:#fff;text-decoration:none;padding:11px 26px;border-radius:8px;font-weight:600;">查看评论管理</a>
+    </div>
+    <p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #eee;color:#999;font-size:12px;text-align:center;">此邮件由系统自动发送</p>
   </div>
 </body>
 </html>`;
