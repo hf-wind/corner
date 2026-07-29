@@ -20,6 +20,8 @@ import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
 import { PreviewKnowledgeDto } from './dto/preview-knowledge.dto';
 import { GenerateArticleDto } from './dto/generate-article.dto';
 import { PolishMomentDto } from './dto/polish-moment.dto';
+import { CreateAiModelConfigDto } from './dto/create-ai-model-config.dto';
+import { UpdateAiModelConfigDto } from './dto/update-ai-model-config.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -123,8 +125,9 @@ export class AiController {
   @Roles('admin')
   async getConfig() {
     const config = await this.ai.getConfig();
+    const { ai_api_key: _apiKey, ...safeConfig } = config;
     return {
-      config,
+      config: safeConfig,
       defaults: this.ai.getDefaults(),
       apiConfigured: await this.ai.isConfigured(),
     };
@@ -135,8 +138,9 @@ export class AiController {
   @Roles('admin')
   async updateConfig(@Body() dto: UpdateAiConfigDto) {
     const config = await this.ai.updateConfig(dto.config || {});
+    const { ai_api_key: _apiKey, ...safeConfig } = config;
     return {
-      config,
+      config: safeConfig,
       defaults: this.ai.getDefaults(),
       apiConfigured: await this.ai.isConfigured(),
     };
@@ -145,8 +149,43 @@ export class AiController {
   @Post('admin/test')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  testConnection() {
-    return this.ai.testConnection();
+  testConnection(@Body() body?: { modelConfigId?: string }) {
+    return this.ai.testConnection(body?.modelConfigId);
+  }
+
+  @Get('admin/models')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  listModels() {
+    return this.ai.listModelConfigs();
+  }
+
+  @Post('admin/models')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  createModel(@Body() dto: CreateAiModelConfigDto) {
+    return this.ai.createModelConfig(dto as unknown as Record<string, unknown>);
+  }
+
+  @Put('admin/models/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  updateModel(@Param('id') id: string, @Body() dto: UpdateAiModelConfigDto) {
+    return this.ai.updateModelConfig(id, dto as unknown as Record<string, unknown>);
+  }
+
+  @Delete('admin/models/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  removeModel(@Param('id') id: string) {
+    return this.ai.removeModelConfig(id);
+  }
+
+  @Post('admin/models/:id/test')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  testModel(@Param('id') id: string) {
+    return this.ai.testConnection(id);
   }
 
   @Post('admin/knowledge/preview')

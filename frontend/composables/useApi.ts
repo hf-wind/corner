@@ -1,6 +1,7 @@
-function authHeaders() {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+function authHeaders(): Record<string, string> {
+  const { token } = useAuth()
+  const accessToken = token.value || localStorage.getItem('token')
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
 }
 
 function base() {
@@ -18,6 +19,36 @@ async function handleResponse<T>(response: any): Promise<T> {
   return response as T
 }
 
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers)
+  for (const [key, value] of Object.entries(authHeaders())) headers.set(key, value)
+
+  let body = options.body
+  if (body && !(body instanceof FormData) && typeof body !== 'string') {
+    headers.set('Content-Type', 'application/json')
+    body = JSON.stringify(body)
+  }
+
+  const response = await fetch(`${base()}${path}`, { ...options, headers, body })
+
+  if (response.status === 401) {
+    const { clearSession } = useAuth()
+    clearSession()
+  }
+
+  const text = response.status === 204 ? '' : await response.text()
+  let payload: any = undefined
+  if (text) {
+    try { payload = JSON.parse(text) } catch { payload = text }
+  }
+
+  if (!response.ok) {
+    const message = payload?.message || payload?.error || `Request failed (${response.status})`
+    throw new Error(String(message))
+  }
+  return handleResponse<T>(payload)
+}
+
 export function useApi() {
   return {
     async get<T = any>(path: string, params?: Record<string, any>): Promise<T> {
@@ -26,18 +57,13 @@ export function useApi() {
           .filter(([_, v]) => v !== undefined && v !== null && v !== '')
           .map(([k, v]) => [k, String(v)])
       ).toString() : ''
-      const res = await $fetch(`${base()}${path}${query}`, {
-        headers: { ...authHeaders() },
-      })
-      return handleResponse<T>(res)
+      return request<T>(`${path}${query}`)
     },
     async post<T = any>(path: string, body?: any): Promise<T> {
-      const res = await $fetch(`${base()}${path}`, {
+      return request<T>(path, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body,
+        body: body as BodyInit,
       })
-      return handleResponse<T>(res)
     },
     async postStream(
       path: string,
@@ -85,27 +111,19 @@ export function useApi() {
       if (buffer) dispatch(buffer)
     },
     async put<T = any>(path: string, body?: any): Promise<T> {
-      const res = await $fetch(`${base()}${path}`, {
+      return request<T>(path, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body,
+        body: body as BodyInit,
       })
-      return handleResponse<T>(res)
     },
     async delete<T = any>(path: string): Promise<T> {
-      const res = await $fetch(`${base()}${path}`, {
-        method: 'DELETE',
-        headers: { ...authHeaders() },
-      })
-      return handleResponse<T>(res)
+      return request<T>(path, { method: 'DELETE' })
     },
     async upload<T = any>(path: string, formData: FormData): Promise<T> {
-      const res = await $fetch(`${base()}${path}`, {
+      return request<T>(path, {
         method: 'POST',
-        headers: { ...authHeaders() },
         body: formData,
       })
-      return handleResponse<T>(res)
     },
   }
 }

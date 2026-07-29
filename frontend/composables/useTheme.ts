@@ -14,7 +14,7 @@ let transitionTimer: ReturnType<typeof setTimeout> | null = null
 export function useTheme(): ThemeContext {
   if (instance) return instance
 
-  const theme: Ref<string> = useState('theme', () => 'light')
+  const theme: Ref<string> = useState('theme', () => 'auto')
   const resolvedTheme = useState<'light' | 'dark'>('resolved-theme', () => 'light')
 
   function setFavicon(mode: string) {
@@ -43,7 +43,7 @@ export function useTheme(): ThemeContext {
   }
 
   function setTheme(mode: string) {
-    const next = ['light', 'dark', 'auto'].includes(mode) ? mode : 'light'
+    const next = ['light', 'dark', 'auto'].includes(mode) ? mode : 'auto'
     document.documentElement.classList.add('theme-switching')
     theme.value = next
     localStorage.setItem('theme', next)
@@ -55,7 +55,7 @@ export function useTheme(): ThemeContext {
   }
 
   function init() {
-    const saved = localStorage.getItem('theme') || 'light'
+    const saved = localStorage.getItem('theme') || 'auto'
     theme.value = saved
     applyTheme()
 

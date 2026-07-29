@@ -92,6 +92,8 @@ export class MusicService {
     id?: string;
     playlistIndex?: number;
     refresh?: boolean;
+    page?: number;
+    limit?: number;
   }) {
     const cfg = await this.getConfig();
     if (!cfg.music_enabled) {
@@ -109,11 +111,21 @@ export class MusicService {
       source = { ...cfg.music_playlists[opts.playlistIndex] };
     }
 
-    const tracks = await this.fetchTracks(source, cfg.music_api, cfg.music_cache_ttl, !!opts?.refresh);
+    const allTracks = await this.fetchTracks(source, cfg.music_api, cfg.music_cache_ttl, !!opts?.refresh);
+    const page = Math.max(1, Number.isFinite(opts?.page) ? Math.floor(opts!.page!) : 1);
+    const limit = Math.max(10, Math.min(100, Number.isFinite(opts?.limit) ? Math.floor(opts!.limit!) : 50));
+    const total = allTracks.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const tracks = allTracks.slice((page - 1) * limit, page * limit);
     return {
       enabled: true,
       source,
       tracks,
+      page,
+      limit,
+      total,
+      totalPages,
+      hasMore: page < totalPages,
       cached: !opts?.refresh,
     };
   }

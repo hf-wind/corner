@@ -17,10 +17,21 @@ export interface ChatMessage {
 
 export interface ChatOptions {
   model?: string;
+  modelConfigId?: string;
   temperature?: number;
   maxTokens?: number;
   thinking?: 'enabled' | 'disabled';
 }
+
+const MODEL_CONFIG_SETTING_KEYS = [
+  'ai_chat_model_config_id',
+  'ai_summarize_model_config_id',
+  'ai_moderate_model_config_id',
+  'ai_friend_moderate_model_config_id',
+  'ai_article_model_config_id',
+  'ai_moment_model_config_id',
+  'ai_library_model_config_id',
+] as const;
 
 @Injectable()
 export class AiService {
@@ -32,26 +43,66 @@ export class AiService {
     private media: MediaService,
   ) {}
 
-  private resolveApiKey(cfg: AiConfig) {
-    return String(cfg.ai_api_key || process.env.DEEPSEEK_API_KEY || '').trim();
+  private envApiKey(provider: string) {
+    const key = String(provider || '').trim().toLowerCase();
+    if (key === 'qwen' || key === 'dashscope') {
+      return String(process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || '').trim();
+    }
+    if (key === 'deepseek') return String(process.env.DEEPSEEK_API_KEY || '').trim();
+    return '';
   }
 
-  private resolveBaseUrl(cfg: AiConfig) {
-    return String(cfg.ai_base_url || process.env.DEEPSEEK_BASE_URL || AI_DEFAULTS.ai_base_url)
-      .trim()
-      .replace(/\/$/, '');
+  private async resolveConnection(cfg: AiConfig, options: ChatOptions = {}) {
+    let record = null;
+    if (options.modelConfigId) {
+      record = await this.prisma.aiModelConfig.findFirst({
+        where: { id: options.modelConfigId, enabled: true },
+      });
+    }
+    if (!record) {
+      record = await this.prisma.aiModelConfig.findFirst({
+        where: { enabled: true, isDefault: true },
+        orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+      });
+    }
+    if (!record) {
+      record = await this.prisma.aiModelConfig.findFirst({
+        where: { enabled: true },
+        orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+      });
+    }
+
+    if (record) {
+      return {
+        provider: record.provider,
+        apiKey: String(record.apiKey || this.envApiKey(record.provider)).trim(),
+        baseUrl: String(record.baseUrl || '').trim().replace(/\/$/, ''),
+        model: String(options.model || record.model || '').trim(),
+      };
+    }
+
+    const provider = String(cfg.ai_provider || 'deepseek').trim();
+    return {
+      provider,
+      apiKey: String(cfg.ai_api_key || this.envApiKey(provider)).trim(),
+      baseUrl: String(
+        cfg.ai_base_url || process.env.DEEPSEEK_BASE_URL || AI_DEFAULTS.ai_base_url,
+      ).trim().replace(/\/$/, ''),
+      model: String(
+        options.model || cfg.ai_model || process.env.DEEPSEEK_MODEL || AI_DEFAULTS.ai_model,
+      ).trim(),
+    };
   }
 
-  private resolveModel(cfg: AiConfig, model?: string) {
-    return String(model || cfg.ai_model || process.env.DEEPSEEK_MODEL || AI_DEFAULTS.ai_model).trim();
-  }
-
-  private hasProviderConfig(cfg: AiConfig) {
-    return Boolean(cfg.ai_enabled && this.resolveApiKey(cfg) && this.resolveBaseUrl(cfg));
+  private async canUseModel(cfg: AiConfig, modelConfigId?: string) {
+    if (!cfg.ai_enabled) return false;
+    const connection = await this.resolveConnection(cfg, { modelConfigId });
+    return Boolean(connection.apiKey && connection.baseUrl && connection.model);
   }
 
   async isConfigured() {
-    return this.hasProviderConfig(await this.getConfig());
+    const cfg = await this.getConfig();
+    return this.canUseModel(cfg);
   }
 
   async getConfig(): Promise<AiConfig> {
@@ -84,12 +135,135 @@ export class AiService {
     return { ...AI_DEFAULTS };
   }
 
-  async testConnection() {
+  private presentModelConfig(model: {
+    id: string;
+    name: string;
+    provider: string;
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    enabled: boolean;
+    isDefault: boolean;
+    sort: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    const key = String(model.apiKey || '');
+    return {
+      ...model,
+      apiKey: '',
+      hasApiKey: Boolean(key || this.envApiKey(model.provider)),
+      apiKeyMasked: key ? `${key.slice(0, 3)}****${key.slice(-4)}` : '',
+    };
+  }
+
+  async listModelConfigs() {
+    const models = await this.prisma.aiModelConfig.findMany({
+      orderBy: [{ isDefault: 'desc' }, { sort: 'asc' }, { createdAt: 'asc' }],
+    });
+    return models.map((model) => this.presentModelConfig(model));
+  }
+
+  async createModelConfig(input: Record<string, unknown>) {
+    const name = String(input.name || '').trim();
+    const provider = String(input.provider || '').trim().toLowerCase();
+    const baseUrl = String(input.baseUrl || '').trim().replace(/\/$/, '');
+    const model = String(input.model || '').trim();
+    if (!name || !provider || !baseUrl || !model) {
+      throw new BadRequestException('名称、服务商、Base URL 和模型标识不能为空');
+    }
+
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const count = await tx.aiModelConfig.count();
+        const isDefault = Boolean(input.isDefault) || count === 0;
+        if (isDefault) await tx.aiModelConfig.updateMany({ data: { isDefault: false } });
+        return tx.aiModelConfig.create({
+          data: {
+            name,
+            provider,
+            apiKey: String(input.apiKey || '').trim(),
+            baseUrl,
+            model,
+            enabled: input.enabled !== false,
+            isDefault,
+            sort: Math.max(0, Number(input.sort) || 0),
+          },
+        });
+      });
+      return this.presentModelConfig(created);
+    } catch (error: any) {
+      if (error?.code === 'P2002') throw new BadRequestException('同一服务商下的配置名称不能重复');
+      throw error;
+    }
+  }
+
+  async updateModelConfig(id: string, input: Record<string, unknown>) {
+    const current = await this.prisma.aiModelConfig.findUnique({ where: { id } });
+    if (!current) throw new NotFoundException('模型配置不存在');
+    const enabled = input.enabled === undefined ? current.enabled : Boolean(input.enabled);
+    const isDefault = input.isDefault === undefined ? current.isDefault : Boolean(input.isDefault);
+    if (isDefault && !enabled) throw new BadRequestException('默认模型必须保持启用');
+
+    try {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        if (isDefault) {
+          await tx.aiModelConfig.updateMany({ where: { id: { not: id } }, data: { isDefault: false } });
+        }
+        return tx.aiModelConfig.update({
+          where: { id },
+          data: {
+            ...(input.name !== undefined ? { name: String(input.name).trim() } : {}),
+            ...(input.provider !== undefined
+              ? { provider: String(input.provider).trim().toLowerCase() }
+              : {}),
+            ...(String(input.apiKey || '').trim() ? { apiKey: String(input.apiKey).trim() } : {}),
+            ...(input.baseUrl !== undefined
+              ? { baseUrl: String(input.baseUrl).trim().replace(/\/$/, '') }
+              : {}),
+            ...(input.model !== undefined ? { model: String(input.model).trim() } : {}),
+            ...(input.sort !== undefined ? { sort: Math.max(0, Number(input.sort) || 0) } : {}),
+            enabled,
+            isDefault,
+          },
+        });
+      });
+      return this.presentModelConfig(updated);
+    } catch (error: any) {
+      if (error?.code === 'P2002') throw new BadRequestException('同一服务商下的配置名称不能重复');
+      throw error;
+    }
+  }
+
+  async removeModelConfig(id: string) {
+    const current = await this.prisma.aiModelConfig.findUnique({ where: { id } });
+    if (!current) throw new NotFoundException('模型配置不存在');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.aiModelConfig.delete({ where: { id } });
+      if (current.isDefault) {
+        const replacement = await tx.aiModelConfig.findFirst({
+          where: { enabled: true },
+          orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+        });
+        if (replacement) {
+          await tx.aiModelConfig.update({ where: { id: replacement.id }, data: { isDefault: true } });
+        }
+      }
+    });
+    for (const key of MODEL_CONFIG_SETTING_KEYS) {
+      const setting = await this.settings.get(key);
+      if (setting === id) await this.settings.set(key, '');
+    }
+    return { success: true };
+  }
+
+  async testConnection(modelConfigId?: string) {
     const cfg = await this.getConfig();
-    if (!this.hasProviderConfig(cfg)) {
+    const connection = await this.resolveConnection(cfg, { modelConfigId });
+    if (!cfg.ai_enabled || !connection.apiKey || !connection.baseUrl || !connection.model) {
       return {
         success: false,
-        message: '请先启用 AI 并填写 API Key 与 Base URL',
+        message: '请先启用 AI 并填写 API Key、Base URL 与模型标识',
       };
     }
 
@@ -99,13 +273,13 @@ export class AiService {
           { role: 'system', content: 'You are a connection test endpoint. Reply with OK only.' },
           { role: 'user', content: 'ping' },
         ],
-        { maxTokens: 8, temperature: 0, thinking: 'disabled' },
+        { modelConfigId, maxTokens: 8, temperature: 0, thinking: 'disabled' },
       );
       return {
         success: true,
         message: '连接成功',
-        provider: cfg.ai_provider,
-        model: this.resolveModel(cfg),
+        provider: connection.provider,
+        model: connection.model,
       };
     } catch (error: any) {
       this.logger.warn(`AI connection test failed: ${error?.message || error}`);
@@ -122,7 +296,7 @@ export class AiService {
       displayName: cfg.ai_pet_display_name,
       description: cfg.ai_pet_description,
       greetings: cfg.ai_pet_greetings,
-      apiConfigured: this.hasProviderConfig(cfg),
+      apiConfigured: await this.canUseModel(cfg, cfg.ai_chat_model_config_id),
       chatEnabled: cfg.ai_pet_chat_enabled,
     };
   }
@@ -154,27 +328,28 @@ export class AiService {
 
   async chat(messages: ChatMessage[], options: ChatOptions = {}) {
     const cfg = await this.getConfig();
-    const apiKey = this.resolveApiKey(cfg);
-    const baseUrl = this.resolveBaseUrl(cfg);
-    if (!this.hasProviderConfig(cfg)) {
+    const connection = await this.resolveConnection(cfg, options);
+    if (!cfg.ai_enabled || !connection.apiKey || !connection.baseUrl || !connection.model) {
       throw new ServiceUnavailableException('AI 未配置或已关闭，请在后台完成服务商连接配置');
     }
 
     const body: Record<string, unknown> = {
-      model: this.resolveModel(cfg, options.model),
+      model: connection.model,
       messages,
       stream: false,
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 1024,
-      thinking: { type: options.thinking || 'disabled' },
     };
+    if (connection.provider.toLowerCase() === 'deepseek') {
+      body.thinking = { type: options.thinking || 'disabled' };
+    }
 
     const timeout = Math.max(3000, Math.min(120000, cfg.ai_request_timeout_ms || 30000));
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetch(`${connection.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${connection.apiKey}`,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeout),
@@ -199,27 +374,29 @@ export class AiService {
     onToken: (token: string) => void,
   ) {
     const cfg = await this.getConfig();
-    const apiKey = this.resolveApiKey(cfg);
-    const baseUrl = this.resolveBaseUrl(cfg);
-    if (!this.hasProviderConfig(cfg)) {
+    const connection = await this.resolveConnection(cfg, options);
+    if (!cfg.ai_enabled || !connection.apiKey || !connection.baseUrl || !connection.model) {
       throw new ServiceUnavailableException('AI 未配置或已关闭，请在后台完成服务商连接配置');
     }
 
     const timeout = Math.max(3000, Math.min(120000, cfg.ai_request_timeout_ms || 30000));
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const body: Record<string, unknown> = {
+      model: connection.model,
+      messages,
+      stream: true,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxTokens ?? 1024,
+    };
+    if (connection.provider.toLowerCase() === 'deepseek') {
+      body.thinking = { type: options.thinking || 'disabled' };
+    }
+    const res = await fetch(`${connection.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${connection.apiKey}`,
       },
-      body: JSON.stringify({
-        model: this.resolveModel(cfg, options.model),
-        messages,
-        stream: true,
-        temperature: options.temperature ?? 0.7,
-        max_tokens: options.maxTokens ?? 1024,
-        thinking: { type: options.thinking || 'disabled' },
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeout),
     });
 
@@ -324,68 +501,7 @@ export class AiService {
   }
 
   async polishMoment(inspiration: string) {
-    const text = String(inspiration || '').trim();
-    if (text.length < 2) {
-      throw new BadRequestException('请先写一点灵感或想法');
-    }
-
-    const fallbackContent = this.localMomentContent(text);
-    const fallbackTitle = this.localMomentTitle(fallbackContent);
-    const fallbackExcerpt = this.localExcerpt(fallbackTitle, fallbackContent, 120);
-    const cfg = await this.getConfig();
-
-    if (!this.hasProviderConfig(cfg)) {
-      return {
-        title: fallbackTitle,
-        content: fallbackContent,
-        excerpt: fallbackExcerpt,
-        source: 'fallback' as const,
-      };
-    }
-
-    try {
-      const result = await this.chat(
-        [
-          {
-            role: 'system',
-            content:
-              '你是一个中文社交内容编辑助手。请把用户的灵感润色成适合发布在个人站点“瞬间”栏目的一段或几段内容。' +
-              '保留原意和真实语气，允许更顺滑、更有画面感，但不要编造事实。' +
-              '如果原文里包含 Markdown 图片语法 ![alt](url)，必须完整保留原样，不要改写 URL。' +
-              '请只返回 JSON，格式为 {"title":"...","content":"...","excerpt":"..."}。',
-          },
-          {
-            role: 'user',
-            content: `请润色下面这段瞬间灵感：\n${text.slice(0, 6000)}`,
-          },
-        ],
-        {
-          temperature: 0.9,
-          maxTokens: 1200,
-          thinking: 'disabled',
-        },
-      );
-
-      const parsed = this.parseJsonObject(result);
-      const content = String(parsed?.content || '').trim() || fallbackContent;
-      const title = String(parsed?.title || '').trim() || this.localMomentTitle(content);
-      const excerpt = String(parsed?.excerpt || '').trim() || this.localExcerpt(title, content, 120);
-
-      return {
-        title: title.slice(0, 80),
-        content,
-        excerpt: excerpt.slice(0, 160),
-        source: 'ai' as const,
-      };
-    } catch (e) {
-      this.logger.warn(`polish moment fallback: ${e}`);
-      return {
-        title: fallbackTitle,
-        content: fallbackContent,
-        excerpt: fallbackExcerpt,
-        source: 'fallback' as const,
-      };
-    }
+    return this.polishMomentWithConfig(inspiration);
   }
 
   async polishMomentWithConfig(inspiration: string) {
@@ -400,7 +516,7 @@ export class AiService {
     const fallbackExcerpt = this.localExcerpt(fallbackTitle, cleanedFallback, 120);
     const cfg = await this.getConfig();
 
-    if (!cfg.ai_moment_enabled || !this.hasProviderConfig(cfg)) {
+    if (!cfg.ai_moment_enabled || !(await this.canUseModel(cfg, cfg.ai_moment_model_config_id))) {
       return {
         title: fallbackTitle,
         content: fallbackContent,
@@ -419,6 +535,7 @@ export class AiService {
           },
         ],
         {
+          modelConfigId: cfg.ai_moment_model_config_id,
           model: cfg.ai_moment_model || cfg.ai_model,
           temperature: cfg.ai_moment_temperature,
           maxTokens: cfg.ai_moment_max_tokens,
@@ -443,6 +560,7 @@ export class AiService {
                 },
               ],
               {
+                modelConfigId: cfg.ai_moment_model_config_id,
                 model: cfg.ai_moment_model || cfg.ai_model,
                 temperature: Math.max(cfg.ai_moment_temperature, 0.8),
                 maxTokens: 180,
@@ -484,7 +602,7 @@ export class AiService {
       return { excerpt: fallback, source: 'fallback' as const };
     }
 
-    if (!cfg.ai_summarize_enabled || !this.hasProviderConfig(cfg)) {
+    if (!cfg.ai_summarize_enabled || !(await this.canUseModel(cfg, cfg.ai_summarize_model_config_id))) {
       return { excerpt: fallback, source: 'fallback' as const };
     }
 
@@ -498,6 +616,7 @@ export class AiService {
           },
         ],
         {
+          modelConfigId: cfg.ai_summarize_model_config_id,
           model: cfg.ai_summarize_model || cfg.ai_model,
           temperature: cfg.ai_summarize_temperature,
           maxTokens: cfg.ai_summarize_max_tokens,
@@ -667,7 +786,7 @@ export class AiService {
     if (!cfg.ai_article_enabled) {
       throw new ServiceUnavailableException('AI 文章生成已关闭');
     }
-    if (!this.hasProviderConfig(cfg)) {
+    if (!(await this.canUseModel(cfg, cfg.ai_article_model_config_id))) {
       throw new ServiceUnavailableException('AI 未配置或已关闭');
     }
 
@@ -677,6 +796,7 @@ export class AiService {
         { role: 'user', content: `灵感/要点：\n${text}` },
       ],
       {
+        modelConfigId: cfg.ai_article_model_config_id,
         model: cfg.ai_article_model || cfg.ai_model,
         temperature: cfg.ai_article_temperature,
         maxTokens: cfg.ai_article_max_tokens,
@@ -717,6 +837,7 @@ export class AiService {
           },
         ],
         {
+          modelConfigId: cfg.ai_article_model_config_id,
           model: cfg.ai_article_model || cfg.ai_model,
           temperature: 0.4,
           maxTokens: 512,
@@ -766,7 +887,7 @@ export class AiService {
       return { approved: true, reason: 'AI 评论审核未启用，自动通过' };
     }
 
-    if (!this.hasProviderConfig(cfg)) {
+    if (!(await this.canUseModel(cfg, cfg.ai_moderate_model_config_id))) {
       this.logger.warn('AI 未配置，评论审核自动通过');
       return { approved: true, reason: 'AI 未配置，自动通过' };
     }
@@ -790,6 +911,7 @@ export class AiService {
           }
         ],
         {
+          modelConfigId: cfg.ai_moderate_model_config_id,
           model: cfg.ai_moderate_model || cfg.ai_model,
           temperature: cfg.ai_moderate_temperature,
           maxTokens: cfg.ai_moderate_max_tokens,
@@ -824,7 +946,7 @@ export class AiService {
       return { approved: false, reason: 'AI 友链审核未启用，等待人工审核' };
     }
 
-    if (!this.hasProviderConfig(cfg)) {
+    if (!(await this.canUseModel(cfg, cfg.ai_friend_moderate_model_config_id))) {
       return { approved: false, reason: 'AI 未配置，等待人工审核' };
     }
 
@@ -874,6 +996,7 @@ export class AiService {
           },
         ],
         {
+          modelConfigId: cfg.ai_friend_moderate_model_config_id,
           model: cfg.ai_friend_moderate_model || cfg.ai_model,
           temperature: cfg.ai_friend_moderate_temperature,
           maxTokens: cfg.ai_friend_moderate_max_tokens,
@@ -1326,7 +1449,7 @@ export class AiService {
       return { reply: quotaMessage, source: 'quota' as const };
     }
 
-    if (!cfg.ai_pet_chat_enabled || !this.hasProviderConfig(cfg)) {
+    if (!cfg.ai_pet_chat_enabled || !(await this.canUseModel(cfg, cfg.ai_chat_model_config_id))) {
       const fallback = cfg.ai_fallback_unconfigured;
       await this.saveMessage(userId, 'assistant', fallback);
       return { reply: fallback, source: 'fallback' as const };
@@ -1334,6 +1457,7 @@ export class AiService {
 
     try {
       const reply = await this.chat(messages, {
+        modelConfigId: cfg.ai_chat_model_config_id,
         model: cfg.ai_chat_model || cfg.ai_model,
         temperature: cfg.ai_chat_temperature,
         maxTokens: cfg.ai_chat_max_tokens,
@@ -1366,7 +1490,7 @@ export class AiService {
       return { source: 'quota' as const };
     }
 
-    if (!cfg.ai_pet_chat_enabled || !this.hasProviderConfig(cfg)) {
+    if (!cfg.ai_pet_chat_enabled || !(await this.canUseModel(cfg, cfg.ai_chat_model_config_id))) {
       const fallback = cfg.ai_fallback_unconfigured;
       onToken(fallback);
       await this.saveMessage(userId, 'assistant', fallback);
@@ -1376,6 +1500,7 @@ export class AiService {
     let partial = '';
     try {
       const reply = await this.chatStream(messages, {
+        modelConfigId: cfg.ai_chat_model_config_id,
         model: cfg.ai_chat_model || cfg.ai_model,
         temperature: cfg.ai_chat_temperature,
         maxTokens: cfg.ai_chat_max_tokens,

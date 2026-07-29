@@ -55,6 +55,20 @@
         </div>
       </a-spin>
     </a-card>
+
+    <a-modal v-model:open="detail.open" :title="detail.item?.title || '消息详情'" width="min(560px, calc(100vw - 32px))">
+      <div v-if="detail.item" class="message-detail">
+        <div class="message-detail-meta">
+          <span>{{ notificationTypeLabel(detail.item.type) }}</span>
+          <time>{{ formatDetailTime(detail.item.createdAt) }}</time>
+        </div>
+        <p>{{ detail.item.content || '暂无详细内容' }}</p>
+      </div>
+      <template #footer>
+        <a-button @click="detail.open = false">关闭</a-button>
+        <a-button v-if="detail.item?.link" type="primary" @click="goToLinkedPage">查看相关页面</a-button>
+      </template>
+    </a-modal>
   </div>
 </template>
 
@@ -63,18 +77,28 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
+const route = useRoute()
+const {
+  unreadCount,
+  refreshUnread,
+  markNotificationRead,
+  markAllNotificationsRead,
+  removeNotification: removeSharedNotification,
+} = useNotifications()
 const loading = ref(true)
 const notifications = ref<any[]>([])
-const unreadCount = ref(0)
 const total = ref(0)
 const totalPages = ref(0)
 const currentPage = ref(1)
 const pageSize = 20
 const filterType = ref<'all' | 'unread'>('all')
+const detail = reactive({ open: false, item: null as any })
 
-onMounted(() => {
-  loadNotifications()
-  loadUnreadCount()
+onMounted(async () => {
+  await Promise.all([loadNotifications(), loadUnreadCount()])
+  const notificationId = String(route.query.notification || '')
+  const item = notifications.value.find(entry => entry.id === notificationId)
+  if (item) await handleClick(item)
 })
 
 async function loadNotifications() {
@@ -96,26 +120,31 @@ async function loadNotifications() {
 }
 
 async function loadUnreadCount() {
-  try {
-    const res = await api.get<any>('/notifications/unread-count')
-    unreadCount.value = res.count || 0
-  } catch {}
+  await refreshUnread()
 }
 
 async function handleClick(item: any) {
   if (!item.read) {
     await markRead(item)
   }
-  if (item.link) {
-    navigateTo(item.link)
-  }
+  detail.item = item
+  detail.open = true
+}
+
+function goToLinkedPage() {
+  const link = detail.item?.link
+  detail.open = false
+  if (link) void navigateTo(link)
+}
+
+function notificationTypeLabel(type: string) {
+  return ({ comment: '评论提醒', reply: '回复提醒', like: '点赞提醒', system: '系统通知' } as Record<string, string>)[type] || '消息提醒'
 }
 
 async function markRead(item: any) {
   try {
-    await api.post(`/notifications/${item.id}/read`)
+    await markNotificationRead(item.id)
     item.read = true
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
   } catch {
     toast.error('操作失败')
   }
@@ -123,9 +152,8 @@ async function markRead(item: any) {
 
 async function markAllRead() {
   try {
-    await api.post('/notifications/read-all')
+    await markAllNotificationsRead()
     notifications.value.forEach(i => i.read = true)
-    unreadCount.value = 0
     toast.success('已全部标为已读')
   } catch {
     toast.error('操作失败')
@@ -134,9 +162,8 @@ async function markAllRead() {
 
 async function deleteNotification(item: any) {
   try {
-    await api.delete(`/notifications/${item.id}`)
+    await removeSharedNotification(item.id, !item.read)
     notifications.value = notifications.value.filter(i => i.id !== item.id)
-    if (!item.read) unreadCount.value = Math.max(0, unreadCount.value - 1)
     total.value--
   } catch {
     toast.error('删除失败')
@@ -153,6 +180,11 @@ function formatTime(date: string) {
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
   if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`
   return d.toLocaleDateString('zh-CN')
+}
+
+function formatDetailTime(date: string) {
+  if (!date) return ''
+  return new Date(date).toLocaleString('zh-CN', { hour12: false })
 }
 </script>
 
@@ -238,6 +270,10 @@ function formatTime(date: string) {
   font-size: 0.72rem;
   color: var(--c-text-3, #999);
 }
+.message-detail { padding:2px 0; }
+.message-detail-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--c-text-3); font-size:.75rem; }
+.message-detail-meta span { padding:3px 7px; border-radius:999px; background:var(--c-primary-soft); color:var(--c-primary); }
+.message-detail p { margin:16px 0 4px; color:var(--c-text-1); font-size:.88rem; line-height:1.85; white-space:pre-wrap; word-break:break-word; }
 .notification-actions {
   display: flex;
   flex-direction: column;

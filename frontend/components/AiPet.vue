@@ -126,6 +126,7 @@ const meta = petMeta as {
 }
 
 const api = useApi()
+const { isLoggedIn } = useAuth()
 const { playing: musicPlaying } = useMusicPlayerState()
 const chatOpen = ref(false)
 const sending = ref(false)
@@ -148,7 +149,6 @@ const displayName = ref(meta.displayName || '哆啦A梦')
 const description = ref(meta.description || '阿风的伙伴 · 蓝色机器猫')
 const greetings = ref<string[]>([...(meta.greetings || [])])
 
-const isLoggedIn = computed(() => import.meta.client && !!localStorage.getItem('token'))
 const isArticleMode = computed(() => props.mode === 'article')
 const hintText = computed(() => isArticleMode.value ? '要我帮你读懂这篇吗？' : (greetings.value[0] || '你好呀～'))
 const inputPlaceholder = computed(() => isArticleMode.value ? '问问这篇文章…' : '问我文章推荐或本站内容…')

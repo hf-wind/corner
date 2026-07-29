@@ -33,7 +33,7 @@
             class="tag-chip"
             :class="[tag.size, { active: activeTag === tag.name }]"
             :style="{ '--tag-delay': `${index * 28}ms` }"
-            @click="selectTag(tag.name)"
+            @click="selectTag(tag)"
           ><Icon name="ph:hash" /><span>{{ tag.name }}</span><small>{{ tag.count }}</small></button>
           <div v-if="!tagCloud.length" class="empty-tags">还没有标签，新的灵感会在这里生长。</div>
         </section>
@@ -54,7 +54,7 @@
       <section class="right-card hot-card">
         <span class="aside-kicker">TRENDING</span><h3>热门标签</h3>
         <div class="hot-list">
-          <button v-for="(tag, index) in hotTagsList" :key="tag.name" type="button" @click="selectTag(tag.name)">
+          <button v-for="(tag, index) in hotTagsList" :key="tag.name" type="button" @click="selectTag(tag)">
             <span>{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ tag.name }}</strong><small>{{ tag.count }} 篇</small>
           </button>
         </div>
@@ -80,6 +80,7 @@ const tagPosts = ref<any[]>([])
 const loading = ref(true)
 const postsLoading = ref(false)
 const activeTag = ref('')
+const activeTagSlug = ref('')
 const totalPosts = ref(0)
 const latestTag = ref('')
 
@@ -88,7 +89,7 @@ const tagCloud = computed(() => {
   const max = Math.max(...counts, 1)
   return allTags.value.map(tag => {
     const ratio = Number(tag._count?.posts || 0) / max
-    return { name: tag.name, count: Number(tag._count?.posts || 0), size: ratio > .66 ? 'size-lg' : ratio > .32 ? 'size-md' : 'size-sm' }
+    return { name: tag.name, slug: tag.slug, count: Number(tag._count?.posts || 0), size: ratio > .66 ? 'size-lg' : ratio > .32 ? 'size-md' : 'size-sm' }
   })
 })
 const hotTagsList = computed(() => [...tagCloud.value].sort((a, b) => b.count - a.count).slice(0, 6))
@@ -104,12 +105,14 @@ const distribution = computed(() => [
 const maxDistribution = computed(() => Math.max(...distribution.value.map(item => item.value), 1))
 function distributionWidth(value: number) { return `${Math.max(value ? 10 : 0, value / maxDistribution.value * 100)}%` }
 
-async function selectTag(name: string) {
-  activeTag.value = name === activeTag.value ? '' : name
-  if (!activeTag.value) { tagPosts.value = []; return }
+async function selectTag(tag: { name: string; slug: string }) {
+  const closing = tag.slug === activeTagSlug.value
+  activeTag.value = closing ? '' : tag.name
+  activeTagSlug.value = closing ? '' : tag.slug
+  if (!activeTagSlug.value) { tagPosts.value = []; return }
   postsLoading.value = true
   try {
-    const res = await api.get<any>('/posts', { tag: activeTag.value, limit: 20 })
+    const res = await api.get<any>(`/tags/${encodeURIComponent(activeTagSlug.value)}/posts`, { limit: 20 })
     tagPosts.value = (res.items ?? []).map((post: any) => ({
       slug: post.slug, title: post.title, date: post.publishedAt, cover: post.coverImage,
       excerpt: post.excerpt, tag: activeTag.value,

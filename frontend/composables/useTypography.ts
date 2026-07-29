@@ -16,6 +16,7 @@ export const fontPresetOptions: FontPresetOption[] = [
 ]
 
 const FONT_STORAGE_KEY = 'font-preset'
+const WENKAI_STYLESHEET_ID = 'font-wenkai-stylesheet'
 
 export function useTypography() {
   const fontPreset: Ref<FontPresetId> = useState('font-preset', () => 'rounded')
@@ -26,6 +27,13 @@ export function useTypography() {
 
   function applyFont(preset: FontPresetId) {
     document.documentElement.dataset.font = preset
+    if (preset === 'wenkai' && !document.getElementById(WENKAI_STYLESHEET_ID)) {
+      const link = document.createElement('link')
+      link.id = WENKAI_STYLESHEET_ID
+      link.rel = 'stylesheet'
+      link.href = 'https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@300;400;700&display=swap'
+      document.head.appendChild(link)
+    }
   }
 
   function setFontPreset(preset: FontPresetId) {

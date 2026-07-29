@@ -11,18 +11,31 @@
           <h3>{{ moment.title }}</h3>
           <time :datetime="dateSource">{{ dateParts.full }}</time>
         </header>
-        <p v-if="summary" class="moment-summary">{{ summary }}</p>
-      </div>
 
-      <div v-if="images.length" class="image-strip" :class="`count-${Math.min(images.length, 3)}`">
-        <img
-          v-for="(image, index) in images.slice(0, 3)"
-          :key="`${image}-${index}`"
-          :src="mediaUrl(image)"
-          :alt="`${moment.title} · 图片 ${index + 1}`"
-          loading="lazy"
-        >
-        <span v-if="images.length > 3">+{{ images.length - 3 }}</span>
+        <aside class="moment-summary" aria-label="记录摘要">
+          <span><Icon name="ph:notebook" />摘要</span>
+          <p>{{ summary }}</p>
+        </aside>
+
+        <MomentContent v-if="bodyContent" class="moment-body" :content="bodyContent" />
+
+        <div v-if="images.length" class="moment-gallery" :class="`gallery-${Math.min(images.length, 4)}`">
+          <button
+            v-for="(image, index) in images"
+            :key="`${image}-${index}`"
+            type="button"
+            class="gallery-item"
+            :aria-label="`预览第 ${index + 1} 张图片，共 ${images.length} 张`"
+            @click="openPreview(index)"
+          >
+            <img
+              :src="mediaUrl(image)"
+              :alt="`${moment.title} · 图片 ${index + 1}`"
+              loading="lazy"
+            >
+            <span class="gallery-zoom"><Icon name="ph:magnifying-glass-plus" /></span>
+          </button>
+        </div>
       </div>
 
       <footer class="moment-actions">
@@ -49,15 +62,23 @@
 
       <Transition name="comment-drop">
         <div v-if="commentsOpen" class="comments-slot">
-          <MomentComments :moment-id="moment.id" @submitted="moment.commentCount += 1" />
+          <MomentComments :moment-id="moment.id" @submitted="moment.commentCount = Math.max(0, moment.commentCount + $event)" />
         </div>
       </Transition>
     </div>
+
+    <ImageLightbox
+      v-model="previewOpen"
+      v-model:index="previewIndex"
+      :images="previewImages"
+      :label="`${moment.title} 图片预览`"
+    />
   </article>
 </template>
 
 <script setup lang="ts">
-import { extractMomentImages, momentPreviewText } from '~/utils/moment'
+import { extractMomentImages, momentPreviewText, stripMomentImages } from '~/utils/moment'
+import ImageLightbox from './ImageLightbox.vue'
 
 const props = withDefaults(defineProps<{
   moment: { id: string; slug: string; title: string; content?: string; excerpt?: string; publishedAt?: string; createdAt?: string; likeCount: number; commentCount: number; liked?: boolean }
@@ -69,8 +90,23 @@ const toast = useToast()
 const { isLoggedIn } = useAuth()
 const { mediaUrl } = useMediaUrl()
 const commentsOpen = ref(props.initiallyExpandedComments)
+const previewOpen = ref(false)
+const previewIndex = ref(0)
 const images = computed(() => extractMomentImages(props.moment.content))
-const summary = computed(() => props.moment.excerpt || momentPreviewText(props.moment.content, 140))
+const previewImages = computed(() => images.value.map((source, index) => ({
+  src: source,
+  alt: `${props.moment.title} · 图片 ${index + 1}`,
+  caption: props.moment.title,
+})))
+const bodyContent = computed(() => stripMomentImages(props.moment.content))
+const summary = computed(() => {
+  const explicit = String(props.moment.excerpt || '').trim()
+  if (explicit) return explicit
+  const generated = momentPreviewText(bodyContent.value, 110)
+  if (generated) return generated
+  if (images.value.length) return `一组关于「${props.moment.title}」的影像记录，共 ${images.value.length} 张图片。`
+  return `关于「${props.moment.title}」的一段瞬间记录。`
+})
 const dateSource = computed(() => String(props.moment.publishedAt || props.moment.createdAt || ''))
 const dateParts = computed(() => {
   const date = new Date(dateSource.value)
@@ -84,6 +120,10 @@ const dateParts = computed(() => {
 })
 
 watch(() => props.initiallyExpandedComments, (value) => { if (value) commentsOpen.value = true })
+function openPreview(index: number) {
+  previewIndex.value = index
+  previewOpen.value = true
+}
 
 async function toggleLike() {
   if (!isLoggedIn.value) { toast.warning('登录后才能点赞瞬间'); return navigateTo('/login') }
@@ -112,38 +152,24 @@ async function toggleLike() {
   font-variant-numeric: tabular-nums;
 }
 
-.moment-date strong {
-  color: var(--c-text-2);
-  font-size: .76rem;
-  font-weight: 650;
-  letter-spacing: .04em;
-}
-
+.moment-date strong { color: var(--c-text-2); font-size: .76rem; font-weight: 650; letter-spacing: 0; }
 .moment-date span { margin-top: 3px; font-size: .64rem; }
 
 .moment-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
-  padding: 15px 16px 10px;
+  padding: 16px 17px 10px;
   border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
-  border-radius: 15px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--ld-bg-card) 96%, transparent);
   box-shadow: 0 7px 24px color-mix(in srgb, var(--ld-shadow) 32%, transparent);
   transition: transform .2s ease, box-shadow .2s ease;
 }
 
 .moment-main:hover { transform: translateY(-2px); box-shadow: 0 11px 28px color-mix(in srgb, var(--ld-shadow) 48%, transparent); }
-
 .moment-copy { min-width: 0; }
-
-.moment-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-}
+.moment-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
 
 .moment-head h3 {
   margin: 0;
@@ -158,111 +184,55 @@ async function toggleLike() {
 .moment-head time { display: none; color: var(--c-text-3); font-size: .66rem; white-space: nowrap; }
 
 .moment-summary {
-  display: -webkit-box;
-  margin: 8px 0 0;
-  overflow: hidden;
-  color: var(--c-text-2);
-  font-size: .82rem;
-  line-height: 1.75;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.image-strip {
-  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 48px);
-  gap: 5px;
-  align-self: start;
-  overflow: hidden;
-  border-radius: 9px;
-}
-
-.image-strip.count-1 { grid-template-columns: 108px; }
-.image-strip.count-2 { grid-template-columns: repeat(2, 64px); }
-
-.image-strip img {
-  width: 100%;
-  height: 72px;
-  background: var(--c-bg-2);
-  object-fit: cover;
-}
-
-.image-strip.count-1 img { height: 78px; }
-
-.image-strip > span {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  padding: 2px 5px;
-  border-radius: 5px;
-  background: rgb(10 14 24 / 62%);
-  color: #fff;
-  font-size: .58rem;
-}
-
-.moment-actions {
-  display: flex;
-  grid-column: 1 / -1;
-  gap: 2px;
-  margin-top: 9px;
-}
-
-.moment-actions button {
-  display: inline-flex;
-  min-height: 28px;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 7px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--c-text-3);
-  cursor: pointer;
-  font: inherit;
-  font-size: .7rem;
-  transition: color .18s ease, background-color .18s ease;
-}
-
-.moment-actions button:hover,
-.moment-actions button.active,
-.moment-actions button.liked {
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-}
-
-.comments-slot {
-  grid-column: 1 / -1;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
   margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--border);
+  padding: 9px 11px;
+  border-left: 3px solid var(--c-primary);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--c-primary-soft) 52%, var(--c-bg));
 }
 
-.comment-drop-enter-active,
-.comment-drop-leave-active { transition: opacity .18s ease, transform .18s ease; }
-.comment-drop-enter-from,
-.comment-drop-leave-to { opacity: 0; transform: translateY(-5px); }
+.moment-summary > span { display: inline-flex; align-items: center; gap: 4px; color: var(--c-primary); font-size: .68rem; font-weight: 650; }
+.moment-summary p { margin: 0; color: var(--c-text-2); font-size: .75rem; line-height: 1.65; }
+.moment-body { margin-top: 12px; color: var(--c-text-2); font-size: .82rem; line-height: 1.75; }
+
+.moment-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 142px));
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.moment-gallery.gallery-1 { grid-template-columns: minmax(140px, 220px); }
+.gallery-item { position: relative; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; padding: 0; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 7px; background: var(--c-bg-2); cursor: zoom-in; }
+.gallery-item img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .22s ease, filter .22s ease; }
+.gallery-item:hover img { transform: scale(1.035); filter: brightness(.9); }
+.gallery-zoom { position: absolute; right: 6px; bottom: 6px; display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: rgb(10 14 24 / 68%); color: #fff; font-size: .82rem; opacity: 0; transition: opacity .18s ease; }
+.gallery-item:hover .gallery-zoom, .gallery-item:focus-visible .gallery-zoom { opacity: 1; }
+.gallery-item:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+
+.moment-actions { display: flex; gap: 2px; margin-top: 10px; }
+.moment-actions button { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; padding: 4px 7px; border: 0; border-radius: 7px; background: transparent; color: var(--c-text-3); cursor: pointer; font: inherit; font-size: .7rem; transition: color .18s ease, background-color .18s ease; }
+.moment-actions button:hover, .moment-actions button.active, .moment-actions button.liked { background: var(--c-primary-soft); color: var(--c-primary); }
+.comments-slot { margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--border); }
+
+.comment-drop-enter-active, .comment-drop-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.comment-drop-enter-from, .comment-drop-leave-to { opacity: 0; transform: translateY(-5px); }
 
 @media (max-width: 640px) {
   .moment-row { grid-template-columns: 1fr; gap: 0; }
   .moment-date { display: none; }
   .moment-head time { display: block; }
-  .moment-main { column-gap: 12px; padding: 14px 14px 9px; border-radius: 13px; }
-  .image-strip { grid-template-columns: repeat(3, 42px); }
-  .image-strip.count-1 { grid-template-columns: 76px; }
-  .image-strip.count-2 { grid-template-columns: repeat(2, 48px); }
-  .image-strip img,
-  .image-strip.count-1 img { height: 66px; }
-}
-
-@media (max-width: 420px) {
-  .moment-summary { -webkit-line-clamp: 3; }
-  .image-strip.count-2 { grid-template-columns: repeat(2, 42px); }
+  .moment-main { padding: 14px 14px 9px; }
+  .moment-summary { grid-template-columns: 1fr; gap: 4px; }
+  .moment-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .moment-gallery.gallery-1 { grid-template-columns: minmax(140px, 210px); }
+  .moment-gallery.gallery-2 { grid-template-columns: repeat(2, minmax(0, 130px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .moment-actions button,
-  .comment-drop-enter-active,
-  .comment-drop-leave-active { transition: none; }
+  .moment-main, .moment-actions button, .gallery-item img, .comment-drop-enter-active, .comment-drop-leave-active { transition: none; }
 }
 </style>

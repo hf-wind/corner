@@ -37,6 +37,7 @@ export class EmailController {
   @UseGuards(AuthGuard('jwt'))
   @Get('config')
   async getConfig() {
-    return this.email.getEmailConfig();
+    const { pass, ...config } = await this.email.getEmailConfig();
+    return { ...config, pass: '', hasPass: Boolean(pass) };
   }
 }

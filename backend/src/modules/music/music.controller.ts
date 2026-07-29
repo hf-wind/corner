@@ -18,6 +18,8 @@ export class MusicController {
     @Query('id') id?: string,
     @Query('index') index?: string,
     @Query('refresh') refresh?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.music.getPlaylist({
       server,
@@ -25,6 +27,8 @@ export class MusicController {
       id,
       playlistIndex: index != null && index !== '' ? Number(index) : undefined,
       refresh: refresh === '1' || refresh === 'true',
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
     });
   }
 

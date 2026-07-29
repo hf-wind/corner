@@ -19,11 +19,7 @@ export function getDisplayImageUrl(
     url.searchParams.set('q', String(quality))
     return url.toString()
   } catch {
-    // relative path (e.g. /uploads/...) — resolve via API base
-    const config = useRuntimeConfig()
-    const base = (config.public.apiBase as string).replace(/\/api\/?$/, '')
-    if (source.startsWith('/')) return `${base}${source}`
     if (source.startsWith('~/')) return source
-    return `${base}/${source}`
+    return useMediaUrl().mediaUrl(source)
   }
 }

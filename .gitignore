@@ -2,6 +2,8 @@ node_modules/
 dist/
 .output/
 .nuxt/
+frontend/localhost/
+frontend/127.0.0.1/
 .env
 .env.local
 .env.production

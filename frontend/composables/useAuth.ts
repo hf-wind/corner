@@ -8,10 +8,27 @@ export type AuthUser = {
 }
 
 const USER_PATHS = ['/admin/profile', '/admin/messages']
+const PROFILE_TTL = 5 * 60 * 1000
+let refreshing: Promise<void> | null = null
+let lastProfileRefreshAt = 0
+let lastProfileToken: string | null = null
+
+function storedToken() {
+  return typeof window === 'undefined' ? null : window.localStorage.getItem('token')
+}
+
+function storedUser(): AuthUser | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return JSON.parse(window.localStorage.getItem('user') ?? 'null') as AuthUser | null
+  } catch {
+    return null
+  }
+}
 
 export function useAuth() {
-  const user = useState<AuthUser | null>('auth-user', () => null)
-  const token = useState<string | null>('auth-token', () => null)
+  const user = useState<AuthUser | null>('auth-user', storedUser)
+  const token = useState<string | null>('auth-token', storedToken)
 
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => {
@@ -20,27 +37,25 @@ export function useAuth() {
   })
 
   function readStorage() {
-    if (!import.meta.client) return
-    token.value = localStorage.getItem('token')
-    try {
-      user.value = JSON.parse(localStorage.getItem('user') ?? 'null') as AuthUser | null
-    } catch {
-      user.value = null
-    }
+    if (typeof window === 'undefined') return
+    token.value = storedToken()
+    user.value = storedUser()
   }
 
-  let refreshing: Promise<void> | null = null
-  async function refreshProfile() {
-    if (!import.meta.client) return
+  async function refreshProfile(force = false) {
+    if (typeof window === 'undefined') return
     readStorage()
     if (!token.value) return
+    if (!force && lastProfileToken === token.value && Date.now() - lastProfileRefreshAt < PROFILE_TTL) return
     if (refreshing) return refreshing
     refreshing = (async () => {
       try {
         const api = useApi()
         const profile = await api.get<AuthUser & { role?: string }>('/auth/profile')
         if (!profile) return
-        setSession(token.value!, {
+        // Guard against race: session may have been cleared during the request
+        if (!token.value) return
+        setSession(token.value, {
           id: profile.id,
           username: profile.username,
           email: profile.email,
@@ -48,6 +63,8 @@ export function useAuth() {
           bio: profile.bio,
           role: profile.role || 'user',
         })
+        lastProfileToken = token.value
+        lastProfileRefreshAt = Date.now()
       } catch {
         /* keep cached session */
       } finally {
@@ -60,7 +77,7 @@ export function useAuth() {
   function setSession(accessToken: string, nextUser: AuthUser) {
     token.value = accessToken
     user.value = nextUser
-    if (import.meta.client) {
+    if (typeof window !== 'undefined') {
       localStorage.setItem('token', accessToken)
       localStorage.setItem('user', JSON.stringify(nextUser))
     }
@@ -69,9 +86,15 @@ export function useAuth() {
   function clearSession() {
     token.value = null
     user.value = null
-    if (import.meta.client) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+    lastProfileToken = null
+    lastProfileRefreshAt = 0
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      } catch {
+        // ignore storage errors
+      }
     }
   }
 

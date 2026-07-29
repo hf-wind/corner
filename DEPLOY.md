@@ -41,7 +41,7 @@ corner/
 │   ├── prisma/schema.prisma        # 数据库模型
 │   ├── src/                        # 源代码
 │   └── Dockerfile
-├── frontend/                       # Nuxt 3 前端
+├── frontend/                       # Vite + Vue 3 前端
 │   ├── pages/                      # 页面组件
 │   ├── layouts/                    # 布局组件
 │   └── Dockerfile
@@ -95,7 +95,7 @@ cp .env.example .env
 docker compose -f docker-compose.dev.yml up -d --build
 
 # 前端热更新（也可在容器外独立运行）
-cd frontend && npx nuxi dev
+cd frontend && npm run dev
 ```
 
 ---
@@ -133,6 +133,19 @@ EOF
 # 4. 启动
 docker compose up -d --build
 ```
+
+### 首次数据初始化
+
+首次部署并确认 PostgreSQL 健康后，执行迁移和正式种子脚本：
+
+```bash
+docker compose exec backend npx prisma migrate deploy
+docker compose exec backend npm run prisma:seed
+```
+
+种子脚本会幂等初始化管理员、DeepSeek Flash 默认模型、站点配置、文章、瞬间、书影音、表情包和歌单，并将 `backend/prisma/seed-assets` 中的图片复制到 `uploads` 持久卷。友链不会写入默认数据。
+
+若希望初始化时直接写入 DeepSeek 密钥，请先在服务器 `.env` 中配置 `DEEPSEEK_API_KEY`，该变量已传入后端容器。也可以初始化后在“后台管理 → AI 配置 → 模型接入”中填写密钥。请勿将真实密钥提交到 Git。
 
 ### 更新部署
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Logger, Sse, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtService } from '@nestjs/jwt';
 import { Observable } from 'rxjs';
@@ -15,14 +15,14 @@ export class NotificationController {
     private jwtService: JwtService,
   ) {}
 
-  @Get('stream')
-  async stream(@Query('token') token: string): Promise<Observable<any>> {
+  @Sse('stream')
+  stream(@Query('token') token: string): Observable<{ data: any }> {
     let userId: string;
     try {
       const payload = this.jwtService.verify(token);
       userId = payload.sub || payload.id;
     } catch {
-      throw new Error('Invalid token');
+      throw new UnauthorizedException('Invalid token');
     }
 
     const subject = this.sseService.getClient(userId);
@@ -30,12 +30,12 @@ export class NotificationController {
 
     return new Observable((observer) => {
       const subscription = subject.subscribe({
-        next: (event) => observer.next(event),
+        next: (event) => observer.next({ data: event }),
         error: (err) => observer.error(err),
       });
 
       this.notificationService.getUnreadCount(userId).then(({ count }) => {
-        observer.next({ type: 'unread-count', data: { count } });
+        observer.next({ data: { type: 'unread-count', data: { count } } });
       });
 
       return () => {

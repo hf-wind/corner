@@ -76,19 +76,19 @@
 
 <script setup lang="ts">
 const { isLoggedIn } = useAuth()
-const api = useApi()
-const config = useRuntimeConfig()
+const {
+  unreadCount,
+  latestItems: items,
+  latestLoading: loading,
+  loadLatest,
+  markNotificationRead,
+  markAllNotificationsRead,
+} = useNotifications()
 
 const bellRef = ref<HTMLElement>()
 const panelRef = ref<HTMLElement>()
 const panelOpen = ref(false)
-const loading = ref(false)
-const unreadCount = ref(0)
-const items = ref<any[]>([])
 const panelPos = ref<{ position: string; top: string; left: string }>({ position: 'fixed', top: '0px', left: '0px' })
-
-let eventSource: EventSource | null = null
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let onScroll: (() => void) | null = null
 let onResize: (() => void) | null = null
 
@@ -116,7 +116,7 @@ function togglePanel() {
   panelOpen.value = !panelOpen.value
   if (panelOpen.value) {
     updatePanelPosition()
-    loadNotifications()
+    void loadLatest()
     onScroll = () => updatePanelPosition()
     onResize = () => updatePanelPosition()
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -133,73 +133,20 @@ function stopPositionListeners() {
 
 const panelStyle = computed(() => panelPos.value)
 
-async function loadNotifications() {
-  loading.value = true
-  try {
-    const res = await api.get<any>('/notifications', { limit: 8 })
-    items.value = res.items ?? []
-  } catch { /* ignore */ }
-  loading.value = false
-}
-
-async function fetchUnreadCount() {
-  if (!isLoggedIn.value) return
-  try {
-    const res = await api.get<{ count: number }>('/notifications/unread-count')
-    unreadCount.value = res.count ?? 0
-  } catch { /* ignore */ }
-}
-
-function connectSSE() {
-  if (!isLoggedIn.value || eventSource) return
-  const token = localStorage.getItem('token')
-  if (!token) return
-
-  eventSource = new EventSource(
-    `${config.public.apiBase}/notifications/stream?token=${token}`
-  )
-
-  eventSource.addEventListener('message', (e: MessageEvent) => {
-    try {
-      const event = JSON.parse(e.data)
-      if (event.type === 'unread-count') {
-        unreadCount.value = event.data?.count ?? 0
-      } else if (event.type === 'notification') {
-        if (panelOpen.value) loadNotifications()
-      }
-    } catch { /* ignore */ }
-  })
-
-  eventSource.onerror = () => {
-    eventSource?.close()
-    eventSource = null
-    reconnectTimer = setTimeout(connectSSE, 3000)
-  }
-}
-
-function disconnectSSE() {
-  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
-  if (eventSource) { eventSource.close(); eventSource = null }
-}
-
 async function markAllRead() {
   try {
-    await api.post('/notifications/read-all')
-    items.value.forEach(i => i.read = true)
-    unreadCount.value = 0
+    await markAllNotificationsRead()
   } catch { /* ignore */ }
 }
 
 async function readItem(item: any) {
   if (!item.read) {
     try {
-      await api.post(`/notifications/${item.id}/read`)
-      item.read = true
-      unreadCount.value = Math.max(0, unreadCount.value - 1)
+      await markNotificationRead(item.id)
     } catch { /* ignore */ }
   }
   panelOpen.value = false
-  navigateTo('/admin/messages')
+  navigateTo({ path: '/admin/messages', query: { notification: item.id } })
 }
 
 function formatTime(date: string) {
@@ -214,13 +161,11 @@ function formatTime(date: string) {
 }
 
 onMounted(() => {
-  fetchUnreadCount()
-  connectSSE()
+  void loadLatest()
   document.addEventListener('click', onClickOutside, true)
 })
 
 onUnmounted(() => {
-  disconnectSSE()
   stopPositionListeners()
   document.removeEventListener('click', onClickOutside, true)
 })
@@ -229,10 +174,6 @@ watch(panelOpen, (v) => {
   if (!v) stopPositionListeners()
 })
 
-watch(isLoggedIn, (v) => {
-  if (v) connectSSE()
-  else disconnectSSE()
-})
 </script>
 
 <style scoped>

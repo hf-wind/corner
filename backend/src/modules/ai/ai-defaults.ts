@@ -11,9 +11,13 @@ export const AI_SETTING_KEYS = [
   'ai_friend_moderation_enabled',
   'ai_friend_require_backlink',
   'ai_chat_model',
+  'ai_chat_model_config_id',
   'ai_summarize_model',
+  'ai_summarize_model_config_id',
   'ai_moderate_model',
+  'ai_moderate_model_config_id',
   'ai_friend_moderate_model',
+  'ai_friend_moderate_model_config_id',
   'ai_pet_system_prompt',
   'ai_summarize_prompt',
   'ai_moderate_prompt',
@@ -43,14 +47,21 @@ export const AI_SETTING_KEYS = [
   'ai_article_prompt',
   'ai_article_meta_prompt',
   'ai_article_model',
+  'ai_article_model_config_id',
   'ai_article_temperature',
   'ai_article_max_tokens',
   'ai_moment_enabled',
   'ai_moment_prompt',
   'ai_moment_summary_prompt',
   'ai_moment_model',
+  'ai_moment_model_config_id',
   'ai_moment_temperature',
   'ai_moment_max_tokens',
+  'ai_library_enabled',
+  'ai_library_prompt',
+  'ai_library_model_config_id',
+  'ai_library_temperature',
+  'ai_library_max_tokens',
 ] as const;
 
 export type AiSettingKey = (typeof AI_SETTING_KEYS)[number];
@@ -68,9 +79,13 @@ export type AiConfig = {
   ai_friend_moderation_enabled: boolean;
   ai_friend_require_backlink: boolean;
   ai_chat_model: string;
+  ai_chat_model_config_id: string;
   ai_summarize_model: string;
+  ai_summarize_model_config_id: string;
   ai_moderate_model: string;
+  ai_moderate_model_config_id: string;
   ai_friend_moderate_model: string;
+  ai_friend_moderate_model_config_id: string;
   ai_pet_system_prompt: string;
   ai_summarize_prompt: string;
   ai_moderate_prompt: string;
@@ -100,14 +115,21 @@ export type AiConfig = {
   ai_article_prompt: string;
   ai_article_meta_prompt: string;
   ai_article_model: string;
+  ai_article_model_config_id: string;
   ai_article_temperature: number;
   ai_article_max_tokens: number;
   ai_moment_enabled: boolean;
   ai_moment_prompt: string;
   ai_moment_summary_prompt: string;
   ai_moment_model: string;
+  ai_moment_model_config_id: string;
   ai_moment_temperature: number;
   ai_moment_max_tokens: number;
+  ai_library_enabled: boolean;
+  ai_library_prompt: string;
+  ai_library_model_config_id: string;
+  ai_library_temperature: number;
+  ai_library_max_tokens: number;
 };
 
 export const AI_DEFAULTS: AiConfig = {
@@ -123,9 +145,13 @@ export const AI_DEFAULTS: AiConfig = {
   ai_friend_moderation_enabled: true,
   ai_friend_require_backlink: true,
   ai_chat_model: '',
+  ai_chat_model_config_id: '',
   ai_summarize_model: '',
+  ai_summarize_model_config_id: '',
   ai_moderate_model: '',
+  ai_moderate_model_config_id: '',
   ai_friend_moderate_model: '',
+  ai_friend_moderate_model_config_id: '',
 
   ai_pet_system_prompt: [
     '你是哆啦A梦（Doraemon），住在这座博客角落里的蓝色机器猫。',
@@ -214,6 +240,7 @@ export const AI_DEFAULTS: AiConfig = {
     '只返回 JSON：{"slug":"english-slug","categoryName":"分类名","tagNames":["标签1","标签2"]}。',
   ].join(' '),
   ai_article_model: '',
+  ai_article_model_config_id: '',
   ai_article_temperature: 0.7,
   ai_article_max_tokens: 4096,
 
@@ -234,6 +261,20 @@ export const AI_DEFAULTS: AiConfig = {
     '不要写成标题，不要加引号，不要提到 AI，不要重复正文原句。',
   ].join(' '),
   ai_moment_model: '',
+  ai_moment_model_config_id: '',
   ai_moment_temperature: 0.9,
   ai_moment_max_tokens: 1200,
+
+  ai_library_enabled: true,
+  ai_library_prompt: [
+    '你是严谨且文风自然的书影音记录助手。',
+    '优先依据提供的公开资料候选做作品消歧与字段整理，再用可靠常识补缺。',
+    '只返回一个合法 JSON 对象，不要 Markdown，不要解释。',
+    '作品资料与原句禁止编造；不确定的资料字段使用 null，不确定的原句返回空数组。',
+    '体会属于可编辑的第一人称草稿，可以表达具体理解，但不要声称真实发生过的私人经历。',
+    '返回 sourceIndex 表示采用的候选序号，没有匹配候选则为 null。不要生成评分、排名、阅读或观看状态及日期。',
+  ].join(' '),
+  ai_library_model_config_id: '',
+  ai_library_temperature: 0.35,
+  ai_library_max_tokens: 2600,
 };

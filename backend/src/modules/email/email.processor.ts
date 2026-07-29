@@ -41,7 +41,7 @@ export class EmailVerificationProcessor {
       secure: secure !== false,
       auth: {
         user: (user as string) || '1833079849@qq.com',
-        pass: (pass as string) || 'wncwabqengfubhbd',
+        pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
       },
     });
 
@@ -133,7 +133,7 @@ export class EmailNotificationProcessor {
       secure: secure !== false,
       auth: {
         user: (user as string) || '1833079849@qq.com',
-        pass: (pass as string) || 'wncwabqengfubhbd',
+        pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
       },
     });
 

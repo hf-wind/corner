@@ -86,8 +86,17 @@ export class NotificationService {
   }
 
   async remove(userId: string, id: string) {
-    return this.prisma.notification.deleteMany({
+    const existing = await this.prisma.notification.findFirst({
+      where: { id, userId },
+      select: { read: true },
+    });
+    const result = await this.prisma.notification.deleteMany({
       where: { id, userId },
     });
+    if (existing && !existing.read) {
+      const { count } = await this.getUnreadCount(userId);
+      this.sse.emit(userId, { type: 'unread-count', data: { count } });
+    }
+    return result;
   }
 }

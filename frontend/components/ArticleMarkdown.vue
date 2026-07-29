@@ -1,15 +1,17 @@
 <template>
-  <div class="article-md-wrap" :class="{ dark: isDark }">
+  <div ref="wrapperRef" class="article-md-wrap" :class="{ dark: isDark }" @click.capture="onContentClick">
     <ClientOnly>
       <MdPreview :id="editorId" :model-value="content || ''" :theme="mdTheme" language="zh-CN" preview-theme="vuepress"
         class="article-md-preview" />
     </ClientOnly>
+    <ImageLightbox v-model="previewOpen" v-model:index="previewIndex" :images="previewImages" label="文章图片预览" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
+import ImageLightbox from '~/components/ImageLightbox.vue'
 
 withDefaults(defineProps<{
   content?: string
@@ -21,8 +23,34 @@ withDefaults(defineProps<{
 
 const isDark = ref(false)
 const mdTheme = computed(() => (isDark.value ? 'dark' : 'light'))
+const wrapperRef = ref<HTMLElement | null>(null)
+const previewOpen = ref(false)
+const previewIndex = ref(0)
+const previewImages = ref<Array<{ src: string; alt: string; caption?: string }>>([])
 
 let observer: MutationObserver | null = null
+
+function onContentClick(event: MouseEvent) {
+  if (event.button !== 0) return
+  const image = (event.target as HTMLElement).closest<HTMLImageElement>('.md-editor-preview img')
+  if (!image || !wrapperRef.value?.contains(image)) return
+
+  const images = Array.from(wrapperRef.value.querySelectorAll<HTMLImageElement>('.md-editor-preview img'))
+    .filter(item => Boolean(item.currentSrc || item.src))
+    .map((item, index) => ({
+      src: item.currentSrc || item.src,
+      alt: item.alt || `文章图片 ${index + 1}`,
+      caption: item.alt || undefined,
+    }))
+  const index = images.findIndex(item => item.src === (image.currentSrc || image.src))
+  if (index < 0) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  previewImages.value = images
+  previewIndex.value = index
+  previewOpen.value = true
+}
 
 onMounted(() => {
   const sync = () => {
@@ -95,6 +123,7 @@ onUnmounted(() => observer?.disconnect())
 .article-md-wrap :deep(.md-editor-preview img) {
   border-radius: 12px;
   box-shadow: 0 10px 28px var(--ld-shadow);
+  cursor: zoom-in;
 }
 
 .article-md-wrap :deep(.md-editor-preview .md-editor-code) {

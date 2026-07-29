@@ -226,6 +226,24 @@ model Setting {
   @@map("settings")
 }
 
+model AiModelConfig {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(100)
+  provider  String   @db.VarChar(50)
+  apiKey    String   @map("api_key") @db.Text
+  baseUrl   String   @map("base_url") @db.Text
+  model     String   @db.VarChar(150)
+  enabled   Boolean  @default(true)
+  isDefault Boolean  @default(false) @map("is_default")
+  sort      Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([provider, name])
+  @@index([enabled, isDefault, sort])
+  @@map("ai_model_configs")
+}
+
 model VisitStat {
   id        String   @id @default(uuid()) @db.Uuid
   postId    String?  @map("post_id") @db.Uuid

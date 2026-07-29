@@ -21,7 +21,6 @@
         <slot />
         <GlobalMediaLibrary />
         <GlobalIconPicker />
-        <GlobalToast />
       </div>
     </div>
   </a-config-provider>

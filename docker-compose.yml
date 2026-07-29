@@ -48,6 +48,10 @@ services:
       REDIS_PASS: ${REDIS_PASS}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      EMAIL_SMTP_PASS: ${EMAIL_SMTP_PASS:-}
       NODE_ENV: production
       PORT: 4000
     volumes:

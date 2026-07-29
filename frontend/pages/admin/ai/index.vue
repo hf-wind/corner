@@ -16,54 +16,56 @@
               : 'AI 服务暂未就绪，保存 API Key 后才能真正调用模型。'"
           />
 
-          <a-card size="small" title="服务连接" :bordered="false" class="section-card">
+          <a-card size="small" title="模型接入" :bordered="false" class="section-card">
+            <template #extra>
+              <a-button type="primary" size="small" @click="openCreateModel">
+                <Icon name="ph:plus-bold" /> 新增模型
+              </a-button>
+            </template>
             <a-form layout="vertical" size="middle">
               <a-row :gutter="16">
-                <a-col :xs="24" :sm="8">
+                <a-col :xs="24" :sm="12">
                   <a-form-item label="启用 AI">
                     <a-switch v-model:checked="form.ai_enabled" />
                   </a-form-item>
                 </a-col>
-                <a-col :xs="24" :sm="8">
-                  <a-form-item label="服务商">
-                    <a-input v-model:value="form.ai_provider" placeholder="deepseek / openai compatible" />
-                  </a-form-item>
-                </a-col>
-                <a-col :xs="24" :sm="8">
+                <a-col :xs="24" :sm="12">
                   <a-form-item label="请求超时 (ms)">
-                    <a-input-number
-                      v-model:value="form.ai_request_timeout_ms"
-                      :min="3000"
-                      :max="120000"
-                      :step="1000"
-                      style="width: 100%"
-                    />
+                    <a-input-number v-model:value="form.ai_request_timeout_ms" :min="3000" :max="120000" :step="1000" style="width:100%" />
                   </a-form-item>
                 </a-col>
               </a-row>
+            </a-form>
 
-              <a-form-item label="API Key">
-                <a-input-password
-                  v-model:value="form.ai_api_key"
-                  placeholder="sk-..."
-                  autocomplete="new-password"
-                />
-              </a-form-item>
+            <a-spin :spinning="modelsLoading">
+              <div v-if="models.length" class="model-list">
+                <div v-for="item in models" :key="item.id" class="model-row" :class="{ disabled: !item.enabled }">
+                  <div class="model-main">
+                    <div class="model-title">
+                      <strong>{{ item.name }}</strong>
+                      <a-tag color="blue">{{ item.provider }}</a-tag>
+                      <a-tag v-if="item.isDefault" color="green">默认</a-tag>
+                      <a-tag v-if="!item.enabled">已停用</a-tag>
+                    </div>
+                    <div class="model-meta">
+                      <code>{{ item.model }}</code>
+                      <span>{{ item.baseUrl }}</span>
+                      <span>{{ item.apiKeyMasked || (item.hasApiKey ? '环境变量密钥' : '未配置密钥') }}</span>
+                    </div>
+                  </div>
+                  <a-space class="model-actions">
+                    <a-button size="small" :loading="testingModelId === item.id" @click="testModel(item)">测试</a-button>
+                    <a-button size="small" @click="openEditModel(item)">编辑</a-button>
+                    <a-button size="small" danger @click="removeModel(item)">删除</a-button>
+                  </a-space>
+                </div>
+              </div>
+              <a-empty v-else description="还没有模型配置" />
+            </a-spin>
+          </a-card>
 
-              <a-row :gutter="16">
-                <a-col :xs="24" :md="12">
-                  <a-form-item label="Base URL">
-                    <a-input v-model:value="form.ai_base_url" placeholder="https://api.deepseek.com" />
-                  </a-form-item>
-                </a-col>
-                <a-col :xs="24" :md="12">
-                  <a-form-item label="默认模型">
-                    <a-input v-model:value="form.ai_model" placeholder="deepseek-v4-flash" />
-                  </a-form-item>
-                </a-col>
-              </a-row>
-
-              <div class="switch-grid">
+          <a-card size="small" title="应用开关" :bordered="false" class="section-card">
+            <div class="switch-grid">
                 <div class="switch-item">
                   <span>聊天助手</span>
                   <a-switch v-model:checked="form.ai_pet_chat_enabled" />
@@ -88,8 +90,11 @@
                   <span>友链审核</span>
                   <a-switch v-model:checked="form.ai_friend_moderation_enabled" />
                 </div>
+                <div class="switch-item">
+                  <span>书影音资料</span>
+                  <a-switch v-model:checked="form.ai_library_enabled" />
+                </div>
               </div>
-            </a-form>
           </a-card>
 
           <a-card size="small" title="人设与兜底" :bordered="false" class="section-card">
@@ -155,7 +160,7 @@
                 <a-row :gutter="16">
                   <a-col :xs="24" :sm="8">
                     <a-form-item label="文章模型">
-                      <a-input v-model:value="form.ai_article_model" placeholder="留空使用默认模型" />
+                      <a-select v-model:value="form.ai_article_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
                     </a-form-item>
                   </a-col>
                   <a-col :xs="24" :sm="8">
@@ -208,7 +213,7 @@
                 <a-row :gutter="16">
                   <a-col :xs="24" :sm="8">
                     <a-form-item label="瞬间模型">
-                      <a-input v-model:value="form.ai_moment_model" placeholder="留空使用默认模型" />
+                      <a-select v-model:value="form.ai_moment_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
                     </a-form-item>
                   </a-col>
                   <a-col :xs="24" :sm="8">
@@ -237,6 +242,31 @@
             </a-card>
           </div>
 
+          <a-card size="small" title="书影音 AI" :bordered="false" class="section-card">
+            <a-form layout="vertical" size="middle">
+              <a-form-item label="资料整理提示词">
+                <a-textarea v-model:value="form.ai_library_prompt" :rows="6" />
+              </a-form-item>
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="书影音模型">
+                    <a-select v-model:value="form.ai_library_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="temperature">
+                    <a-input-number v-model:value="form.ai_library_temperature" :min="0" :max="2" :step="0.1" style="width:100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="maxTokens">
+                    <a-input-number v-model:value="form.ai_library_max_tokens" :min="512" :max="8000" style="width:100%" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
+          </a-card>
+
           <div class="dual-grid">
             <a-card size="small" title="摘要与评论审核" :bordered="false" class="section-card">
               <a-form layout="vertical" size="middle">
@@ -246,7 +276,7 @@
                 <a-row :gutter="16">
                   <a-col :xs="24" :sm="4">
                     <a-form-item label="摘要模型">
-                      <a-input v-model:value="form.ai_summarize_model" placeholder="留空默认" />
+                      <a-select v-model:value="form.ai_summarize_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
                     </a-form-item>
                   </a-col>
                   <a-col :xs="24" :sm="4">
@@ -272,7 +302,7 @@
                   </a-col>
                   <a-col :xs="24" :sm="4">
                     <a-form-item label="审核模型">
-                      <a-input v-model:value="form.ai_moderate_model" placeholder="留空默认" />
+                      <a-select v-model:value="form.ai_moderate_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
                     </a-form-item>
                   </a-col>
                   <a-col :xs="24" :sm="4">
@@ -308,7 +338,7 @@
                 <a-row :gutter="16">
                   <a-col :xs="24" :sm="8">
                     <a-form-item label="聊天模型">
-                      <a-input v-model:value="form.ai_chat_model" placeholder="留空默认" />
+                      <a-select v-model:value="form.ai_chat_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
                     </a-form-item>
                   </a-col>
                   <a-col :xs="24" :sm="8">
@@ -374,7 +404,7 @@
                 <a-row :gutter="16">
                   <a-col :xs="24" :sm="4">
                     <a-form-item label="友链模型">
-                      <a-input v-model:value="form.ai_friend_moderate_model" placeholder="留空默认" />
+                      <a-select v-model:value="form.ai_friend_moderate_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
                     </a-form-item>
                   </a-col>
                   <a-col :xs="24" :sm="4">
@@ -562,11 +592,58 @@
         </a-spin>
       </a-card>
     </div>
+
+    <a-modal
+      v-model:open="modelDialog.open"
+      :title="modelDialog.id ? '编辑模型配置' : '新增模型配置'"
+      :confirm-loading="modelSaving"
+      ok-text="保存"
+      cancel-text="取消"
+      width="620px"
+      @ok="saveModel"
+    >
+      <a-form layout="vertical" :model="modelDialog">
+        <a-row :gutter="16">
+          <a-col :xs="24" :sm="12">
+            <a-form-item label="配置名称" required><a-input v-model:value="modelDialog.name" placeholder="例如：DeepSeek Flash" /></a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12">
+            <a-form-item label="服务商" required>
+              <a-auto-complete v-model:value="modelDialog.provider" :options="providerOptions" placeholder="deepseek / qwen" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="API Key">
+          <a-input-password v-model:value="modelDialog.apiKey" :placeholder="modelDialog.id ? '留空保留原密钥' : 'sk-...'" autocomplete="new-password" />
+          <div v-if="modelDialog.id && modelDialog.hasApiKey" class="field-tip">已配置密钥，留空不会覆盖。</div>
+        </a-form-item>
+        <a-form-item label="Base URL" required><a-input v-model:value="modelDialog.baseUrl" placeholder="https://api.deepseek.com" /></a-form-item>
+        <a-form-item label="模型标识" required><a-input v-model:value="modelDialog.model" placeholder="deepseek-v4-flash" /></a-form-item>
+        <a-row :gutter="16">
+          <a-col :xs="24" :sm="8"><a-form-item label="启用"><a-switch v-model:checked="modelDialog.enabled" /></a-form-item></a-col>
+          <a-col :xs="24" :sm="8"><a-form-item label="设为默认"><a-switch v-model:checked="modelDialog.isDefault" /></a-form-item></a-col>
+          <a-col :xs="24" :sm="8"><a-form-item label="排序"><a-input-number v-model:value="modelDialog.sort" :min="0" style="width:100%" /></a-form-item></a-col>
+        </a-row>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
+
+type AiModelItem = {
+  id: string
+  name: string
+  provider: string
+  baseUrl: string
+  model: string
+  enabled: boolean
+  isDefault: boolean
+  sort: number
+  hasApiKey: boolean
+  apiKeyMasked: string
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -585,6 +662,30 @@ const testing = ref(false)
 const apiConfigured = ref(false)
 const defaults = ref<Record<string, any>>({})
 const form = reactive<Record<string, any>>({})
+const modelsLoading = ref(false)
+const modelSaving = ref(false)
+const testingModelId = ref('')
+const models = ref<AiModelItem[]>([])
+const providerOptions = [{ value: 'deepseek' }, { value: 'qwen' }, { value: 'openai' }]
+const modelOptions = computed(() => models.value
+  .filter(item => item.enabled)
+  .map(item => ({
+    value: item.id,
+    label: `${item.name} · ${item.model}${item.isDefault ? '（默认）' : ''}`,
+  })))
+const modelDialog = reactive({
+  open: false,
+  id: '',
+  name: '',
+  provider: 'deepseek',
+  apiKey: '',
+  baseUrl: 'https://api.deepseek.com',
+  model: 'deepseek-v4-flash',
+  enabled: true,
+  isDefault: false,
+  sort: 0,
+  hasApiKey: false,
+})
 const greetingsText = ref('')
 const previewQuery = ref('')
 const previewLoading = ref(false)
@@ -601,10 +702,119 @@ const knowledgeListLoading = ref(false)
 const knowledgeList = ref<{ total: number; items: any[] }>({ total: 0, items: [] })
 
 onMounted(async () => {
-  await loadConfig()
+  await Promise.all([loadConfig(), loadModels()])
   await loadKnowledgeList()
   if (tab.value === 'chats') await loadConversations()
 })
+
+async function loadModels() {
+  modelsLoading.value = true
+  try {
+    models.value = await api.get<AiModelItem[]>('/ai/admin/models')
+  } catch {
+    models.value = []
+    toast.error('加载模型配置失败')
+  } finally {
+    modelsLoading.value = false
+  }
+}
+
+function resetModelDialog() {
+  Object.assign(modelDialog, {
+    open: true,
+    id: '',
+    name: '',
+    provider: 'deepseek',
+    apiKey: '',
+    baseUrl: 'https://api.deepseek.com',
+    model: 'deepseek-v4-flash',
+    enabled: true,
+    isDefault: !models.value.length,
+    sort: models.value.length,
+    hasApiKey: false,
+  })
+}
+
+function openCreateModel() {
+  resetModelDialog()
+}
+
+function openEditModel(item: AiModelItem) {
+  Object.assign(modelDialog, {
+    open: true,
+    id: item.id,
+    name: item.name,
+    provider: item.provider,
+    apiKey: '',
+    baseUrl: item.baseUrl,
+    model: item.model,
+    enabled: item.enabled,
+    isDefault: item.isDefault,
+    sort: item.sort,
+    hasApiKey: item.hasApiKey,
+  })
+}
+
+async function saveModel() {
+  if (!modelDialog.name.trim() || !modelDialog.provider.trim() || !modelDialog.baseUrl.trim() || !modelDialog.model.trim()) {
+    toast.warning('请完整填写名称、服务商、Base URL 和模型标识')
+    return
+  }
+  modelSaving.value = true
+  const payload = {
+    name: modelDialog.name.trim(),
+    provider: modelDialog.provider.trim(),
+    apiKey: modelDialog.apiKey.trim() || undefined,
+    baseUrl: modelDialog.baseUrl.trim(),
+    model: modelDialog.model.trim(),
+    enabled: modelDialog.enabled,
+    isDefault: modelDialog.isDefault,
+    sort: modelDialog.sort,
+  }
+  try {
+    if (modelDialog.id) await api.put(`/ai/admin/models/${modelDialog.id}`, payload)
+    else await api.post('/ai/admin/models', payload)
+    modelDialog.open = false
+    toast.success('模型配置已保存')
+    await loadModels()
+  } catch (error: any) {
+    toast.error(error?.message || '模型配置保存失败')
+  } finally {
+    modelSaving.value = false
+  }
+}
+
+async function testModel(item: AiModelItem) {
+  testingModelId.value = item.id
+  try {
+    const res = await api.post<any>(`/ai/admin/models/${item.id}/test`)
+    if (res.success) toast.success(`${item.name} 连接成功`)
+    else toast.error(res.message || '连接失败')
+  } catch (error: any) {
+    toast.error(error?.message || '连接失败')
+  } finally {
+    testingModelId.value = ''
+  }
+}
+
+function removeModel(item: AiModelItem) {
+  Modal.confirm({
+    title: '删除模型配置',
+    content: `确认删除「${item.name}」？使用它的应用将自动回退到默认模型。`,
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await api.delete(`/ai/admin/models/${item.id}`)
+        toast.success('已删除')
+        await loadModels()
+      } catch (error: any) {
+        toast.error(error?.message || '删除失败')
+      }
+    },
+  })
+}
 
 function applyConfig(cfg: Record<string, any>) {
   Object.keys(cfg).forEach((key) => {
@@ -799,6 +1009,60 @@ useHead({ title: 'AI 配置' })
 
 .switch-item span {
   color: var(--c-text-2);
+}
+
+.model-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.model-row.disabled {
+  opacity: 0.62;
+}
+
+.model-main {
+  min-width: 0;
+}
+
+.model-title,
+.model-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-title strong {
+  color: var(--c-text);
+}
+
+.model-meta {
+  margin-top: 7px;
+  color: var(--c-text-3);
+  font-size: 0.76rem;
+}
+
+.model-meta code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--c-bg-1);
+  color: var(--c-primary);
+}
+
+.field-tip {
+  margin-top: 5px;
+  color: var(--c-text-3);
+  font-size: 0.74rem;
 }
 
 .dual-grid {
@@ -999,6 +1263,15 @@ useHead({ title: 'AI 配置' })
 
   .actions {
     flex-direction: column;
+  }
+
+  .model-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .model-actions {
+    width: 100%;
   }
 }
 </style>

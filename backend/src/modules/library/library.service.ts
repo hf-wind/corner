@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLibraryItemDto } from './dto/create-library-item.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
@@ -33,6 +33,10 @@ export class LibraryService {
   async lookupMetadata(type: 'book' | 'film', title: string) {
     const cleanTitle = String(title || '').trim();
     if (!cleanTitle) throw new BadRequestException('请先输入书名或影视名');
+    const aiConfig = await this.ai.getConfig();
+    if (!aiConfig.ai_library_enabled) {
+      throw new ServiceUnavailableException('书影音 AI 资料整理已在后台关闭');
+    }
     const sources = await this.lookupPublicSources(type, cleanTitle);
     const workFields = type === 'book'
       ? `originalTitle, creator（作者）, summary（180至300字无剧透简介）, genres（字符串数组）, country, language`
@@ -44,14 +48,19 @@ export class LibraryService {
       [
         {
           role: 'system',
-          content: `你是严谨且文风自然的书影音记录助手。优先依据提供的公开资料候选做作品消歧与字段整理，再用可靠常识补缺。只返回一个合法 JSON 对象，不要 Markdown，不要解释。作品资料与原句禁止编造；不确定的资料字段使用 null，不确定的原句返回空数组。体会属于可编辑的第一人称草稿，可以表达具体理解，但不要声称真实发生过的私人经历。返回 sourceIndex 表示采用的候选序号，没有匹配候选则为 null。不要生成评分、排名、阅读/观看状态或日期。`,
+          content: aiConfig.ai_library_prompt,
         },
         {
           role: 'user',
           content: `类型：${type === 'book' ? '书籍' : '影视'}\n名称：${cleanTitle}\n需要字段：title（规范中文名）, ${workFields}, ${recordFields}, sourceIndex\n\n公开资料候选：\n${JSON.stringify(sources.map((source, sourceIndex) => ({ sourceIndex, ...source, coverImage: undefined }))).slice(0, 9000)}`,
         },
       ],
-      { temperature: 0.35, maxTokens: 2600, thinking: 'disabled' },
+      {
+        modelConfigId: aiConfig.ai_library_model_config_id,
+        temperature: aiConfig.ai_library_temperature,
+        maxTokens: aiConfig.ai_library_max_tokens,
+        thinking: 'disabled',
+      },
     );
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new BadRequestException('AI 返回的资料格式无法识别，请重试');

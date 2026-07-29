@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateMomentDto } from './dto/create-moment.dto';
 import { UpdateMomentDto } from './dto/update-moment.dto';
 import { MomentQueryDto } from './dto/moment-query.dto';
+import { NotificationService } from '../notification/notification.service';
+import { contentPreview } from '../../common/utils/content-preview';
 
 type PublishedMomentSnapshot = {
   title: string;
@@ -16,7 +18,10 @@ const momentAuthorSelect = { id: true, username: true, avatar: true } satisfies 
 
 @Injectable()
 export class MomentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationService,
+  ) {}
 
   private buildListSelect(currentUserId?: string): Prisma.MomentSelect {
     return {
@@ -227,6 +232,18 @@ export class MomentService {
       await this.prisma.momentLike.delete({ where: { id: existing.id } });
     } else {
       await this.prisma.momentLike.create({ data: { userId, momentId: moment.id } });
+      if (moment.authorId && moment.authorId !== userId) {
+        const liker = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { username: true },
+        });
+        await this.notificationService.create(moment.authorId, {
+          type: 'like',
+          title: '你的瞬间收到了赞',
+          content: `瞬间：「${moment.title}」\n点赞人：${liker?.username || '匿名用户'}\n瞬间内容：${contentPreview(moment.excerpt || moment.content)}`,
+          link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
+        });
+      }
     }
 
     const likeCount = await this.prisma.momentLike.count({ where: { momentId: moment.id } });

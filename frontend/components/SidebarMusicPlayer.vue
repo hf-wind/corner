@@ -45,7 +45,7 @@
           </div>
           <div class="smp-list-body" @scroll.passive="onTrackListScroll">
             <button
-              v-for="(t, i) in visibleTracks"
+              v-for="(t, i) in tracks"
               :key="`${t.url}-${i}`"
               type="button"
               class="smp-track"
@@ -59,7 +59,9 @@
               </span>
               <Icon v-if="i === index && playing" name="ph:waveform-bold" class="smp-track-wave" />
             </button>
-            <div v-if="hasMoreTracks" class="smp-list-loading">继续滚动以加载更多歌曲</div>
+            <div v-if="hasMoreTracks" class="smp-list-loading">
+              {{ loadingMore ? '正在加载更多歌曲…' : '继续滚动以加载更多歌曲' }}
+            </div>
             <div v-if="!tracks.length" class="smp-empty">{{ loading ? '加载中…' : '暂无歌曲' }}</div>
           </div>
         </div>
@@ -165,11 +167,11 @@ const progress = ref(0)
 const duration = ref(0)
 const mode = ref<PlayMode>('order')
 const userInteracted = ref(false)
-const visibleTrackCount = ref(60)
+const trackPage = ref(1)
+const hasMoreTracks = ref(false)
+const loadingMore = ref(false)
 
 const current = computed(() => tracks.value[index.value] || null)
-const visibleTracks = computed(() => tracks.value.slice(0, visibleTrackCount.value))
-const hasMoreTracks = computed(() => visibleTrackCount.value < tracks.value.length)
 const coverStyle = computed(() => {
   if (!current.value?.pic) return {}
   return {
@@ -188,6 +190,7 @@ const modeTitle = computed(() => {
 })
 
 let autoCollapseTimer: ReturnType<typeof setTimeout> | null = null
+let playlistRequestId = 0
 
 onMounted(async () => {
   document.addEventListener('click', onDocClick)
@@ -237,23 +240,30 @@ async function bootstrap() {
 }
 
 async function loadPlaylist(i: number, refresh = false) {
+  const requestId = ++playlistRequestId
   loading.value = true
   try {
     const res = await api.get<{
       enabled: boolean
       tracks: Track[]
       source?: { name: string }
+      page: number
+      hasMore: boolean
     }>('/music/playlist', {
       index: i,
       refresh: refresh ? '1' : undefined,
+      page: 1,
+      limit: 50,
     })
+    if (requestId !== playlistRequestId) return
     if (!res?.enabled) {
       enabled.value = false
       return
     }
     playlistIndex.value = i
     tracks.value = res.tracks || []
-    visibleTrackCount.value = Math.min(60, tracks.value.length)
+    trackPage.value = res.page || 1
+    hasMoreTracks.value = !!res.hasMore
     index.value = 0
     progress.value = 0
     await nextTick()
@@ -263,9 +273,32 @@ async function loadPlaylist(i: number, refresh = false) {
       if (playing.value) await a.play().catch(() => { playing.value = false })
     }
   } catch {
-    tracks.value = []
+    if (requestId === playlistRequestId) tracks.value = []
   } finally {
-    loading.value = false
+    if (requestId === playlistRequestId) loading.value = false
+  }
+}
+
+async function loadMoreTracks() {
+  if (loading.value || loadingMore.value || !hasMoreTracks.value) return
+  const targetPlaylist = playlistIndex.value
+  const targetPage = trackPage.value + 1
+  loadingMore.value = true
+  try {
+    const res = await api.get<{ tracks: Track[]; page: number; hasMore: boolean }>('/music/playlist', {
+      index: targetPlaylist,
+      page: targetPage,
+      limit: 50,
+    })
+    if (targetPlaylist !== playlistIndex.value) return
+    const seen = new Set(tracks.value.map(track => track.url))
+    tracks.value.push(...(res.tracks || []).filter(track => !seen.has(track.url)))
+    trackPage.value = res.page || targetPage
+    hasMoreTracks.value = !!res.hasMore
+  } catch {
+    // 保留已经加载的歌曲，允许用户再次滚动重试。
+  } finally {
+    loadingMore.value = false
   }
 }
 
@@ -344,7 +377,7 @@ function prev() {
   reloadAndPlay()
 }
 
-function next() {
+async function next() {
   if (!tracks.value.length) return
   if (mode.value === 'shuffle') {
     let n = index.value
@@ -353,6 +386,9 @@ function next() {
     }
     index.value = n
   } else {
+    if (index.value >= tracks.value.length - 1 && hasMoreTracks.value) {
+      await loadMoreTracks()
+    }
     index.value = (index.value + 1) % tracks.value.length
   }
   reloadAndPlay()
@@ -429,7 +465,7 @@ function toggleList() {
 function onTrackListScroll(event: Event) {
   const el = event.currentTarget as HTMLElement
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 72 && hasMoreTracks.value) {
-    visibleTrackCount.value = Math.min(tracks.value.length, visibleTrackCount.value + 60)
+    void loadMoreTracks()
   }
 }
 

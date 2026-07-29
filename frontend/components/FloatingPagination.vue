@@ -259,7 +259,7 @@ onUnmounted(() => {
 <style scoped>
 /*
  * Exact CSS from Nuxt DevTools Main.vue
- * Only #nuxt-devtools-* → #fp-pagination-anchor / .fp-* renames
+ * Only legacy devtool selectors → #fp-pagination-anchor / .fp-* renames
  */
 
 #fp-pagination-anchor {

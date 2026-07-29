@@ -52,7 +52,7 @@
         <footer class="prompt-footer">
           <div class="prompt-tools">
             <template v-if="mode === 'moment'">
-              <div class="picker-wrap"><button type="button" class="tool-button" :class="{ active: pickerOpen }" title="插入表情" @click="pickerOpen = !pickerOpen"><Icon name="ph:smiley-bold" /></button><EmojiPalette :open="pickerOpen" @select="insertEmoji" /></div>
+              <div class="picker-wrap"><button type="button" class="tool-button" :class="{ active: pickerOpen }" title="插入表情" @click="pickerOpen = !pickerOpen"><Icon name="ph:smiley-bold" /></button><EmojiPalette :open="pickerOpen" @select="insertEmoji" @close="pickerOpen = false" /></div>
               <button type="button" class="tool-button" title="插入图片" @click="pickImages"><Icon name="ph:image-bold" /></button>
             </template>
             <span><Icon name="ph:shield-check" />生成结果会先保存为草稿</span>

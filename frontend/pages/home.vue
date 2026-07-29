@@ -46,19 +46,24 @@
     </aside>
 
     <ClientOnly>
-      <AiPet mode="home" />
+      <AiPet v-if="showPet" mode="home" />
     </ClientOnly>
   </div>
 </template>
 
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
+
+const AiPet = defineAsyncComponent(() => import('~/components/AiPet.vue'))
 const api = useApi()
 const articles = ref<any[]>([])
 const loading = ref(true)
 const refreshing = ref(false)
 const page = ref(1)
 const totalPages = ref(1)
+const showPet = ref(false)
 let requestId = 0
+let petIdleHandle: number | undefined
 
 async function loadArticles() {
   const id = ++requestId
@@ -106,6 +111,14 @@ async function restoreScroll() {
 
 onMounted(() => {
   loadArticles().then(restoreScroll)
+  const schedule = window.requestIdleCallback || ((callback: IdleRequestCallback) => window.setTimeout(callback, 1000))
+  petIdleHandle = schedule(() => { showPet.value = true }, { timeout: 2200 })
+})
+
+onUnmounted(() => {
+  if (petIdleHandle === undefined) return
+  if (window.cancelIdleCallback) window.cancelIdleCallback(petIdleHandle)
+  else window.clearTimeout(petIdleHandle)
 })
 </script>
 

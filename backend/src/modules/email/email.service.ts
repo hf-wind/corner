@@ -58,7 +58,7 @@ export class EmailService {
       port: port ?? 465,
       secure: secure ?? true,
       user: user ?? '1833079849@qq.com',
-      pass: pass ?? 'wncwabqengfubhbd',
+      pass: pass ?? process.env.EMAIL_SMTP_PASS ?? '',
       fromName: fromName ?? '清欢小筑',
       fromAddress: fromAddress ?? '1833079849@qq.com',
       siteUrl: (siteUrl as string) || 'https://corner.example.com',

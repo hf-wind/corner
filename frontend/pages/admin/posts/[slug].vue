@@ -311,7 +311,7 @@ async function save() {
   margin-bottom: 8px;
 }
 
-.md-editor-preview ::deep(pre) {
+.md-editor-preview :deep(pre) {
   border-radius: 0px;
 }
 

@@ -29,13 +29,13 @@
 
         <a-form layout="vertical" class="profile-form" :model="form" @finish="save">
           <a-form-item label="用户名" name="username" :rules="[{ required: true, message: '请输入用户名' }]">
-            <a-input v-model:value="form.username" maxlength="50" placeholder="显示名称" />
+            <a-input v-model:value="form.username" :maxlength="50" placeholder="显示名称" />
           </a-form-item>
           <a-form-item label="邮箱">
             <a-input :value="form.email" disabled />
           </a-form-item>
           <a-form-item label="个人简介">
-            <a-textarea v-model:value="form.bio" :rows="4" maxlength="500" show-count placeholder="介绍一下自己" />
+            <a-textarea v-model:value="form.bio" :rows="4" :maxlength="500" show-count placeholder="介绍一下自己" />
           </a-form-item>
           <a-form-item>
             <a-button type="primary" html-type="submit" :loading="saving">保存修改</a-button>
@@ -53,7 +53,7 @@
           </a-form-item>
           <a-form-item label="验证码" name="code" :rules="[{ required: true, message: '请输入验证码' }]">
             <div class="code-row">
-              <a-input v-model:value="pwdForm.code" placeholder="请输入验证码" maxlength="6" />
+              <a-input v-model:value="pwdForm.code" placeholder="请输入验证码" :maxlength="6" />
               <a-button :disabled="codeCooldown > 0" @click="sendChangePasswordCode">
                 {{ codeCooldown > 0 ? `${codeCooldown}s` : '发送验证码' }}
               </a-button>

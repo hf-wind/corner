@@ -116,6 +116,7 @@ let animationId = 0
 let pointerFrame = 0
 let resizeFrame = 0
 let statsFrame = 0
+let lastParticleFrame = 0
 let typewriterTimer = 0
 let introTimer = 0
 let exitTimer = 0
@@ -168,7 +169,7 @@ function runIntro() {
     duration: index === 1 ? 1050 : 760,
     delay: 120 + index * 92,
     easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-    fill: 'backwards',
+    fill: 'both',
   }))
 
   const titleLetters = [...page.querySelectorAll<HTMLElement>('.title-char')]
@@ -180,7 +181,7 @@ function runIntro() {
       duration: 700,
       delay: 520 + index * 72,
       easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-      fill: 'backwards',
+      fill: 'both',
     })
   })
 
@@ -286,7 +287,7 @@ function resizeCanvas() {
 }
 
 function createParticles() {
-  const count = canvasWidth < 640 ? 18 : Math.min(36, Math.max(24, Math.round(canvasWidth / 48)))
+  const count = canvasWidth < 640 ? 16 : Math.min(30, Math.max(20, Math.round(canvasWidth / 56)))
   particles = Array.from({ length: count }, () => ({
     x: Math.random() * canvasWidth,
     y: Math.random() * canvasHeight,
@@ -299,6 +300,9 @@ function createParticles() {
 }
 
 function renderParticles(now: number) {
+  animationId = requestAnimationFrame(renderParticles)
+  if (now - lastParticleFrame < 33) return
+  lastParticleFrame = now
   const context = canvasContext
   if (!context) return
   context.clearRect(0, 0, canvasWidth, canvasHeight)
@@ -324,8 +328,8 @@ function renderParticles(now: number) {
       const dx = point.x - next.x
       const dy = point.y - next.y
       const distanceSquared = dx * dx + dy * dy
-      if (distanceSquared > 110 * 110) continue
-      const opacity = (1 - Math.sqrt(distanceSquared) / 110) * 0.1
+      if (distanceSquared > 100 * 100) continue
+      const opacity = (1 - Math.sqrt(distanceSquared) / 100) * 0.1
       context.beginPath()
       context.moveTo(point.x, point.y)
       context.lineTo(next.x, next.y)
@@ -335,7 +339,6 @@ function renderParticles(now: number) {
     }
   }
 
-  animationId = requestAnimationFrame(renderParticles)
 }
 
 function handleVisibilityChange() {

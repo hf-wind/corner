@@ -2,13 +2,16 @@
   <div>
     <a-spin :spinning="loading" class="table-spin">
       <a-card :bordered="false" class="list-card" size="small">
+        <div class="comment-filter">
+          <a-segmented v-model:value="source" :options="sourceOptions" @change="resetAndLoad" />
+        </div>
         <a-table :dataSource="comments" :columns="columns" rowKey="id" size="small" :pagination="false" :locale="{ emptyText: '暂无评论' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'authorName'">
               <span class="comment-author">{{ record.authorName || '匿名' }}</span>
             </template>
             <template v-if="column.key === 'content'">
-              <span style="white-space:pre-wrap" v-html="renderContent(record.content)"></span>
+              <span class="moderation-content">{{ renderModerationContent(record.content) }}</span>
             </template>
             <template v-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
@@ -51,14 +54,14 @@
 
         <div class="detail-section">
           <div class="detail-section-title">评论内容</div>
-          <div class="detail-content" v-html="renderContent(detail.item.content)"></div>
+          <div class="detail-content moderation-content">{{ renderModerationContent(detail.item.content) }}</div>
         </div>
 
         <div class="detail-section">
           <div class="detail-row">
-            <span class="detail-label">所属文章</span>
-            <a :href="`/article/${detail.item.post?.slug}`" target="_blank" class="detail-value detail-link">
-              {{ detail.item.post?.title || detail.item.postId }}
+            <span class="detail-label">所属{{ source === 'article' ? '文章' : '瞬间' }}</span>
+            <a :href="detail.item.sourceLink" target="_blank" class="detail-value detail-link">
+              {{ detail.item.post?.title || detail.item.moment?.title || detail.item.postId || detail.item.momentId }}
             </a>
           </div>
           <div class="detail-row" v-if="detail.item.parent || detail.item.replyToName">
@@ -116,26 +119,16 @@ const currentPage = ref(1)
 const total = ref(0)
 const totalPages = ref(1)
 const pageSize = 20
+const source = ref<'article' | 'moment'>('article')
+const sourceOptions = [{ label: '文章评论', value: 'article' }, { label: '瞬间评论', value: 'moment' }]
 const rejectDialog = reactive({ open: false, comment: null as any, reason: '', customReason: '' })
 const detail = reactive({ open: false, item: null as any })
 
-function renderContent(text: string) {
-  const tokens: string[] = []
-  let r = text.replace(/(?:◆emoji:([^◆]+)◆|\[\[emoji:([^\]|]+)(?:\|[^\]]*)?\]\])/g, (_, oldUrl, newUrl) => {
-    tokens.push(oldUrl || newUrl)
-    return `◆EMJ${tokens.length - 1}◆`
-  })
-  r = r.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  r = r.replace(/\n/g, '<br>')
-  r = r.replace(/https?:\/\/[^\s<]+/g, (url) => {
-    if (/\.(png|gif|jpg|jpeg|webp|svg|apng|avif)(\?[^\s<]*)?$/i.test(url) || url.includes('cdn.jsdelivr.net/gh/twitter/twemoji')) {
-      return `<img src="${mediaUrl(url)}" alt="emoji" class="inline-emoji" />`
-    }
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
-  })
-  r = r.replace(/@(\S+)/g, '<span class="reply-mention">@$1</span>')
-  r = r.replace(/◆EMJ(\d+)◆/g, (_, idx) => `<img src="${mediaUrl(tokens[parseInt(idx)])}" alt="emoji" class="inline-emoji" />`)
-  return r
+function renderModerationContent(text: string) {
+  return String(text || '')
+    .replace(/◆emoji:[^◆]+◆/g, '【表情】')
+    .replace(/\[\[emoji:[^\]|]+(?:\|([^\]]*))?\]\]/g, (_, label) => `【表情：${label || '表情'}】`)
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '【图片】')
 }
 
 const columns = [
@@ -153,19 +146,27 @@ function statusText(s: string) { return s === 'approved' ? '已发布' : s === '
 async function loadComments() {
   loading.value = true
   try {
-    const res = await api.get<any>('/comments', { page: currentPage.value, limit: pageSize })
-    comments.value = res?.items ?? []
+    const isMoment = source.value === 'moment'
+    const res = await api.get<any>(isMoment ? '/moment-comments' : '/comments', { page: currentPage.value, limit: pageSize })
+    comments.value = (res?.items ?? []).map((item: any) => ({
+      ...item,
+      sourceLink: isMoment
+        ? `/moments?focus=${encodeURIComponent(item.moment?.slug || item.momentId)}`
+        : `/article/${item.post?.slug || item.postId}`,
+    }))
     total.value = res?.total ?? 0
     totalPages.value = res?.totalPages ?? 1
   } catch { comments.value = [] }
   loading.value = false
 }
 
+function resetAndLoad() { currentPage.value = 1; void loadComments() }
+
 onMounted(loadComments)
 
 async function handleApprove(c: any) {
   try {
-    const updated = await api.post<any>(`/comments/${c.id}/approve`)
+    const updated = await api.post<any>(`${source.value === 'moment' ? '/moment-comments' : '/comments'}/${c.id}/approve`)
     Object.assign(c, updated)
     toast.success('已通过并已通知评论作者')
   }
@@ -192,7 +193,7 @@ async function confirmReject() {
     toast.warning('请选择驳回理由'); return
   }
   try {
-    const updated = await api.post<any>(`/comments/${rejectDialog.comment.id}/reject`, { reason })
+    const updated = await api.post<any>(`${source.value === 'moment' ? '/moment-comments' : '/comments'}/${rejectDialog.comment.id}/reject`, { reason })
     Object.assign(rejectDialog.comment, updated)
     toast.success('已驳回并已通知评论作者')
     rejectDialog.open = false; rejectDialog.reason = ''; rejectDialog.customReason = ''
@@ -202,9 +203,10 @@ async function confirmReject() {
 
 <style scoped>
 .list-card { border-radius:8px; }
+.comment-filter { margin-bottom:12px; }
 .table-pagination { display:flex; justify-content:center; padding:16px 0 4px; }
 .comment-author { font-weight:500; font-size:0.82rem; }
-.inline-emoji { display:inline; width:1.6em; height:1.6em; vertical-align:-0.35em; border-radius:4px; }
+.moderation-content { white-space:pre-wrap; word-break:break-word; }
 .reply-mention { color:var(--c-primary); font-weight:600; }
 
 .detail-wrap { display:flex; flex-direction:column; gap:16px; }

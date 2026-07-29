@@ -43,7 +43,7 @@
               <button type="button" class="icon-action" title="插入图片" @click="pickImages">
                 <Icon name="ph:image-bold" />
               </button>
-              <EmojiPalette :open="pickerOpen" @select="insertEmoji" />
+              <EmojiPalette :open="pickerOpen" @select="insertEmoji" @close="pickerOpen = false" />
               <span>保存为草稿后可预览发布</span>
             </div>
             <a-button type="primary" :loading="creating" :disabled="!inspiration.trim()" @click="createFromInspiration">
@@ -91,7 +91,7 @@
               <button type="button" class="icon-action" title="插入图片" @click="pickImages">
                 <Icon name="ph:image-bold" />
               </button>
-              <EmojiPalette :open="pickerOpen" @select="insertEmoji" />
+              <EmojiPalette :open="pickerOpen" @select="insertEmoji" @close="pickerOpen = false" />
             </div>
           </section>
 

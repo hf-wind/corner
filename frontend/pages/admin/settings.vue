@@ -46,7 +46,7 @@
             <a-input v-model:value="email.email_smtp_user" placeholder="1833079849@qq.com" @blur="saveEmailSetting('email_smtp_user')" />
           </a-form-item>
           <a-form-item label="SMTP密钥">
-            <a-input-password v-model:value="email.email_smtp_pass" placeholder="wncwabqengfubhbd" @blur="saveEmailSetting('email_smtp_pass')" />
+            <a-input-password v-model:value="email.email_smtp_pass" placeholder="已配置则留空，输入新密码可替换" @blur="saveEmailSetting('email_smtp_pass')" />
           </a-form-item>
           <a-form-item label="显示名称">
             <a-input v-model:value="email.email_from_name" placeholder="清欢小筑" @blur="saveEmailSetting('email_from_name')" />
@@ -153,7 +153,7 @@ const email = reactive({
   email_smtp_port: 465,
   email_smtp_secure: true,
   email_smtp_user: '1833079849@qq.com',
-  email_smtp_pass: 'wncwabqengfubhbd',
+  email_smtp_pass: '',
   email_from_name: '清欢小筑',
   email_from_address: '1833079849@qq.com',
   site_url: '',
@@ -211,7 +211,7 @@ async function loadEmail() {
       email.email_smtp_port = emailRes.port || 465
       email.email_smtp_secure = emailRes.secure !== false
       email.email_smtp_user = emailRes.user || '1833079849@qq.com'
-      email.email_smtp_pass = emailRes.pass || 'wncwabqengfubhbd'
+      email.email_smtp_pass = ''
       email.email_from_name = emailRes.fromName || '清欢小筑'
       email.email_from_address = emailRes.fromAddress || '1833079849@qq.com'
     }
@@ -222,6 +222,7 @@ async function loadEmail() {
 }
 
 async function saveEmailSetting(key: string) {
+  if (key === 'email_smtp_pass' && !email.email_smtp_pass.trim()) return
   try {
     await api.put('/settings', { key, value: (email as any)[key] })
     toast.success('已保存')
@@ -360,7 +361,7 @@ async function refreshCache() {
   refreshing.value = true
   try {
     const res = await api.post<any>('/music/admin/refresh')
-    const n = res?.tracks?.length ?? 0
+    const n = res?.total ?? res?.tracks?.length ?? 0
     toast.success(`缓存已刷新，共 ${n} 首`)
   } catch {
     toast.error('刷新失败，请检查 API / 歌单 ID')
