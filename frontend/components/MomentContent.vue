@@ -4,6 +4,7 @@
 
 <script setup lang="ts">
 import MarkdownIt from 'markdown-it'
+import { renderInlineEmoji } from '~/utils/commentContent'
 
 const props = defineProps<{
   content?: string
@@ -40,7 +41,7 @@ const html = computed(() => {
     .replace(/MOMENT_EMOJI_(\d+)/g, (_, rawIndex) => {
       const emoji = emojis[Number(rawIndex)]
       if (!emoji?.url) return ''
-      return `<img src="${mediaUrl(emoji.url)}" alt="${emoji.label}" class="moment-inline-emoji" />`
+      return renderInlineEmoji(emoji.url, emoji.label, mediaUrl, 'moment-inline-emoji')
     })
 })
 </script>

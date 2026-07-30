@@ -26,12 +26,13 @@ const publishedAt = new Date('2026-07-29T00:00:00+08:00');
 
 const aboutProfile = {
   name: 'huifeng',
-  role: '青海人 · 写代码 · 骑车闲游',
+  badge: '开发者',
+  role: '绍兴 · 写代码 · 骑车闲游',
   motto: '听风于隅，漫写人间',
   introduction: '余籍青海，少习计算机之术，科班出身。癸卯年入某市电信实习，从软件开发之事；甲辰七月转正，遂以此为业。迄今所作，横跨掌中 App、小程序与案头 PC 三端，亦曾铺陈驾驶舱数据大屏。又参与数字孪生项目，司 UE 与前端相联，使虚景能应实数。技未敢言精，不过逢题拆题，遇坑填坑，日拱一卒而已。\n\n大学之时，曾为青协志愿者干事，写策划数篇，张罗活动若干。所为皆寻常，却由此略知：一事之成，多赖众人彼此搭手。今二十五，狮子座，A 型血；若问 SBti，则曰“吗喽”，聊以自嘲。烟不沾，酒少饮，偶遇米酒果酒，亦浅尝而止。\n\n工作之外，好骑车，也爱四处闲游。去处未必远，风景未必盛；只消有路可走、有风可听，便觉一日不算虚度。此间名“风隅随笔”，存技术所得，记书影所感，也收日常微末。自知不过普通人，无宏图可陈，惟愿少些喧哗，多些诚实；听风于隅，漫写人间。',
   avatarUrl: '',
-  location: '中国 · 青海',
-  availability: '普通人，慢慢写，认真过日子',
+  location: '中国 · 绍兴',
+  availability: '持续写作，也持续学习',
   facts: [
     { label: '年岁', value: '25' },
     { label: '星座', value: '狮子座' },
@@ -190,7 +191,7 @@ async function main() {
     site_title: '风隅随笔', site_description: '听风于隅，漫写人间', site_url: 'https://corner.ink',
     site_keywords: ['风隅随笔', 'huifeng', '技术', '随笔', '书影', '生活'], media_naming: 'uuid',
     media_custom_folders: [], friends: [], about_profile: aboutProfile, theme_default: 'auto',
-    my_site_info: { name: '风隅随笔', url: 'https://corner.ink/', avatar: '', rssUrl: 'https://corner.ink/rss.xml', description: '听风于隅，漫写人间' },
+    my_site_info: { name: '风隅随笔', url: 'https://corner.ink/', avatar: '', rssUrl: 'https://corner.ink/rss.xml', description: '听风于隅，漫写人间', contactEmail: '1833079849@qq.com' },
     email_from_name: '风隅随笔',
     music_enabled: true, music_autoplay: false, music_volume: 0.55,
     music_api: 'https://api.i-meto.com/meting/api', music_server: 'netease', music_type: 'playlist',
@@ -260,7 +261,7 @@ async function main() {
   }
 
   for (const packData of [
-    { name: 'Twemoji', type: 'animated', sort: 1, items: twemojiItems },
+    { name: 'Twemoji', type: 'static', sort: 1, items: twemojiItems },
     { name: 'QQ', type: 'animated', sort: 2, items: qqItems },
   ]) {
     let pack = await prisma.emojiPack.findFirst({ where: { name: packData.name } });
@@ -274,7 +275,7 @@ async function main() {
   console.log('正式环境初始化完成');
   console.log(`管理员: ${adminUsername} <${adminEmail}>`);
   console.log(`模型: DeepSeek Flash${deepseekApiKey ? '' : '（未写入密钥，请配置 DEEPSEEK_API_KEY）'}`);
-  console.log(`文章 ${await prisma.post.count()} / 瞬间 ${await prisma.moment.count()} / 书影音 ${await prisma.libraryItem.count()} / 表情 ${await prisma.emojiItem.count()}`);
+  console.log(`文章 ${await prisma.post.count()} / 瞬间 ${await prisma.moment.count()} / 书影 ${await prisma.libraryItem.count()} / 表情 ${await prisma.emojiItem.count()}`);
 }
 
 main()

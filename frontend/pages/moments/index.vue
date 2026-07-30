@@ -21,17 +21,13 @@
               <small><Icon name="ph:arrow-down" /> 从新到旧</small>
             </header>
 
-            <div v-if="loading && !moments.length" class="moment-skeletons" aria-label="正在加载瞬间">
-              <div v-for="i in 5" :key="i" class="moment-skeleton"><i /><div><b /><span /><em /></div></div>
-            </div>
-
-            <div v-else-if="!moments.length" class="moment-empty">
+            <div v-if="!loading && !moments.length" class="moment-empty content-reveal">
               <span><Icon name="ph:paper-plane-tilt" /></span>
               <h3>这一页还很安静</h3>
               <p>下一段值得记住的小事，会从这里开始。</p>
             </div>
 
-            <div v-else class="moment-list">
+            <div v-else-if="moments.length" class="moment-list content-reveal">
               <MomentCard
                 v-for="moment in moments"
                 :key="moment.slug"
@@ -157,17 +153,16 @@ useHead({ title: '我的瞬间' })
 .hero-mark { position:absolute; right:105px; bottom:-42px; color:var(--c-primary); font-size:8.5rem; opacity:.045; transform:rotate(-9deg); }.hero-stamp { position:absolute; right:8px; bottom:8px; color:var(--c-text-3); font-size:.43rem; letter-spacing:.15em; line-height:1.5; text-align:right; opacity:.55; }
 .content-grid { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:22px; align-items:start; margin-top:24px; }
 .feed-section { min-width:0; }.stream-header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:0 0 12px 62px; }.stream-header span { color:var(--c-primary); font-size:.52rem; font-weight:700; letter-spacing:.18em; }.stream-header h2 { margin:4px 0 0; color:var(--c-text); font-size:1.08rem; }.stream-header small { display:flex; align-items:center; gap:5px; color:var(--c-text-3); font-size:.62rem; }
-.moment-list,.moment-skeletons { display:grid; gap:11px; }
-.moment-skeleton { display:grid; grid-template-columns:50px minmax(0,1fr); gap:12px; }.moment-skeleton>i { width:38px; height:9px; margin-top:17px; border-radius:999px; }.moment-skeleton>div { height:112px; padding:18px; border:1px solid var(--border); border-radius:15px; background:var(--ld-bg-card); }.moment-skeleton>i,.moment-skeleton b,.moment-skeleton span,.moment-skeleton em { display:block; background:linear-gradient(90deg,var(--c-bg-2),var(--ld-bg-card),var(--c-bg-2)); background-size:220% 100%; animation:skeleton-wave 1.25s linear infinite; }.moment-skeleton b { width:38%; height:11px; border-radius:5px; }.moment-skeleton span { width:78%; height:8px; margin-top:14px; border-radius:5px; }.moment-skeleton em { width:58px; height:7px; margin-top:16px; border-radius:5px; }
+.moment-list { display:grid; gap:11px; }
 .moment-empty { display:flex; min-height:280px; flex-direction:column; align-items:center; justify-content:center; padding:30px; border:1px dashed var(--border); border-radius:16px; color:var(--c-text-3); text-align:center; }.moment-empty>span { display:grid; width:48px; height:48px; margin-bottom:12px; place-items:center; border-radius:15px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.25rem; }.moment-empty h3 { margin:0; color:var(--c-text-2); font-size:.9rem; }.moment-empty p { margin:7px 0 0; font-size:.68rem; }
 .moments-sidebar { position:sticky; top:0; display:grid; gap:12px; }.side-card { padding:16px; border:1px solid color-mix(in srgb,var(--border) 74%,transparent); border-radius:16px; background:color-mix(in srgb,var(--ld-bg-card) 96%,transparent); box-shadow:0 7px 24px color-mix(in srgb,var(--ld-shadow) 30%,transparent); }.side-card header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }.side-card header>span { display:flex; align-items:center; gap:6px; color:var(--c-text-2); font-size:.72rem; font-weight:650; }.side-card header small { color:var(--c-text-3); font-size:.56rem; }
 .overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }.overview-grid div { display:flex; min-width:0; flex-direction:column; padding:9px 5px; border-radius:9px; background:var(--c-bg-1); text-align:center; }.overview-grid strong { color:var(--c-text); font-size:.95rem; font-variant-numeric:tabular-nums; }.overview-grid span { margin-top:3px; color:var(--c-text-3); font-size:.5rem; white-space:nowrap; }.overview-card>p { display:flex; align-items:center; gap:6px; margin:12px 0 0; color:var(--c-text-3); font-size:.57rem; }.overview-card>p i { width:5px; height:5px; border-radius:50%; background:var(--c-primary); box-shadow:0 0 0 3px var(--c-primary-soft); }
 .index-card { padding-bottom:9px; }.index-card button { display:grid; width:100%; grid-template-columns:22px minmax(0,1fr) 14px; align-items:center; gap:7px; padding:8px 2px; border:0; border-top:1px solid color-mix(in srgb,var(--border) 62%,transparent); background:transparent; color:var(--c-text-2); cursor:pointer; text-align:left; font:inherit; }.index-card button:hover { color:var(--c-primary); }.index-card button em { color:var(--c-text-3); font-size:.53rem; font-style:normal; font-variant-numeric:tabular-nums; }.index-card button span { overflow:hidden; font-size:.65rem; text-overflow:ellipsis; white-space:nowrap; }.index-card button :deep(svg) { color:var(--c-text-3); font-size:.7rem; }
 .note-card { position:relative; overflow:hidden; background:linear-gradient(145deg,var(--c-primary-soft),var(--ld-bg-card)); }.note-card> :deep(svg) { color:var(--c-primary); font-size:1.2rem; opacity:.75; }.note-card p { margin:11px 0 0; color:var(--c-text-2); font-size:.68rem; line-height:1.75; }.note-card span { display:block; margin-top:7px; color:var(--c-text-3); font-size:.57rem; }
 .load-more { display:flex; justify-content:center; margin-top:18px; }.load-more button { display:flex; align-items:center; gap:6px; padding:7px 12px; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); color:var(--c-text-3); cursor:pointer; font:inherit; font-size:.67rem; }.load-more button:hover:not(:disabled) { color:var(--c-primary); }.load-more button:disabled { cursor:wait; opacity:.6; }.spinning { animation:spin .8s linear infinite; }
-@keyframes skeleton-wave { from { background-position:100% 0; } to { background-position:-100% 0; } } @keyframes spin { to { transform:rotate(360deg); } }
+@keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:980px) { .content-grid { grid-template-columns:minmax(0,1fr) 230px; } }
 @media (max-width:900px) { .moments-main { padding:max(76px,calc(env(safe-area-inset-top) + 64px)) 18px 38px; }.content-grid { grid-template-columns:1fr; }.moments-sidebar { position:static; grid-template-columns:repeat(2,minmax(0,1fr)); }.note-card { display:none; } }
-@media (max-width:640px) { .moments-hero { min-height:168px; align-items:flex-start; padding:26px 21px; border-radius:16px; }.hero-copy h1 { max-width:270px; font-size:1.7rem; }.hero-copy p { max-width:255px; font-size:.68rem; line-height:1.7; }.hero-count { position:absolute; right:20px; bottom:20px; min-width:auto; padding-left:0; border:0; }.hero-count strong { font-size:1.45rem; }.hero-mark { right:25px; }.content-grid { margin-top:20px; }.stream-header { margin-left:1px; }.moments-sidebar { display:none; }.moment-list,.moment-skeletons { gap:9px; }.moment-skeleton { grid-template-columns:1fr; }.moment-skeleton>i { display:none; } }
-@media (prefers-reduced-motion:reduce) { .moment-skeleton>i,.moment-skeleton b,.moment-skeleton span,.moment-skeleton em,.spinning { animation:none; } }
+@media (max-width:640px) { .moments-hero { min-height:168px; align-items:flex-start; padding:26px 21px; border-radius:16px; }.hero-copy h1 { max-width:270px; font-size:1.7rem; }.hero-copy p { max-width:255px; font-size:.68rem; line-height:1.7; }.hero-count { position:absolute; right:20px; bottom:20px; min-width:auto; padding-left:0; border:0; }.hero-count strong { font-size:1.45rem; }.hero-mark { right:25px; }.content-grid { margin-top:20px; }.stream-header { margin-left:1px; }.moments-sidebar { display:none; }.moment-list { gap:9px; } }
+@media (prefers-reduced-motion:reduce) { .spinning { animation:none; } }
 </style>

@@ -1,12 +1,8 @@
 <template>
-  <div v-if="loading || featured.length" ref="swiperRef" class="swiper-3d-wrap" :class="{ mounted }"
+  <div v-if="!loading && featured.length" ref="swiperRef" class="swiper-3d-wrap content-reveal" :class="{ mounted }"
     @mouseenter="pauseTimer" @mouseleave="restartTimer">
     <div class="section-title">· 精选推荐</div>
-    <div v-if="loading" class="swiper-skeleton" aria-hidden="true">
-      <span v-for="i in 3" :key="i" />
-    </div>
-    <template v-else>
-      <div class="swiper-3d-track" :style="{ transform: `translate3d(${trackOffset}px, 0, 0)` }">
+    <div class="swiper-3d-track" :style="{ transform: `translate3d(${trackOffset}px, 0, 0)` }">
         <NuxtLink v-for="(item, i) in featured" :key="item.slug" :to="'/article/' + item.slug" class="swiper-card-3d"
           :class="slideClasses(i)">
           <img
@@ -29,7 +25,6 @@
         <span v-for="(item, i) in featured" :key="i" class="dot" :class="{ active: i === currentIndex }"
           @click="goTo(i)" />
       </div>
-    </template>
   </div>
 </template>
 
@@ -201,25 +196,6 @@ onUnmounted(() => {
   will-change: transform;
 }
 
-.swiper-skeleton {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  height: 160px;
-}
-
-.swiper-skeleton span {
-  border-radius: 14px;
-  background: linear-gradient(110deg, var(--c-bg-2) 28%, var(--c-bg-3) 45%, var(--c-bg-2) 62%);
-  background-size: 220% 100%;
-  animation: swiper-skeleton 1.4s ease-in-out infinite;
-}
-
-@keyframes swiper-skeleton {
-  0%, 100% { background-position: 100% 0; opacity: 0.68; }
-  50% { background-position: 0 0; opacity: 1; }
-}
-
 .swiper-card-3d {
   flex: 0 0 v-bind('cardWidth + "px"');
   border-radius: 14px;
@@ -383,14 +359,6 @@ onUnmounted(() => {
   .swiper-card-3d img {
     height: 148px;
   }
-
-  .swiper-skeleton {
-    grid-template-columns: 1fr;
-    height: 148px;
-    padding: 0 16px;
-  }
-
-  .swiper-skeleton span:not(:first-child) { display: none; }
 
   .swiper-overlay {
     padding: 13px;

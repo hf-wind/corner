@@ -1,19 +1,7 @@
 <template>
   <div class="page-layout article-page admin-preview">
     <main id="main-content" ref="articleMainRef" class="article-main" :class="{ 'article-ready': articleReady }">
-      <div v-if="loading" class="article-loading-state" aria-label="正在加载文章">
-        <div class="article-skeleton-line skeleton-back" />
-        <div class="article-skeleton-cover" />
-        <div class="article-skeleton-line skeleton-meta" />
-        <div class="article-skeleton-line skeleton-title" />
-        <div class="article-skeleton-line skeleton-title short" />
-        <div class="article-skeleton-excerpt" />
-        <div class="article-skeleton-body">
-          <span v-for="i in 7" :key="i" :style="{ width: `${88 - (i % 3) * 9}%` }" />
-        </div>
-      </div>
-
-      <template v-else-if="article.title">
+      <template v-if="!loading && article.title">
         <NuxtLink to="/admin/posts" class="back-btn">
           <Icon name="ph:arrow-left-bold" />
           返回列表
@@ -158,38 +146,6 @@ watch(slug, load)
   padding: 28px 32px;
   min-width: 0;
   scrollbar-gutter: stable;
-}
-
-.article-loading-state {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding-top: 4px;
-  animation: article-skeleton-pulse 1.35s ease-in-out infinite alternate;
-}
-
-.article-skeleton-line,
-.article-skeleton-cover,
-.article-skeleton-excerpt,
-.article-skeleton-body span {
-  display: block;
-  border-radius: 9px;
-  background: var(--c-bg-2);
-}
-
-.article-skeleton-line { height: 14px; }
-.skeleton-back { width: 88px; height: 12px; }
-.article-skeleton-cover { width: 100%; height: clamp(180px, 34vh, 340px); border-radius: 16px; }
-.skeleton-meta { width: min(420px, 68%); height: 12px; }
-.skeleton-title { width: min(720px, 82%); height: 28px; }
-.skeleton-title.short { width: min(480px, 56%); }
-.article-skeleton-excerpt { width: 100%; height: 70px; border-radius: 14px; }
-.article-skeleton-body { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
-.article-skeleton-body span { height: 12px; }
-
-@keyframes article-skeleton-pulse {
-  from { opacity: 0.55; }
-  to { opacity: 0.92; }
 }
 
 .back-btn {

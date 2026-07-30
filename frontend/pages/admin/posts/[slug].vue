@@ -149,6 +149,19 @@ let autoSaveTimer: ReturnType<typeof setInterval> | null = null
 let hasUnsaved = false
 let originalContent = ''
 
+function postPayload() {
+  return {
+    title: form.value.title,
+    slug: form.value.slug,
+    content: form.value.content,
+    excerpt: form.value.excerpt,
+    coverImage: form.value.coverImage,
+    categoryId: form.value.categoryId,
+    tagIds: [...form.value.tagIds],
+    featured: form.value.featured,
+  }
+}
+
 onMounted(async () => {
   const slug = route.params.slug as string
   const [post, catRes, tagRes] = await Promise.all([
@@ -195,7 +208,7 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
 async function autoSave() {
   if (!hasUnsaved || !form.value.title || !form.value.slug) return
   try {
-    const res = await api.put<any>(`/posts/${route.params.slug}`, form.value)
+    const res = await api.put<any>(`/posts/${route.params.slug}`, postPayload())
     needsPublish.value = res?.needsPublish ?? true
     originalContent = JSON.stringify(form.value)
     hasUnsaved = false
@@ -291,7 +304,7 @@ async function save() {
   form.value.slug = ensureSlug(form.value.slug, form.value.title)
   saving.value = true
   try {
-    const res = await api.put<any>(`/posts/${route.params.slug}`, form.value)
+    const res = await api.put<any>(`/posts/${route.params.slug}`, postPayload())
     needsPublish.value = res?.needsPublish ?? true
     toast.success('保存成功')
     originalContent = JSON.stringify(form.value)

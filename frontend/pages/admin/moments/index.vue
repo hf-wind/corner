@@ -1,30 +1,24 @@
 <template>
   <div class="moment-admin-page">
-    <section class="page-hero">
-      <div>
-        <p class="page-eyebrow">Moment Manager</p>
-        <h1>我的瞬间</h1>
-        <p>这里管理的是单向发布的动态，不和文章混在一起。</p>
-      </div>
-      <a-button type="primary" size="large" @click="$router.push('/admin/moments/create')">
-        <Icon name="ph:plus-bold" />
-        写瞬间
-      </a-button>
-    </section>
-
     <div class="toolbar">
       <a-segmented
         v-model:value="filter.status"
         :options="statusOptions"
         @change="onFilterChange"
       />
-      <a-input-search
-        v-model:value="filter.search"
-        placeholder="搜索标题、摘要或内容..."
-        allow-clear
-        class="search-input"
-        @search="onFilterChange"
-      />
+      <div class="toolbar-actions">
+        <a-input-search
+          v-model:value="filter.search"
+          placeholder="搜索标题、摘要或内容..."
+          allow-clear
+          class="search-input"
+          @search="onFilterChange"
+        />
+        <a-button type="primary" @click="$router.push('/admin/moments/create')">
+          <Icon name="ph:plus-bold" />
+          写瞬间
+        </a-button>
+      </div>
     </div>
 
     <a-card :bordered="false" class="moment-table-card">
@@ -212,39 +206,16 @@ onMounted(() => {
   gap: 18px;
 }
 
-.page-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 22px 24px;
-  border-bottom: 1px solid var(--border);
-  background: var(--c-bg);
-}
-
-.page-eyebrow {
-  margin: 0 0 8px;
-  font-size: 0.74rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--c-text-3);
-}
-
-.page-hero h1 {
-  margin: 0;
-  color: var(--c-text);
-}
-
-.page-hero p:last-child {
-  margin: 8px 0 0;
-  color: var(--c-text-2);
-}
-
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 14px;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .search-input {
@@ -285,17 +256,11 @@ onMounted(() => {
 }
 
 @media (max-width: 760px) {
-  .page-hero {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
   .toolbar {
     flex-direction: column;
   }
 
-  .search-input {
-    max-width: none;
-  }
+  .toolbar-actions { width: 100%; }
+  .search-input { max-width: none; flex: 1; }
 }
 </style>

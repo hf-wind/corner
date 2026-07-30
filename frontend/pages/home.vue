@@ -5,22 +5,7 @@
 
       <div class="section-title">· 最新文章</div>
 
-      <template v-if="loading">
-        <div class="skeleton-list">
-          <div v-for="i in 4" :key="i" class="skeleton-card">
-            <div class="skeleton-cover" />
-            <div class="skeleton-body">
-              <div class="skeleton-line skeleton-line-tag" />
-              <div class="skeleton-line skeleton-line-title" />
-              <div class="skeleton-line skeleton-line-title skeleton-line-short" />
-              <div class="skeleton-line skeleton-line-desc" />
-              <div class="skeleton-line skeleton-line-footer" />
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <div v-else class="article-list-wrap" :class="{ refreshing }" aria-live="polite">
+      <div v-if="!loading" class="article-list-wrap content-reveal" :class="{ refreshing }" aria-live="polite">
         <div v-if="refreshing" class="article-refresh-bar"><span /></div>
         <div v-if="!articles.length" class="article-empty">
           <Icon name="ph:article-bold" />
@@ -226,99 +211,11 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-/* ===== Skeleton ===== */
-
-@keyframes shimmer {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(100%); }
-}
-
-.skeleton-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.skeleton-card {
-  display: flex;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--ld-bg-card);
-  box-shadow: 0 1px 3px var(--ld-shadow);
-  position: relative;
-  contain: layout paint style;
-}
-
-.skeleton-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c-bg-3) 70%, transparent), transparent);
-  animation: shimmer 1.8s ease-in-out infinite;
-  will-change: transform;
-}
-
-.skeleton-cover {
-  width: 140px;
-  aspect-ratio: 140 / 110;
-  flex-shrink: 0;
-  background: var(--c-bg-2);
-}
-
-.skeleton-body {
-  flex: 1;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  justify-content: center;
-}
-
-.skeleton-line {
-  height: 12px;
-  border-radius: 4px;
-  background: var(--c-bg-2);
-}
-
-.skeleton-line-tag { width: 60px; height: 16px; border-radius: 8px; }
-.skeleton-line-title { width: 85%; height: 15px; }
-.skeleton-line-short { width: 50%; }
-.skeleton-line-desc { width: 65%; height: 11px; }
-.skeleton-line-footer { width: 55%; height: 11px; }
-
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-card::after {
-    animation: none;
-  }
-
   .article-refresh-bar span { animation: none; }
 }
 
 @media (max-width: 640px) {
-  .article-list,
-  .skeleton-list {
-    gap: 9px;
-  }
-
-  .skeleton-card {
-    min-height: 112px;
-    border-radius: 12px;
-  }
-
-  .skeleton-cover {
-    width: clamp(96px, 29vw, 112px);
-    min-height: 112px;
-    aspect-ratio: auto;
-  }
-
-  .skeleton-body {
-    padding: 10px;
-  }
-
-  .skeleton-line-desc,
-  .skeleton-line-footer {
-    display: none;
-  }
+  .article-list { gap: 9px; }
 }
 </style>

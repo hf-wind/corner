@@ -263,6 +263,19 @@ html.no-transition, html.no-transition body {
 
 a { text-decoration: none; color: inherit; }
 
+.content-reveal {
+  animation: content-reveal .36s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes content-reveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-reveal { animation: none; }
+}
+
 ::-webkit-scrollbar { display: none; }
 
 .table-spin { min-height:200px; display:flex; align-items:center; justify-content:center; }

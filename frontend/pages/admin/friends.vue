@@ -60,6 +60,9 @@
         <a-form-item label="RSS 地址">
           <a-input v-model:value="siteForm.rssUrl" placeholder="RSS/Atom feed URL" />
         </a-form-item>
+        <a-form-item label="联系邮箱">
+          <a-input v-model:value="siteForm.contactEmail" type="email" placeholder="用于本站资料展示" />
+        </a-form-item>
         <a-button type="primary" :loading="siteSaving" @click="saveSiteInfo">保存本站信息</a-button>
       </a-form>
     </a-card>
@@ -113,7 +116,7 @@ const loading = ref(true)
 const friends = ref<any[]>([])
 const dialog = reactive({ open: false, isEdit: false, editIndex: -1, form: emptyFriend() })
 const siteSaving = ref(false)
-const siteForm = reactive({ name: '', url: '', avatar: '', description: '', rssUrl: '' })
+const siteForm = reactive({ name: '', url: '', avatar: '', description: '', rssUrl: '', contactEmail: '1833079849@qq.com' })
 
 const columns = [
   { title: '', key: 'avatar', width: 54 },
@@ -180,9 +183,10 @@ async function loadSiteInfo() {
       avatar: res?.avatar || '',
       description: res?.description || '',
       rssUrl: res?.rssUrl || '',
+      contactEmail: res?.contactEmail || '1833079849@qq.com',
     })
   } catch {
-    Object.assign(siteForm, { name: '', url: '', avatar: '', description: '', rssUrl: '' })
+    Object.assign(siteForm, { name: '', url: '', avatar: '', description: '', rssUrl: '', contactEmail: '1833079849@qq.com' })
   }
 }
 

@@ -10,7 +10,16 @@ export function useMediaUrl() {
 
   function mediaUrl(path?: string | null) {
     if (!path) return ''
-    if (/^https?:\/\//i.test(path) || path.startsWith('data:')) return path
+    if (/^https?:\/\//i.test(path)) {
+      try {
+        const url = new URL(path)
+        if (['cdn.jsdelivr.net', 'koishi.js.org'].includes(url.hostname.toLowerCase())) {
+          return `/api/emoji-packs/asset?url=${encodeURIComponent(url.toString())}`
+        }
+      } catch { /* keep the original URL */ }
+      return path
+    }
+    if (path.startsWith('data:')) return path
     const normalized = path.startsWith('/') ? path : `/${path}`
     return `${imageBase.value}${normalized}`
   }

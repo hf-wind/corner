@@ -20,9 +20,6 @@
       @cancel-reply="cancelReply"
     />
   </section>
-  <div v-else class="comment-section-skeleton article-anim">
-    <span /><span /><span />
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -98,19 +95,4 @@ async function handleSubmitReply(payload: { content: string; comment: any; paren
 <style scoped>
 .comments-enter { animation: comments-in 0.3s ease; }
 @keyframes comments-in { from { opacity: 0; transform: translateY(8px); } }
-.comment-section-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px 0;
-}
-.comment-section-skeleton span {
-  height: 72px;
-  border-radius: 10px;
-  background: linear-gradient(90deg, var(--c-bg-2), var(--ld-bg-card), var(--c-bg-2));
-  background-size: 220% 100%;
-  animation: skeleton-wave 1.25s linear infinite;
-}
-@keyframes skeleton-wave { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-.article-anim { animation: none; }
 </style>

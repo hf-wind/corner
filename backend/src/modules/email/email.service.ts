@@ -327,13 +327,74 @@ export class EmailService {
     };
   }
 
-  private renderEmailContent(text: string): string {
-    return text
-      .replace(/(?:◆emoji:([^◆]+)◆|\[\[emoji:([^\]|]+)(?:\|[^]]*)?\]\])/g, (_, oldUrl, newUrl) => {
-        const url = oldUrl || newUrl
-        return `<img src="${url}" alt="emoji" style="width:20px;height:20px;vertical-align:middle;display:inline;" />`
-      })
+  private renderEmailContent(text: string, siteUrl: string): string {
+    const emojis: Array<{ source: string; label: string }> = [];
+    const tokenized = String(text || '').replace(
+      /(?:◆emoji:([^◆]+)◆|\[\[emoji:([^\]|]+)(?:\|([^\]]*))?\]\])/g,
+      (_, oldSource, source, label) => {
+        const index = emojis.push({
+          source: String(oldSource || source || '').trim(),
+          label: String(label || '表情').trim(),
+        }) - 1;
+        return `EMAIL_EMOJI_${index}`;
+      },
+    );
+
+    return this.escapeHtml(tokenized)
       .replace(/\n/g, '<br>')
+      .replace(/EMAIL_EMOJI_(\d+)/g, (_, rawIndex) => {
+        const emoji = emojis[Number(rawIndex)];
+        return emoji ? this.renderEmailEmoji(emoji.source, emoji.label, siteUrl) : '';
+      });
+  }
+
+  private renderEmailEmoji(source: string, label: string, siteUrl: string): string {
+    const original = this.unwrapEmojiProxy(source);
+    const twemoji = this.twemojiCharacter(original);
+    if (twemoji) return this.escapeHtml(twemoji);
+
+    const baseUrl = siteUrl.replace(/\/$/, '');
+    let imageUrl = source;
+    try {
+      const remote = new URL(original);
+      if (['cdn.jsdelivr.net', 'koishi.js.org'].includes(remote.hostname.toLowerCase())) {
+        imageUrl = `${baseUrl}/api/emoji-packs/asset?url=${encodeURIComponent(remote.toString())}`;
+      }
+    } catch {
+      if (source.startsWith('/')) imageUrl = `${baseUrl}${source}`;
+    }
+    if (!/^(?:https?:\/\/)/i.test(imageUrl)) return this.escapeHtml(label);
+    return `<img src="${this.escapeHtml(imageUrl)}" alt="${this.escapeHtml(label)}" style="width:20px;height:20px;vertical-align:-4px;display:inline-block;object-fit:contain;" />`;
+  }
+
+  private unwrapEmojiProxy(source: string): string {
+    if (!source.startsWith('/api/emoji-packs/asset')) return source;
+    try {
+      return new URL(source, 'https://corner.local').searchParams.get('url') || source;
+    } catch {
+      return source;
+    }
+  }
+
+  private twemojiCharacter(source: string): string {
+    if (!/twemoji/i.test(source)) return '';
+    const codepoints = source.match(/\/([0-9a-f]+(?:-[0-9a-f]+)*)\.(?:png|svg)(?:\?|$)/i)?.[1];
+    if (!codepoints) return '';
+    try {
+      return String.fromCodePoint(...codepoints.split('-').map((value) => Number.parseInt(value, 16)));
+    } catch {
+      return '';
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[character] || character);
   }
 
   private getVerificationCodeTemplate(code: string, type: string): string {
@@ -403,7 +464,7 @@ export class EmailService {
     
       <div style="background:#f8f9fa;border-left:4px solid #5b8def;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
         <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
-          "${this.renderEmailContent(data.content)}"
+          "${this.renderEmailContent(data.content, siteUrl)}"
         </p>
       </div>
       
@@ -453,7 +514,7 @@ export class EmailService {
     
       <div style="background:#f8f9fa;border-left:4px solid #7c6bef;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
         <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
-          "${this.renderEmailContent(data.content)}"
+          "${this.renderEmailContent(data.content, siteUrl)}"
         </p>
       </div>
     
@@ -499,7 +560,7 @@ export class EmailService {
     <div style="margin:20px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
       <p style="margin:0 0 10px;color:#475569;line-height:1.6;">${data.sourceType}：<strong>${data.sourceTitle}</strong></p>
       <p style="margin:0 0 10px;color:#475569;line-height:1.6;">评论人：<strong>${data.authorName}</strong></p>
-      <div style="padding:12px;background:#f8fafc;border-radius:8px;color:#334155;line-height:1.7;">${this.renderEmailContent(data.content)}</div>
+      <div style="padding:12px;background:#f8fafc;border-radius:8px;color:#334155;line-height:1.7;">${this.renderEmailContent(data.content, data.siteUrl)}</div>
     </div>
     <p style="margin:0 0 18px;"><span style="display:inline-block;padding:5px 10px;border-radius:6px;background:${statusBackground};color:${statusColor};font-weight:700;">${statusText}</span></p>
     ${!data.approved && data.reason ? `<p style="color:#b91c1c;line-height:1.6;">原因：${data.reason}</p>` : ''}

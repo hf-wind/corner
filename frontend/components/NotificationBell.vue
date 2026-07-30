@@ -103,11 +103,13 @@ function updatePanelPosition() {
   const rect = bellRef.value.getBoundingClientRect()
   const panelWidth = Math.min(320, window.innerWidth - 24)
   const left = Math.min(Math.max(12, rect.right - panelWidth), window.innerWidth - panelWidth - 12)
-  const estimatedHeight = 380
-  const top = rect.bottom + 8
+  const panelHeight = panelRef.value?.getBoundingClientRect().height || 240
+  const below = rect.bottom + 8
+  const above = rect.top - panelHeight - 8
+  const top = below + panelHeight <= window.innerHeight - 12 ? below : Math.max(12, above)
   panelPos.value = {
     position: 'fixed',
-    top: `${Math.max(12, Math.min(top, window.innerHeight - estimatedHeight - 12))}px`,
+    top: `${top}px`,
     left: `${left}px`,
   }
 }
@@ -116,7 +118,7 @@ function togglePanel() {
   panelOpen.value = !panelOpen.value
   if (panelOpen.value) {
     updatePanelPosition()
-    void loadLatest()
+    void loadLatest().finally(() => nextTick(updatePanelPosition))
     onScroll = () => updatePanelPosition()
     onResize = () => updatePanelPosition()
     window.addEventListener('scroll', onScroll, { passive: true })

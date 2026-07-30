@@ -67,6 +67,8 @@ onUnmounted(() => observer?.disconnect())
 <style scoped>
 .article-md-wrap {
   width: 100%;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .article-md-wrap :deep(.article-md-preview) {
@@ -87,7 +89,8 @@ onUnmounted(() => observer?.disconnect())
 
 .article-md-wrap :deep(.md-editor-preview-wrapper) {
   padding: 0;
-  background: transparent;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .article-md-wrap :deep(.md-editor-preview) {
@@ -95,6 +98,8 @@ onUnmounted(() => observer?.disconnect())
   font-size: 0.95rem;
   line-height: 1.9;
   color: var(--c-text);
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .article-md-wrap :deep(.md-editor-preview h1),

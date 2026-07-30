@@ -1,5 +1,32 @@
 # 风隅随笔部署手册
 
+## 无本地数据库的开发环境
+
+开发数据使用服务器上的独立 Compose 项目 `corner-dev-data`，与生产数据库、Redis、目录和凭据完全隔离。两个端口只监听服务器回环地址，必须通过 `ubuntu` 账户的 SSH 隧道访问，不对公网开放。
+
+Windows PowerShell 终端 1：
+
+```powershell
+.\scripts\dev-tunnel.ps1
+```
+
+首次使用时，脚本会在服务器 `/srv/corner/dev-data` 生成独立凭据并启动数据服务，然后在本地生成被 Git 忽略的 `backend/.env.tunnel`。保持隧道终端开启，再执行：
+
+```powershell
+cd backend
+npm run tunnel:init
+npm run start:dev:tunnel
+```
+
+终端 3 启动前端：
+
+```powershell
+cd frontend
+npm run dev
+```
+
+后续启动可使用 `.\scripts\dev-tunnel.ps1 -SkipSetup`。本地访问地址为前端 `http://localhost:3000`、后端 `http://localhost:4000/api`；本地无需安装 PostgreSQL 或 Redis。
+
 日常运维、日志、备份邮件、版本发布和故障处理见 [OPERATIONS.md](./OPERATIONS.md)。
 
 生产环境使用 Docker Compose。宿主机只需安装 Docker、Git 和基础运维工具，Node.js、PostgreSQL、Redis、前端及后端运行环境都封装在镜像中。

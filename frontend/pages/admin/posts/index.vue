@@ -1,15 +1,11 @@
 <template>
   <div>
-    <div class="table-toolbar">
-      <a-select v-model:value="filter.status" placeholder="状态" style="width:110px" @change="onFilterChange" allow-clear>
-        <a-select-option value="all">全部</a-select-option>
-        <a-select-option value="published">已发布</a-select-option>
-        <a-select-option value="draft">草稿</a-select-option>
-        <a-select-option value="pending">待发布</a-select-option>
-      </a-select>
-      <a-input v-model:value="filter.search" placeholder="搜索文章标题..." style="width:220px" @pressEnter="loadPosts" allow-clear />
-      <a-button @click="loadPosts">搜索</a-button>
-      <a-button type="primary" @click="$router.push('/admin/posts/create')">写文章</a-button>
+    <div class="table-toolbar post-toolbar">
+      <a-segmented v-model:value="filter.status" :options="statusOptions" @change="onFilterChange" />
+      <div class="post-toolbar-actions">
+        <a-input-search v-model:value="filter.search" placeholder="搜索文章标题..." allow-clear class="post-search" @search="onFilterChange" />
+        <a-button type="primary" @click="$router.push('/admin/posts/create')"><Icon name="ph:plus-bold" /> 写文章</a-button>
+      </div>
     </div>
 
     <a-spin :spinning="loading" class="table-spin">
@@ -75,6 +71,12 @@ const total = ref(0)
 const totalPages = ref(1)
 const filter = ref({ status: 'all', search: '' })
 const publishingSlug = ref('')
+const statusOptions = [
+  { label: '全部', value: 'all' },
+  { label: '已发布', value: 'published' },
+  { label: '草稿', value: 'draft' },
+  { label: '待发布', value: 'pending' },
+]
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', minWidth: 200 },
@@ -171,8 +173,16 @@ onMounted(loadPosts)
 
 <style scoped>
 .table-toolbar { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
+.post-toolbar { justify-content:space-between; }
+.post-toolbar-actions { display:flex; gap:8px; }
+.post-search { width:260px; }
 .list-card { border-radius:8px; }
 .post-title { font-weight:500; font-size:0.85rem; display:inline-flex; align-items:center; gap:8px; }
 .pending-badge { transform: scale(0.85); }
 .table-pagination { display:flex; justify-content:center; padding:16px 0 4px; }
+@media (max-width:700px) {
+  .post-toolbar { align-items:stretch; flex-direction:column; }
+  .post-toolbar-actions { width:100%; }
+  .post-search { width:auto; flex:1; }
+}
 </style>

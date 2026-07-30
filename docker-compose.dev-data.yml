@@ -1,0 +1,37 @@
+name: corner-dev-data
+
+services:
+  postgres-dev:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DEV_POSTGRES_DB:-corner_dev}
+      POSTGRES_USER: ${DEV_POSTGRES_USER:-corner_dev}
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:?DEV_POSTGRES_PASSWORD is required}
+    ports:
+      - "127.0.0.1:${DEV_POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - ${DEV_DATA_ROOT:?DEV_DATA_ROOT is required}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DEV_POSTGRES_USER:-corner_dev} -d ${DEV_POSTGRES_DB:-corner_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+
+  redis-dev:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${DEV_REDIS_PASSWORD:?DEV_REDIS_PASSWORD is required}", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${DEV_REDIS_PORT:-16379}:6379"
+    volumes:
+      - ${DEV_DATA_ROOT:?DEV_DATA_ROOT is required}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${DEV_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true

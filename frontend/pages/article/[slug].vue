@@ -2,19 +2,7 @@
   <div class="page-layout article-page">
     <main id="main-content" ref="articleMainRef" class="article-main" :class="{ 'article-ready': articleReady }"
       @scroll.passive="handleArticleScroll">
-      <div v-if="articleLoading" class="article-loading-state" aria-label="正在加载文章">
-        <div class="article-skeleton-line skeleton-back" />
-        <div class="article-skeleton-cover" />
-        <div class="article-skeleton-line skeleton-meta" />
-        <div class="article-skeleton-line skeleton-title" />
-        <div class="article-skeleton-line skeleton-title short" />
-        <div class="article-skeleton-excerpt" />
-        <div class="article-skeleton-body">
-          <span v-for="i in 7" :key="i" :style="{ width: `${88 - (i % 3) * 9}%` }" />
-        </div>
-      </div>
-
-      <template v-else>
+      <template v-if="!articleLoading">
       <NuxtLink to="/home" class="back-btn">
         <Icon name="ph:arrow-left-bold" />
         返回首页
@@ -326,51 +314,6 @@ onUnmounted(() => {
   padding: 28px 32px;
   min-width: 0;
   scrollbar-gutter: stable;
-}
-
-.article-loading-state {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding-top: 4px;
-  animation: article-skeleton-pulse 1.35s ease-in-out infinite alternate;
-}
-
-.article-skeleton-line,
-.article-skeleton-cover,
-.article-skeleton-excerpt,
-.article-skeleton-body span {
-  display: block;
-  border-radius: 9px;
-  background: var(--c-bg-2);
-}
-
-.article-skeleton-line { height: 14px; }
-.skeleton-back { width: 88px; height: 12px; }
-.article-skeleton-cover { width: 100%; height: clamp(180px, 34vh, 340px); border-radius: 16px; }
-.skeleton-meta { width: min(420px, 68%); height: 12px; }
-.skeleton-title { width: min(720px, 82%); height: 28px; }
-.skeleton-title.short { width: min(480px, 56%); }
-.article-skeleton-excerpt { width: 100%; height: 70px; border-radius: 14px; }
-.article-skeleton-body { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
-.article-skeleton-body span { height: 12px; }
-
-.comment-section-skeleton {
-  display: grid;
-  gap: 10px;
-  margin: 34px 0 24px;
-}
-
-.comment-section-skeleton span {
-  display: block;
-  height: 74px;
-  border-radius: 14px;
-  background: var(--c-bg-1);
-}
-
-@keyframes article-skeleton-pulse {
-  from { opacity: 0.55; }
-  to { opacity: 0.92; }
 }
 
 .article-main::-webkit-scrollbar {
@@ -714,9 +657,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
-  .article-skeleton-cover { height: 210px; border-radius: 12px; }
-  .skeleton-title { height: 23px; width: 92%; }
-
   .back-btn {
     margin-bottom: 14px;
   }

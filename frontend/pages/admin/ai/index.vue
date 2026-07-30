@@ -91,7 +91,7 @@
                   <a-switch v-model:checked="form.ai_friend_moderation_enabled" />
                 </div>
                 <div class="switch-item">
-                  <span>书影音资料</span>
+                  <span>书影资料</span>
                   <a-switch v-model:checked="form.ai_library_enabled" />
                 </div>
               </div>
@@ -242,14 +242,14 @@
             </a-card>
           </div>
 
-          <a-card size="small" title="书影音 AI" :bordered="false" class="section-card">
+          <a-card size="small" title="书影 AI" :bordered="false" class="section-card">
             <a-form layout="vertical" size="middle">
               <a-form-item label="资料整理提示词">
                 <a-textarea v-model:value="form.ai_library_prompt" :rows="6" />
               </a-form-item>
               <a-row :gutter="16">
                 <a-col :xs="24" :sm="8">
-                  <a-form-item label="书影音模型">
+                  <a-form-item label="书影模型">
                     <a-select v-model:value="form.ai_library_model_config_id" :options="modelOptions" allow-clear placeholder="默认模型" />
                   </a-form-item>
                 </a-col>

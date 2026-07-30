@@ -1,7 +1,7 @@
 <template>
   <div class="library-admin">
     <header class="admin-heading">
-      <div><h1>书影音</h1><p>管理阅读与观影收藏、体会、摘录和个人排名。</p></div>
+      <div><h1>书影</h1><p>管理阅读与观影收藏、体会、摘录和个人排名。</p></div>
       <a-button type="primary" @click="router.push('/admin/library/create')"><Icon name="ph:plus-bold" /> 新增记录</a-button>
     </header>
 
@@ -105,7 +105,7 @@ function remove(item: LibraryItem) {
 }
 
 onMounted(load)
-useHead({ title: '书影音管理' })
+useHead({ title: '书影管理' })
 </script>
 
 <style scoped>

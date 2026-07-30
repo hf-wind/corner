@@ -41,8 +41,11 @@ export class PostController {
   }
 
   @Get(':slug')
-  findBySlug(@Param('slug') slug: string) {
-    return this.post.findBySlug(slug);
+  findBySlug(@Param('slug') slug: string, @Req() req: any) {
+    return this.post.findBySlug(slug, {
+      ip: req.ip || req.socket?.remoteAddress || '',
+      userAgent: req.get?.('user-agent') || '',
+    });
   }
 
   @Get(':slug/adjacent')

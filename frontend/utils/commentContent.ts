@@ -13,8 +13,24 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;')
 }
 
-function emojiImage(source: string, label: string, resolveMedia: MediaResolver) {
-  return `<img src="${escapeHtml(resolveMedia(source))}" alt="${escapeHtml(label || 'emoji')}" class="inline-emoji" loading="lazy" />`
+export function twemojiCharacter(source: string) {
+  let candidate = String(source || '').trim()
+  if (candidate.startsWith('/api/emoji-packs/asset')) {
+    try { candidate = new URL(candidate, 'https://corner.local').searchParams.get('url') || candidate } catch { /* ignore */ }
+  }
+  const codepoints = candidate.match(/\/([0-9a-f]+(?:-[0-9a-f]+)*)\.(?:png|svg)(?:\?|$)/i)?.[1]
+  if (!codepoints || !/twemoji/i.test(candidate)) return ''
+  try {
+    return String.fromCodePoint(...codepoints.split('-').map(value => Number.parseInt(value, 16)))
+  } catch {
+    return ''
+  }
+}
+
+export function renderInlineEmoji(source: string, label: string, resolveMedia: MediaResolver, className = 'inline-emoji') {
+  const character = twemojiCharacter(source)
+  if (character) return escapeHtml(character)
+  return `<img src="${escapeHtml(resolveMedia(source))}" alt="${escapeHtml(label || 'emoji')}" class="${escapeHtml(className)}" loading="lazy" />`
 }
 
 export function renderCommentContent(text: string, resolveMedia: MediaResolver) {
@@ -33,13 +49,13 @@ export function renderCommentContent(text: string, resolveMedia: MediaResolver) 
       const cleanUrl = url.replace(/[),.!?;:]+$/, '')
       const suffix = url.slice(cleanUrl.length)
       if (IMAGE_URL_RE.test(cleanUrl) || cleanUrl.includes('cdn.jsdelivr.net/gh/twitter/twemoji')) {
-        return `${emojiImage(cleanUrl, 'emoji', resolveMedia)}${suffix}`
+        return `${renderInlineEmoji(cleanUrl, 'emoji', resolveMedia)}${suffix}`
       }
       return `<a href="${escapeHtml(cleanUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cleanUrl)}</a>${suffix}`
     })
     .replace(/COMMENT_EMOJI_(\d+)/g, (_, rawIndex) => {
       const emoji = emojis[Number(rawIndex)]
-      return emoji?.source ? emojiImage(emoji.source, emoji.label, resolveMedia) : ''
+      return emoji?.source ? renderInlineEmoji(emoji.source, emoji.label, resolveMedia) : ''
     })
     .replace(/(^|>)(@[^\s<]+)/g, '$1<span class="reply-mention">$2</span>')
 }

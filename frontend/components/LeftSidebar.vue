@@ -179,8 +179,9 @@ const siteNav = [
 const adminFullNav = [
   { to: '/admin/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/admin', icon: 'ph:gauge-bold', label: '仪表盘' },
+  { to: '/admin/analytics', icon: 'ph:chart-line-up-bold', label: '访问统计' },
   { to: '/admin/posts', icon: 'ph:article-bold', label: '文章' },
-  { to: '/admin/library', icon: 'ph:books-bold', label: '书影音' },
+  { to: '/admin/library', icon: 'ph:books-bold', label: '书影' },
   { to: '/admin/categories', icon: 'ph:folder-open-bold', label: '分类' },
   { to: '/admin/tags', icon: 'ph:tag-bold', label: '标签' },
   { to: '/admin/comments', icon: 'ph:chat-circle-dots-bold', label: '评论' },

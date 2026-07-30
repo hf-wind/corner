@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostQueryDto } from './dto/post-query.dto';
+import { createHash } from 'node:crypto';
 
 type PublishedPostSnapshot = {
   title: string;
@@ -14,6 +15,11 @@ type PublishedPostSnapshot = {
   featured: boolean;
   category: { id: string; name: string; slug: string } | null;
   tags: Array<{ id: string; name: string; slug: string }>;
+};
+
+type VisitContext = {
+  ip?: string;
+  userAgent?: string;
 };
 
 const postInclude = {
@@ -61,16 +67,48 @@ export class PostService {
     return this.isAdminListQuery(query) ? this.findAdminList(query) : this.findPublicList(query);
   }
 
-  async findBySlug(slug: string) {
+  async findBySlug(slug: string, visit: VisitContext = {}) {
     const post = await this.findPublishedByAnySlug(slug);
     if (!post) throw new NotFoundException('Post not found');
 
-    await this.prisma.post.update({
-      where: { id: post.id },
-      data: { viewCount: { increment: 1 } },
-    });
+    const counted = await this.recordUniqueView(post.id, visit);
+    return this.formatPublic({ ...post, viewCount: post.viewCount + (counted ? 1 : 0) });
+  }
 
-    return this.formatPublic({ ...post, viewCount: post.viewCount + 1 });
+  private async recordUniqueView(postId: string, visit: VisitContext) {
+    const userAgent = String(visit.userAgent || '').slice(0, 500);
+    if (/bot|crawler|spider|slurp|preview|headless|lighthouse|uptime|monitor/i.test(userAgent)) {
+      return false;
+    }
+
+    const fingerprint = `${String(visit.ip || 'unknown')}|${userAgent || 'unknown'}`;
+    const ipHash = createHash('sha256').update(fingerprint).digest('hex');
+    const visitDay = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const salt = process.env.VIEW_COUNT_SALT || process.env.JWT_SECRET || 'corner-view-count';
+    const visitKey = createHash('sha256')
+      .update(`${postId}|${visitDay}|${ipHash}|${salt}`)
+      .digest('hex');
+
+    try {
+      await this.prisma.$transaction(async (transaction) => {
+        await transaction.visitStat.create({
+          data: { postId, visitKey, ipHash },
+        });
+        await transaction.post.update({
+          where: { id: postId },
+          data: { viewCount: { increment: 1 } },
+        });
+      });
+      return true;
+    } catch (error: any) {
+      if (error?.code === 'P2002') return false;
+      throw error;
+    }
   }
 
   async preview(slug: string) {

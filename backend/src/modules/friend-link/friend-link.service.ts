@@ -26,6 +26,7 @@ type SiteInfo = {
   description?: string;
   avatar?: string;
   rssUrl?: string;
+  contactEmail?: string;
 };
 
 type InspectedSiteInfo = {
@@ -58,6 +59,7 @@ export class FriendLinkService {
       description: this.stringValue(value.description),
       avatar: this.stringValue(value.avatar),
       rssUrl: this.stringValue(value.rssUrl),
+      contactEmail: this.stringValue(value.contactEmail) || '1833079849@qq.com',
     };
   }
 
@@ -68,6 +70,7 @@ export class FriendLinkService {
       description: this.stringValue(data.description),
       avatar: this.optionalUrl(data.avatar, '站点头像'),
       rssUrl: this.optionalUrl(data.rssUrl, 'RSS 地址'),
+      contactEmail: this.optionalEmail(data.contactEmail),
     };
     await this.settings.set('my_site_info', info);
     return info;
@@ -651,6 +654,13 @@ export class FriendLinkService {
   private optionalUrl(value: unknown, label: string) {
     const text = this.stringValue(value);
     return text ? this.validUrl(text, label) : '';
+  }
+
+  private optionalEmail(value: unknown) {
+    const text = this.stringValue(value).toLowerCase();
+    if (!text) return '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) throw new BadRequestException('联系邮箱格式不正确');
+    return text;
   }
 
   private validUrl(value: unknown, label: string) {

@@ -3,7 +3,7 @@
     <header class="form-header">
       <div>
         <a-button type="text" class="back-button" @click="router.push('/admin/library')">
-          <Icon name="ph:arrow-left-bold" /> 返回书影音
+          <Icon name="ph:arrow-left-bold" /> 返回书影
         </a-button>
         <h1>{{ item ? '编辑收藏记录' : '新增收藏记录' }}</h1>
         <p>把故事资料与自己的阅读、观影感受一起留下。</p>
@@ -263,9 +263,27 @@ async function save() {
   if (!form.title.trim()) { toast.warning('请填写名称'); return }
   if (!form.slug.trim()) { toast.warning('请填写 Slug'); return }
   const payload: Record<string, any> = {
-    ...form,
-    title: form.title.trim(), slug: form.slug.trim(),
+    type: form.type,
+    title: form.title.trim(),
+    originalTitle: form.originalTitle,
+    slug: form.slug.trim(),
+    coverImage: form.coverImage,
+    creator: form.creator,
+    director: form.director,
+    summary: form.summary,
+    reflection: form.reflection,
+    publishStatus: form.publishStatus,
+    progressStatus: form.progressStatus,
+    rating: form.rating,
+    rank: form.rank,
+    recommended: form.recommended,
     experienceDate: form.experienceDate ? `${form.experienceDate}-01` : null,
+    releaseYear: form.releaseYear,
+    country: form.country,
+    language: form.language,
+    runtimeMinutes: form.runtimeMinutes,
+    episodeCount: form.episodeCount,
+    platform: form.platform,
     genres: splitComma(genresText.value), cast: splitComma(castText.value),
     highlights: splitLines(highlightsText.value), quotes: splitLines(quotesText.value),
   }

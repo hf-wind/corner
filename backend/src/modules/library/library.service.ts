@@ -35,7 +35,7 @@ export class LibraryService {
     if (!cleanTitle) throw new BadRequestException('请先输入书名或影视名');
     const aiConfig = await this.ai.getConfig();
     if (!aiConfig.ai_library_enabled) {
-      throw new ServiceUnavailableException('书影音 AI 资料整理已在后台关闭');
+      throw new ServiceUnavailableException('书影 AI 资料整理已在后台关闭');
     }
     const sources = await this.lookupPublicSources(type, cleanTitle);
     const workFields = type === 'book'
@@ -172,13 +172,13 @@ export class LibraryService {
 
   async findById(id: string) {
     const item = await this.prisma.libraryItem.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException('书影音记录不存在');
+    if (!item) throw new NotFoundException('书影记录不存在');
     return this.presentItem(item);
   }
 
   async findPublishedBySlug(slug: string) {
     const item = await this.prisma.libraryItem.findFirst({ where: { slug, publishStatus: 'published' } });
-    if (!item) throw new NotFoundException('书影音记录不存在或尚未发布');
+    if (!item) throw new NotFoundException('书影记录不存在或尚未发布');
     void this.prisma.libraryItem.update({ where: { id: item.id }, data: { viewCount: { increment: 1 } } }).catch(() => undefined);
     return this.presentItem(item);
   }

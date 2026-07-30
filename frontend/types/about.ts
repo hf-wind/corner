@@ -22,6 +22,7 @@ export interface AboutFact {
 
 export interface AboutProfile {
   name: string
+  badge: string
   role: string
   motto: string
   avatarUrl: string
@@ -38,11 +39,12 @@ export interface AboutProfile {
 export function createAboutProfile(): AboutProfile {
   return {
     name: 'huifeng',
-    role: '青海人 · 写代码 · 骑车闲游',
+    badge: '开发者',
+    role: '绍兴 · 写代码 · 骑车闲游',
     motto: '听风于隅，漫写人间',
     avatarUrl: '',
-    location: '中国 · 青海',
-    availability: '普通人，慢慢写，认真过日子',
+    location: '中国 · 绍兴',
+    availability: '持续写作，也持续学习',
     introduction: '余籍青海，少习计算机之术，科班出身。癸卯年入某市电信实习，从软件开发之事；甲辰七月转正，遂以此为业。迄今所作，横跨掌中 App、小程序与案头 PC 三端，亦曾铺陈驾驶舱数据大屏。又参与数字孪生项目，司 UE 与前端相联，使虚景能应实数。技未敢言精，不过逢题拆题，遇坑填坑，日拱一卒而已。\n\n大学之时，曾为青协志愿者干事，写策划数篇，张罗活动若干。所为皆寻常，却由此略知：一事之成，多赖众人彼此搭手。今二十五，狮子座，A 型血；若问 SBti，则曰“吗喽”，聊以自嘲。烟不沾，酒少饮，偶遇米酒果酒，亦浅尝而止。\n\n工作之外，好骑车，也爱四处闲游。去处未必远，风景未必盛；只消有路可走、有风可听，便觉一日不算虚度。此间名“风隅随笔”，存技术所得，记书影所感，也收日常微末。自知不过普通人，无宏图可陈，惟愿少些喧哗，多些诚实；听风于隅，漫写人间。',
     socialLinks: [
       { label: 'Email', url: 'mailto:hello@corner.ink', icon: 'ph:envelope-simple-bold' },
@@ -76,10 +78,17 @@ export function normalizeAboutProfile(value: unknown): AboutProfile {
   const defaults = createAboutProfile()
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaults
   const source = value as Partial<AboutProfile>
+  const role = source.role === '青海人 · 写代码 · 骑车闲游' ? defaults.role : source.role
+  const location = source.location === '中国 · 青海' ? defaults.location : source.location
+  const availability = source.availability === '普通人，慢慢写，认真过日子' ? defaults.availability : source.availability
 
   return {
     ...defaults,
     ...source,
+    badge: typeof source.badge === 'string' && source.badge.trim() ? source.badge.trim() : defaults.badge,
+    role: typeof role === 'string' ? role : defaults.role,
+    location: typeof location === 'string' ? location : defaults.location,
+    availability: typeof availability === 'string' ? availability : defaults.availability,
     socialLinks: Array.isArray(source.socialLinks) ? source.socialLinks.filter(isSocialLink) : defaults.socialLinks,
     skills: Array.isArray(source.skills) ? source.skills.filter(isSkill).map((item) => ({
       name: item.name,

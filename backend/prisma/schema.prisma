@@ -249,6 +249,7 @@ model AiModelConfig {
 model VisitStat {
   id        String   @id @default(uuid()) @db.Uuid
   postId    String?  @map("post_id") @db.Uuid
+  visitKey  String?  @unique @map("visit_key") @db.VarChar(64)
   ipHash    String?  @map("ip_hash") @db.VarChar(64)
   userAgent String?  @map("user_agent") @db.Text
   visitedAt DateTime @default(now()) @map("visited_at")

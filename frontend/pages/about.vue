@@ -13,10 +13,10 @@
 
           <div class="hero-grid">
             <div class="profile-copy">
-              <p class="eyebrow">ABOUT / FROM QINGHAI</p>
+              <p class="eyebrow">ABOUT / PROFILE</p>
               <div class="name-line">
                 <h1>{{ profile.name }}</h1>
-                <span>普通人</span>
+                <span v-if="profile.badge">{{ profile.badge }}</span>
               </div>
               <p class="role">{{ profile.role }}</p>
               <blockquote>“{{ profile.motto }}”</blockquote>
@@ -58,7 +58,7 @@
         <section class="story-band reveal-block">
           <div class="section-heading">
             <span>01</span>
-            <div><p>AN ORDINARY PERSON</p><h2>小传</h2></div>
+            <div><p>MY STORY</p><h2>小传</h2></div>
           </div>
 
           <div class="story-layout">
@@ -122,7 +122,7 @@
 
         <footer class="about-footer reveal-block">
           <div>
-            <p>风从青海来，字在一隅落下。</p>
+            <p>{{ profile.motto }}</p>
             <span>{{ currentYear }} · 风隅随笔</span>
           </div>
           <strong>{{ profile.name }}</strong>

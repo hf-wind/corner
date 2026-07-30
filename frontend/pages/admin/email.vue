@@ -4,26 +4,26 @@
       <template #title>
         <div class="card-header">
           <span>邮件记录</span>
-          <a-space>
-            <a-select v-model:value="filterType" placeholder="邮件类型" allowClear style="width:140px" @change="loadLogs">
+          <div class="filter-bar">
+            <a-select v-model:value="filterType" placeholder="邮件类型" allowClear class="type-filter" @change="loadLogs">
               <a-select-option value="verification">验证码</a-select-option>
               <a-select-option value="comment_notification">评论通知</a-select-option>
               <a-select-option value="reply_notification">回复通知</a-select-option>
               <a-select-option value="like_notification">点赞通知</a-select-option>
             </a-select>
-            <a-select v-model:value="filterStatus" placeholder="发送状态" allowClear style="width:120px" @change="loadLogs">
+            <a-select v-model:value="filterStatus" placeholder="发送状态" allowClear class="status-filter" @change="loadLogs">
               <a-select-option value="pending">待发送</a-select-option>
               <a-select-option value="sending">发送中</a-select-option>
               <a-select-option value="sent">已发送</a-select-option>
               <a-select-option value="failed">失败</a-select-option>
             </a-select>
             <a-button @click="loadLogs">刷新</a-button>
-          </a-space>
+          </div>
         </div>
       </template>
 
       <a-spin :spinning="loading">
-        <a-table :dataSource="logs" :columns="columns" :pagination="pagination" @change="handleTableChange" rowKey="id" size="middle">
+        <a-table :dataSource="logs" :columns="columns" :pagination="pagination" :scroll="{ x: 1420 }" @change="handleTableChange" rowKey="id" size="middle">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'type'">
               <a-tag :color="getTypeColor(record.type)">{{ getTypeLabel(record.type) }}</a-tag>
@@ -34,6 +34,9 @@
             <template v-if="column.key === 'content'">
               <span v-if="record.content" class="content-text">{{ truncate(stripHtml(record.content), 50) }}</span>
               <span v-else>-</span>
+            </template>
+            <template v-if="column.key === 'subject'">
+              <a-tooltip :title="record.subject"><span class="subject-text">{{ record.subject }}</span></a-tooltip>
             </template>
             <template v-if="column.key === 'createdAt'">
               {{ formatDate(record.createdAt) }}
@@ -114,7 +117,7 @@ const pagination = reactive({
 
 const columns = [
   { title: '收件人', dataIndex: 'to', key: 'to', width: 180 },
-  { title: '主题', dataIndex: 'subject', key: 'subject', width: 220 },
+  { title: '主题', dataIndex: 'subject', key: 'subject', width: 300 },
   { title: '类型', dataIndex: 'type', key: 'type', width: 110 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
   { title: '内容', dataIndex: 'content', key: 'content', width: 300 },
@@ -238,6 +241,11 @@ function stripHtml(html: string) {
   align-items: center;
 }
 
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+.type-filter { width: 140px; }
+.status-filter { width: 120px; }
+.subject-text { display: block; overflow: hidden; color: var(--c-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
 .error-text {
   color: #ef4444;
   font-size: 0.82rem;
@@ -291,11 +299,16 @@ function stripHtml(html: string) {
 }
 
 .detail-content {
-  background: #f8f9fa;
+  background: var(--c-bg-1);
   padding: 12px;
   border-radius: 6px;
   line-height: 1.6;
   font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .card-header { align-items: stretch; flex-direction: column; gap: 10px; }
+  .filter-bar, .type-filter, .status-filter { width: 100%; }
 }
 
 .detail-content :deep(img) {

@@ -23,12 +23,6 @@
       <p>暂无评论，快来抢沙发吧~</p>
     </div>
 
-    <div v-if="loading && !comments.length" class="comment-skeletons">
-      <div v-for="n in 3" :key="n" class="skeleton-item">
-        <span class="skeleton-avatar" /><div><span class="skeleton-line short" /><span class="skeleton-line" /><span class="skeleton-line short" /></div>
-      </div>
-    </div>
-
     <transition-group name="comment-fade" tag="div" class="comment-list">
       <CommonCommentItem
         v-for="c in sortedComments"
@@ -147,30 +141,6 @@ function handleSubmit(content: string) {
   flex-direction: column;
   gap: 14px;
 }
-.comment-skeletons { display: flex; flex-direction: column; gap: 14px; }
-.skeleton-item {
-  display: flex;
-  gap: 14px;
-  padding: 17px 16px;
-  border-radius: 16px;
-  background: var(--ld-bg-card);
-}
-.skeleton-avatar {
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  background: var(--c-bg-2);
-  flex-shrink: 0;
-}
-.skeleton-item > div { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-.skeleton-line {
-  height: 12px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--c-bg-2), var(--ld-bg-card), var(--c-bg-2));
-  background-size: 220% 100%;
-  animation: skeleton-wave 1.25s linear infinite;
-}
-.skeleton-line.short { width: 40%; }
-@keyframes skeleton-wave { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 .comment-more {
   display: flex;
   justify-content: center;
@@ -208,6 +178,6 @@ function handleSubmit(content: string) {
   .comment-time { width: 100%; margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-item, .comment-fade-enter-active, .comment-fade-leave-active { animation: none; }
+  .comment-fade-enter-active, .comment-fade-leave-active { animation: none; }
 }
 </style>

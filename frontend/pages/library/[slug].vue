@@ -2,7 +2,7 @@
   <main class="detail-page">
     <div v-if="loading" class="detail-loading"><span /><div><i /><i /><i /></div></div>
     <div v-else-if="!item" class="not-found">
-      <Icon name="ph:books" /><h1>没有找到这份记录</h1><p>它可能还在草稿箱，或已经被移走。</p><NuxtLink to="/library">返回书影音</NuxtLink>
+      <Icon name="ph:books" /><h1>没有找到这份记录</h1><p>它可能还在草稿箱，或已经被移走。</p><NuxtLink to="/library">返回书影</NuxtLink>
     </div>
     <template v-else>
       <section class="detail-hero">

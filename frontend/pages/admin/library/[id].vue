@@ -20,7 +20,7 @@ onMounted(async () => {
   catch (error: any) { toast.error(error?.message || '记录加载失败') }
   finally { loading.value = false }
 })
-useHead({ title: computed(() => item.value ? `编辑 ${item.value.title}` : '编辑书影音') })
+useHead({ title: computed(() => item.value ? `编辑 ${item.value.title}` : '编辑书影') })
 </script>
 
 <style scoped>.edit-loading { min-height:400px; }</style>

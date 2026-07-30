@@ -26,6 +26,7 @@
                   <a-form-item label="名字"><a-input v-model:value="profile.name" :maxlength="40" /></a-form-item>
                   <a-form-item label="身份描述"><a-input v-model:value="profile.role" :maxlength="80" /></a-form-item>
                 </div>
+                <a-form-item label="名片标签"><a-input v-model:value="profile.badge" :maxlength="20" placeholder="例如：开发者" /></a-form-item>
                 <a-form-item label="一句话"><a-input v-model:value="profile.motto" :maxlength="120" show-count /></a-form-item>
                 <div class="two-cols">
                   <a-form-item label="所在地"><a-input v-model:value="profile.location" :maxlength="50" /></a-form-item>
