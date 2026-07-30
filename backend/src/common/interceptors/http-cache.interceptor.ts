@@ -41,6 +41,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
           const cached = await this.redis.getJson<unknown>(key);
           if (cached !== null) {
             if (this.applyEtag(request, response, cached)) {
+              subscriber.next(undefined);
               subscriber.complete();
               return;
             }
@@ -57,6 +58,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
             const filled = await this.redis.getJson<unknown>(key);
             if (filled !== null) {
               if (this.applyEtag(request, response, filled)) {
+                subscriber.next(undefined);
                 subscriber.complete();
                 return;
               }
@@ -124,7 +126,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
     response.setHeader('ETag', etag);
     if (request.headers['if-none-match'] !== etag) return false;
     response.setHeader('X-Cache', 'HIT');
-    response.status(304).end();
+    response.status(304);
     return true;
   }
 }
