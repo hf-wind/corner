@@ -1,5 +1,5 @@
 <template>
-  <div class="home-sidebar" :class="{ loading }">
+  <div class="home-sidebar" :class="{ ready: !loading }">
     <section class="side-card overview-card" aria-labelledby="home-overview-title">
       <div class="side-card-head">
         <span id="home-overview-title"><Icon name="ph:pulse-bold" /> 站点一览</span>
@@ -112,6 +112,19 @@ onUnmounted(() => {
   border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
   border-radius: 13px;
   background: var(--ld-bg-card);
+  opacity: 0;
+  transform: translate3d(10px, 0, 0);
+}
+
+.home-sidebar.ready .side-card {
+  animation: side-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.home-sidebar.ready .side-card:nth-of-type(2) { animation-delay: 55ms; }
+.home-sidebar.ready .side-card:nth-of-type(3) { animation-delay: 110ms; }
+
+@keyframes side-card-in {
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 .side-card-head {
@@ -193,9 +206,8 @@ onUnmounted(() => {
 .topic-tag:hover { color: var(--c-primary); background: var(--c-primary-soft); }
 .topic-tag small { color: var(--c-text-3); font-size: 0.52rem; }
 .side-empty { padding: 12px 0; color: var(--c-text-3); font-size: 0.65rem; text-align: center; }
-.home-sidebar.loading .overview-item strong { color: transparent; background: var(--c-bg-2); border-radius: 5px; }
-
 @media (prefers-reduced-motion: reduce) {
+  .home-sidebar.ready .side-card { animation: none; opacity: 1; transform: none; }
   .popular-main strong { transition: none; }
 }
 </style>

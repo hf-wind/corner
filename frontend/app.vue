@@ -1,6 +1,10 @@
 <template>
   <component :is="activeLayout">
-    <RouterView />
+    <RouterView v-slot="{ Component, route: viewRoute }">
+      <Transition name="route-page" mode="out-in">
+        <component :is="Component" :key="viewRoute.fullPath" />
+      </Transition>
+    </RouterView>
   </component>
   <GlobalToast v-if="toasts.length" />
   <SidebarMusicPlayer v-if="showPlayer" />
@@ -74,3 +78,45 @@ useHead(() => ({
   }
 }))
 </script>
+
+<style>
+.route-page-enter-active,
+.route-page-leave-active {
+  will-change: opacity, transform;
+}
+
+.route-page-enter-active {
+  transition: opacity 0.3s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.route-page-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.route-page-enter-from {
+  opacity: 0;
+  transform: translate3d(0, 8px, 0);
+}
+
+.route-page-leave-to {
+  opacity: 0;
+  transform: translate3d(0, -3px, 0);
+}
+
+.route-page-enter-active .sidebar-right {
+  transition: opacity 0.36s ease 0.05s, transform 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
+}
+
+.route-page-enter-from .sidebar-right {
+  opacity: 0;
+  transform: translate3d(14px, 0, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-page-enter-active,
+  .route-page-leave-active,
+  .route-page-enter-active .sidebar-right {
+    transition: none;
+  }
+}
+</style>

@@ -19,6 +19,7 @@ curl --fail https://corner.ink/api/health
 TURNSTILE_SITE_KEY=你的-site-key
 TURNSTILE_SECRET_KEY=你的-secret-key
 TURNSTILE_HOSTNAME=corner.ink
+TURNSTILE_ENABLED=true
 
 EMAIL_SMTP_HOST=smtp.qq.com
 EMAIL_SMTP_PORT=465
@@ -42,7 +43,9 @@ docker compose config --quiet
 docker compose up -d --build --wait
 ```
 
-本地开发的 `NODE_ENV` 不是 `production`，后端默认跳过 Turnstile；生产环境缺少 secret key 时认证接口会拒绝请求，避免静默失去防护。
+本地开发的 `NODE_ENV` 不是 `production`，前后端默认跳过 Turnstile。若使用生产构建的 Compose 容器做本地调试，在本地 `.env` 设置 `TURNSTILE_ENABLED=false`；生产环境必须保持为 `true`，缺少 secret key 时认证接口会拒绝请求。
+
+使用远程开发数据时，运行 `scripts/dev.ps1`。它会在一个 PowerShell 窗口中自动启动 SSH 隧道、后端和前端，同时转发 PostgreSQL `15432` 和 Redis `16379`；按 `Ctrl+C` 会统一停止进程，并清理 `3000`、`4000`、`15432`、`16379` 的本项目残留监听。首次使用运行 `scripts/dev.ps1 -Init`，后续可运行 `scripts/dev.ps1 -SkipSetup`。
 
 ## 日志
 

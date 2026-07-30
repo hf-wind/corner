@@ -19,7 +19,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "tunnel:init": "node --env-file=.env.tunnel ./node_modules/prisma/build/index.js migrate dev && node --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
+    "tunnel:init": "node --env-file=.env.tunnel ./node_modules/prisma/build/index.js migrate deploy && node --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

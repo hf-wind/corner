@@ -152,7 +152,7 @@ const greetings = ref<string[]>([...(meta.greetings || [])])
 const isArticleMode = computed(() => props.mode === 'article')
 const hintText = computed(() => isArticleMode.value ? '要我帮你读懂这篇吗？' : (greetings.value[0] || '你好呀～'))
 const inputPlaceholder = computed(() => isArticleMode.value ? '问问这篇文章…' : '问我文章推荐或本站内容…')
-const actionsVisible = computed(() => !chatOpen.value && !suppressActions.value && !showHint.value && !showLoginBubble.value)
+const actionsVisible = computed(() => isLoggedIn.value && !chatOpen.value && !suppressActions.value && !showHint.value && !showLoginBubble.value)
 const quickActions = computed<QuickAction[]>(() => isArticleMode.value
   ? [
       { label: '三句话总结', icon: 'ph:magic-wand-bold', prompt: '请用三句话总结当前文章。', kind: 'summary' },

@@ -1,18 +1,24 @@
 <template>
-  <div class="turnstile-slot" :class="{ unavailable: unavailable }">
+  <div v-if="enabled" class="turnstile-slot" :class="{ unavailable: unavailable }">
     <div ref="container"></div>
     <span v-if="unavailable">人机验证暂不可用</span>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps<{ modelValue?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const container = ref<HTMLElement | null>(null)
 const unavailable = ref(false)
 let widgetId: string | undefined
+const bypassToken = 'local-development-bypass'
+const enabled = computed(() => {
+  const configured = String(import.meta.env.VITE_TURNSTILE_ENABLED || '').trim().toLowerCase()
+  if (configured) return !['0', 'false', 'off', 'no'].includes(configured)
+  return import.meta.env.PROD
+})
 
 type TurnstileApi = {
   render: (element: HTMLElement, options: Record<string, unknown>) => string
@@ -40,8 +46,8 @@ function loadScript(): Promise<void> {
 }
 
 async function renderWidget() {
-  if (!import.meta.env.PROD) {
-    emit('update:modelValue', 'local-development-bypass')
+  if (!enabled.value) {
+    emit('update:modelValue', bypassToken)
     return
   }
   const sitekey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim()
@@ -69,6 +75,10 @@ async function renderWidget() {
 }
 
 function reset() {
+  if (!enabled.value) {
+    emit('update:modelValue', bypassToken)
+    return
+  }
   emit('update:modelValue', '')
   unavailable.value = false
   if (widgetId && window.turnstile) window.turnstile.reset(widgetId)

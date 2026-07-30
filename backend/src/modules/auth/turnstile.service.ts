@@ -11,7 +11,7 @@ export class TurnstileService {
   private readonly logger = new Logger(TurnstileService.name);
 
   async verify(token: string | undefined, remoteIp?: string): Promise<void> {
-    if (process.env.NODE_ENV !== 'production') return;
+    if (!this.isEnabled()) return;
 
     const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
     if (!secret) {
@@ -43,5 +43,11 @@ export class TurnstileService {
       this.logger.warn(`Turnstile rejected request: ${(result['error-codes'] || []).join(',') || 'hostname mismatch'}`);
       throw new BadRequestException('人机验证失败，请刷新后重试');
     }
+  }
+
+  private isEnabled(): boolean {
+    const configured = process.env.TURNSTILE_ENABLED?.trim().toLowerCase();
+    if (configured) return !['0', 'false', 'off', 'no'].includes(configured);
+    return process.env.NODE_ENV === 'production';
   }
 }

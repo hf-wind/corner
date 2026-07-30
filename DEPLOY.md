@@ -4,28 +4,15 @@
 
 开发数据使用服务器上的独立 Compose 项目 `corner-dev-data`，与生产数据库、Redis、目录和凭据完全隔离。两个端口只监听服务器回环地址，必须通过 `ubuntu` 账户的 SSH 隧道访问，不对公网开放。
 
-Windows PowerShell 终端 1：
+Windows PowerShell：
 
 ```powershell
-.\scripts\dev-tunnel.ps1
+.\scripts\dev.ps1 -Init
 ```
 
-首次使用时，脚本会在服务器 `/srv/corner/dev-data` 生成独立凭据并启动数据服务，然后在本地生成被 Git 忽略的 `backend/.env.tunnel`。保持隧道终端开启，再执行：
+首次使用加 `-Init`，脚本会在服务器 `/srv/corner/dev-data` 准备独立数据服务，在本地生成被 Git 忽略的 `backend/.env.tunnel`，初始化测试数据库，并自动启动 SSH 隧道、后端和前端。保持当前窗口开启，按 `Ctrl+C` 会统一停止服务并清理开发端口。
 
-```powershell
-cd backend
-npm run tunnel:init
-npm run start:dev:tunnel
-```
-
-终端 3 启动前端：
-
-```powershell
-cd frontend
-npm run dev
-```
-
-后续启动可使用 `.\scripts\dev-tunnel.ps1 -SkipSetup`。本地访问地址为前端 `http://localhost:3000`、后端 `http://localhost:4000/api`；本地无需安装 PostgreSQL 或 Redis。
+后续启动只需运行 `.\scripts\dev.ps1 -SkipSetup`。如果需要重新执行迁移和种子数据，可再次加 `-Init`；窗口异常关闭后可执行 `.\scripts\dev.ps1 -Stop` 清理本项目残留端口。本地访问地址为前端 `http://localhost:3000`、后端 `http://localhost:4000/api`；本地无需安装 PostgreSQL 或 Redis。
 
 日常运维、日志、备份邮件、版本发布和故障处理见 [OPERATIONS.md](./OPERATIONS.md)。
 
