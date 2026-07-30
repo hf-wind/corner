@@ -30,6 +30,7 @@ jobs:
         working-directory: backend
         run: |
           npm ci
+          npm run prisma:generate
           npm test -- --runInBand
           npm run build
 
