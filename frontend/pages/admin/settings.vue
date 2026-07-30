@@ -49,7 +49,7 @@
             <a-input-password v-model:value="email.email_smtp_pass" placeholder="已配置则留空，输入新密码可替换" @blur="saveEmailSetting('email_smtp_pass')" />
           </a-form-item>
           <a-form-item label="显示名称">
-            <a-input v-model:value="email.email_from_name" placeholder="清欢小筑" @blur="saveEmailSetting('email_from_name')" />
+            <a-input v-model:value="email.email_from_name" placeholder="风隅随笔" @blur="saveEmailSetting('email_from_name')" />
           </a-form-item>
           <a-form-item label="发信人地址">
             <a-input v-model:value="email.email_from_address" placeholder="1833079849@qq.com" @blur="saveEmailSetting('email_from_address')" />
@@ -141,6 +141,7 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
+const { updateSiteSetting } = useSiteSettings()
 const settings = ref({ site_title: '', site_description: '', site_keywords: '' as any })
 const keywordText = ref('')
 const mediaNaming = ref('timestamp')
@@ -154,7 +155,7 @@ const email = reactive({
   email_smtp_secure: true,
   email_smtp_user: '1833079849@qq.com',
   email_smtp_pass: '',
-  email_from_name: '清欢小筑',
+  email_from_name: '风隅随笔',
   email_from_address: '1833079849@qq.com',
   site_url: '',
 })
@@ -212,12 +213,11 @@ async function loadEmail() {
       email.email_smtp_secure = emailRes.secure !== false
       email.email_smtp_user = emailRes.user || '1833079849@qq.com'
       email.email_smtp_pass = ''
-      email.email_from_name = emailRes.fromName || '清欢小筑'
+      email.email_from_name = emailRes.fromName || '风隅随笔'
       email.email_from_address = emailRes.fromAddress || '1833079849@qq.com'
     }
-    if (siteUrlRes?.value) {
-      email.site_url = siteUrlRes.value
-    }
+    const siteUrl = typeof siteUrlRes === 'string' ? siteUrlRes : siteUrlRes?.value
+    if (siteUrl) email.site_url = siteUrl
   } catch {}
 }
 
@@ -263,6 +263,9 @@ async function saveMediaNaming() {
 async function saveSetting(key: string) {
   try {
     await api.put('/settings', { key, value: (settings.value as any)[key] })
+    if (key === 'site_title' || key === 'site_description') {
+      updateSiteSetting(key, String((settings.value as any)[key] || ''))
+    }
     toast.success('已保存')
   } catch {
     toast.error('保存失败')

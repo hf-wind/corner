@@ -15,7 +15,7 @@
         <div class="welcome-copy">
           <span>LINK EXCHANGE · 交换友链</span>
           <h2>让彼此的小站，成为互联网里的路标</h2>
-          <p>如果你也在认真记录生活、创作或技术，欢迎与清欢小筑交换友链。提交后会进行访问与反链检查。</p>
+          <p>如果你也在认真记录生活、创作或技术，欢迎与风隅随笔交换友链。提交后会进行访问与反链检查。</p>
           <div class="welcome-steps">
             <span><b>01</b>添加本站</span><i /><span><b>02</b>提交信息</span><i /><span><b>03</b>审核上线</span>
           </div>

@@ -36,6 +36,7 @@ const MODEL_CONFIG_SETTING_KEYS = [
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
+  private missingModelTableWarningLogged = false;
 
   constructor(
     private prisma: PrismaService,
@@ -48,28 +49,52 @@ export class AiService {
     if (key === 'qwen' || key === 'dashscope') {
       return String(process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || '').trim();
     }
-    if (key === 'deepseek') return String(process.env.DEEPSEEK_API_KEY || '').trim();
+    if (key === 'deepseek') {
+      return String(process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY || '').trim();
+    }
     return '';
+  }
+
+  private isMissingModelConfigTable(error: unknown) {
+    return Boolean(
+      error
+      && typeof error === 'object'
+      && 'code' in error
+      && error.code === 'P2021',
+    );
+  }
+
+  private warnMissingModelConfigTable() {
+    if (this.missingModelTableWarningLogged) return;
+    this.missingModelTableWarningLogged = true;
+    this.logger.warn(
+      'ai_model_configs 表尚未创建，暂时使用旧版 AI 设置；请执行 npx prisma migrate deploy',
+    );
   }
 
   private async resolveConnection(cfg: AiConfig, options: ChatOptions = {}) {
     let record = null;
-    if (options.modelConfigId) {
-      record = await this.prisma.aiModelConfig.findFirst({
-        where: { id: options.modelConfigId, enabled: true },
-      });
-    }
-    if (!record) {
-      record = await this.prisma.aiModelConfig.findFirst({
-        where: { enabled: true, isDefault: true },
-        orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
-      });
-    }
-    if (!record) {
-      record = await this.prisma.aiModelConfig.findFirst({
-        where: { enabled: true },
-        orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
-      });
+    try {
+      if (options.modelConfigId) {
+        record = await this.prisma.aiModelConfig.findFirst({
+          where: { id: options.modelConfigId, enabled: true },
+        });
+      }
+      if (!record) {
+        record = await this.prisma.aiModelConfig.findFirst({
+          where: { enabled: true, isDefault: true },
+          orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+        });
+      }
+      if (!record) {
+        record = await this.prisma.aiModelConfig.findFirst({
+          where: { enabled: true },
+          orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+        });
+      }
+    } catch (error) {
+      if (!this.isMissingModelConfigTable(error)) throw error;
+      this.warnMissingModelConfigTable();
     }
 
     if (record) {
@@ -158,10 +183,16 @@ export class AiService {
   }
 
   async listModelConfigs() {
-    const models = await this.prisma.aiModelConfig.findMany({
-      orderBy: [{ isDefault: 'desc' }, { sort: 'asc' }, { createdAt: 'asc' }],
-    });
-    return models.map((model) => this.presentModelConfig(model));
+    try {
+      const models = await this.prisma.aiModelConfig.findMany({
+        orderBy: [{ isDefault: 'desc' }, { sort: 'asc' }, { createdAt: 'asc' }],
+      });
+      return models.map((model) => this.presentModelConfig(model));
+    } catch (error) {
+      if (!this.isMissingModelConfigTable(error)) throw error;
+      this.warnMissingModelConfigTable();
+      return [];
+    }
   }
 
   async createModelConfig(input: Record<string, unknown>) {
@@ -955,7 +986,7 @@ export class AiService {
       try {
         const friendPageRes = await fetch(friendPageUrl, {
           signal: AbortSignal.timeout(timeout),
-          headers: { 'User-Agent': 'CornerBot/1.0' },
+          headers: { 'User-Agent': 'FengyuNotesBot/1.0' },
         });
         if (!friendPageRes.ok) {
           return { approved: false, reason: `友链页面无法访问 (${friendPageRes.status})` };
@@ -978,7 +1009,7 @@ export class AiService {
     try {
       const siteRes = await fetch(siteUrl, {
         signal: AbortSignal.timeout(timeout),
-        headers: { 'User-Agent': 'CornerBot/1.0' },
+        headers: { 'User-Agent': 'FengyuNotesBot/1.0' },
       });
       if (!siteRes.ok) {
         return { approved: false, reason: `站点无法访问 (${siteRes.status})` };

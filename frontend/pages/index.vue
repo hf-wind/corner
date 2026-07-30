@@ -13,7 +13,7 @@
     <div class="page-vignette" aria-hidden="true" />
 
     <div class="corner-mark corner-mark-top" aria-hidden="true">
-      <span>CORNER</span><i /> <span>PERSONAL SPACE</span>
+      <span>CORNER.INK</span><i /> <span>PERSONAL NOTES</span>
     </div>
     <div class="corner-mark corner-mark-bottom" aria-hidden="true">
       <span>{{ currentYear }}</span><i /> <span>KEEP CURIOSITY</span>
@@ -23,7 +23,7 @@
       <section class="hero-card">
         <div class="eyebrow" data-reveal>
           <span class="eyebrow-dot" />
-          <span>一方安静的数字花园</span>
+          <span>听风于隅，漫写人间</span>
         </div>
 
         <div class="logo-stage" data-reveal aria-hidden="true">
@@ -36,7 +36,7 @@
           <span class="logo-badge"><Icon name="ph:sparkle-fill" /></span>
         </div>
 
-        <h1 id="welcome-title" class="site-title" data-reveal aria-label="清欢小筑">
+        <h1 id="welcome-title" class="site-title" data-reveal :aria-label="siteTitle">
           <span v-for="(char, index) in titleChars" :key="index" class="title-char">{{ char }}</span>
         </h1>
 
@@ -62,7 +62,7 @@
           @pointermove="handleButtonMove"
           @pointerleave="resetButtonPosition"
         >
-          <span>进入小筑</span>
+          <span>进入风隅</span>
           <span class="enter-arrow"><Icon name="ph:arrow-right-bold" /></span>
         </button>
 
@@ -100,6 +100,7 @@ interface OverviewStats {
 const router = useRouter()
 const api = useApi()
 const { resolvedTheme, setTheme } = useTheme()
+const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings()
 
 const pageEl = ref<HTMLElement | null>(null)
 const particleCanvas = ref<HTMLCanvasElement | null>(null)
@@ -109,7 +110,7 @@ const introComplete = ref(false)
 const isLeaving = ref(false)
 const displayStats = reactive<OverviewStats>({ posts: 0, comments: 0, views: 0 })
 const statsReady = ref(false)
-const titleChars = [...'清欢小筑']
+const titleChars = computed(() => [...siteTitle.value])
 const currentYear = new Date().getFullYear()
 
 let animationId = 0
@@ -192,7 +193,7 @@ function runIntro() {
 }
 
 function initTypewriter(delay = 0) {
-  const slogan = [...'雨过天晴云破处，这般颜色做将来']
+  const slogan = [...siteDescription.value]
   let index = 0
   if (typewriterEl.value) typewriterEl.value.textContent = ''
 
@@ -351,6 +352,7 @@ function handleVisibilityChange() {
 }
 
 onMounted(() => {
+  void loadSiteSettings()
   reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
   finePointer = window.matchMedia('(hover: hover) and (pointer: fine)')
   runIntro()

@@ -80,7 +80,7 @@
         <header><div><small>KEEP EXPLORING</small><h2>也许你还会喜欢</h2></div><NuxtLink to="/library">查看全部 <Icon name="ph:arrow-right-bold" /></NuxtLink></header>
         <div><LibraryCard v-for="entry in related" :key="entry.id" :item="entry" /></div>
       </section>
-      <footer class="detail-footer"><NuxtLink to="/library"><Icon name="ph:arrow-left" /> 回到书影音收藏馆</NuxtLink><span>清欢小筑 · PERSONAL COLLECTION</span></footer>
+      <footer class="detail-footer"><NuxtLink to="/library"><Icon name="ph:arrow-left" /> 回到书影收藏馆</NuxtLink><span>风隅随笔 · PERSONAL COLLECTION</span></footer>
     </template>
   </main>
 </template>
@@ -124,8 +124,8 @@ async function load() {
 }
 onMounted(load)
 useHead({
-  title: computed(() => item.value ? `${item.value.title} · ${item.value.type === 'book' ? '阅读手记' : '观影记录'}` : '书影音'),
-  meta: [{ name: 'description', content: computed(() => item.value?.summary || item.value?.reflection || '清欢小筑的书影音收藏记录') }],
+  title: computed(() => item.value ? `${item.value.title} · ${item.value.type === 'book' ? '阅读手记' : '观影记录'}` : '书影'),
+  meta: [{ name: 'description', content: computed(() => item.value?.summary || item.value?.reflection || '风隅随笔的书影收藏记录') }],
 })
 </script>
 

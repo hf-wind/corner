@@ -53,7 +53,7 @@ export class FriendLinkService {
     const raw = await this.settings.get('my_site_info');
     const value = this.parseObject(raw);
     return {
-      name: this.stringValue(value.name) || 'Corner',
+      name: this.stringValue(value.name) || '风隅随笔',
       url: this.stringValue(value.url) || 'https://corner.example.com',
       description: this.stringValue(value.description),
       avatar: this.stringValue(value.avatar),
@@ -445,7 +445,7 @@ export class FriendLinkService {
           signal: AbortSignal.timeout(8000),
           headers: {
             Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.2',
-            'User-Agent': 'CornerFriendLinkInspector/1.0 (+public-site-metadata)',
+            'User-Agent': 'FengyuFriendLinkInspector/1.0 (+public-site-metadata)',
           },
         });
       } catch (error) {

@@ -17,7 +17,7 @@
             <div ref="posterRef" class="poster-card">
               <div class="poster-cover" :style="coverStyle">
                 <div class="poster-cover-mask" />
-                <div class="poster-brand">Corner Blog</div>
+                <div class="poster-brand">{{ siteTitle }}</div>
               </div>
               <div class="poster-body">
                 <h2 class="poster-title">{{ article.title || '未命名文章' }}</h2>
@@ -66,6 +66,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
+const { siteTitle } = useSiteSettings()
 
 const posterRef = ref<HTMLElement | null>(null)
 const exporting = ref(false)
@@ -73,7 +74,7 @@ const copied = ref(false)
 
 const pageUrl = computed(() => (import.meta.client ? window.location.href : ''))
 const qrUrl = computed(() =>
-  `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=8&data=${encodeURIComponent(pageUrl.value || 'https://corner.blog')}`,
+  `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=8&data=${encodeURIComponent(pageUrl.value || 'https://corner.ink')}`,
 )
 
 const coverStyle = computed(() => {

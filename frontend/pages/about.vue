@@ -1,112 +1,132 @@
 <template>
   <div class="about-shell">
-    <main class="about-scroll">
+    <main ref="aboutPage" class="about-scroll">
       <div class="about-page">
-        <header class="profile-header">
-          <div class="profile-index" aria-hidden="true">
-            <span>PROFILE</span>
-            <strong>01</strong>
+        <header class="profile-hero reveal-block">
+          <div v-if="profile.tools.length" class="breeze-strip" aria-hidden="true">
+            <div class="breeze-track">
+              <span v-for="group in 2" :key="group">
+                <i v-for="tool in profile.tools" :key="`${group}-${tool}`">{{ tool }}<b>+</b></i>
+              </span>
+            </div>
           </div>
 
-          <div class="portrait-wrap">
-            <div class="portrait-frame">
-              <img :src="avatarSrc" :alt="`${profile.name}的头像`" class="portrait">
+          <div class="hero-grid">
+            <div class="profile-copy">
+              <p class="eyebrow">ABOUT / FROM QINGHAI</p>
+              <div class="name-line">
+                <h1>{{ profile.name }}</h1>
+                <span>普通人</span>
+              </div>
+              <p class="role">{{ profile.role }}</p>
+              <blockquote>“{{ profile.motto }}”</blockquote>
+
+              <div class="status-row">
+                <span><Icon name="ph:map-pin-bold" /> {{ profile.location }}</span>
+                <span class="available"><i />{{ profile.availability }}</span>
+              </div>
+
+              <div v-if="profile.socialLinks.length" class="social-row">
+                <a
+                  v-for="link in profile.socialLinks"
+                  :key="`${link.label}-${link.url}`"
+                  :href="safeUrl(link.url)"
+                  :title="link.label"
+                  :aria-label="link.label"
+                  :target="isExternalLink(link.url) ? '_blank' : undefined"
+                  :rel="isExternalLink(link.url) ? 'noopener noreferrer' : undefined"
+                >
+                  <Icon :name="link.icon || 'ph:link-bold'" />
+                </a>
+              </div>
             </div>
-            <span class="portrait-caption">THIS IS ME · {{ currentYear }}</span>
-          </div>
 
-          <div class="profile-intro">
-            <p class="eyebrow">ABOUT / 关于我</p>
-            <h1>{{ profile.name }}</h1>
-            <p class="role">{{ profile.role }}</p>
-            <blockquote>“{{ profile.motto }}”</blockquote>
-
-            <div class="status-row">
-              <span><Icon name="ph:map-pin-bold" /> {{ profile.location }}</span>
-              <span class="available"><i />{{ profile.availability }}</span>
-            </div>
-
-            <div v-if="profile.socialLinks.length" class="social-row">
-              <a
-                v-for="link in profile.socialLinks"
-                :key="`${link.label}-${link.url}`"
-                :href="safeUrl(link.url)"
-                :title="link.label"
-                :aria-label="link.label"
-                :target="isExternalLink(link.url) ? '_blank' : undefined"
-                :rel="isExternalLink(link.url) ? 'noopener noreferrer' : undefined"
-              >
-                <Icon :name="link.icon || 'ph:link-bold'" />
-              </a>
+            <div class="portrait-area">
+              <span class="wind-ring wind-ring-one" aria-hidden="true" />
+              <span class="wind-ring wind-ring-two" aria-hidden="true" />
+              <div class="portrait-frame">
+                <img :src="avatarSrc" :alt="`${profile.name}的头像`" class="portrait">
+              </div>
+              <div class="portrait-note">
+                <span>CORNER.INK</span>
+                <time>{{ currentClock }}</time>
+              </div>
             </div>
           </div>
         </header>
 
-        <div class="profile-body">
-          <div class="story-column">
-            <section class="story-section">
-              <div class="section-marker"><span>01</span><i /></div>
-              <div class="section-content">
-                <p class="section-kicker">HELLO, STRANGER</p>
-                <h2>关于此刻的我</h2>
-                <div class="introduction">
-                  <p v-for="paragraph in introductionParagraphs" :key="paragraph">{{ paragraph }}</p>
-                </div>
-              </div>
-            </section>
-
-            <section v-if="profile.timeline.length" class="story-section timeline-section">
-              <div class="section-marker"><span>02</span><i /></div>
-              <div class="section-content">
-                <p class="section-kicker">MILESTONES</p>
-                <h2>一路走来</h2>
-                <ol class="timeline-list">
-                  <li v-for="item in profile.timeline" :key="`${item.year}-${item.title}`">
-                    <time>{{ item.year }}</time>
-                    <div>
-                      <h3>{{ item.title }}</h3>
-                      <p>{{ item.description }}</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-            </section>
+        <section class="story-band reveal-block">
+          <div class="section-heading">
+            <span>01</span>
+            <div><p>AN ORDINARY PERSON</p><h2>小传</h2></div>
           </div>
 
-          <aside class="profile-notes">
-            <section v-if="profile.facts.length" class="notes-block facts-block">
-              <p class="notes-label">QUICK NOTES</p>
-              <dl>
-                <div v-for="fact in profile.facts" :key="fact.label">
-                  <dt>{{ fact.label }}</dt>
-                  <dd>{{ fact.value }}</dd>
-                </div>
-              </dl>
-            </section>
+          <div class="story-layout">
+            <div class="introduction">
+              <p v-for="paragraph in introductionParagraphs" :key="paragraph">{{ paragraph }}</p>
+            </div>
 
-            <section v-if="profile.skills.length" class="notes-block skills-block">
-              <p class="notes-label">WHAT I DO</p>
-              <div class="skill-list">
-                <div v-for="skill in profile.skills" :key="skill.name" class="skill-row">
-                  <div><span>{{ skill.name }}</span><strong>{{ skill.level }}</strong></div>
-                  <span class="skill-track"><i :style="{ width: `${skill.level}%` }" /></span>
-                </div>
+            <aside class="now-panel">
+              <p class="panel-label">AT THIS MOMENT</p>
+              <strong>{{ currentClock }}</strong>
+              <span>东八区 · {{ currentDate }}</span>
+              <div v-if="profile.tools.length" class="current-thing">
+                <i />
+                <span>此刻也许在</span>
+                <Transition name="word-swap" mode="out-in">
+                  <b :key="activeTool">{{ activeTool }}</b>
+                </Transition>
               </div>
-            </section>
-
-            <section v-if="profile.tools.length" class="notes-block tools-block">
-              <p class="notes-label">CURRENTLY USING</p>
-              <div class="tool-list">
-                <span v-for="(tool, index) in profile.tools" :key="tool"><b>{{ padIndex(index + 1) }}</b>{{ tool }}</span>
+              <div class="ride-line" aria-hidden="true">
+                <span /><Icon name="ph:bicycle-bold" />
               </div>
-            </section>
+            </aside>
+          </div>
+        </section>
 
-            <footer class="signature">
-              <span>Thanks for stopping by.</span>
-              <strong>{{ profile.name }}</strong>
-            </footer>
-          </aside>
-        </div>
+        <section v-if="profile.facts.length" class="facts-band reveal-block" aria-label="个人速记">
+          <dl>
+            <div v-for="fact in profile.facts" :key="fact.label">
+              <dt>{{ fact.label }}</dt>
+              <dd>{{ fact.value }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section v-if="profile.timeline.length" class="journey-band reveal-block">
+          <div class="section-heading">
+            <span>02</span>
+            <div><p>ON THE WAY</p><h2>走过的几站</h2></div>
+          </div>
+          <ol class="timeline-list">
+            <li v-for="(item, index) in profile.timeline" :key="`${item.year}-${item.title}`">
+              <span class="timeline-index">{{ padIndex(index + 1) }}</span>
+              <time>{{ item.year }}</time>
+              <div><h3>{{ item.title }}</h3><p>{{ item.description }}</p></div>
+            </li>
+          </ol>
+        </section>
+
+        <section v-if="profile.skills.length" class="work-band reveal-block">
+          <div class="section-heading">
+            <span>03</span>
+            <div><p>THINGS I HAVE DONE</p><h2>做过这些</h2></div>
+          </div>
+          <div class="work-list">
+            <article v-for="(skill, index) in profile.skills" :key="skill.name">
+              <Icon :name="skillIcons[index % skillIcons.length]" />
+              <div><h3>{{ skill.name }}</h3><p>{{ skill.description }}</p></div>
+            </article>
+          </div>
+        </section>
+
+        <footer class="about-footer reveal-block">
+          <div>
+            <p>风从青海来，字在一隅落下。</p>
+            <span>{{ currentYear }} · 风隅随笔</span>
+          </div>
+          <strong>{{ profile.name }}</strong>
+        </footer>
       </div>
     </main>
   </div>
@@ -119,10 +139,24 @@ import { normalizeAboutProfile } from '~/types/about'
 const api = useApi()
 const { mediaUrl } = useMediaUrl()
 const profile = ref(normalizeAboutProfile(null))
+const aboutPage = ref<HTMLElement | null>(null)
 const currentYear = new Date().getFullYear()
+const now = ref(new Date())
+const activeToolIndex = ref(0)
+const skillIcons = ['ph:devices-bold', 'ph:chart-line-up-bold', 'ph:cube-focus-bold', 'ph:code-bold']
+let clockTimer = 0
+let toolTimer = 0
+let revealObserver: IntersectionObserver | null = null
 
 const avatarSrc = computed(() => profile.value.avatarUrl ? mediaUrl(profile.value.avatarUrl) : avatarFallback)
 const introductionParagraphs = computed(() => profile.value.introduction.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean))
+const activeTool = computed(() => profile.value.tools[activeToolIndex.value % profile.value.tools.length] || '发呆')
+const currentClock = computed(() => new Intl.DateTimeFormat('zh-CN', {
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+}).format(now.value))
+const currentDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
+  month: 'long', day: 'numeric', weekday: 'short',
+}).format(now.value))
 
 function isExternalLink(url: string) {
   return /^https?:\/\//i.test(url)
@@ -137,12 +171,41 @@ function padIndex(index: number) {
   return String(index).padStart(2, '0')
 }
 
-onMounted(async () => {
-  try {
-    profile.value = normalizeAboutProfile(await api.get('/settings/about_profile'))
-  } catch {
-    // The built-in profile keeps the page useful before the first admin save.
+function observeSections() {
+  revealObserver?.disconnect()
+  const blocks = aboutPage.value?.querySelectorAll<HTMLElement>('.reveal-block')
+  if (!blocks?.length || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    blocks?.forEach((block) => block.classList.add('is-visible'))
+    return
   }
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return
+      entry.target.classList.add('is-visible')
+      revealObserver?.unobserve(entry.target)
+    })
+  }, { threshold: 0.12 })
+  blocks.forEach((block) => revealObserver?.observe(block))
+}
+
+onMounted(async () => {
+  clockTimer = window.setInterval(() => { now.value = new Date() }, 1000)
+  toolTimer = window.setInterval(() => {
+    if (profile.value.tools.length > 1) activeToolIndex.value = (activeToolIndex.value + 1) % profile.value.tools.length
+  }, 2600)
+  await nextTick()
+  observeSections()
+  void api.get('/settings/about_profile').then((value) => {
+    profile.value = normalizeAboutProfile(value)
+  }).catch(() => {
+    // Built-in content keeps the page complete before the first seed or admin save.
+  })
+})
+
+onUnmounted(() => {
+  window.clearInterval(clockTimer)
+  window.clearInterval(toolTimer)
+  revealObserver?.disconnect()
 })
 
 useHead(() => ({
@@ -153,151 +216,116 @@ useHead(() => ({
 
 <style scoped>
 .about-shell {
-  display: flex;
   width: 100%;
   min-width: 0;
   height: 100%;
-  background: var(--c-bg-1);
+  background: var(--c-bg);
 }
 
 .about-scroll {
   width: 100%;
+  height: 100%;
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }
 
 .about-page {
-  width: min(1120px, calc(100% - 64px));
-  margin: 32px auto 72px;
-  border: 1px solid var(--border);
-  background: var(--c-bg);
-  box-shadow: 0 18px 60px color-mix(in srgb, var(--c-text) 8%, transparent);
+  width: min(1120px, calc(100% - 72px));
+  margin: 0 auto;
+  padding: 42px 0 64px;
 }
 
-.profile-header {
-  position: relative;
-  display: grid;
-  grid-template-columns: 92px minmax(220px, 320px) minmax(0, 1fr);
-  min-height: 430px;
+.profile-hero {
+  overflow: hidden;
+  border-block: 1px solid var(--border);
+}
+
+.breeze-strip {
+  height: 34px;
+  overflow: hidden;
   border-bottom: 1px solid var(--border);
-}
-
-.profile-index {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 20px;
-  padding-top: 42px;
-  border-right: 1px solid var(--border);
   color: var(--c-text-3);
-}
-
-.profile-index span {
-  font-size: .6rem;
-  letter-spacing: .2em;
-  writing-mode: vertical-rl;
-}
-
-.profile-index strong {
-  color: var(--c-primary);
   font-family: var(--font-mono);
-  font-size: 1.15rem;
+  font-size: .6rem;
+  white-space: nowrap;
 }
 
-.portrait-wrap {
+.breeze-track {
   display: flex;
+  width: max-content;
+  animation: breeze-move 28s linear infinite;
+}
+
+.breeze-track > span {
+  display: flex;
+  height: 33px;
   align-items: center;
+}
+
+.breeze-track i {
+  display: inline-flex;
+  align-items: center;
+  gap: 24px;
+  padding-right: 24px;
+  font-style: normal;
+}
+
+.breeze-track b { color: var(--c-primary); font-weight: 400; }
+
+.hero-grid {
+  display: grid;
+  min-height: 510px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
+}
+
+.profile-copy {
+  display: flex;
   justify-content: center;
   flex-direction: column;
-  gap: 14px;
-  padding: 44px 32px;
-  background: color-mix(in srgb, var(--c-primary-soft) 28%, var(--c-bg));
-}
-
-.portrait-frame {
-  position: relative;
-  width: min(230px, 100%);
-  aspect-ratio: 4 / 5;
-  padding: 9px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 48%, var(--border));
-  background: var(--c-bg);
-}
-
-.portrait-frame::before,
-.portrait-frame::after {
-  position: absolute;
-  z-index: 1;
-  width: 34px;
-  height: 34px;
-  border-color: var(--c-primary);
-  content: '';
-  pointer-events: none;
-}
-
-.portrait-frame::before {
-  top: -6px;
-  left: -6px;
-  border-top: 2px solid;
-  border-left: 2px solid;
-}
-
-.portrait-frame::after {
-  right: -6px;
-  bottom: -6px;
-  border-right: 2px solid;
-  border-bottom: 2px solid;
-}
-
-.portrait {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: saturate(.9) contrast(1.03);
-}
-
-.portrait-caption {
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: .58rem;
-  letter-spacing: .13em;
-}
-
-.profile-intro {
-  align-self: center;
-  padding: 52px clamp(34px, 6vw, 82px);
+  padding: 64px 72px 64px 44px;
 }
 
 .eyebrow,
-.section-kicker,
-.notes-label {
+.section-heading p,
+.panel-label {
   color: var(--c-primary);
   font-family: var(--font-mono);
-  font-size: .65rem;
+  font-size: .64rem;
   font-weight: 700;
-  letter-spacing: .16em;
+  letter-spacing: 0;
 }
 
-.profile-intro h1 {
-  margin: 14px 0 8px;
+.name-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  margin: 14px 0 6px;
+}
+
+.name-line h1 {
+  margin: 0;
   color: var(--c-text);
-  font-size: 4.7rem;
-  line-height: 1.06;
+  font-size: 4rem;
+  line-height: 1;
 }
 
-.role {
-  color: var(--c-text-2);
-  font-size: .84rem;
-  letter-spacing: .08em;
+.name-line > span {
+  margin-bottom: 7px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--c-text-3);
+  font-size: .65rem;
 }
 
-.profile-intro blockquote {
-  max-width: 590px;
-  margin: 38px 0 26px;
-  padding-left: 18px;
-  border-left: 3px solid var(--c-primary);
+.role { color: var(--c-text-2); font-size: .86rem; }
+
+.profile-copy blockquote {
+  max-width: 560px;
+  margin: 46px 0 28px;
   color: var(--c-text-1);
   font-family: var(--font-wenkai);
-  font-size: 1.12rem;
+  font-size: 1.28rem;
   line-height: 1.8;
 }
 
@@ -309,399 +337,217 @@ useHead(() => ({
   font-size: .72rem;
 }
 
-.status-row span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.status-row .available {
-  color: #1e8b59;
-}
-
+.status-row span { display: inline-flex; align-items: center; gap: 6px; }
+.status-row .available { color: #258052; }
 .available i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+  animation: status-pulse 2.4s ease-in-out infinite;
 }
 
-.social-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 26px;
-}
-
+.social-row { display: flex; gap: 8px; margin-top: 28px; }
 .social-row a {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border: 1px solid var(--border);
+  border-radius: 6px;
   color: var(--c-text-1);
   font-size: 1rem;
   place-items: center;
-  transition: background .18s, border-color .18s, color .18s, transform .18s;
+  transition: transform .18s, border-color .18s, color .18s, background .18s;
 }
+.social-row a:hover { border-color: var(--c-primary); background: var(--c-primary-soft); color: var(--c-primary); transform: translateY(-3px); }
 
-.social-row a:hover {
-  border-color: var(--c-primary);
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-  transform: translateY(-2px);
-}
-
-.profile-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-}
-
-.story-column {
-  padding: 60px clamp(34px, 6vw, 76px);
-  border-right: 1px solid var(--border);
-}
-
-.story-section {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  gap: 26px;
-}
-
-.story-section + .story-section {
-  margin-top: 72px;
-}
-
-.section-marker {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 12px;
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: .65rem;
-}
-
-.section-marker i {
-  width: 1px;
-  min-height: 92px;
-  flex: 1;
-  background: var(--border);
-}
-
-.section-content h2 {
-  margin: 7px 0 24px;
-  color: var(--c-text);
-  font-size: 1.55rem;
-}
-
-.introduction {
-  color: var(--c-text-2);
-  font-size: .88rem;
-  line-height: 2;
-}
-
-.introduction p + p {
-  margin-top: 14px;
-}
-
-.timeline-list {
-  list-style: none;
-}
-
-.timeline-list li {
+.portrait-area {
   position: relative;
   display: grid;
-  grid-template-columns: 66px 1fr;
-  gap: 20px;
-  padding: 0 0 28px 18px;
+  min-width: 0;
+  overflow: hidden;
   border-left: 1px solid var(--border);
+  background: var(--c-bg-1);
+  place-items: center;
 }
 
-.timeline-list li:last-child {
-  padding-bottom: 0;
+.portrait-frame {
+  position: relative;
+  z-index: 2;
+  width: 238px;
+  aspect-ratio: 4 / 5;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 50%, var(--border));
+  background: var(--c-bg);
+  transform: rotate(1.5deg);
 }
 
-.timeline-list li::before {
+.portrait { width: 100%; height: 100%; object-fit: cover; filter: saturate(.88) contrast(1.03); }
+
+.wind-ring {
   position: absolute;
-  top: 5px;
-  left: -4px;
-  width: 7px;
-  height: 7px;
-  border: 2px solid var(--c-bg);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 28%, transparent);
   border-radius: 50%;
-  background: var(--c-primary);
-  box-shadow: 0 0 0 1px var(--c-primary);
+}
+.wind-ring::after {
+  position: absolute;
+  top: 50%;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d95d39;
   content: '';
 }
+.wind-ring-one { width: 340px; height: 340px; animation: ring-spin 18s linear infinite; }
+.wind-ring-two { width: 410px; height: 410px; border-style: dashed; opacity: .55; animation: ring-spin 26s linear infinite reverse; }
 
-.timeline-list time {
+.portrait-note {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  font-size: .58rem;
+}
+.portrait-note time { color: var(--c-text-1); font-size: .72rem; font-variant-numeric: tabular-nums; }
+
+.story-band,
+.journey-band,
+.work-band { padding: 78px 44px; border-bottom: 1px solid var(--border); }
+
+.section-heading { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 42px; }
+.section-heading > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
   color: var(--c-primary);
   font-family: var(--font-mono);
-  font-size: .72rem;
-  font-weight: 700;
+  font-size: .62rem;
+  place-items: center;
 }
+.section-heading h2 { margin: 5px 0 0; color: var(--c-text); font-size: 1.65rem; }
 
-.timeline-list h3 {
-  margin-bottom: 5px;
-  color: var(--c-text);
-  font-size: .88rem;
-}
+.story-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 72px; }
+.introduction { color: var(--c-text-2); font-family: var(--font-wenkai); font-size: .95rem; line-height: 2.15; }
+.introduction p + p { margin-top: 18px; }
 
-.timeline-list p {
-  color: var(--c-text-2);
-  font-size: .76rem;
-  line-height: 1.7;
-}
-
-.profile-notes {
+.now-panel {
+  align-self: start;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   background: var(--c-bg-1);
 }
+.now-panel > strong { display: block; margin-top: 18px; color: var(--c-text); font-family: var(--font-mono); font-size: 2rem; font-variant-numeric: tabular-nums; }
+.now-panel > span { color: var(--c-text-3); font-size: .66rem; }
+.current-thing { display: grid; grid-template-columns: 8px auto minmax(0, 1fr); align-items: center; gap: 7px; margin-top: 30px; color: var(--c-text-3); font-size: .7rem; }
+.current-thing > i { width: 6px; height: 6px; border-radius: 50%; background: #258052; }
+.current-thing b { overflow: hidden; color: var(--c-primary); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.word-swap-enter-active, .word-swap-leave-active { transition: opacity .2s, transform .2s; }
+.word-swap-enter-from { opacity: 0; transform: translateY(6px); }
+.word-swap-leave-to { opacity: 0; transform: translateY(-6px); }
 
-.notes-block {
-  padding: 34px 30px;
-  border-bottom: 1px solid var(--border);
-}
+.ride-line { position: relative; height: 34px; margin-top: 24px; overflow: hidden; color: #d95d39; }
+.ride-line > span { position: absolute; right: 0; bottom: 7px; left: 0; height: 1px; background: var(--border); }
+.ride-line > span::after { position: absolute; right: 12%; bottom: -2px; width: 5px; height: 5px; border-radius: 50%; background: var(--c-primary); content: ''; }
+.ride-line :deep(svg) { position: absolute; bottom: 8px; left: 0; font-size: 1.15rem; animation: ride-across 7s ease-in-out infinite; }
 
-.notes-label {
-  margin-bottom: 22px;
-}
+.facts-band { padding: 0 44px; border-bottom: 1px solid var(--border); }
+.facts-band dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.facts-band dl > div { min-width: 0; padding: 24px 20px; border-right: 1px solid var(--border); }
+.facts-band dl > div:nth-child(3n) { border-right: 0; }
+.facts-band dl > div:nth-child(n + 4) { border-top: 1px solid var(--border); }
+.facts-band dt { margin-bottom: 7px; color: var(--c-text-3); font-size: .64rem; }
+.facts-band dd { overflow-wrap: anywhere; color: var(--c-text-1); font-size: .78rem; font-weight: 700; }
 
-.facts-block dl {
-  display: grid;
-  gap: 15px;
-}
+.timeline-list { list-style: none; }
+.timeline-list li { display: grid; grid-template-columns: 44px 84px minmax(0, 1fr); gap: 20px; padding: 25px 0; border-top: 1px solid var(--border); }
+.timeline-list li:last-child { border-bottom: 1px solid var(--border); }
+.timeline-index { color: var(--c-text-3); font-family: var(--font-mono); font-size: .62rem; }
+.timeline-list time { color: var(--c-primary); font-family: var(--font-mono); font-size: .72rem; font-weight: 700; }
+.timeline-list h3 { margin-bottom: 7px; color: var(--c-text); font-size: .9rem; }
+.timeline-list p { color: var(--c-text-2); font-size: .76rem; line-height: 1.8; }
 
-.facts-block dl > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 10px;
-  border-bottom: 1px dashed var(--border);
-}
+.work-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+.work-list article { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 18px; min-height: 150px; padding: 28px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.work-list :deep(svg) { color: #d95d39; font-size: 1.45rem; }
+.work-list h3 { margin-bottom: 9px; color: var(--c-text); font-size: .9rem; }
+.work-list p { color: var(--c-text-2); font-size: .75rem; line-height: 1.8; }
 
-.facts-block dt {
-  color: var(--c-text-3);
-  font-size: .7rem;
-}
+.about-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding: 60px 44px 8px; }
+.about-footer p { color: var(--c-text-1); font-family: var(--font-wenkai); font-size: 1rem; }
+.about-footer span { display: block; margin-top: 8px; color: var(--c-text-3); font-family: var(--font-mono); font-size: .6rem; }
+.about-footer strong { color: var(--c-text); font-family: var(--font-wenkai); font-size: 1.7rem; font-weight: 400; }
 
-.facts-block dd {
-  color: var(--c-text-1);
-  font-size: .72rem;
-  font-weight: 700;
-  text-align: right;
-}
+.reveal-block { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s cubic-bezier(.16, 1, .3, 1); }
+.reveal-block.is-visible { opacity: 1; transform: none; }
 
-.skill-list {
-  display: grid;
-  gap: 18px;
-}
-
-.skill-row > div {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  color: var(--c-text-1);
-  font-size: .72rem;
-}
-
-.skill-row strong {
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: .62rem;
-}
-
-.skill-track {
-  display: block;
-  height: 3px;
-  overflow: hidden;
-  background: var(--c-bg-3);
-}
-
-.skill-track i {
-  display: block;
-  height: 100%;
-  background: var(--c-primary);
-}
-
-.tool-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.tool-list span {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  min-width: 0;
-  color: var(--c-text-2);
-  font-size: .7rem;
-}
-
-.tool-list b {
-  color: var(--c-primary);
-  font-family: var(--font-mono);
-  font-size: .55rem;
-}
-
-.signature {
-  display: flex;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 8px;
-  padding: 36px 30px 46px;
-  color: var(--c-text-3);
-  font-size: .62rem;
-}
-
-.signature strong {
-  color: var(--c-text-1);
-  font-family: var(--font-wenkai);
-  font-size: 1.45rem;
-  font-weight: 400;
-}
+@keyframes breeze-move { to { transform: translateX(-50%); } }
+@keyframes ring-spin { to { transform: rotate(360deg); } }
+@keyframes status-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, currentColor 5%, transparent); } }
+@keyframes ride-across { 0%, 8% { transform: translateX(-24px); } 50% { transform: translateX(205px) rotate(-2deg); } 92%, 100% { transform: translateX(-24px); } }
 
 @media (max-width: 980px) {
-  .about-page {
-    width: min(100% - 32px, 820px);
-  }
-
-  .profile-header {
-    grid-template-columns: 70px 250px minmax(0, 1fr);
-  }
-
-  .profile-body {
-    grid-template-columns: minmax(0, 1fr) 270px;
-  }
-
-  .story-column {
-    padding-right: 36px;
-    padding-left: 36px;
-  }
+  .about-page { width: min(100% - 32px, 820px); }
+  .hero-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+  .profile-copy { padding-right: 40px; padding-left: 36px; }
+  .story-layout { gap: 40px; }
 }
 
 @media (max-width: 900px) {
-  .about-scroll {
-    padding-top: max(64px, calc(env(safe-area-inset-top) + 58px));
-  }
-
-  .profile-intro h1 {
-    font-size: 3.3rem;
-  }
+  .about-page { padding-top: max(70px, calc(env(safe-area-inset-top) + 64px)); }
+  .name-line h1 { font-size: 3.2rem; }
 }
 
 @media (max-width: 760px) {
-  .about-page {
-    width: 100%;
-    margin: 0;
-    border: 0;
-    box-shadow: none;
-  }
-
-  .profile-header {
-    grid-template-columns: 52px minmax(0, 1fr);
-  }
-
-  .profile-index {
-    grid-row: span 2;
-  }
-
-  .portrait-wrap {
-    padding: 32px 24px 24px;
-  }
-
-  .portrait-frame {
-    width: min(210px, 72vw);
-  }
-
-  .profile-intro {
-    padding: 32px 26px 42px;
-  }
-
-  .profile-intro h1 {
-    font-size: 2.5rem;
-  }
-
-  .profile-intro blockquote {
-    margin-top: 28px;
-  }
-
-  .profile-body {
-    grid-template-columns: 1fr;
-  }
-
-  .story-column {
-    padding: 44px 24px;
-    border-right: 0;
-  }
-
-  .profile-notes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-top: 1px solid var(--border);
-  }
-
-  .notes-block,
-  .signature {
-    border-right: 1px solid var(--border);
-  }
+  .about-page { width: 100%; padding-bottom: 38px; }
+  .profile-hero { border-top: 0; }
+  .hero-grid { grid-template-columns: 1fr; }
+  .profile-copy { order: 2; padding: 42px 24px 50px; }
+  .portrait-area { min-height: 420px; border-bottom: 1px solid var(--border); border-left: 0; }
+  .profile-copy blockquote { margin-top: 34px; }
+  .story-band, .journey-band, .work-band { padding: 58px 24px; }
+  .story-layout { grid-template-columns: 1fr; gap: 34px; }
+  .facts-band { padding: 0 24px; }
+  .facts-band dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts-band dl > div:nth-child(3n) { border-right: 1px solid var(--border); }
+  .facts-band dl > div:nth-child(2n) { border-right: 0; }
+  .facts-band dl > div:nth-child(n + 3) { border-top: 1px solid var(--border); }
+  .work-list { grid-template-columns: 1fr; }
+  .about-footer { padding: 48px 24px 8px; }
 }
 
 @media (max-width: 520px) {
-  .profile-header {
-    grid-template-columns: 38px minmax(0, 1fr);
-  }
-
-  .profile-index {
-    padding-top: 26px;
-  }
-
-  .profile-index span {
-    font-size: .5rem;
-  }
-
-  .portrait-wrap {
-    padding-right: 18px;
-    padding-left: 18px;
-  }
-
-  .profile-intro {
-    padding-right: 20px;
-    padding-left: 20px;
-  }
-
-  .profile-intro h1 {
-    font-size: 2.1rem;
-  }
-
-  .story-column {
-    padding-right: 18px;
-    padding-left: 14px;
-  }
-
-  .story-section {
-    grid-template-columns: 32px minmax(0, 1fr);
-    gap: 15px;
-  }
-
-  .timeline-list li {
-    grid-template-columns: 52px 1fr;
-    gap: 12px;
-  }
-
-  .profile-notes {
-    grid-template-columns: 1fr;
-  }
-
-  .notes-block,
-  .signature {
-    border-right: 0;
-  }
+  .portrait-area { min-height: 370px; }
+  .portrait-frame { width: 208px; }
+  .wind-ring-one { width: 292px; height: 292px; }
+  .wind-ring-two { width: 350px; height: 350px; }
+  .name-line { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .name-line h1 { font-size: 2.7rem; }
+  .name-line > span { margin-bottom: 0; }
+  .profile-copy blockquote { font-size: 1.1rem; }
+  .section-heading { margin-bottom: 32px; }
+  .timeline-list li { grid-template-columns: 32px minmax(0, 1fr); gap: 14px; }
+  .timeline-list time { grid-column: 2; grid-row: 1; }
+  .timeline-list li > div { grid-column: 2; }
+  .facts-band dl { grid-template-columns: 1fr; }
+  .facts-band dl > div { border-right: 0 !important; border-top: 1px solid var(--border); }
+  .facts-band dl > div:first-child { border-top: 0; }
+  .about-footer { align-items: flex-start; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .social-row a {
-    transition: none;
-  }
+  .breeze-track, .wind-ring, .available i, .ride-line :deep(svg) { animation: none; }
+  .reveal-block { opacity: 1; transform: none; transition: none; }
+  .social-row a, .word-swap-enter-active, .word-swap-leave-active { transition: none; }
 }
 </style>

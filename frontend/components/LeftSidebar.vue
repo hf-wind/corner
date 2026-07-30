@@ -127,6 +127,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ openSearch: [] }>()
 const { theme, setTheme } = useTheme()
+const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings()
 // 字体切换入口暂时隐藏：const { fontPreset, fontPresets, setFontPreset } = useTypography()
 const { registerSlot, unregisterSlot } = useMusicPlayerSlot()
 const {
@@ -165,12 +166,12 @@ onBeforeUnmount(() => {
 })
 
 const siteNav = [
-  { to: '/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/home', icon: 'ph:house-bold', label: '首页' },
-  { to: '/library', icon: 'ph:books-bold', label: '书影音' },
   { to: '/archive', icon: 'ph:archive-bold', label: '归档' },
   { to: '/category', icon: 'ph:folder-open-bold', label: '分类' },
   { to: '/tags', icon: 'ph:tag-bold', label: '标签' },
+  { to: '/library', icon: 'ph:books-bold', label: '书影' },
+  { to: '/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/friends', icon: 'ph:handshake-bold', label: '友链' },
   { to: '/about', icon: 'ph:info-bold', label: '关于' },
 ]
@@ -212,13 +213,13 @@ const heroLink = computed(() => {
 })
 
 const heroTitle = computed(() => {
-  if (!isPanel.value) return '清欢小筑'
+  if (!isPanel.value) return siteTitle.value
   return isUserAdmin.value ? '管理后台' : '个人中心'
 })
 
 const heroSlogan = computed(() => {
-  if (!isPanel.value) return '此心安处，便是清欢'
-  return isUserAdmin.value ? '清欢小筑 · 内容管理' : '管理账号与消息'
+  if (!isPanel.value) return siteDescription.value
+  return isUserAdmin.value ? `${siteTitle.value} · 内容管理` : '管理账号与消息'
 })
 
 function isNavActive(to: string) {
@@ -249,6 +250,7 @@ function handleLogout() {
 }
 
 onMounted(() => {
+  void loadSiteSettings()
   readStorage()
   if (isLoggedIn.value) refreshProfile()
 })

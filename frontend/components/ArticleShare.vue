@@ -14,7 +14,7 @@
           </header>
 
           <div class="share-card">
-            <div class="card-badge">Corner Blog</div>
+            <div class="card-badge">{{ siteTitle }}</div>
             <h3 class="card-title">{{ article.title }}</h3>
             <p v-if="article.excerpt" class="card-excerpt">{{ article.excerpt }}</p>
             <div class="card-meta">
@@ -59,6 +59,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
+const { siteTitle } = useSiteSettings()
 
 const copiedFull = ref(false)
 const copiedLink = ref(false)
@@ -68,7 +69,7 @@ const canNativeShare = computed(() => import.meta.client && typeof navigator.sha
 const shareText = computed(() => {
   const title = props.article.title || '未命名文章'
   const excerpt = props.article.excerpt ? `\n\n${props.article.excerpt}` : ''
-  return `【Corner Blog】${title}${excerpt}\n\n${pageUrl.value}`
+  return `【${siteTitle.value}】${title}${excerpt}\n\n${pageUrl.value}`
 })
 
 function close() {
@@ -94,7 +95,7 @@ async function copyLink() {
 async function nativeShare() {
   try {
     await navigator.share({
-      title: props.article.title || 'Corner Blog',
+      title: props.article.title || siteTitle.value,
       text: props.article.excerpt || props.article.title || '',
       url: pageUrl.value,
     })

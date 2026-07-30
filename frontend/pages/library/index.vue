@@ -42,7 +42,7 @@
         <button type="button" :disabled="page >= totalPages" @click="goPage(page + 1)"><Icon name="ph:arrow-right" /></button>
       </div>
     </section>
-    <footer class="library-footer"><span>清欢小筑 · 私人书影音档案</span><i /><span>持续更新中</span></footer>
+    <footer class="library-footer"><span>风隅随笔 · 私人书影档案</span><i /><span>持续更新中</span></footer>
   </main>
 </template>
 
@@ -82,7 +82,7 @@ function searchItems() { page.value = 1; syncQuery(); loadItems() }
 function clearSearch() { search.value = ''; searchItems() }
 function goPage(next: number) { page.value = next; loadItems(); document.querySelector('.collection-section')?.scrollIntoView({ behavior: 'smooth' }) }
 onMounted(() => { void Promise.all([loadMeta(), loadItems()]) })
-useHead({ title: '书影音', meta: [{ name: 'description', content: '清欢小筑的个人阅读记录与悬疑影视收藏。' }] })
+useHead({ title: '书影', meta: [{ name: 'description', content: '风隅随笔的个人阅读记录与影视收藏。' }] })
 </script>
 
 <style scoped>

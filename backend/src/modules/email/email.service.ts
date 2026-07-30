@@ -59,7 +59,7 @@ export class EmailService {
       secure: secure ?? true,
       user: user ?? '1833079849@qq.com',
       pass: pass ?? process.env.EMAIL_SMTP_PASS ?? '',
-      fromName: fromName ?? '清欢小筑',
+      fromName: fromName ?? '风隅随笔',
       fromAddress: fromAddress ?? '1833079849@qq.com',
       siteUrl: (siteUrl as string) || 'https://corner.example.com',
     };
@@ -119,7 +119,7 @@ export class EmailService {
 
     await this.verificationQueue.add('send-verification', {
       to: email,
-      subject: `【清欢小筑】${typeText}验证码`,
+      subject: `【风隅随笔】${typeText}验证码`,
       html,
       type: 'verification',
     });
@@ -170,7 +170,7 @@ export class EmailService {
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【清欢小筑】${data.senderName} 评论了你的${data.sourceType || '文章'}`,
+      subject: `【风隅随笔】${data.senderName} 评论了你的${data.sourceType || '文章'}`,
       html,
       type: 'comment_notification',
       postId: data.postId,
@@ -195,7 +195,7 @@ export class EmailService {
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【清欢小筑】${data.senderName} 回复了你的评论`,
+      subject: `【风隅随笔】${data.senderName} 回复了你的评论`,
       html,
       type: 'reply_notification',
       postId: data.postId,
@@ -221,7 +221,7 @@ export class EmailService {
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【清欢小筑】评论审核${data.approved ? '通过' : '未通过'}：${data.sourceTitle}`,
+      subject: `【风隅随笔】评论审核${data.approved ? '通过' : '未通过'}：${data.sourceTitle}`,
       html,
       type: 'comment_moderation_notification',
       postId: data.sourceId,
@@ -244,7 +244,7 @@ export class EmailService {
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【清欢小筑】${data.senderName} 赞了你的评论`,
+      subject: `【风隅随笔】${data.senderName} 赞了你的评论`,
       html,
       type: 'like_notification',
       postId: data.postId,
@@ -263,7 +263,7 @@ export class EmailService {
       await transporter.sendMail({
         from: `"${config.fromName}" <${config.fromAddress}>`,
         to,
-        subject: '【清欢小筑】邮件测试',
+        subject: '【风隅随笔】邮件测试',
         html,
       });
 
@@ -326,7 +326,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">清欢小筑</h1>
+      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">${type}验证码</h2>
@@ -370,7 +370,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">清欢小筑</h1>
+      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">💬 新评论通知</h2>
@@ -420,7 +420,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">清欢小筑</h1>
+      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">↩️ 新回复通知</h2>
@@ -473,7 +473,7 @@ export class EmailService {
 </head>
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:520px;margin:40px auto;background:#fff;border-radius:16px;padding:36px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-    <h1 style="color:#334155;margin:0 0 24px;font-size:22px;">清欢小筑 · 评论审核</h1>
+    <h1 style="color:#334155;margin:0 0 24px;font-size:22px;">风隅随笔 · 评论审核</h1>
     <p style="color:#666;line-height:1.6;">Hi <strong>${data.toName}</strong>，以下评论已完成审核。</p>
     <div style="margin:20px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
       <p style="margin:0 0 10px;color:#475569;line-height:1.6;">${data.sourceType}：<strong>${data.sourceTitle}</strong></p>
@@ -509,7 +509,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">清欢小筑</h1>
+      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">❤️ 新点赞通知</h2>
@@ -548,7 +548,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">清欢小筑</h1>
+      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">✅ 邮件测试成功</h2>

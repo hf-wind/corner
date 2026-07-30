@@ -71,7 +71,7 @@ export class EmailVerificationProcessor {
     try {
       const transporter = await this.getTransporter();
       await transporter.sendMail({
-        from: `"${(fromName as string) || '清欢小筑'}" <${(fromAddress as string) || '1833079849@qq.com'}>`,
+        from: `"${(fromName as string) || '风隅随笔'}" <${(fromAddress as string) || '1833079849@qq.com'}>`,
         to,
         subject,
         html,
@@ -164,7 +164,7 @@ export class EmailNotificationProcessor {
     try {
       const transporter = await this.getTransporter();
       await transporter.sendMail({
-        from: `"${(fromName as string) || '清欢小筑'}" <${(fromAddress as string) || '1833079849@qq.com'}>`,
+        from: `"${(fromName as string) || '风隅随笔'}" <${(fromAddress as string) || '1833079849@qq.com'}>`,
         to,
         subject,
         html,

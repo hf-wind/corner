@@ -11,6 +11,12 @@ import { qqItems, twemojiItems } from './seed-emoji-data';
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 if (!databaseUrl) throw new Error('DATABASE_URL 未配置，已拒绝执行初始化');
 
+const adminUsername = String(process.env.SEED_ADMIN_USERNAME || 'huifeng').trim();
+const adminEmail = String(process.env.SEED_ADMIN_EMAIL || '1833079849@qq.com').trim().toLowerCase();
+const adminPassword = String(process.env.SEED_ADMIN_PASSWORD || '');
+if (!adminPassword) throw new Error('SEED_ADMIN_PASSWORD 未配置，已拒绝创建管理员');
+if (adminPassword.length < 12) throw new Error('SEED_ADMIN_PASSWORD 至少需要 12 位');
+
 const pool = new Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 15000 });
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 const uploadsRoot = join(process.cwd(), 'uploads');
@@ -20,40 +26,42 @@ const publishedAt = new Date('2026-07-29T00:00:00+08:00');
 
 const aboutProfile = {
   name: 'huifeng',
-  role: '开发者 · 记录者 · 长期主义者',
-  motto: '把好奇心写进代码，也写进每一个普通的日子。',
-  introduction: '我是一个热爱技术与生活的开发者。白天写代码，晚上写文字。这个站点是一座持续生长的数字花园，收藏技术探索、生活感悟和那些值得被记住的片刻。\n\n我相信好作品来自耐心，好的交流始于真诚。如果你也在认真做事、认真生活，欢迎留下你的来信。',
+  role: '青海人 · 写代码 · 骑车闲游',
+  motto: '听风于隅，漫写人间',
+  introduction: '余籍青海，少习计算机之术，科班出身。癸卯年入某市电信实习，从软件开发之事；甲辰七月转正，遂以此为业。迄今所作，横跨掌中 App、小程序与案头 PC 三端，亦曾铺陈驾驶舱数据大屏。又参与数字孪生项目，司 UE 与前端相联，使虚景能应实数。技未敢言精，不过逢题拆题，遇坑填坑，日拱一卒而已。\n\n大学之时，曾为青协志愿者干事，写策划数篇，张罗活动若干。所为皆寻常，却由此略知：一事之成，多赖众人彼此搭手。今二十五，狮子座，A 型血；若问 SBti，则曰“吗喽”，聊以自嘲。烟不沾，酒少饮，偶遇米酒果酒，亦浅尝而止。\n\n工作之外，好骑车，也爱四处闲游。去处未必远，风景未必盛；只消有路可走、有风可听，便觉一日不算虚度。此间名“风隅随笔”，存技术所得，记书影所感，也收日常微末。自知不过普通人，无宏图可陈，惟愿少些喧哗，多些诚实；听风于隅，漫写人间。',
   avatarUrl: '',
-  location: '中国 · 绍兴',
-  availability: '冷静思考，认真生活',
+  location: '中国 · 青海',
+  availability: '普通人，慢慢写，认真过日子',
   facts: [
-    { label: '建站时间', value: '2022' },
-    { label: '当前状态', value: '持续更新' },
-    { label: '偏爱', value: '代码 / 书 / 电影' },
+    { label: '年岁', value: '25' },
+    { label: '星座', value: '狮子座' },
+    { label: '血型', value: 'A 型' },
+    { label: 'SBti', value: '吗喽' },
+    { label: '烟酒', value: '不烟不酒，偶饮米酒果酒' },
+    { label: '闲时', value: '骑行 / 到处溜达' },
   ],
   skills: [
-    { name: 'Vue / Nuxt', level: 90 },
-    { name: 'TypeScript', level: 88 },
-    { name: 'Node.js', level: 82 },
-    { name: 'Rust', level: 75 },
+    { name: '三端应用', description: '手机 App、小程序与 PC 端，都真正做过。' },
+    { name: '数据驾驶舱', description: '把散落的指标收拢成能被看懂的大屏。' },
+    { name: '数字孪生', description: '负责 UE 与前端联动，让场景和数据对上话。' },
+    { name: '软件开发', description: '从需求到交付，在具体问题里一点点学会做事。' },
   ],
-  tools: ['Nuxt 3', 'NestJS', 'PostgreSQL', 'Docker'],
+  tools: ['写代码', '骑车', '看书', '看电影', '数据大屏', 'UE 联动', '到处溜达'],
   timeline: [
-    { year: '2025', title: '博客 v3.0 上线', description: '用 Nuxt 3 与 NestJS 重新搭建这座数字花园。' },
-    { year: '2024', title: '学习 Rust', description: '从 Web 开发走向更宽阔的工程世界。' },
-    { year: '2023', title: '博客 v2.0', description: '从 Hexo 迁移到 Vue 自建系统。' },
-    { year: '2022', title: '开始写博客', description: '用第一篇文章，为长期记录按下开始。' },
+    { year: '大学', title: '与人同做一件事', description: '在青协写策划、张罗活动，慢慢懂得彼此搭手的分量。' },
+    { year: '2023', title: '代码走进真实世界', description: '进入某市电信公司实习，第一次把所学交给具体的人和事。' },
+    { year: '2024.07', title: '留下来，继续做开发', description: '正式入职，做产品，也做交付，把手上的事一件件做完。' },
+    { year: '至今', title: '仍在边做边学', description: '往来于三端、大屏与数字孪生之间，见得越多，越知所学尚浅。' },
   ],
   socialLinks: [
-    { url: 'https://github.com', icon: 'ph:github-logo-bold', label: 'GitHub' },
     { url: 'mailto:hello@corner.ink', icon: 'ph:envelope-simple-bold', label: 'Email' },
     { url: '/rss.xml', icon: 'ph:rss-bold', label: 'RSS' },
   ],
 };
 
-const articleContent = `# 你好，清欢小筑
+const articleContent = `# 你好，风隅随笔
 
-终于可以认真地说一声：你好，清欢小筑。
+终于可以认真地说一声：你好，风隅随笔。
 
 这个名字不是为了把生活写得多么诗意，而是提醒我，在忙碌、变化和偶尔的疲惫里，仍然要给自己留下一小块安静的地方。可以写代码，也可以写一顿饭、一场雨、一本读到一半的书，或者某个不值得发朋友圈，却很想记住的傍晚。
 
@@ -65,7 +73,7 @@ const articleContent = `# 你好，清欢小筑
 
 ## 我希望这里是什么样子
 
-我希望清欢小筑是诚实的。
+我希望风隅随笔是诚实的。
 
 不知道的事情就说不知道，仍在学习的内容就保留过程；不为了显得厉害而堆砌术语，也不为了所谓的“氛围感”忽略真实。每一篇文章都尽量对得起阅读它的人，每一次交流也尽量带着耐心。
 
@@ -75,11 +83,11 @@ const articleContent = `# 你好，清欢小筑
 
 严格来说，这不是第一次开始。建站、改版、迁移、重写，已经发生过很多次。可每一次重新整理，都让我更确定：我想保留的不是一个完美的网站，而是一段持续生活、持续学习的证据。
 
-所以，欢迎来到清欢小筑。
+所以，欢迎来到风隅随笔。
 
 愿这里有认真写下的技术，也有不慌不忙的日常；有解决问题的清醒，也有允许自己停一停的从容。愿每一位偶然路过的人，都能在某一段文字里找到一点有用的信息，或者一点真诚的共鸣。
 
-你好，清欢小筑。往后的日子，请慢慢生长。
+你好，风隅随笔。往后的日子，请慢慢生长。
 `;
 
 const libraryItems = [
@@ -143,20 +151,25 @@ async function installSeedMedia(adminId: string) {
 }
 
 async function main() {
-  const passwordHash = await bcrypt.hash('874512lhfLHF', 12);
-  const existingAdmin = await prisma.user.findUnique({ where: { email: '1833079849@qq.com' } });
+  const passwordHash = await bcrypt.hash(adminPassword, 12);
+  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
   const admin = existingAdmin
     ? await prisma.user.update({
         where: { id: existingAdmin.id },
-        data: { username: 'huifeng', passwordHash, role: 'admin', avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '认真写代码，也认真记录生活。' },
+        data: { username: adminUsername, passwordHash, role: 'admin', avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
       })
     : await prisma.user.create({
-        data: { username: 'huifeng', email: '1833079849@qq.com', passwordHash, role: 'admin', avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '认真写代码，也认真记录生活。' },
+        data: { username: adminUsername, email: adminEmail, passwordHash, role: 'admin', avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
       });
 
   await installSeedMedia(admin.id);
 
-  const deepseekApiKey = String(process.env.SEED_DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY || '').trim();
+  const deepseekApiKey = String(
+    process.env.SEED_DEEPSEEK_API_KEY
+    || process.env.DEEPSEEK_API_KEY
+    || process.env.AI_API_KEY
+    || '',
+  ).trim();
   await prisma.aiModelConfig.updateMany({ data: { isDefault: false } });
   const deepseek = await prisma.aiModelConfig.upsert({
     where: { provider_name: { provider: 'deepseek', name: 'DeepSeek Flash' } },
@@ -174,10 +187,11 @@ async function main() {
   }
 
   const settings: Record<string, unknown> = {
-    site_title: 'Corner', site_description: '一个记录技术与生活的个人博客',
-    site_keywords: ['清欢小筑', '技术', '生活', '阅读', '电影'], media_naming: 'uuid',
+    site_title: '风隅随笔', site_description: '听风于隅，漫写人间', site_url: 'https://corner.ink',
+    site_keywords: ['风隅随笔', 'huifeng', '技术', '随笔', '书影', '生活'], media_naming: 'uuid',
     media_custom_folders: [], friends: [], about_profile: aboutProfile, theme_default: 'auto',
-    my_site_info: { name: '清欢小筑', url: 'https://corner.ink/', avatar: '', rssUrl: '', description: '' },
+    my_site_info: { name: '风隅随笔', url: 'https://corner.ink/', avatar: '', rssUrl: 'https://corner.ink/rss.xml', description: '听风于隅，漫写人间' },
+    email_from_name: '风隅随笔',
     music_enabled: true, music_autoplay: false, music_volume: 0.55,
     music_api: 'https://api.i-meto.com/meting/api', music_server: 'netease', music_type: 'playlist',
     music_id: '8043180114', music_cache_ttl: 21600,
@@ -194,7 +208,7 @@ async function main() {
     update: { name: '随笔', description: '生活感悟、随想' },
   });
   const tagSeeds = [
-    { name: '清欢小筑', slug: 'qinghuan', color: '#10b981' },
+    { name: '风隅随笔', slug: 'corner-notes', color: '#10b981' },
     { name: '建站', slug: 'site-building', color: '#3b82f6' },
     { name: '生活', slug: 'life', color: '#f97316' },
   ];
@@ -208,8 +222,8 @@ async function main() {
   }
 
   const postData = {
-    title: '你好，清欢小筑', slug: 'hello-qinghuan-cottage', content: articleContent,
-    excerpt: '这里会认真记录技术，也收藏书影音与普通日子。你好，清欢小筑，愿往后的内容真诚、清醒，也足够长久。',
+    title: '你好，风隅随笔', slug: 'hello-corner-notes', content: articleContent,
+    excerpt: '这里会认真记录技术，也收藏书影与普通日子。你好，风隅随笔，愿往后的内容真诚、清醒，也足够长久。',
     coverImage: '/uploads/cover/01fdecfa-f838-42f4-8492-577ca8cc7a77.webp',
     authorId: admin.id, categoryId: category.id, status: 'published', featured: true,
     needsPublish: false, publishedAt,
@@ -258,7 +272,7 @@ async function main() {
   }
 
   console.log('正式环境初始化完成');
-  console.log(`管理员: huifeng <1833079849@qq.com>`);
+  console.log(`管理员: ${adminUsername} <${adminEmail}>`);
   console.log(`模型: DeepSeek Flash${deepseekApiKey ? '' : '（未写入密钥，请配置 DEEPSEEK_API_KEY）'}`);
   console.log(`文章 ${await prisma.post.count()} / 瞬间 ${await prisma.moment.count()} / 书影音 ${await prisma.libraryItem.count()} / 表情 ${await prisma.emojiItem.count()}`);
 }

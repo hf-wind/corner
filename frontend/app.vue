@@ -21,6 +21,7 @@ const { init: initTheme } = useTheme()
 const { readStorage, refreshProfile, isLoggedIn } = useAuth()
 const { connectRealtime, disconnectRealtime, refreshUnread } = useNotifications()
 const { toasts } = useToast()
+const { siteTitle, loadSiteSettings } = useSiteSettings()
 const route = useRoute()
 const showPlayer = ref(false)
 let playerIdleHandle: number | undefined
@@ -36,6 +37,7 @@ const activeLayout = computed(() => {
 })
 
 onMounted(() => {
+  void loadSiteSettings()
   initTheme()
   initTypography()
   if (sessionReady.value) {
@@ -63,9 +65,9 @@ watch(isLoggedIn, (loggedIn) => {
   }
 })
 
-useHead({
+useHead(() => ({
   titleTemplate: (chunk) => {
-    return chunk ? `${chunk} - 清欢小筑` : '清欢小筑'
+    return chunk ? `${chunk} - ${siteTitle.value}` : siteTitle.value
   }
-})
+}))
 </script>

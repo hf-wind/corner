@@ -223,7 +223,7 @@ export class MediaService {
       res = await fetch(src, {
         signal: AbortSignal.timeout(30000),
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; CornerBot/1.0)',
+          'User-Agent': 'Mozilla/5.0 (compatible; FengyuNotesBot/1.0)',
           Accept: 'image/*,*/*',
         },
       });

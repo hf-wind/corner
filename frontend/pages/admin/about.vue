@@ -63,12 +63,12 @@
 
         <aside class="editor-side">
           <a-card :bordered="false" class="editor-section compact-section">
-            <template #title><span>技能</span></template>
+            <template #title><span>做过这些</span></template>
             <template #extra><a-button type="link" size="small" @click="addSkill"><Icon name="ph:plus-bold" /> 添加</a-button></template>
             <div class="compact-list">
               <div v-for="(skill, index) in profile.skills" :key="index" class="skill-editor-row">
-                <a-input v-model:value="skill.name" placeholder="技能名称" :maxlength="40" />
-                <a-input-number v-model:value="skill.level" :min="0" :max="100" :precision="0" />
+                <a-input v-model:value="skill.name" placeholder="项目或经验" :maxlength="40" />
+                <a-input v-model:value="skill.description" placeholder="用一句话说明" :maxlength="120" />
                 <a-button type="text" danger title="删除" @click="profile.skills.splice(index, 1)"><Icon name="ph:x-bold" /></a-button>
               </div>
             </div>
@@ -92,7 +92,7 @@
           </a-card>
 
           <a-card :bordered="false" class="editor-section compact-section">
-            <template #title><span>速记信息</span></template>
+            <template #title><span>个人标签</span></template>
             <template #extra><a-button type="link" size="small" @click="addFact"><Icon name="ph:plus-bold" /> 添加</a-button></template>
             <div class="compact-list">
               <div v-for="(fact, index) in profile.facts" :key="index" class="fact-editor-row">
@@ -103,8 +103,8 @@
             </div>
           </a-card>
 
-          <a-card :bordered="false" class="editor-section compact-section" title="常用工具">
-            <a-textarea v-model:value="toolsText" :rows="6" placeholder="每行一个工具" />
+          <a-card :bordered="false" class="editor-section compact-section" title="生活与工具">
+            <a-textarea v-model:value="toolsText" :rows="6" placeholder="每行一个词，会在关于页轮换展示" />
           </a-card>
         </aside>
       </div>
@@ -185,7 +185,7 @@ function addTimeline() {
 }
 
 function addSkill() {
-  profile.skills.push({ name: '', level: 70 } satisfies AboutSkill)
+  profile.skills.push({ name: '', description: '' } satisfies AboutSkill)
 }
 
 function addSocial() {
@@ -338,7 +338,7 @@ useHead({ title: '关于我管理' })
 .skill-editor-row,
 .fact-editor-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 74px 32px;
+  grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr) 32px;
   gap: 7px;
 }
 
