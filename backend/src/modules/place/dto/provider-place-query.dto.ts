@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsLatitude, IsLongitude, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class ProviderSearchQueryDto {
   @IsString()
@@ -27,4 +27,8 @@ export class ProviderReverseQueryDto {
   @IsLatitude()
   @Type(() => Number)
   latitude: number;
+
+  @IsOptional()
+  @IsIn(['wgs84', 'gcj02'])
+  coordinateSystem?: 'wgs84' | 'gcj02' = 'gcj02';
 }

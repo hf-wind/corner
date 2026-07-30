@@ -51,7 +51,7 @@ export class PlaceService {
   async findBySlugAdmin(slug: string) {
     const place = await this.prisma.place.findUnique({
       where: { slug },
-      include: { _count: { select: { moments: true } } },
+      include: { _count: { select: { moments: true, albums: true, albumItems: true, confirmedMediaMetadata: true } } },
     });
     if (!place) throw new NotFoundException('地点不存在');
     return this.formatAdmin(place);
@@ -119,11 +119,12 @@ export class PlaceService {
   async remove(id: string) {
     const place = await this.prisma.place.findUnique({
       where: { id },
-      include: { _count: { select: { moments: true } } },
+      include: { _count: { select: { moments: true, albums: true, albumItems: true, confirmedMediaMetadata: true } } },
     });
     if (!place) throw new NotFoundException('地点不存在');
-    if (place._count.moments > 0) {
-      throw new ConflictException(`该地点仍被 ${place._count.moments} 条瞬间引用，请先迁移引用`);
+    const referenceCount = place._count.moments + place._count.albums + place._count.albumItems + place._count.confirmedMediaMetadata;
+    if (referenceCount > 0) {
+      throw new ConflictException(`该地点仍被 ${referenceCount} 条内容或照片引用，请先迁移引用`);
     }
     await this.prisma.place.delete({ where: { id } });
   }
@@ -155,8 +156,11 @@ export class PlaceService {
   }
 
   async reverseProvider(query: ProviderReverseQueryDto) {
+    const providerCoordinate = query.coordinateSystem === 'wgs84'
+      ? toGcj02(query.longitude, query.latitude)
+      : { longitude: query.longitude, latitude: query.latitude };
     const payload = await this.amapRequest('/v3/geocode/regeo', {
-      location: `${query.longitude},${query.latitude}`,
+      location: `${providerCoordinate.longitude},${providerCoordinate.latitude}`,
       extensions: 'base',
       radius: '1000',
     });
@@ -171,7 +175,7 @@ export class PlaceService {
       province: this.providerText(component.province),
       country: this.providerText(component.country) || '中国',
       type: 'poi',
-      mapLocation: { longitude: query.longitude, latitude: query.latitude },
+      mapLocation: providerCoordinate,
     };
   }
 

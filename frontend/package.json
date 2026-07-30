@@ -13,11 +13,12 @@
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
-    "@iconify/vue": "^4.3.0",
     "@iconify-json/ph": "^1.2.2",
     "@iconify-json/solar": "^1.2.5",
+    "@iconify/vue": "^4.3.0",
     "@unhead/vue": "^2.1.15",
     "ant-design-vue": "^4.2.6",
+    "dayjs": "^1.11.21",
     "html2canvas": "^1.4.1",
     "markdown-it": "^14.1.0",
     "md-editor-v3": "^6.5.4",

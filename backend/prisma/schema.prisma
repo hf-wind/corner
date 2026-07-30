@@ -27,6 +27,7 @@ model User {
   momentComments MomentComment[]
   momentCommentLikes MomentCommentLike[]
   momentLikes  MomentLike[]
+  albums       Album[]
 
   @@index([isActive, role])
   @@map("users")
@@ -112,6 +113,7 @@ model Moment {
   place             Place?          @relation(fields: [placeId], references: [id], onDelete: Restrict)
   comments          MomentComment[]
   likes             MomentLike[]
+  albumItems        AlbumItem[]
 
   @@index([status, publishedAt])
   @@index([publishedAt])
@@ -136,6 +138,9 @@ model Place {
   updatedAt    DateTime @updatedAt @map("updated_at")
   coverMedia   Media?   @relation("PlaceCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
   moments      Moment[]
+  albums       Album[]
+  albumItems   AlbumItem[]
+  confirmedMediaMetadata MediaMetadata[]
 
   @@index([name])
   @@index([city, name])
@@ -249,8 +254,91 @@ model Media {
   createdAt    DateTime @default(now()) @map("created_at")
   uploader     User?    @relation(fields: [uploadedBy], references: [id])
   placeCovers  Place[]  @relation("PlaceCover")
+  albumCovers  Album[]  @relation("AlbumCover")
+  albumItems   AlbumItem[]
+  metadata     MediaMetadata?
 
   @@map("media")
+}
+
+model Album {
+  id                       String      @id @default(uuid()) @db.Uuid
+  title                    String      @db.VarChar(255)
+  slug                     String      @unique @db.VarChar(255)
+  description              String?     @db.Text
+  status                   String      @default("draft") @db.VarChar(20)
+  coverMediaId             String?     @map("cover_media_id") @db.Uuid
+  authorId                 String      @map("author_id") @db.Uuid
+  happenedAt               DateTime?   @map("happened_at")
+  placeId                  String?     @map("place_id") @db.Uuid
+  locationVisibility       String      @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String      @default("place") @map("location_precision") @db.VarChar(20)
+  locationExactConfirmedAt DateTime?   @map("location_exact_confirmed_at")
+  publishedAt              DateTime?   @map("published_at")
+  createdAt                DateTime    @default(now()) @map("created_at")
+  updatedAt                DateTime    @updatedAt @map("updated_at")
+  coverMedia               Media?      @relation("AlbumCover", fields: [coverMediaId], references: [id], onDelete: Restrict)
+  author                   User        @relation(fields: [authorId], references: [id])
+  place                    Place?      @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  items                    AlbumItem[]
+
+  @@index([status, publishedAt])
+  @@index([placeId, happenedAt])
+  @@map("albums")
+}
+
+model AlbumItem {
+  id                       String    @id @default(uuid()) @db.Uuid
+  albumId                  String    @map("album_id") @db.Uuid
+  mediaId                  String    @map("media_id") @db.Uuid
+  sort                     Int       @default(0)
+  caption                  String?   @db.Text
+  happenedAt               DateTime? @map("happened_at")
+  placeId                  String?   @map("place_id") @db.Uuid
+  momentId                 String?   @map("moment_id") @db.Uuid
+  locationVisibility       String    @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String    @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource           String?   @map("location_source") @db.VarChar(20)
+  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+  album                    Album     @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  media                    Media     @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  place                    Place?    @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  moment                   Moment?   @relation(fields: [momentId], references: [id], onDelete: SetNull)
+
+  @@unique([albumId, mediaId])
+  @@unique([albumId, sort])
+  @@index([placeId, happenedAt])
+  @@index([momentId])
+  @@map("album_items")
+}
+
+model MediaMetadata {
+  id                       String    @id @default(uuid()) @db.Uuid
+  mediaId                  String    @unique @map("media_id") @db.Uuid
+  status                   String    @default("pending") @db.VarChar(20)
+  rawExif                  Json?     @map("raw_exif")
+  capturedAt               DateTime? @map("captured_at")
+  latitude                 Float?
+  longitude                Float?
+  width                    Int?
+  height                   Int?
+  cameraMake               String?   @map("camera_make") @db.VarChar(120)
+  cameraModel              String?   @map("camera_model") @db.VarChar(160)
+  lensModel                String?   @map("lens_model") @db.VarChar(200)
+  confirmedCapturedAt      DateTime? @map("confirmed_captured_at")
+  confirmedPlaceId         String?   @map("confirmed_place_id") @db.Uuid
+  error                    String?   @db.Text
+  processedAt              DateTime? @map("processed_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+  media                    Media     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  confirmedPlace           Place?    @relation(fields: [confirmedPlaceId], references: [id], onDelete: SetNull)
+
+  @@index([status, processedAt])
+  @@index([confirmedPlaceId])
+  @@map("media_metadata")
 }
 
 model Setting {

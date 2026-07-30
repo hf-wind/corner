@@ -144,6 +144,7 @@ const route = useRoute()
 const router = useRouter()
 
 const isPanel = computed(() => props.variant === 'admin')
+const { albumsEnabled } = useFeatureFlags()
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar))
 const playerSlotRef = ref<HTMLElement | null>(null)
 let registeredSlot: HTMLElement | null = null
@@ -172,12 +173,14 @@ const siteNav = [
   { to: '/tags', icon: 'ph:tag-bold', label: '标签' },
   { to: '/library', icon: 'ph:books-bold', label: '书影' },
   { to: '/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
+  { to: '/albums', icon: 'ph:images-square-bold', label: '相册' },
   { to: '/friends', icon: 'ph:handshake-bold', label: '友链' },
   { to: '/about', icon: 'ph:info-bold', label: '关于' },
 ]
 
 const adminFullNav = [
   { to: '/admin/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
+  { to: '/admin/albums', icon: 'ph:images-square-bold', label: '相册' },
   { to: '/admin', icon: 'ph:gauge-bold', label: '仪表盘' },
   { to: '/admin/analytics', icon: 'ph:chart-line-up-bold', label: '访问统计' },
   { to: '/admin/posts', icon: 'ph:article-bold', label: '文章' },
@@ -205,8 +208,9 @@ const userPanelNav = [
 ]
 
 const navItems = computed(() => {
-  if (!isPanel.value) return siteNav
-  return isUserAdmin.value ? adminFullNav : userPanelNav
+  const filterFeatures = (items: typeof siteNav) => items.filter(item => albumsEnabled || !item.to.includes('/albums'))
+  if (!isPanel.value) return filterFeatures(siteNav)
+  return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav
 })
 
 const heroLink = computed(() => {

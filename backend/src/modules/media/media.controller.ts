@@ -5,10 +5,14 @@ import { memoryStorage } from 'multer';
 import { MediaService } from './media.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { MediaMetadataService } from './media-metadata.service';
 
 @Controller('media')
 export class MediaController {
-  constructor(private media: MediaService) {}
+  constructor(
+    private media: MediaService,
+    private metadata: MediaMetadataService,
+  ) {}
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
@@ -82,6 +86,27 @@ export class MediaController {
   @Post('batch/delete')
   batchRemove(@Body() body: { ids: string[] }) {
     return this.media.batchRemove(body.ids);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Get(':id/metadata')
+  getMetadata(@Param('id') id: string) {
+    return this.metadata.findOne(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Put(':id/metadata')
+  confirmMetadata(@Param('id') id: string, @Body() body: { capturedAt?: string | null; placeId?: string | null }) {
+    return this.metadata.confirm(id, body);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post(':id/metadata/retry')
+  retryMetadata(@Param('id') id: string) {
+    return this.metadata.retry(id);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

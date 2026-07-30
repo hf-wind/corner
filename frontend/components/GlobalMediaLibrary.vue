@@ -4,10 +4,12 @@
     :multiple="state.multiple"
     :folder="state.folder"
     :compress-animated="state.compressAnimated"
+    :return-items="state.returnItems"
     @confirm="onConfirm"
+    @cancel="onCancel"
   />
 </template>
 
 <script setup lang="ts">
-const { state, onConfirm } = useMediaLibrary()
+const { state, onConfirm, onCancel } = useMediaLibrary()
 </script>

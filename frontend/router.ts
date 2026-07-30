@@ -15,6 +15,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/moments', component: () => import('./pages/moments/index.vue') },
   { path: '/moments/:slug', component: () => import('./pages/moments/[slug].vue') },
   { path: '/places/:slug', component: () => import('./pages/places/[slug].vue') },
+  { path: '/albums', component: () => import('./pages/albums/index.vue') },
+  { path: '/albums/:slug', component: () => import('./pages/albums/[slug].vue') },
   { path: '/library', component: () => import('./pages/library/index.vue') },
   { path: '/library/:slug', component: () => import('./pages/library/[slug].vue') },
   { path: '/login', component: () => import('./pages/login.vue'), meta: { layout: false } },
@@ -22,6 +24,9 @@ const routes: RouteRecordRaw[] = [
 
   { path: '/admin', component: () => import('./pages/admin/index.vue'), meta: adminMeta },
   { path: '/admin/about', component: () => import('./pages/admin/about.vue'), meta: adminMeta },
+  { path: '/admin/albums', component: () => import('./pages/admin/albums/index.vue'), meta: adminMeta },
+  { path: '/admin/albums/create', component: () => import('./pages/admin/albums/create.vue'), meta: adminMeta },
+  { path: '/admin/albums/:id', component: () => import('./pages/admin/albums/[id].vue'), meta: adminMeta },
   { path: '/admin/ai', component: () => import('./pages/admin/ai/index.vue'), meta: adminMeta },
   { path: '/admin/categories', component: () => import('./pages/admin/categories.vue'), meta: adminMeta },
   { path: '/admin/comments', component: () => import('./pages/admin/comments.vue'), meta: adminMeta },
@@ -60,6 +65,10 @@ const router = createRouter({
 setCompatRouter(router)
 
 router.beforeEach(async (to) => {
+  if (to.path === '/albums' || to.path.startsWith('/albums/') || to.path === '/admin/albums' || to.path.startsWith('/admin/albums/')) {
+    const { albumsEnabled } = useFeatureFlags()
+    if (!albumsEnabled) return to.path.startsWith('/admin/') ? '/admin' : '/home'
+  }
   if (!to.meta.requiresAuth) return true
 
   const { useAuth } = await import('./composables/useAuth')

@@ -6,6 +6,8 @@ import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
 import { PRESET_FOLDERS, PRESET_FOLDER_KEYS, sanitizeFolder } from './media.constants';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
 
 const mimeTypeMap: Record<string, string[]> = {
   image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'],
@@ -26,6 +28,7 @@ export class MediaService {
   constructor(
     private prisma: PrismaService,
     private settings: SettingsService,
+    @InjectQueue('media-metadata') private metadataQueue: Queue,
   ) {
     this.ensurePresetDirs();
   }
@@ -173,8 +176,15 @@ export class MediaService {
   }
 
   async batchRemove(ids: string[]) {
-    const items = await this.prisma.media.findMany({ where: { id: { in: ids } } });
+    const items = await this.prisma.media.findMany({
+      where: { id: { in: ids } },
+      include: { _count: { select: { albumItems: true, albumCovers: true, placeCovers: true } } },
+    });
     if (!items.length) throw new NotFoundException('No media found');
+    const referenced = items.filter((item) => item._count.albumItems || item._count.albumCovers || item._count.placeCovers);
+    if (referenced.length) {
+      throw new BadRequestException(`有 ${referenced.length} 张图片正在被相册或地点引用，请先移除引用`);
+    }
 
     for (const item of items) {
       const candidates = [
@@ -338,7 +348,7 @@ export class MediaService {
       try { unlinkSync((file as any).path); } catch { /* ignore */ }
     }
 
-    return this.prisma.media.create({
+    const created = await this.prisma.media.create({
       data: {
         filename,
         originalName,
@@ -350,6 +360,20 @@ export class MediaService {
         uploadedBy: userId,
       },
     });
+    if (isRasterImage) {
+      await this.prisma.mediaMetadata.create({ data: { mediaId: created.id } });
+      void this.metadataQueue.add('extract', { mediaId: created.id }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: true,
+      }).catch(async (error: Error) => {
+        await this.prisma.mediaMetadata.update({
+          where: { mediaId: created.id },
+          data: { status: 'failed', error: `无法加入 EXIF 队列：${error.message}` },
+        }).catch(() => undefined);
+      });
+    }
+    return created;
   }
 
   private async compressImage(buffer: Buffer, folder: string): Promise<Buffer> {
@@ -388,8 +412,14 @@ export class MediaService {
   }
 
   async remove(id: string) {
-    const media = await this.prisma.media.findUnique({ where: { id } });
+    const media = await this.prisma.media.findUnique({
+      where: { id },
+      include: { _count: { select: { albumItems: true, albumCovers: true, placeCovers: true } } },
+    });
     if (!media) throw new NotFoundException('Media not found');
+    if (media._count.albumItems || media._count.albumCovers || media._count.placeCovers) {
+      throw new BadRequestException('图片正在被相册或地点引用，请先移除引用');
+    }
 
     const candidates = [
       join(process.cwd(), media.path.replace(/^\//, '')),

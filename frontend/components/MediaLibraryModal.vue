@@ -69,11 +69,13 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   folder?: string
   compressAnimated?: boolean
-}>(), { multiple: false, readonly: false, folder: '', compressAnimated: false })
+  returnItems?: boolean
+}>(), { multiple: false, readonly: false, folder: '', compressAnimated: false, returnItems: false })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
-  (e: 'confirm', urls: string[]): void
+  (e: 'confirm', payload: any[]): void
+  (e: 'cancel'): void
 }>()
 
 const api = useApi()
@@ -178,13 +180,13 @@ async function handleDelete() {
 }
 
 function handleConfirm() {
-  const urls = selected.value.map((i) => i.path)
-  emit('confirm', urls)
+  emit('confirm', props.returnItems ? selected.value : selected.value.map((i) => i.path))
   visible.value = false
 }
 
 function handleClose() {
   selectedIds.value.clear()
+  emit('cancel')
   emit('update:modelValue', false)
 }
 
