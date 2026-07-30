@@ -11,6 +11,8 @@ fi
 docker compose config --quiet
 docker compose build --pull
 docker compose up -d --remove-orphans --wait
+docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
+docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 curl --fail --silent --show-error \
   --retry 24 \
   --retry-delay 5 \
