@@ -95,7 +95,7 @@ CONFIRM_RESTORE=corner ./scripts/restore.sh /path/to/backup
 2. 使用独立 CI SSH 密钥连接生产服务器。
 3. 发布前执行一次完整备份。
 4. 仅允许 fast-forward 更新代码。
-5. 构建镜像、启动服务并等待健康检查。
+5. 调用 `scripts/deploy.sh` 构建镜像、启动服务并等待健康检查。
 6. 请求 `https://corner.ink/api/health` 完成外部验收。
 
 GitHub Actions 的 `production` environment 需要以下 Secrets：
