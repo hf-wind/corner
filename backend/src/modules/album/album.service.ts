@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { buildPublicLocation } from '../../common/location/public-location';
 import { CreateAlbumDto } from './dto/create-album.dto';
 import { UpdateAlbumDto } from './dto/update-album.dto';
+import type { PublicMapMemory } from '../memory-map/memory-map.types';
 
 const albumInclude = {
   coverMedia: true,
@@ -57,6 +58,45 @@ export class AlbumService {
     const album = await this.prisma.album.findFirst({ where: { slug, status: 'published' }, include: albumInclude });
     if (!album) throw new NotFoundException('Album not found');
     return this.formatPublic(album, true);
+  }
+
+  async findPublicMapMemories(): Promise<PublicMapMemory[]> {
+    const rows = await this.prisma.album.findMany({
+      where: { status: 'published' },
+      include: albumInclude,
+      orderBy: [{ happenedAt: 'desc' }, { publishedAt: 'desc' }],
+      take: 2000,
+    });
+    const memories: PublicMapMemory[] = [];
+    for (const row of rows) {
+      const album = this.formatPublic(row, true);
+      if (this.hasMapCoordinate(album.publicLocation)) {
+        memories.push({
+          id: `album:${album.id}`,
+          type: 'album',
+          title: album.title,
+          excerpt: album.description,
+          occurredAt: album.happenedAt || album.publishedAt,
+          href: `/albums/${album.slug}`,
+          thumbnail: album.cover?.path,
+          publicLocation: album.publicLocation,
+        });
+      }
+      for (const item of album.items || []) {
+        if (!this.hasMapCoordinate(item.publicLocation)) continue;
+        memories.push({
+          id: `photo:${item.id}`,
+          type: 'photo',
+          title: item.caption || album.title,
+          excerpt: item.caption,
+          occurredAt: item.happenedAt || album.happenedAt || album.publishedAt,
+          href: `/albums/${album.slug}?photo=${encodeURIComponent(item.id)}`,
+          thumbnail: item.media.path,
+          publicLocation: item.publicLocation,
+        });
+      }
+    }
+    return memories;
   }
 
   async findAdmin(query: { page?: string; limit?: string; status?: string; search?: string }) {
@@ -222,5 +262,11 @@ export class AlbumService {
       author: album.author,
       ...(includeItems ? { items } : {}),
     };
+  }
+
+  private hasMapCoordinate(location: unknown): location is NonNullable<ReturnType<typeof buildPublicLocation>> {
+    if (!location || typeof location !== 'object') return false;
+    const value = location as { latitude?: unknown; longitude?: unknown };
+    return Number.isFinite(Number(value.latitude)) && Number.isFinite(Number(value.longitude));
   }
 }

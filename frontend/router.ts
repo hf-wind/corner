@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { setCompatRouter } from './compat/runtime'
+import { useFeatureFlags } from './composables/useFeatureFlags'
 
 const adminMeta = { layout: 'admin', requiresAuth: true } as const
 
@@ -15,6 +16,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/moments', component: () => import('./pages/moments/index.vue') },
   { path: '/moments/:slug', component: () => import('./pages/moments/[slug].vue') },
   { path: '/places/:slug', component: () => import('./pages/places/[slug].vue') },
+  { path: '/time/map', component: () => import('./pages/time/map.vue') },
   { path: '/albums', component: () => import('./pages/albums/index.vue') },
   { path: '/albums/:slug', component: () => import('./pages/albums/[slug].vue') },
   { path: '/library', component: () => import('./pages/library/index.vue') },
@@ -65,6 +67,10 @@ const router = createRouter({
 setCompatRouter(router)
 
 router.beforeEach(async (to) => {
+  if (to.path === '/time/map') {
+    const { mapEnabled } = useFeatureFlags()
+    if (!mapEnabled) return '/home'
+  }
   if (to.path === '/albums' || to.path.startsWith('/albums/') || to.path === '/admin/albums' || to.path.startsWith('/admin/albums/')) {
     const { albumsEnabled } = useFeatureFlags()
     if (!albumsEnabled) return to.path.startsWith('/admin/') ? '/admin' : '/home'

@@ -14,6 +14,7 @@ import {
   type LocationVisibility,
   type PlaceSnapshot,
 } from '../../common/location/public-location';
+import type { PublicMapMemory } from '../memory-map/memory-map.types';
 
 type PublishedMomentSnapshot = {
   title: string;
@@ -363,6 +364,28 @@ export class MomentService {
     };
   }
 
+  async findPublicMapMemories(): Promise<PublicMapMemory[]> {
+    const rows = await this.prisma.moment.findMany({
+      where: { status: 'published' },
+      select: this.buildListSelect(),
+      orderBy: { publishedAt: 'desc' },
+      take: 5000,
+    });
+    return rows.flatMap((row) => {
+      const moment = this.formatPublic(row);
+      if (!this.hasMapCoordinate(moment.publicLocation)) return [];
+      return [{
+        id: `moment:${moment.id}`,
+        type: 'moment' as const,
+        title: moment.title,
+        excerpt: moment.excerpt,
+        occurredAt: moment.happenedAt || moment.publishedAt,
+        href: `/moments?focus=${encodeURIComponent(moment.slug)}`,
+        publicLocation: moment.publicLocation,
+      }];
+    });
+  }
+
   private async findPublishedByAnySlug(slug: string, currentUserId?: string) {
     const include = this.buildInclude(currentUserId);
     const byWork = await this.prisma.moment.findFirst({
@@ -649,5 +672,11 @@ export class MomentService {
       if (query.to && happenedAt > new Date(query.to).getTime()) return false;
     }
     return true;
+  }
+
+  private hasMapCoordinate(location: unknown): location is NonNullable<ReturnType<typeof buildPublicLocation>> {
+    if (!location || typeof location !== 'object') return false;
+    const value = location as { latitude?: unknown; longitude?: unknown };
+    return Number.isFinite(Number(value.latitude)) && Number.isFinite(Number(value.longitude));
   }
 }

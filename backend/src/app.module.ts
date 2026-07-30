@@ -27,6 +27,7 @@ import { LibraryModule } from './modules/library/library.module';
 import { MomentModule } from './modules/moment/moment.module';
 import { PlaceModule } from './modules/place/place.module';
 import { AlbumModule } from './modules/album/album.module';
+import { MemoryMapModule } from './modules/memory-map/memory-map.module';
 import { RedisModule } from './common/redis/redis.module';
 import { RedisRateLimitGuard } from './common/guards/redis-rate-limit.guard';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
@@ -72,6 +73,7 @@ import { HttpCacheInterceptor } from './common/interceptors/http-cache.intercept
     MomentModule,
     PlaceModule,
     AlbumModule,
+    MemoryMapModule,
   ],
   controllers: [AppController],
   providers: [

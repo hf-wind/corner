@@ -51,13 +51,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export function useApi() {
   return {
-    async get<T = any>(path: string, params?: Record<string, any>): Promise<T> {
+    async get<T = any>(path: string, params?: Record<string, any>, options: RequestInit = {}): Promise<T> {
       const query = params ? '?' + new URLSearchParams(
         Object.entries(params)
           .filter(([_, v]) => v !== undefined && v !== null && v !== '')
           .map(([k, v]) => [k, String(v)])
       ).toString() : ''
-      return request<T>(`${path}${query}`)
+      return request<T>(`${path}${query}`, options)
     },
     async post<T = any>(path: string, body?: any): Promise<T> {
       return request<T>(path, {

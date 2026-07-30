@@ -18,6 +18,7 @@
             <Icon name="ph:map-pin-bold" />{{ moment.publicLocation.name }}
           </NuxtLink>
           <span v-else-if="moment.publicLocation"><Icon name="ph:map-pin-bold" />{{ moment.publicLocation.name }}</span>
+          <NuxtLink v-if="moment.publicLocation?.latitude != null" :to="nearbyMapLink"><Icon name="ph:map-trifold-bold" />查看附近记忆</NuxtLink>
         </div>
 
         <aside class="moment-summary" aria-label="记录摘要">
@@ -123,6 +124,16 @@ const happenedAtText = computed(() => {
   if (Number.isNaN(date.getTime())) return ''
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
 })
+const nearbyMapLink = computed(() => ({
+  path: '/time/map',
+  query: {
+    lng: props.moment.publicLocation?.longitude,
+    lat: props.moment.publicLocation?.latitude,
+    cs: 'wgs84',
+    place: props.moment.publicLocation?.slug || undefined,
+    memory: `moment:${props.moment.id}`,
+  },
+}))
 const dateParts = computed(() => {
   const date = new Date(dateSource.value)
   if (Number.isNaN(date.getTime())) return { day: '--', month: '--', year: '', full: '' }

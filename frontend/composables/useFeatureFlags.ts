@@ -6,5 +6,6 @@ function envEnabled(value: string | undefined, fallback = true) {
 export function useFeatureFlags() {
   return {
     albumsEnabled: envEnabled(import.meta.env.VITE_FEATURE_ALBUMS_ENABLED, true),
+    mapEnabled: envEnabled(import.meta.env.VITE_FEATURE_MAP_ENABLED, true),
   }
 }

@@ -40,6 +40,10 @@ export class HttpCacheInterceptor implements NestInterceptor {
           const key = `corner:http-cache:${version}:${digest}`;
           const cached = await this.redis.getJson<unknown>(key);
           if (cached !== null) {
+            if (this.applyEtag(request, response, cached)) {
+              subscriber.complete();
+              return;
+            }
             response.setHeader('X-Cache', 'HIT');
             subscriber.next(cached);
             subscriber.complete();
@@ -52,6 +56,10 @@ export class HttpCacheInterceptor implements NestInterceptor {
             await new Promise((resolve) => setTimeout(resolve, 75));
             const filled = await this.redis.getJson<unknown>(key);
             if (filled !== null) {
+              if (this.applyEtag(request, response, filled)) {
+                subscriber.complete();
+                return;
+              }
               response.setHeader('X-Cache', 'HIT');
               subscriber.next(filled);
               subscriber.complete();
@@ -62,6 +70,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
           response.setHeader('X-Cache', 'MISS');
           next.handle().pipe(
             mergeMap((data) => {
+              this.applyEtag(request, response, data);
               void this.redis.setJson(key, data, this.ttlFor(request.path)).catch((error: Error) => {
                 this.logger.warn(`Cache write failed: ${error.message}`);
               });
@@ -104,8 +113,18 @@ export class HttpCacheInterceptor implements NestInterceptor {
   }
 
   private ttlFor(path: string): number {
+    if (/\/memories\/(?:map|places)(?:\/|$)/.test(path)) return 120;
     if (/\/(?:settings|categories|tags|emoji-packs)(?:\/|$)/.test(path)) return 600;
     if (/\/(?:posts|moments|library|comments|moment-comments)(?:\/|$)/.test(path)) return 120;
     return 60;
+  }
+
+  private applyEtag(request: Request, response: Response, data: unknown) {
+    const etag = `\"${createHash('sha256').update(JSON.stringify(data)).digest('base64url')}\"`;
+    response.setHeader('ETag', etag);
+    if (request.headers['if-none-match'] !== etag) return false;
+    response.setHeader('X-Cache', 'HIT');
+    response.status(304).end();
+    return true;
   }
 }
