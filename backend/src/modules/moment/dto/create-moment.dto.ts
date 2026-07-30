@@ -1,6 +1,7 @@
 import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { MomentLocationDto } from './moment-location.dto';
 
-export class CreateMomentDto {
+export class CreateMomentDto extends MomentLocationDto {
   @IsString()
   @MaxLength(255)
   title: string;

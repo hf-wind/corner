@@ -15,7 +15,7 @@ export class MomentController {
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
   findAll(@Query() query: MomentQueryDto, @Req() req: any) {
-    return this.moment.findAll(query, req.user?.id);
+    return this.moment.findAll(query, req.user?.id, req.user?.role === 'admin');
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

@@ -13,6 +13,30 @@ $backendEnv = Join-Path $repoRoot 'backend/.env.tunnel'
 $sshTarget = "$SshUser@$SshHost"
 $sshArgs = @('-i', $KeyPath, '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30')
 
+function Read-DotEnvValues {
+  param([string]$Path)
+
+  $result = @{}
+  if (-not (Test-Path -LiteralPath $Path)) { return $result }
+
+  foreach ($line in (Get-Content -LiteralPath $Path)) {
+    if ($line -notmatch '^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$') { continue }
+    $value = $Matches[2]
+    if ($value.Length -ge 2 -and (($value[0] -eq '"' -and $value[-1] -eq '"') -or ($value[0] -eq "'" -and $value[-1] -eq "'"))) {
+      $value = $value.Substring(1, $value.Length - 2)
+    }
+    $result[$Matches[1]] = $value
+  }
+  return $result
+}
+
+function ConvertTo-DotEnvLine {
+  param([string]$Name, [string]$Value)
+
+  $escaped = $Value.Replace('\', '\\').Replace('"', '\"')
+  return "$Name=`"$escaped`""
+}
+
 if (-not (Test-Path -LiteralPath $KeyPath)) {
   throw "SSH private key not found: $KeyPath"
 }
@@ -32,20 +56,32 @@ foreach ($line in $remoteEnv) {
   if ($line -match '^([A-Z0-9_]+)=(.*)$') { $values[$Matches[1]] = $Matches[2] }
 }
 
-foreach ($required in @('DEV_POSTGRES_DB', 'DEV_POSTGRES_USER', 'DEV_POSTGRES_PASSWORD', 'DEV_REDIS_PASSWORD', 'DEV_JWT_SECRET', 'DEV_SEED_ADMIN_PASSWORD')) {
+foreach ($required in @('DEV_POSTGRES_DB', 'DEV_POSTGRES_USER', 'DEV_POSTGRES_PASSWORD', 'DEV_REDIS_PASSWORD', 'DEV_JWT_SECRET')) {
   if (-not $values[$required]) { throw "Missing remote setting: $required" }
 }
 
+$rootEnv = Read-DotEnvValues (Join-Path $repoRoot '.env')
+$existingTunnelEnv = Read-DotEnvValues $backendEnv
+$adminValues = @{}
+foreach ($name in @('SEED_ADMIN_USERNAME', 'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD')) {
+  $adminValues[$name] = if ($existingTunnelEnv[$name]) { $existingTunnelEnv[$name] } else { $rootEnv[$name] }
+  if (-not $adminValues[$name]) {
+    throw "Missing local administrator setting: $name. Configure it in backend/.env.tunnel or the root .env before starting the development tunnel."
+  }
+}
+
 $lines = @(
-  "DATABASE_URL=postgresql://$($values.DEV_POSTGRES_USER):$($values.DEV_POSTGRES_PASSWORD)@127.0.0.1:15432/$($values.DEV_POSTGRES_DB)",
+  $(ConvertTo-DotEnvLine 'DATABASE_URL' "postgresql://$($values.DEV_POSTGRES_USER):$($values.DEV_POSTGRES_PASSWORD)@127.0.0.1:15432/$($values.DEV_POSTGRES_DB)"),
   'REDIS_HOST=127.0.0.1',
   'REDIS_PORT=16379',
-  "REDIS_PASS=$($values.DEV_REDIS_PASSWORD)",
-  "JWT_SECRET=$($values.DEV_JWT_SECRET)",
+  $(ConvertTo-DotEnvLine 'REDIS_PASS' $values.DEV_REDIS_PASSWORD),
+  $(ConvertTo-DotEnvLine 'JWT_SECRET' $values.DEV_JWT_SECRET),
   'JWT_EXPIRES_IN=7d',
-  'SEED_ADMIN_USERNAME=dev-admin',
-  'SEED_ADMIN_EMAIL=dev@corner.local',
-  "SEED_ADMIN_PASSWORD=$($values.DEV_SEED_ADMIN_PASSWORD)",
+  $(ConvertTo-DotEnvLine 'SEED_ADMIN_USERNAME' $adminValues.SEED_ADMIN_USERNAME),
+  $(ConvertTo-DotEnvLine 'SEED_ADMIN_EMAIL' $adminValues.SEED_ADMIN_EMAIL),
+  $(ConvertTo-DotEnvLine 'SEED_ADMIN_PASSWORD' $adminValues.SEED_ADMIN_PASSWORD),
+  $(ConvertTo-DotEnvLine 'SEED_ALLOWED_DATABASE' $values.DEV_POSTGRES_DB),
+  'SEED_ALLOW_REMOTE_DATABASE=false',
   'NODE_ENV=development',
   'PORT=4000'
 )

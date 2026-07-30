@@ -14,6 +14,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/about', component: () => import('./pages/about.vue') },
   { path: '/moments', component: () => import('./pages/moments/index.vue') },
   { path: '/moments/:slug', component: () => import('./pages/moments/[slug].vue') },
+  { path: '/places/:slug', component: () => import('./pages/places/[slug].vue') },
   { path: '/library', component: () => import('./pages/library/index.vue') },
   { path: '/library/:slug', component: () => import('./pages/library/[slug].vue') },
   { path: '/login', component: () => import('./pages/login.vue'), meta: { layout: false } },

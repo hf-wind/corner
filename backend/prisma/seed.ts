@@ -10,6 +10,16 @@ import { qqItems, twemojiItems } from './seed-emoji-data';
 
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 if (!databaseUrl) throw new Error('DATABASE_URL 未配置，已拒绝执行初始化');
+const databaseTarget = new URL(databaseUrl);
+const databaseName = databaseTarget.pathname.replace(/^\//, '');
+const allowedDatabase = String(process.env.SEED_ALLOWED_DATABASE || '').trim();
+if (!allowedDatabase || databaseName !== allowedDatabase) {
+  throw new Error(`初始化目标校验失败：当前数据库 ${databaseName || '(未知)'}，允许目标 ${allowedDatabase || '(未配置)'}`);
+}
+const localDatabaseHosts = new Set(['127.0.0.1', 'localhost', '::1']);
+if (!localDatabaseHosts.has(databaseTarget.hostname) && process.env.SEED_ALLOW_REMOTE_DATABASE !== 'true') {
+  throw new Error(`拒绝初始化远程数据库 ${databaseTarget.hostname}；如确需执行，必须显式设置 SEED_ALLOW_REMOTE_DATABASE=true`);
+}
 
 const adminUsername = String(process.env.SEED_ADMIN_USERNAME || 'huifeng').trim();
 const adminEmail = String(process.env.SEED_ADMIN_EMAIL || '1833079849@qq.com').trim().toLowerCase();
@@ -153,11 +163,18 @@ async function installSeedMedia(adminId: string) {
 
 async function main() {
   const passwordHash = await bcrypt.hash(adminPassword, 12);
-  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+  const configuredAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+  const existingAdmins = configuredAdmin
+    ? []
+    : await prisma.user.findMany({ where: { role: 'admin' }, orderBy: { createdAt: 'asc' }, take: 2 });
+  if (!configuredAdmin && existingAdmins.length > 1) {
+    throw new Error('存在多个管理员且配置邮箱未命中，已拒绝猜测要迁移的账号');
+  }
+  const existingAdmin = configuredAdmin || existingAdmins[0];
   const admin = existingAdmin
     ? await prisma.user.update({
         where: { id: existingAdmin.id },
-        data: { username: adminUsername, passwordHash, role: 'admin', isActive: true, avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
+        data: { username: adminUsername, email: adminEmail, passwordHash, role: 'admin', isActive: true, avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
       })
     : await prisma.user.create({
         data: { username: adminUsername, email: adminEmail, passwordHash, role: 'admin', isActive: true, avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
@@ -250,10 +267,55 @@ async function main() {
     excerpt: '阿风傍晚骑鉴湖，撞见大爷打太极，哆啦A梦觉得这画面比大雄的漫画还治愈。',
     authorId: admin.id, status: 'published', needsPublish: false, publishedAt,
   };
+  const canonicalMomentPlace = await prisma.place.findUnique({ where: { slug: 'jianhu-scenic-area' } });
+  const legacyMomentPlace = canonicalMomentPlace
+    ? null
+    : await prisma.place.findFirst({ where: { name: '鉴湖景区' }, orderBy: { createdAt: 'asc' } });
+  const momentPlace = canonicalMomentPlace
+    ? canonicalMomentPlace
+    : legacyMomentPlace
+      ? await prisma.place.update({
+          where: { id: legacyMomentPlace.id },
+          data: {
+            name: '鉴湖景区', slug: 'jianhu-scenic-area', address: '柯岩大道558号',
+            city: '绍兴市', province: '浙江省', country: '中国',
+            latitude: 30.050010024209417, longitude: 120.46902866239579, type: 'poi',
+          },
+        })
+      : await prisma.place.create({
+        data: {
+      name: '鉴湖景区', slug: 'jianhu-scenic-area', address: '柯岩大道558号',
+      city: '绍兴市', province: '浙江省', country: '中国',
+      latitude: 30.050010024209417, longitude: 120.46902866239579, type: 'poi',
+        },
+      });
+  const momentHappenedAt = new Date('2026-07-07T18:08:00+08:00');
+  const momentSnapshot = {
+    title: momentData.title, slug: momentData.slug, content: momentData.content, excerpt: momentData.excerpt,
+    happenedAt: momentHappenedAt.toISOString(),
+    place: {
+      id: momentPlace.id, name: momentPlace.name, slug: momentPlace.slug, address: momentPlace.address,
+      city: momentPlace.city, province: momentPlace.province, country: momentPlace.country,
+      latitude: momentPlace.latitude, longitude: momentPlace.longitude, type: momentPlace.type,
+    },
+    locationVisibility: 'blurred', locationPrecision: 'place', locationSource: 'map',
+    locationExactConfirmedAt: null,
+  };
   await prisma.moment.upsert({
     where: { slug: momentData.slug },
-    create: { ...momentData, publishedSnapshot: { title: momentData.title, slug: momentData.slug, content: momentData.content, excerpt: momentData.excerpt } },
-    update: { ...momentData, publishedSnapshot: { title: momentData.title, slug: momentData.slug, content: momentData.content, excerpt: momentData.excerpt } },
+    create: {
+      ...momentData, placeId: momentPlace.id, happenedAt: momentHappenedAt,
+      locationVisibility: 'blurred', locationPrecision: 'place', locationSource: 'map',
+      publishedSnapshot: momentSnapshot,
+    },
+    update: {
+      ...momentData, placeId: momentPlace.id, happenedAt: momentHappenedAt,
+      locationVisibility: 'blurred', locationPrecision: 'place', locationSource: 'map',
+      locationExactConfirmedAt: null, publishedSnapshot: momentSnapshot,
+    },
+  });
+  await prisma.place.deleteMany({
+    where: { id: { not: momentPlace.id }, name: '鉴湖景区', moments: { none: {} } },
   });
 
   for (const item of libraryItems) {
@@ -272,7 +334,7 @@ async function main() {
     await prisma.emojiItem.createMany({ data: packData.items.map((item) => ({ packId: pack!.id, label: item.label, char: 'char' in item ? String(item.char || '') || null : null, imageUrl: item.imageUrl, sort: item.sort })) });
   }
 
-  console.log('正式环境初始化完成');
+  console.log(`数据库初始化完成：${databaseTarget.hostname}/${databaseName}`);
   console.log(`管理员: ${adminUsername} <${adminEmail}>`);
   console.log(`模型: DeepSeek Flash${deepseekApiKey ? '' : '（未写入密钥，请配置 DEEPSEEK_API_KEY）'}`);
   console.log(`文章 ${await prisma.post.count()} / 瞬间 ${await prisma.moment.count()} / 书影 ${await prisma.libraryItem.count()} / 表情 ${await prisma.emojiItem.count()}`);

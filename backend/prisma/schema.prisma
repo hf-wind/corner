@@ -99,16 +99,48 @@ model Moment {
   likeCount         Int             @default(0) @map("like_count")
   needsPublish      Boolean         @default(true) @map("needs_publish")
   publishedSnapshot Json?           @map("published_snapshot")
+  placeId           String?         @map("place_id") @db.Uuid
+  happenedAt        DateTime?       @map("happened_at")
+  locationVisibility String         @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision String          @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource    String?         @map("location_source") @db.VarChar(20)
+  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
   publishedAt       DateTime?       @map("published_at")
   createdAt         DateTime        @default(now()) @map("created_at")
   updatedAt         DateTime        @updatedAt @map("updated_at")
   author            User            @relation(fields: [authorId], references: [id])
+  place             Place?          @relation(fields: [placeId], references: [id], onDelete: Restrict)
   comments          MomentComment[]
   likes             MomentLike[]
 
   @@index([status, publishedAt])
   @@index([publishedAt])
+  @@index([placeId, happenedAt])
+  @@index([happenedAt])
   @@map("moments")
+}
+
+model Place {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(150)
+  slug         String   @unique @db.VarChar(160)
+  address      String?  @db.Text
+  city         String?  @db.VarChar(100)
+  province     String?  @db.VarChar(100)
+  country      String?  @db.VarChar(100)
+  latitude     Float
+  longitude    Float
+  type         String   @default("poi") @db.VarChar(30)
+  coverMediaId String?  @map("cover_media_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  coverMedia   Media?   @relation("PlaceCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+  moments      Moment[]
+
+  @@index([name])
+  @@index([city, name])
+  @@index([latitude, longitude])
+  @@map("places")
 }
 
 model PostTag {
@@ -216,6 +248,7 @@ model Media {
   uploadedBy   String?  @map("uploaded_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
   uploader     User?    @relation(fields: [uploadedBy], references: [id])
+  placeCovers  Place[]  @relation("PlaceCover")
 
   @@map("media")
 }

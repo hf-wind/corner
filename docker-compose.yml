@@ -70,6 +70,7 @@ services:
       QWEN_API_KEY: ${QWEN_API_KEY:-}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+      AMAP_WEB_SERVICE_KEY: ${AMAP_WEB_SERVICE_KEY:-}
       EMAIL_SMTP_PASS: ${EMAIL_SMTP_PASS:-}
       EMAIL_SMTP_USER: ${EMAIL_SMTP_USER:-1833079849@qq.com}
       EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-smtp.qq.com}
@@ -102,6 +103,8 @@ services:
         VITE_API_BASE: /api
         VITE_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-0x4AAAAAAEBb-aIzkxa6-yRo}
         VITE_TURNSTILE_ENABLED: ${TURNSTILE_ENABLED:-true}
+        VITE_AMAP_WEB_KEY: ${VITE_AMAP_WEB_KEY:-}
+        VITE_AMAP_SECURITY_CODE: ${VITE_AMAP_SECURITY_CODE:-}
     restart: unless-stopped
     depends_on:
       backend:

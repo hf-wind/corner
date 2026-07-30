@@ -32,15 +32,18 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
-            <div class="moment-row-title">
-              <strong>{{ record.title }}</strong>
-              <span>{{ record.excerpt || '这条瞬间还没写摘要。' }}</span>
+            <div class="moment-row-content">
+              <i v-if="record.needsPublish" class="change-dot" aria-label="有未发布修改" />
+              <div class="moment-row-title">
+                <strong>{{ record.title }}</strong>
+                <span>{{ record.excerpt || '这条瞬间还没写摘要。' }}</span>
+              </div>
             </div>
           </template>
 
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.published ? 'green' : record.needsPublish ? 'orange' : 'default'">
-              {{ record.published ? '已发布' : record.needsPublish ? '待发布' : '草稿' }}
+            <a-tag :color="record.published ? 'green' : 'default'">
+              {{ record.published ? '已发布' : '草稿' }}
             </a-tag>
           </template>
 
@@ -104,7 +107,7 @@ const statusOptions = [
   { label: '全部', value: 'all' },
   { label: '已发布', value: 'published' },
   { label: '草稿', value: 'draft' },
-  { label: '待发布', value: 'pending' },
+  { label: '有修改', value: 'pending' },
 ]
 
 const columns = [
@@ -228,14 +231,31 @@ onMounted(() => {
   overflow: hidden;
 }
 
+.moment-row-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
 .moment-row-title {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 4px;
 }
 
 .moment-row-title strong {
   color: var(--c-text);
+}
+
+.change-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #22c55e 18%, transparent);
 }
 
 .moment-row-title span {

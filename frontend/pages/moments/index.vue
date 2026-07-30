@@ -18,7 +18,19 @@
           <section class="feed-section" aria-labelledby="moment-stream-title">
             <header class="stream-header">
               <div><span>RECENT NOTES</span><h2 id="moment-stream-title">最近记录</h2></div>
-              <small><Icon name="ph:arrow-down" /> 从新到旧</small>
+              <div class="stream-tools">
+                <div class="place-filter">
+                  <button type="button" :class="{ active: selectedPlace }" aria-haspopup="listbox" :aria-expanded="placeMenuOpen" @click="placeMenuOpen = !placeMenuOpen">
+                    <Icon name="ph:map-pin-line-bold" /><span>{{ selectedPlaceName }}</span><Icon name="ph:caret-down-bold" />
+                  </button>
+                  <div v-if="placeMenuOpen" class="place-menu" role="listbox">
+                    <button type="button" role="option" :aria-selected="!selectedPlace" :class="{ selected: !selectedPlace }" @click="selectPlace('')"><span><Icon name="ph:globe-hemisphere-east-bold" />全部地点</span><em>{{ total }}</em></button>
+                    <button v-for="place in places" :key="place.slug" type="button" role="option" :aria-selected="selectedPlace === place.slug" :class="{ selected: selectedPlace === place.slug }" @click="selectPlace(place.slug)"><span><Icon name="ph:map-pin-fill" />{{ place.name }}</span><em>{{ place.momentCount }}</em></button>
+                    <p v-if="!places.length">地点需要发布后才会出现在这里</p>
+                  </div>
+                </div>
+                <small class="sort-indicator"><Icon name="ph:arrow-down" /> 从新到旧</small>
+              </div>
             </header>
 
             <div v-if="!loading && !moments.length" class="moment-empty content-reveal">
@@ -81,12 +93,17 @@ import { extractMomentImages } from '~/utils/moment'
 
 const api = useApi()
 const route = useRoute()
+const router = useRouter()
 const loading = ref(true)
 const loadingMore = ref(false)
 const page = ref(1)
 const total = ref(0)
 const totalPages = ref(1)
 const moments = ref<any[]>([])
+const places = ref<any[]>([])
+const selectedPlace = ref(String(route.query.place || ''))
+const placeMenuOpen = ref(false)
+const selectedPlaceName = computed(() => places.value.find(place => place.slug === selectedPlace.value)?.name || '全部地点')
 const focusSlug = computed(() => String(route.query.focus || ''))
 const visibleImageCount = computed(() => moments.value.reduce((sum, item) => sum + extractMomentImages(item.content).length, 0))
 const visibleCommentCount = computed(() => moments.value.reduce((sum, item) => sum + Number(item.commentCount || 0), 0))
@@ -108,10 +125,11 @@ async function fetchMoments(targetPage = 1, append = false) {
   if (append) loadingMore.value = true
   else loading.value = true
   try {
-    const res = await api.get<any>('/moments', { page: targetPage, limit: 10, sort: 'latest' })
+    const res = await api.get<any>('/moments', { page: targetPage, limit: 10, sort: 'latest', place: selectedPlace.value || undefined })
     const nextItems = (res.items ?? []).map((item: any) => ({
       id: item.id, slug: item.slug, title: item.title, content: item.content, excerpt: item.excerpt,
       publishedAt: item.publishedAt, createdAt: item.createdAt, likeCount: item.likeCount ?? 0,
+      happenedAt: item.happenedAt, publicLocation: item.publicLocation,
       commentCount: item.commentCount ?? item._count?.comments ?? 0, liked: !!item.liked,
     }))
     if (append) {
@@ -136,7 +154,22 @@ async function loadMore() {
   await fetchMoments(nextPage, true)
 }
 
-onMounted(() => { void fetchMoments(1) })
+async function applyPlaceFilter() {
+  await router.replace({ query: { ...route.query, place: selectedPlace.value || undefined, focus: undefined } })
+  await fetchMoments(1)
+}
+
+async function selectPlace(slug: string) {
+  selectedPlace.value = slug
+  placeMenuOpen.value = false
+  await applyPlaceFilter()
+}
+
+onMounted(async () => {
+  const placeResult = await api.get<any>('/places', { limit: 100 }).catch(() => ({ items: [] }))
+  places.value = placeResult.items || []
+  await fetchMoments(1)
+})
 useHead({ title: '我的瞬间' })
 </script>
 
@@ -153,6 +186,7 @@ useHead({ title: '我的瞬间' })
 .hero-mark { position:absolute; right:105px; bottom:-42px; color:var(--c-primary); font-size:8.5rem; opacity:.045; transform:rotate(-9deg); }.hero-stamp { position:absolute; right:8px; bottom:8px; color:var(--c-text-3); font-size:.43rem; letter-spacing:.15em; line-height:1.5; text-align:right; opacity:.55; }
 .content-grid { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:22px; align-items:start; margin-top:24px; }
 .feed-section { min-width:0; }.stream-header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:0 0 12px 62px; }.stream-header span { color:var(--c-primary); font-size:.52rem; font-weight:700; letter-spacing:.18em; }.stream-header h2 { margin:4px 0 0; color:var(--c-text); font-size:1.08rem; }.stream-header small { display:flex; align-items:center; gap:5px; color:var(--c-text-3); font-size:.62rem; }
+.stream-tools { --stream-control-width:132px; display:flex; align-items:center; gap:10px; }.place-filter { position:relative; width:var(--stream-control-width); }.place-filter>button,.sort-indicator { display:flex; width:var(--stream-control-width); height:32px; box-sizing:border-box; align-items:center; gap:7px; padding:0 9px; border:1px solid color-mix(in srgb,var(--border) 82%,transparent); border-radius:9px; background:color-mix(in srgb,var(--ld-bg-card) 96%,transparent); box-shadow:0 4px 14px color-mix(in srgb,var(--ld-shadow) 22%,transparent); color:var(--c-text-2); font:inherit; font-size:.62rem; }.place-filter>button { justify-content:space-between; cursor:pointer; }.sort-indicator { justify-content:center; }.place-filter>button :deep(svg):first-child,.sort-indicator :deep(svg) { color:var(--c-primary); }.place-filter>button.active { border-color:color-mix(in srgb,var(--c-primary) 42%,var(--border)); background:var(--c-primary-soft); color:var(--c-primary); }.place-menu { position:absolute; z-index:30; top:38px; right:0; width:100%; box-sizing:border-box; padding:7px; border:1px solid var(--border); border-radius:11px; background:var(--ld-bg-card); box-shadow:0 14px 32px color-mix(in srgb,var(--ld-shadow) 55%,transparent); }.place-menu button { display:flex; width:100%; align-items:center; justify-content:space-between; gap:6px; padding:8px 7px; border:0; border-radius:7px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; }.place-menu button:hover,.place-menu button.selected { background:var(--c-primary-soft); color:var(--c-primary); }.place-menu button span { display:flex; min-width:0; align-items:center; gap:5px; overflow:hidden; font-size:.62rem; text-overflow:ellipsis; white-space:nowrap; }.place-menu button em { min-width:20px; padding:2px 4px; border-radius:999px; background:var(--c-bg-2); color:var(--c-text-3); font-size:.5rem; font-style:normal; text-align:center; }.place-menu p { margin:4px; padding:9px 4px; color:var(--c-text-3); font-size:.56rem; line-height:1.6; text-align:center; }
 .moment-list { display:grid; gap:11px; }
 .moment-empty { display:flex; min-height:280px; flex-direction:column; align-items:center; justify-content:center; padding:30px; border:1px dashed var(--border); border-radius:16px; color:var(--c-text-3); text-align:center; }.moment-empty>span { display:grid; width:48px; height:48px; margin-bottom:12px; place-items:center; border-radius:15px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.25rem; }.moment-empty h3 { margin:0; color:var(--c-text-2); font-size:.9rem; }.moment-empty p { margin:7px 0 0; font-size:.68rem; }
 .moments-sidebar { position:sticky; top:0; display:grid; gap:12px; }.side-card { padding:16px; border:1px solid color-mix(in srgb,var(--border) 74%,transparent); border-radius:16px; background:color-mix(in srgb,var(--ld-bg-card) 96%,transparent); box-shadow:0 7px 24px color-mix(in srgb,var(--ld-shadow) 30%,transparent); }.side-card header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }.side-card header>span { display:flex; align-items:center; gap:6px; color:var(--c-text-2); font-size:.72rem; font-weight:650; }.side-card header small { color:var(--c-text-3); font-size:.56rem; }
@@ -163,6 +197,6 @@ useHead({ title: '我的瞬间' })
 @keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:980px) { .content-grid { grid-template-columns:minmax(0,1fr) 230px; } }
 @media (max-width:900px) { .moments-main { padding:max(76px,calc(env(safe-area-inset-top) + 64px)) 18px 38px; }.content-grid { grid-template-columns:1fr; }.moments-sidebar { position:static; grid-template-columns:repeat(2,minmax(0,1fr)); }.note-card { display:none; } }
-@media (max-width:640px) { .moments-hero { min-height:168px; align-items:flex-start; padding:26px 21px; border-radius:16px; }.hero-copy h1 { max-width:270px; font-size:1.7rem; }.hero-copy p { max-width:255px; font-size:.68rem; line-height:1.7; }.hero-count { position:absolute; right:20px; bottom:20px; min-width:auto; padding-left:0; border:0; }.hero-count strong { font-size:1.45rem; }.hero-mark { right:25px; }.content-grid { margin-top:20px; }.stream-header { margin-left:1px; }.moments-sidebar { display:none; }.moment-list { gap:9px; } }
+@media (max-width:640px) { .moments-hero { min-height:168px; align-items:flex-start; padding:26px 21px; border-radius:16px; }.hero-copy h1 { max-width:270px; font-size:1.7rem; }.hero-copy p { max-width:255px; font-size:.68rem; line-height:1.7; }.hero-count { position:absolute; right:20px; bottom:20px; min-width:auto; padding-left:0; border:0; }.hero-count strong { font-size:1.45rem; }.hero-mark { right:25px; }.content-grid { margin-top:20px; }.stream-header { align-items:flex-start; margin-left:1px; }.stream-tools { align-items:flex-end; flex-direction:column; gap:5px; }.stream-tools small { display:none; }.moments-sidebar { display:none; }.moment-list { gap:9px; } }
 @media (prefers-reduced-motion:reduce) { .spinning { animation:none; } }
 </style>

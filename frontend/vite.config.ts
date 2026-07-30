@@ -109,8 +109,10 @@ function autoComponentsPlugin(): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, root, '')
+  const envRoot = resolve(root, '..')
+  const env = loadEnv(mode, envRoot, '')
   return {
+    envDir: envRoot,
     plugins: [
       appIconsPlugin(),
       autoComponentsPlugin(),

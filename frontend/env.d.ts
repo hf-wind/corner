@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_API_PROXY_TARGET?: string
   readonly VITE_TURNSTILE_SITE_KEY?: string
   readonly VITE_TURNSTILE_ENABLED?: string
+  readonly VITE_AMAP_WEB_KEY?: string
+  readonly VITE_AMAP_SECURITY_CODE?: string
 }
 
 interface ImportMeta {

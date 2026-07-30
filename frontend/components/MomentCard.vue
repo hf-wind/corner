@@ -12,6 +12,14 @@
           <time :datetime="dateSource">{{ dateParts.full }}</time>
         </header>
 
+        <div class="moment-context">
+          <span v-if="moment.happenedAt"><Icon name="ph:clock-bold" />发生于 {{ happenedAtText }}</span>
+          <NuxtLink v-if="moment.publicLocation?.slug" :to="`/places/${moment.publicLocation.slug}`">
+            <Icon name="ph:map-pin-bold" />{{ moment.publicLocation.name }}
+          </NuxtLink>
+          <span v-else-if="moment.publicLocation"><Icon name="ph:map-pin-bold" />{{ moment.publicLocation.name }}</span>
+        </div>
+
         <aside class="moment-summary" aria-label="记录摘要">
           <span><Icon name="ph:notebook" />摘要</span>
           <p>{{ summary }}</p>
@@ -79,9 +87,10 @@
 <script setup lang="ts">
 import { extractMomentImages, momentPreviewText, stripMomentImages } from '~/utils/moment'
 import ImageLightbox from './ImageLightbox.vue'
+import type { PublicLocation } from '~/types/place'
 
 const props = withDefaults(defineProps<{
-  moment: { id: string; slug: string; title: string; content?: string; excerpt?: string; publishedAt?: string; createdAt?: string; likeCount: number; commentCount: number; liked?: boolean }
+  moment: { id: string; slug: string; title: string; content?: string; excerpt?: string; happenedAt?: string; publicLocation?: PublicLocation | null; publishedAt?: string; createdAt?: string; likeCount: number; commentCount: number; liked?: boolean }
   initiallyExpandedComments?: boolean
 }>(), { initiallyExpandedComments: false })
 
@@ -107,7 +116,13 @@ const summary = computed(() => {
   if (images.value.length) return `一组关于「${props.moment.title}」的影像记录，共 ${images.value.length} 张图片。`
   return `关于「${props.moment.title}」的一段瞬间记录。`
 })
-const dateSource = computed(() => String(props.moment.publishedAt || props.moment.createdAt || ''))
+const dateSource = computed(() => String(props.moment.happenedAt || props.moment.publishedAt || props.moment.createdAt || ''))
+const happenedAtText = computed(() => {
+  if (!props.moment.happenedAt) return ''
+  const date = new Date(props.moment.happenedAt)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
+})
 const dateParts = computed(() => {
   const date = new Date(dateSource.value)
   if (Number.isNaN(date.getTime())) return { day: '--', month: '--', year: '', full: '' }
@@ -182,6 +197,7 @@ async function toggleLike() {
 }
 
 .moment-head time { display: none; color: var(--c-text-3); font-size: .66rem; white-space: nowrap; }
+.moment-context { display:flex; flex-wrap:wrap; gap:7px 12px; margin-top:7px; }.moment-context span,.moment-context a { display:inline-flex; align-items:center; gap:4px; color:var(--c-text-3); font-size:.62rem; text-decoration:none; }.moment-context a { color:var(--c-primary); }.moment-context a:hover { text-decoration:underline; }
 
 .moment-summary {
   display: grid;

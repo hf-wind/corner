@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class MomentQueryDto {
   @IsOptional()
@@ -33,4 +33,17 @@ export class MomentQueryDto {
   @IsBoolean()
   @Type(() => Boolean)
   needsPublish?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  place?: string;
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }
