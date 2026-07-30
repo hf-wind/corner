@@ -31,28 +31,28 @@ export class AuthService {
     if (type === 'login') {
       const user = await this.prisma.user.findUnique({ where: { email } });
       if (!user) throw new BadRequestException('该邮箱未注册');
+      if (!user.isActive) throw new BadRequestException('账号已被禁用');
     }
 
     if (type === 'change_password') {
       const user = await this.prisma.user.findUnique({ where: { email } });
       if (!user) throw new BadRequestException('该邮箱未注册');
+      if (!user.isActive) throw new BadRequestException('账号已被禁用');
     }
 
     return this.emailService.sendVerificationCode(email, type);
   }
 
-  async register(dto: RegisterDto & { code?: string }) {
-    if (dto.code) {
-      const valid = await this.emailService.verifyCode(dto.email, dto.code, 'register');
-      if (!valid) throw new BadRequestException('验证码无效或已过期');
-    }
+  async register(dto: RegisterDto) {
+    const validCode = await this.emailService.verifyCode(dto.email, dto.code, 'register');
+    if (!validCode) throw new BadRequestException('验证码无效或已过期');
 
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already exists');
 
     const username = await this.generateUsername(dto.email);
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = await this.prisma.user.create({
       data: {
         username,
@@ -69,6 +69,7 @@ export class AuthService {
   async login(dto: LoginDto & { code?: string }) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user.isActive) throw new UnauthorizedException('账号已被禁用');
 
     if (dto.code) {
       const valid = await this.emailService.verifyCode(dto.email, dto.code, 'login');

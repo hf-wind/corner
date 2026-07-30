@@ -3,16 +3,20 @@ import { AuthGuard } from '@nestjs/passport';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { MomentCommentService } from './moment-comment.service';
 import { CreateMomentCommentDto } from './dto/create-moment-comment.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('moment-comments')
 export class MomentCommentController {
   constructor(private comment: MomentCommentService) {}
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Get()
   findAll(@Query() query: { page?: string; limit?: string; status?: string }) {
     return this.comment.findAll({
-      page: query.page ? parseInt(query.page, 10) : 1,
-      limit: query.limit ? parseInt(query.limit, 10) : 20,
+      page: Math.max(1, Math.min(500, query.page ? parseInt(query.page, 10) || 1 : 1)),
+      limit: Math.max(1, Math.min(100, query.limit ? parseInt(query.limit, 10) || 20 : 20)),
       status: query.status,
     });
   }
@@ -29,9 +33,9 @@ export class MomentCommentController {
     return this.comment.findByMoment(
       momentId,
       req.user?.id,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 5,
-      replyLimit ? parseInt(replyLimit, 10) : 3,
+      Math.max(1, Math.min(500, page ? parseInt(page, 10) || 1 : 1)),
+      Math.max(1, Math.min(50, limit ? parseInt(limit, 10) || 5 : 5)),
+      Math.max(1, Math.min(20, replyLimit ? parseInt(replyLimit, 10) || 3 : 3)),
     );
   }
 
@@ -52,8 +56,8 @@ export class MomentCommentController {
     return this.comment.findReplies(
       id,
       req.user?.id,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 3,
+      Math.max(1, Math.min(500, page ? parseInt(page, 10) || 1 : 1)),
+      Math.max(1, Math.min(50, limit ? parseInt(limit, 10) || 3 : 3)),
     );
   }
 
@@ -69,19 +73,22 @@ export class MomentCommentController {
     return this.comment.toggleLike(id, req.user.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':id/approve')
   approve(@Param('id') id: string) {
     return this.comment.approve(id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':id/reject')
   reject(@Param('id') id: string, @Body('reason') reason?: string) {
     return this.comment.reject(id, reason);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.comment.remove(id);

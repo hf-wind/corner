@@ -18,12 +18,13 @@ const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/Sideb
 
 const { init: initTypography } = useTypography()
 const { init: initTheme } = useTheme()
-const { readStorage, refreshProfile, isLoggedIn } = useAuth()
+const { readStorage, refreshProfile, isLoggedIn, isAdmin } = useAuth()
 const { connectRealtime, disconnectRealtime, refreshUnread } = useNotifications()
 const { toasts } = useToast()
 const { siteTitle, loadSiteSettings } = useSiteSettings()
 const route = useRoute()
 const showPlayer = ref(false)
+const clientProtection = useProductionClientProtection(isAdmin)
 let playerIdleHandle: number | undefined
 
 readStorage()
@@ -37,6 +38,7 @@ const activeLayout = computed(() => {
 })
 
 onMounted(() => {
+  clientProtection.start()
   void loadSiteSettings()
   initTheme()
   initTypography()
@@ -50,6 +52,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clientProtection.stop()
   disconnectRealtime()
   if (playerIdleHandle === undefined) return
   if (window.cancelIdleCallback) window.cancelIdleCallback(playerIdleHandle)

@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release:
+        description: Semantic version bump after a successful deployment
+        required: true
+        default: auto
+        type: choice
+        options: [auto, patch, minor, major, none]
 
 permissions:
   contents: read
@@ -64,3 +71,67 @@ jobs:
         run: |
           ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
             "cd '$APP_PATH' && git fetch origin main && git checkout main && git merge --ff-only origin/main && ./scripts/deploy.sh"
+
+  release:
+    needs: deploy
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.release != 'none' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create annotated version tag and release notes
+        env:
+          REQUESTED_BUMP: ${{ github.event_name == 'workflow_dispatch' && inputs.release || 'auto' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          latest="$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)"
+          if [[ -z "$latest" ]]; then
+            next="v1.0.0"
+            range="HEAD"
+          else
+            if [[ "$REQUESTED_BUMP" == "auto" ]] && git tag --points-at HEAD | grep -qx "$latest"; then
+              echo "HEAD already has $latest; skipping"
+              exit 0
+            fi
+            version="${latest#v}"
+            IFS=. read -r major minor patch <<< "$version"
+            bump="$REQUESTED_BUMP"
+            messages="$(git log --format=%B "$latest"..HEAD)"
+            if [[ "$bump" == "auto" ]]; then
+              if grep -qi '\[skip release\]' <<< "$messages"; then
+                echo "Release skipped by commit directive"
+                exit 0
+              elif grep -qi '\[release:major\]' <<< "$messages"; then bump="major"
+              elif grep -qi '\[release:minor\]' <<< "$messages"; then bump="minor"
+              else bump="patch"
+              fi
+            fi
+            case "$bump" in
+              major) major=$((major + 1)); minor=0; patch=0 ;;
+              minor) minor=$((minor + 1)); patch=0 ;;
+              patch) patch=$((patch + 1)) ;;
+              *) echo "Unsupported release bump: $bump" >&2; exit 1 ;;
+            esac
+            next="v${major}.${minor}.${patch}"
+            range="$latest..HEAD"
+          fi
+
+          {
+            echo "# $next"
+            echo
+            echo "生产部署：$(date -u +'%Y-%m-%d %H:%M UTC')"
+            echo
+            echo "## 本版改进"
+            git log --no-merges --pretty='- %s (%h)' "$range"
+          } > release-notes.md
+
+          git config user.name "hf-wind"
+          git config user.email "1833079849@qq.com"
+          git tag -a "$next" -F release-notes.md
+          git push origin "$next"
+          gh release create "$next" --title "$next" --notes-file release-notes.md

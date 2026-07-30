@@ -46,6 +46,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/profile', component: () => import('./pages/admin/profile.vue'), meta: adminMeta },
   { path: '/admin/settings', component: () => import('./pages/admin/settings.vue'), meta: adminMeta },
   { path: '/admin/tags', component: () => import('./pages/admin/tags.vue'), meta: adminMeta },
+  { path: '/admin/users', component: () => import('./pages/admin/users.vue'), meta: adminMeta },
   { path: '/:pathMatch(.*)*', redirect: '/home' },
 ]
 

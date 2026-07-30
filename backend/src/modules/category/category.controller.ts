@@ -3,6 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('categories')
 export class CategoryController {
@@ -27,25 +29,29 @@ export class CategoryController {
     return this.cat.findPosts(slug, page ?? 1, limit ?? 20);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':slug/posts')
   assignPosts(@Param('slug') slug: string, @Body('postIds') postIds: string[]) {
     return this.cat.assignPosts(slug, postIds);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post()
   create(@Body() dto: CreateCategoryDto) {
     return this.cat.create(dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Put(':slug')
   update(@Param('slug') slug: string, @Body() dto: UpdateCategoryDto) {
     return this.cat.update(slug, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Delete(':slug')
   remove(@Param('slug') slug: string) {
     return this.cat.remove(slug);

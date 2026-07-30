@@ -184,6 +184,7 @@ const adminFullNav = [
   { to: '/admin/categories', icon: 'ph:folder-open-bold', label: '分类' },
   { to: '/admin/tags', icon: 'ph:tag-bold', label: '标签' },
   { to: '/admin/comments', icon: 'ph:chat-circle-dots-bold', label: '评论' },
+  { to: '/admin/users', icon: 'ph:users-three-bold', label: '用户' },
   { to: '/admin/media', icon: 'ph:image-bold', label: '文件' },
   { to: '/admin/friends', icon: 'ph:handshake-bold', label: '友链' },
   { to: '/admin/friend-applications', icon: 'ph:link-bold', label: '友联申请' },

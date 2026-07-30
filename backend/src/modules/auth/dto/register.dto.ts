@@ -9,9 +9,13 @@ export class RegisterDto {
   @MaxLength(128)
   password: string;
 
-  @IsOptional()
   @IsString()
   @MinLength(6)
   @MaxLength(6)
-  code?: string;
+  code: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }

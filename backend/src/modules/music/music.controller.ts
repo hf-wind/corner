@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { MusicService } from './music.service';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('music')
 export class MusicController {
@@ -32,7 +34,8 @@ export class MusicController {
     });
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Get('admin/config')
   async adminConfig() {
     const config = await this.music.getConfig();
@@ -42,7 +45,8 @@ export class MusicController {
     };
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Put('admin/config')
   async updateConfig(@Body() body: { config?: Record<string, unknown> }) {
     const config = await this.music.updateConfig(body?.config || {});
@@ -52,7 +56,8 @@ export class MusicController {
     };
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post('admin/refresh')
   refresh() {
     return this.music.refreshCache();

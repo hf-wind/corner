@@ -40,7 +40,7 @@ export class EmailVerificationProcessor {
       port: (port as number) || 465,
       secure: secure !== false,
       auth: {
-        user: (user as string) || '1833079849@qq.com',
+        user: (user as string) || process.env.EMAIL_SMTP_USER || '1833079849@qq.com',
         pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
       },
     });
@@ -71,7 +71,7 @@ export class EmailVerificationProcessor {
     try {
       const transporter = await this.getTransporter();
       await transporter.sendMail({
-        from: `"${(fromName as string) || '风隅随笔'}" <${(fromAddress as string) || '1833079849@qq.com'}>`,
+        from: `"${(fromName as string) || process.env.EMAIL_FROM_NAME || '风隅随笔'}" <${(fromAddress as string) || process.env.EMAIL_FROM_ADDRESS || '1833079849@qq.com'}>`,
         to,
         subject,
         html,
@@ -132,7 +132,7 @@ export class EmailNotificationProcessor {
       port: (port as number) || 465,
       secure: secure !== false,
       auth: {
-        user: (user as string) || '1833079849@qq.com',
+        user: (user as string) || process.env.EMAIL_SMTP_USER || '1833079849@qq.com',
         pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
       },
     });
@@ -164,7 +164,7 @@ export class EmailNotificationProcessor {
     try {
       const transporter = await this.getTransporter();
       await transporter.sendMail({
-        from: `"${(fromName as string) || '风隅随笔'}" <${(fromAddress as string) || '1833079849@qq.com'}>`,
+        from: `"${(fromName as string) || process.env.EMAIL_FROM_NAME || '风隅随笔'}" <${(fromAddress as string) || process.env.EMAIL_FROM_ADDRESS || '1833079849@qq.com'}>`,
         to,
         subject,
         html,

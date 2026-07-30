@@ -49,6 +49,7 @@
           <input v-model="confirmPassword" class="form-input" type="password" placeholder="再次输入密码" required minlength="6">
         </div>
         <div class="form-hint">注册后系统将自动为你分配昵称和头像，后续可在个人中心修改。</div>
+        <TurnstileWidget ref="turnstileWidget" v-model="turnstileToken" />
         <div v-if="error" class="form-error">{{ error }}</div>
         <div v-if="success" class="form-success">{{ success }}</div>
         <button class="login-btn" type="submit" :disabled="submitting">{{ submitting ? '注册中...' : '注册' }}</button>
@@ -80,19 +81,28 @@ const error = ref('')
 const success = ref('')
 const submitting = ref(false)
 const cooldown = ref(0)
+const turnstileToken = ref('')
+const turnstileWidget = ref<{ reset: () => void } | null>(null)
 let cooldownTimer: NodeJS.Timeout | null = null
+
+function requireTurnstile() {
+  if (!import.meta.env.PROD || turnstileToken.value) return true
+  toast.warning('请先完成人机验证')
+  return false
+}
 
 async function sendCode() {
   if (!email.value) {
     toast.warning('请先输入邮箱')
     return
   }
+  if (!requireTurnstile()) return
   
   error.value = ''
   success.value = ''
   
   try {
-    await api.post('/auth/send-code', { email: email.value, type: 'register' })
+    await api.post('/auth/send-code', { email: email.value, type: 'register', turnstileToken: turnstileToken.value })
     toast.success('验证码已发送，请查收邮箱')
     cooldown.value = 60
     cooldownTimer = setInterval(() => {
@@ -104,6 +114,8 @@ async function sendCode() {
     }, 1000)
   } catch (e: any) {
     toast.error(e?.message || '发送验证码失败')
+  } finally {
+    turnstileWidget.value?.reset()
   }
 }
 
@@ -120,6 +132,7 @@ async function handleRegister() {
     toast.warning('请输入6位验证码')
     return
   }
+  if (!requireTurnstile()) return
   
   submitting.value = true
   try {
@@ -127,6 +140,7 @@ async function handleRegister() {
       email: email.value,
       password: password.value,
       code: code.value,
+      turnstileToken: turnstileToken.value,
     })
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
@@ -134,6 +148,7 @@ async function handleRegister() {
     router.push(panelHome())
   } catch (e: any) {
     toast.error(e?.message || '注册失败，请检查邮箱是否已被注册')
+    turnstileWidget.value?.reset()
   }
   submitting.value = false
 }

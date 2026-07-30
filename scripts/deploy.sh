@@ -5,7 +5,7 @@ project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
 
 if [[ -x scripts/backup.sh ]] && docker compose ps --status running postgres | grep -q postgres; then
-  ./scripts/backup.sh
+  SKIP_BACKUP_EMAIL=1 ./scripts/backup.sh
 fi
 
 docker compose config --quiet

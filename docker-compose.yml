@@ -1,5 +1,11 @@
 name: corner
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,6 +23,7 @@ services:
       retries: 12
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -31,6 +38,7 @@ services:
       retries: 12
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
 
   backend:
     build:
@@ -63,6 +71,15 @@ services:
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       WEATHER_API_KEY: ${WEATHER_API_KEY:-}
       EMAIL_SMTP_PASS: ${EMAIL_SMTP_PASS:-}
+      EMAIL_SMTP_USER: ${EMAIL_SMTP_USER:-1833079849@qq.com}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-smtp.qq.com}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-465}
+      EMAIL_SMTP_SECURE: ${EMAIL_SMTP_SECURE:-true}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-风隅随笔}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-1833079849@qq.com}
+      BACKUP_EMAIL_TO: ${BACKUP_EMAIL_TO:-1833079849@qq.com}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      TURNSTILE_HOSTNAME: ${TURNSTILE_HOSTNAME:-corner.ink}
       NODE_ENV: production
       PORT: 4000
     volumes:
@@ -75,10 +92,14 @@ services:
       start_period: 30s
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
 
   frontend:
     build:
       context: ./frontend
+      args:
+        VITE_API_BASE: /api
+        VITE_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-0x4AAAAAAEBb-aIzkxa6-yRo}
     restart: unless-stopped
     depends_on:
       backend:
@@ -90,6 +111,7 @@ services:
       retries: 12
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
 
   caddy:
     image: caddy:2-alpine
@@ -109,5 +131,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ${DATA_ROOT:-./data}/caddy/data:/data
       - ${DATA_ROOT:-./data}/caddy/config:/config
+      - ${DATA_ROOT:-./data}/logs/caddy:/var/log/caddy
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging

@@ -54,6 +54,7 @@
           </div>
         </div>
         
+        <TurnstileWidget ref="turnstileWidget" v-model="turnstileToken" />
         <div v-if="error" class="form-error">{{ error }}</div>
         <div v-if="success" class="form-success">{{ success }}</div>
         <button class="login-btn" type="submit" :disabled="submitting">{{ submitting ? '登录中...' : '登录' }}</button>
@@ -85,19 +86,28 @@ const error = ref('')
 const success = ref('')
 const submitting = ref(false)
 const cooldown = ref(0)
+const turnstileToken = ref('')
+const turnstileWidget = ref<{ reset: () => void } | null>(null)
 let cooldownTimer: NodeJS.Timeout | null = null
+
+function requireTurnstile() {
+  if (!import.meta.env.PROD || turnstileToken.value) return true
+  toast.warning('请先完成人机验证')
+  return false
+}
 
 async function sendCode() {
   if (!email.value) {
     toast.warning('请先输入邮箱')
     return
   }
+  if (!requireTurnstile()) return
   
   error.value = ''
   success.value = ''
   
   try {
-    await api.post('/auth/send-code', { email: email.value, type: 'login' })
+    await api.post('/auth/send-code', { email: email.value, type: 'login', turnstileToken: turnstileToken.value })
     toast.success('验证码已发送，请查收邮箱')
     cooldown.value = 60
     cooldownTimer = setInterval(() => {
@@ -109,6 +119,8 @@ async function sendCode() {
     }, 1000)
   } catch (e: any) {
     toast.error(e?.message || '发送验证码失败')
+  } finally {
+    turnstileWidget.value?.reset()
   }
 }
 
@@ -120,10 +132,11 @@ async function handleLogin() {
     toast.warning('请输入6位验证码')
     return
   }
+  if (!requireTurnstile()) return
   
   submitting.value = true
   try {
-    const payload: any = { email: email.value }
+    const payload: any = { email: email.value, turnstileToken: turnstileToken.value }
     if (loginType.value === 'password') {
       payload.password = password.value
     } else {
@@ -137,6 +150,7 @@ async function handleLogin() {
     router.push(panelHome())
   } catch (e: any) {
     toast.error(e?.message || '登录失败，请检查邮箱和密码')
+    turnstileWidget.value?.reset()
   }
   submitting.value = false
 }

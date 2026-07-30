@@ -1,5 +1,7 @@
 # 风隅随笔部署手册
 
+日常运维、日志、备份邮件、版本发布和故障处理见 [OPERATIONS.md](./OPERATIONS.md)。
+
 生产环境使用 Docker Compose。宿主机只需安装 Docker、Git 和基础运维工具，Node.js、PostgreSQL、Redis、前端及后端运行环境都封装在镜像中。
 
 ## 生产架构

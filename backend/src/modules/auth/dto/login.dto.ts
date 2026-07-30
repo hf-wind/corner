@@ -1,7 +1,7 @@
-import { IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, MaxLength } from 'class-validator';
 
 export class LoginDto {
-  @IsString()
+  @IsEmail()
   email: string;
 
   @IsOptional()
@@ -12,6 +12,11 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   @MinLength(6)
-  @MinLength(6)
+  @MaxLength(6)
   code?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }

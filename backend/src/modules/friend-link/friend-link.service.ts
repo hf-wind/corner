@@ -54,7 +54,7 @@ export class FriendLinkService {
     const value = this.parseObject(raw);
     return {
       name: this.stringValue(value.name) || '风隅随笔',
-      url: this.stringValue(value.url) || 'https://corner.example.com',
+      url: this.stringValue(value.url) || 'https://corner.ink',
       description: this.stringValue(value.description),
       avatar: this.stringValue(value.avatar),
       rssUrl: this.stringValue(value.rssUrl),
@@ -335,7 +335,7 @@ export class FriendLinkService {
 
   private async notifyAdmins(title: string, content: string) {
     const admins = await this.prisma.user.findMany({
-      where: { role: 'admin' },
+      where: { role: 'admin', isActive: true },
       select: { id: true },
     });
     await Promise.all(

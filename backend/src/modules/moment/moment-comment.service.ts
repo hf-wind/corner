@@ -288,7 +288,7 @@ export class MomentCommentService {
     const adminEmails = new Set<string>();
     try {
       const admins = await this.prisma.user.findMany({
-        where: { role: 'admin' },
+        where: { role: 'admin', isActive: true },
         select: { id: true, username: true, email: true },
       });
       await Promise.allSettled(admins.map(async (admin) => {

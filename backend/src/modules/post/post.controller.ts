@@ -4,6 +4,8 @@ import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostQueryDto } from './dto/post-query.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('posts')
 export class PostController {
@@ -24,13 +26,15 @@ export class PostController {
     return this.post.findArchive();
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Get(':slug/preview')
   preview(@Param('slug') slug: string) {
     return this.post.preview(slug);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':slug/publish')
   publish(@Param('slug') slug: string) {
     return this.post.publish(slug);
@@ -46,19 +50,22 @@ export class PostController {
     return this.post.findAdjacent(slug);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post()
   create(@Body() dto: CreatePostDto, @Req() req: any) {
     return this.post.create(dto, req.user.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Put(':slug')
   update(@Param('slug') slug: string, @Body() dto: UpdatePostDto) {
     return this.post.update(slug, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Delete(':slug')
   remove(@Param('slug') slug: string) {
     return this.post.remove(slug);

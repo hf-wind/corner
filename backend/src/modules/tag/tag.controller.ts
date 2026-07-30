@@ -3,6 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { TagService } from './tag.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('tags')
 export class TagController {
@@ -27,25 +29,29 @@ export class TagController {
     return this.tag.findPosts(slug, page ?? 1, limit ?? 20);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':slug/posts')
   assignPosts(@Param('slug') slug: string, @Body('postIds') postIds: string[]) {
     return this.tag.assignPosts(slug, postIds);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post()
   create(@Body() dto: CreateTagDto) {
     return this.tag.create(dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Put(':slug')
   update(@Param('slug') slug: string, @Body() dto: UpdateTagDto) {
     return this.tag.update(slug, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Delete(':slug')
   remove(@Param('slug') slug: string) {
     return this.tag.remove(slug);

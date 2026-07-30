@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
@@ -57,11 +57,11 @@ export class EmailService {
       host: host ?? 'smtp.qq.com',
       port: port ?? 465,
       secure: secure ?? true,
-      user: user ?? '1833079849@qq.com',
-      pass: pass ?? process.env.EMAIL_SMTP_PASS ?? '',
-      fromName: fromName ?? '风隅随笔',
-      fromAddress: fromAddress ?? '1833079849@qq.com',
-      siteUrl: (siteUrl as string) || 'https://corner.example.com',
+      user: user ?? process.env.EMAIL_SMTP_USER ?? '1833079849@qq.com',
+      pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
+      fromName: fromName ?? process.env.EMAIL_FROM_NAME ?? '风隅随笔',
+      fromAddress: fromAddress ?? process.env.EMAIL_FROM_ADDRESS ?? '1833079849@qq.com',
+      siteUrl: (siteUrl as string) || 'https://corner.ink',
     };
   }
 
@@ -80,7 +80,10 @@ export class EmailService {
   ): Promise<{ success: boolean; message: string }> {
     const config = await this.getEmailConfig();
     if (!config.enabled) {
-      return { success: false, message: '邮件服务未启用' };
+      throw new ServiceUnavailableException('邮件服务未启用');
+    }
+    if (!String(config.pass || '').trim()) {
+      throw new ServiceUnavailableException('邮件服务尚未配置 SMTP 授权码');
     }
 
     const recentCode = await this.prisma.verificationCode.findFirst({
@@ -93,13 +96,13 @@ export class EmailService {
     });
 
     if (recentCode) {
-      return { success: false, message: '验证码已发送，请60秒后再试' };
+      throw new HttpException('验证码已发送，请 60 秒后再试', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     const code = await this.generateVerificationCode();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    await this.prisma.verificationCode.create({
+    const verification = await this.prisma.verificationCode.create({
       data: {
         email,
         code,
@@ -117,14 +120,32 @@ export class EmailService {
           : '修改密码';
     const html = this.getVerificationCodeTemplate(code, typeText);
 
-    await this.verificationQueue.add('send-verification', {
-      to: email,
-      subject: `【风隅随笔】${typeText}验证码`,
-      html,
-      type: 'verification',
-    });
+    const job = await this.verificationQueue.add(
+      'send-verification',
+      {
+        to: email,
+        subject: `【风隅随笔】${typeText}验证码`,
+        html,
+        type: 'verification',
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+        timeout: 15000,
+        removeOnComplete: 100,
+        removeOnFail: 200,
+      },
+    );
 
-    this.logger.log(`验证码已加入队列: ${email} (${type})`);
+    try {
+      await job.finished();
+    } catch (error) {
+      await this.prisma.verificationCode.delete({ where: { id: verification.id } }).catch(() => undefined);
+      this.logger.error(`验证码邮件发送失败: ${email}: ${(error as Error).message}`);
+      throw new ServiceUnavailableException('验证码邮件发送失败，请稍后重试');
+    }
+
+    this.logger.log(`验证码邮件已发送: ${email} (${type})`);
     return { success: true, message: '验证码已发送' };
   }
 
@@ -359,7 +380,7 @@ export class EmailService {
     link?: string;
     siteUrl?: string;
   }): string {
-    const siteUrl = data.siteUrl || 'https://corner.example.com';
+    const siteUrl = data.siteUrl || 'https://corner.ink';
     return `
 <!DOCTYPE html>
 <html>
@@ -409,7 +430,7 @@ export class EmailService {
     link?: string;
     siteUrl?: string;
   }): string {
-    const siteUrl = data.siteUrl || 'https://corner.example.com';
+    const siteUrl = data.siteUrl || 'https://corner.ink';
     return `
 <!DOCTYPE html>
 <html>
@@ -498,7 +519,7 @@ export class EmailService {
     postId: string;
     siteUrl?: string;
   }): string {
-    const siteUrl = data.siteUrl || 'https://corner.example.com';
+    const siteUrl = data.siteUrl || 'https://corner.ink';
     return `
 <!DOCTYPE html>
 <html>

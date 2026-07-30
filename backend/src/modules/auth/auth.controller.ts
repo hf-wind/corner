@@ -3,7 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { IsEmail, IsString, IsIn, MinLength } from 'class-validator';
+import { IsEmail, IsString, IsIn, MinLength, IsOptional, MaxLength } from 'class-validator';
+import { TurnstileService } from './turnstile.service';
 
 class SendCodeDto {
   @IsEmail()
@@ -12,6 +13,11 @@ class SendCodeDto {
   @IsString()
   @IsIn(['register', 'login', 'change_password'])
   type: 'register' | 'login' | 'change_password';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }
 
 class ChangePasswordDto {
@@ -25,20 +31,26 @@ class ChangePasswordDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private auth: AuthService) {}
+  constructor(
+    private auth: AuthService,
+    private turnstile: TurnstileService,
+  ) {}
 
   @Post('send-code')
-  sendCode(@Body() dto: SendCodeDto) {
+  async sendCode(@Body() dto: SendCodeDto, @Req() req: any) {
+    await this.turnstile.verify(dto.turnstileToken, req.ip);
     return this.auth.sendVerificationCode(dto.email, dto.type);
   }
 
   @Post('register')
-  register(@Body() dto: RegisterDto) {
+  async register(@Body() dto: RegisterDto, @Req() req: any) {
+    await this.turnstile.verify(dto.turnstileToken, req.ip);
     return this.auth.register(dto);
   }
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
+  async login(@Body() dto: LoginDto, @Req() req: any) {
+    await this.turnstile.verify(dto.turnstileToken, req.ip);
     return this.auth.login(dto);
   }
 

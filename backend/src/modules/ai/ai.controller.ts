@@ -35,26 +35,30 @@ export class AiController {
     return this.ai.getPetMeta();
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post('summarize')
   summarize(@Body() dto: SummarizeDto) {
     return this.ai.summarize(dto.title || '', dto.content || '');
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post('generate-article')
   generateArticle(@Body() dto: GenerateArticleDto, @Req() req: Request) {
     const userId = (req.user as any)?.id;
     return this.ai.generateArticle(dto.outline, userId);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post('polish-moment')
   polishMoment(@Body() dto: PolishMomentDto) {
     return this.ai.polishMomentWithConfig(dto.inspiration);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Get('wallpapers')
   wallpapers(@Query('page') page?: string, @Query('rows') rows?: string) {
     return this.ai.listWallpapers(

@@ -156,10 +156,10 @@ async function main() {
   const admin = existingAdmin
     ? await prisma.user.update({
         where: { id: existingAdmin.id },
-        data: { username: adminUsername, passwordHash, role: 'admin', avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
+        data: { username: adminUsername, passwordHash, role: 'admin', isActive: true, avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
       })
     : await prisma.user.create({
-        data: { username: adminUsername, email: adminEmail, passwordHash, role: 'admin', avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
+        data: { username: adminUsername, email: adminEmail, passwordHash, role: 'admin', isActive: true, avatar: '/uploads/avatar/6e92f48a-b316-40ba-b136-e851f7bdadae.webp', bio: '听风于隅，漫写人间。' },
       });
 
   await installSeedMedia(admin.id);

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { BullModule } from '@nestjs/bull';
 import { join } from 'path';
@@ -24,6 +25,9 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { FriendLinkModule } from './modules/friend-link/friend-link.module';
 import { LibraryModule } from './modules/library/library.module';
 import { MomentModule } from './modules/moment/moment.module';
+import { RedisModule } from './common/redis/redis.module';
+import { RedisRateLimitGuard } from './common/guards/redis-rate-limit.guard';
+import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 
 @Module({
   imports: [
@@ -43,6 +47,7 @@ import { MomentModule } from './modules/moment/moment.module';
         password: process.env.REDIS_PASS,
       },
     }),
+    RedisModule,
     PrismaModule,
     AuthModule,
     UserModule,
@@ -65,6 +70,10 @@ import { MomentModule } from './modules/moment/moment.module';
     MomentModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    HttpCacheInterceptor,
+    { provide: APP_GUARD, useClass: RedisRateLimitGuard },
+  ],
 })
 export class AppModule {}

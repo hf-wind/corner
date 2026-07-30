@@ -5,6 +5,8 @@ import { MomentService } from './moment.service';
 import { CreateMomentDto } from './dto/create-moment.dto';
 import { UpdateMomentDto } from './dto/update-moment.dto';
 import { MomentQueryDto } from './dto/moment-query.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('moments')
 export class MomentController {
@@ -16,13 +18,15 @@ export class MomentController {
     return this.moment.findAll(query, req.user?.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Get(':slug/preview')
   preview(@Param('slug') slug: string, @Req() req: any) {
     return this.moment.preview(slug, req.user?.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':slug/publish')
   publish(@Param('slug') slug: string) {
     return this.moment.publish(slug);
@@ -40,19 +44,22 @@ export class MomentController {
     return this.moment.findBySlug(slug, req.user?.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post()
   create(@Body() dto: CreateMomentDto, @Req() req: any) {
     return this.moment.create(dto, req.user.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Put(':slug')
   update(@Param('slug') slug: string, @Body() dto: UpdateMomentDto) {
     return this.moment.update(slug, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Delete(':slug')
   remove(@Param('slug') slug: string) {
     return this.moment.remove(slug);

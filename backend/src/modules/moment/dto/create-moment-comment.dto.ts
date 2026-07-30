@@ -1,10 +1,12 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class CreateMomentCommentDto {
   @IsUUID()
   momentId: string;
 
   @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
   content: string;
 
   @IsOptional()

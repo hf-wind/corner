@@ -1,16 +1,18 @@
-import { IsOptional, IsString, IsInt, Min, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, IsBoolean, Max, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PostQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(500)
   @Type(() => Number)
   page?: number = 1;
 
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(500)
   @Type(() => Number)
   limit?: number = 10;
 
@@ -28,6 +30,7 @@ export class PostQueryDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   search?: string;
 
   @IsOptional()

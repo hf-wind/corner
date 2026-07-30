@@ -44,8 +44,8 @@ export class FriendLinkController {
     @Query('status') status?: string,
   ) {
     return this.friendLinkService.getApplications({
-      page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 20,
+      page: Math.max(1, Math.min(500, page ? parseInt(page) || 1 : 1)),
+      limit: Math.max(1, Math.min(100, limit ? parseInt(limit) || 20 : 20)),
       status,
     });
   }
