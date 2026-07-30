@@ -11,8 +11,11 @@ fi
 docker compose config --quiet
 docker compose build --pull
 docker compose up -d --remove-orphans --wait
+# A Git checkout replaces Caddyfile's inode, so recreate the container to refresh
+# the read-only single-file bind mount after validating the new configuration.
+docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile
+docker compose up -d --force-recreate --no-deps caddy
 docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
-docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 curl --fail --silent --show-error \
   --retry 24 \
   --retry-delay 5 \
