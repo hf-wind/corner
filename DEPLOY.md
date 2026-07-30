@@ -76,6 +76,15 @@ cd /srv/corner/app
 
 建议通过系统定时器或 cron 每日执行，并将 `/srv/corner/backups` 再同步到对象存储或另一台机器。只保存在同一块系统盘不构成灾备。
 
+仓库已提供每日备份的 systemd timer：
+
+```bash
+sudo cp deploy/systemd/corner-backup.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now corner-backup.timer
+systemctl list-timers corner-backup.timer
+```
+
 在新服务器恢复：
 
 ```bash
