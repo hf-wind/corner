@@ -116,6 +116,12 @@ export function useApi() {
         body: body as BodyInit,
       })
     },
+    async patch<T = any>(path: string, body?: any): Promise<T> {
+      return request<T>(path, {
+        method: 'PATCH',
+        body: body as BodyInit,
+      })
+    },
     async delete<T = any>(path: string): Promise<T> {
       return request<T>(path, { method: 'DELETE' })
     },

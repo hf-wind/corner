@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateLibraryItemDto } from './dto/create-library-item.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
 import { AiService } from '../ai/ai.service';
+import { MemoryGraphService } from '../memory-graph/memory-graph.service';
 
 type LibraryQuery = {
   page?: string;
@@ -28,6 +29,7 @@ export class LibraryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiService,
+    private readonly memoryGraph?: MemoryGraphService,
   ) {}
 
   async lookupMetadata(type: 'book' | 'film', title: string) {
@@ -187,6 +189,7 @@ export class LibraryService {
     const data = this.toData(dto);
     try {
       const item = await this.prisma.libraryItem.create({ data: data as any });
+      this.memoryGraph?.scheduleRebuild();
       return this.presentItem(item);
     } catch (error: any) {
       if (error?.code === 'P2002') throw new BadRequestException('Slug 已存在，请换一个');
@@ -199,6 +202,7 @@ export class LibraryService {
     const data = this.toData(dto, current.publishStatus);
     try {
       const item = await this.prisma.libraryItem.update({ where: { id }, data: data as any });
+      this.memoryGraph?.scheduleRebuild();
       return this.presentItem(item);
     } catch (error: any) {
       if (error?.code === 'P2002') throw new BadRequestException('Slug 已存在，请换一个');
@@ -209,6 +213,7 @@ export class LibraryService {
   async remove(id: string) {
     await this.findById(id);
     await this.prisma.libraryItem.delete({ where: { id } });
+    this.memoryGraph?.scheduleRebuild();
     return { success: true };
   }
 

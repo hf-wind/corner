@@ -12,10 +12,11 @@ import { CreatePlaceDto } from './dto/create-place.dto';
 import { PlaceQueryDto } from './dto/place-query.dto';
 import { ProviderReverseQueryDto, ProviderSearchQueryDto } from './dto/provider-place-query.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
+import { MemoryGraphService } from '../memory-graph/memory-graph.service';
 
 @Injectable()
 export class PlaceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private memoryGraph?: MemoryGraphService) {}
 
   async findAllAdmin(query: PlaceQueryDto) {
     const page = query.page ?? 1;
@@ -76,6 +77,7 @@ export class PlaceService {
       },
       include: { _count: { select: { moments: true } } },
     });
+    this.memoryGraph?.scheduleRebuild();
     return this.formatAdmin(place);
   }
 
@@ -113,6 +115,7 @@ export class PlaceService {
       });
       return updated;
     });
+    this.memoryGraph?.scheduleRebuild();
     return this.formatAdmin(place);
   }
 
@@ -127,6 +130,7 @@ export class PlaceService {
       throw new ConflictException(`该地点仍被 ${referenceCount} 条内容或照片引用，请先迁移引用`);
     }
     await this.prisma.place.delete({ where: { id } });
+    this.memoryGraph?.scheduleRebuild();
   }
 
   async searchProvider(query: ProviderSearchQueryDto) {

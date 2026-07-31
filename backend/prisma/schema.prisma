@@ -28,6 +28,8 @@ model User {
   momentCommentLikes MomentCommentLike[]
   momentLikes  MomentLike[]
   albums       Album[]
+  journeys     Journey[]
+  storyRoutes  StoryRoute[]
 
   @@index([isActive, role])
   @@map("users")
@@ -141,6 +143,9 @@ model Place {
   albums       Album[]
   albumItems   AlbumItem[]
   confirmedMediaMetadata MediaMetadata[]
+  memoryNodes  MemoryNode[]
+  journeyStops JourneyStop[]
+  storySteps   StoryStep[]
 
   @@index([name])
   @@index([city, name])
@@ -257,6 +262,7 @@ model Media {
   albumCovers  Album[]  @relation("AlbumCover")
   albumItems   AlbumItem[]
   metadata     MediaMetadata?
+  storyStepPhotos StoryStep[]
 
   @@map("media")
 }
@@ -535,4 +541,144 @@ model LibraryItem {
   @@index([type, publishStatus])
   @@index([recommended, publishedAt])
   @@map("library_items")
+}
+
+model MemoryNode {
+  id             String   @id @db.VarChar(180)
+  type           String   @db.VarChar(30)
+  sourceId       String   @map("source_id") @db.VarChar(100)
+  title          String   @db.VarChar(255)
+  slug           String?  @db.VarChar(255)
+  excerpt        String?  @db.Text
+  href           String   @db.Text
+  image          String?  @db.Text
+  occurredAt     DateTime? @map("occurred_at")
+  placeId        String?  @map("place_id") @db.Uuid
+  coordinateSeed Int      @map("coordinate_seed")
+  contentHash    String   @map("content_hash") @db.VarChar(64)
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  place          Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  outgoing       MemoryRelation[] @relation("MemoryRelationSource")
+  incoming       MemoryRelation[] @relation("MemoryRelationTarget")
+  storySteps     StoryStep[]
+
+  @@unique([type, sourceId])
+  @@index([type, occurredAt])
+  @@index([placeId])
+  @@map("memory_nodes")
+}
+
+model MemoryRelation {
+  id         String   @id @db.VarChar(64)
+  sourceId   String   @map("source_id") @db.VarChar(180)
+  targetId   String   @map("target_id") @db.VarChar(180)
+  type       String   @db.VarChar(40)
+  origin     String   @default("automatic") @db.VarChar(20)
+  status     String   @default("active") @db.VarChar(20)
+  evidence   Json     @default("{}")
+  weight     Float    @default(0.5)
+  hidden     Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  source     MemoryNode @relation("MemoryRelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target     MemoryNode @relation("MemoryRelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, type, origin])
+  @@index([sourceId, hidden, status])
+  @@index([targetId, hidden, status])
+  @@index([origin, status])
+  @@map("memory_relations")
+}
+
+model Journey {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(255)
+  slug        String   @unique @db.VarChar(255)
+  description String?  @db.Text
+  status      String   @default("draft") @db.VarChar(20)
+  coverImage  String?  @map("cover_image") @db.Text
+  authorId    String   @map("author_id") @db.Uuid
+  happenedAt  DateTime? @map("happened_at")
+  endedAt     DateTime? @map("ended_at")
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  author      User     @relation(fields: [authorId], references: [id])
+  stops       JourneyStop[]
+  storyRoutes StoryRoute[]
+
+  @@index([status, publishedAt])
+  @@map("journeys")
+}
+
+model JourneyStop {
+  id         String   @id @default(uuid()) @db.Uuid
+  journeyId  String   @map("journey_id") @db.Uuid
+  placeId    String?  @map("place_id") @db.Uuid
+  sort       Int      @default(0)
+  title      String   @db.VarChar(255)
+  narration  String?  @db.Text
+  occurredAt DateTime? @map("occurred_at")
+  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision String @default("place") @map("location_precision") @db.VarChar(20)
+  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  journey    Journey  @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  place      Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+
+  @@unique([journeyId, sort])
+  @@index([placeId])
+  @@map("journey_stops")
+}
+
+model StoryRoute {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(255)
+  slug        String   @unique @db.VarChar(255)
+  description String?  @db.Text
+  status      String   @default("draft") @db.VarChar(20)
+  shareToken  String   @unique @map("share_token") @db.VarChar(64)
+  coverImage  String?  @map("cover_image") @db.Text
+  journeyId   String?  @map("journey_id") @db.Uuid
+  authorId    String   @map("author_id") @db.Uuid
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  journey     Journey? @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+  author      User     @relation(fields: [authorId], references: [id])
+  steps       StoryStep[]
+
+  @@index([status, publishedAt])
+  @@map("story_routes")
+}
+
+model StoryStep {
+  id            String   @id @default(uuid()) @db.Uuid
+  routeId       String   @map("route_id") @db.Uuid
+  nodeId        String?  @map("node_id") @db.VarChar(180)
+  placeId       String?  @map("place_id") @db.Uuid
+  photoMediaId  String?  @map("photo_media_id") @db.Uuid
+  sort          Int      @default(0)
+  title         String?  @db.VarChar(255)
+  narration     String?  @db.Text
+  musicUrl      String?  @map("music_url") @db.Text
+  musicStartSec Float?   @map("music_start_sec")
+  musicEndSec   Float?   @map("music_end_sec")
+  durationSec   Int      @default(8) @map("duration_sec")
+  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision String @default("place") @map("location_precision") @db.VarChar(20)
+  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  route         StoryRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  node          MemoryNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  place         Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  photoMedia    Media?   @relation(fields: [photoMediaId], references: [id], onDelete: SetNull)
+
+  @@unique([routeId, sort])
+  @@index([nodeId])
+  @@map("story_steps")
 }

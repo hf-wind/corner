@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MemoryGraphService } from '../memory-graph/memory-graph.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostQueryDto } from './dto/post-query.dto';
@@ -54,7 +55,7 @@ const postAdminSelect = {
 
 @Injectable()
 export class PostService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private memoryGraph?: MemoryGraphService) {}
 
   private isAdminListQuery(query: PostQueryDto) {
     return (
@@ -203,6 +204,7 @@ export class PostService {
       select: postAdminSelect,
     });
 
+    this.memoryGraph?.scheduleRebuild();
     return this.format(published);
   }
 
@@ -259,6 +261,7 @@ export class PostService {
       });
     });
 
+    this.memoryGraph?.scheduleRebuild();
     return this.format(updated);
   }
 
@@ -281,6 +284,7 @@ export class PostService {
       select: postAdminSelect,
     });
 
+    this.memoryGraph?.scheduleRebuild();
     return this.format(post);
   }
 
@@ -288,6 +292,7 @@ export class PostService {
     const existing = await this.prisma.post.findUnique({ where: { slug } });
     if (!existing) throw new NotFoundException('Post not found');
     await this.prisma.post.delete({ where: { id: existing.id } });
+    this.memoryGraph?.scheduleRebuild();
   }
 
   async findArchive() {

@@ -20,6 +20,7 @@ export interface MapAdapter {
   focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type']): void
   fitBounds(bounds: MapBounds): void
   setItems(items: MapMarkerItem[], selectedId?: string): void
+  setPath(points: Array<{ longitude: number; latitude: number }>): void
   onViewChange(handler: () => void): void
   onSelect(handler: (item: MapMarkerItem) => void): void
 }
@@ -95,6 +96,7 @@ export class AmapAdapter implements MapAdapter {
   private AMap: any
   private map: any
   private markers: any[] = []
+  private pathLine: any = null
   private markerItems: Map<string, MapMarkerItem> = new Map()
   private markerById: Map<string, any> = new Map()
   private itemsSignature = ''
@@ -131,6 +133,8 @@ export class AmapAdapter implements MapAdapter {
 
   destroy() {
     this.markers = []
+    if (this.pathLine) this.map?.remove(this.pathLine)
+    this.pathLine = null
     this.markerItems.clear()
     this.markerById.clear()
     this.itemsSignature = ''
@@ -241,6 +245,23 @@ export class AmapAdapter implements MapAdapter {
     this.markerItems.clear()
     for (const item of items) this.markerItems.set(item.id, item)
     if (this.markers.length) this.map.add(this.markers)
+  }
+
+  setPath(points: Array<{ longitude: number; latitude: number }>) {
+    if (this.pathLine) this.map.remove(this.pathLine)
+    this.pathLine = null
+    if (points.length < 2) return
+    this.pathLine = new this.AMap.Polyline({
+      path: points.map(point => [point.longitude, point.latitude]),
+      strokeColor: '#d69a3a',
+      strokeWeight: 5,
+      strokeOpacity: .82,
+      lineJoin: 'round',
+      lineCap: 'round',
+      showDir: true,
+      zIndex: 80,
+    })
+    this.map.add(this.pathLine)
   }
 
   onViewChange(handler: () => void) { this.viewHandler = handler }

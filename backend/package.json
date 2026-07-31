@@ -19,6 +19,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/prisma/build/index.js migrate dev",
     "prisma:seed": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
+    "memory:rebuild": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs src/scripts/rebuild-memory-graph.ts",
     "tunnel:init": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/prisma/build/index.js migrate deploy && node --env-file=../.env --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",

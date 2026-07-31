@@ -64,6 +64,7 @@ import type { MapMemoryType, MemoryMapCluster, MemoryMapItem, MemoryMapResult } 
 const api = useApi()
 const route = useRoute()
 const { mediaUrl } = useMediaUrl()
+const { selectMemory: selectSharedMemory } = useMemorySelection()
 const mapEl = ref<HTMLElement | null>(null)
 const listEl = ref<HTMLElement | null>(null)
 const adapter = shallowRef<MapAdapter | null>(null)
@@ -166,6 +167,7 @@ async function loadMap(boundsOverride?: MapBounds, zoomOverride?: number) {
 
 function selectMemory(item: MemoryMapItem, center = false, scroll = false) {
   selectedId.value = item.id
+  selectSharedMemory({ id: item.id, type: item.type, href: item.href })
   adapter.value?.setItems(result.value.items, item.id)
   if (center) {
     adapter.value?.focusMemory(item.longitude, item.latitude, item.type)

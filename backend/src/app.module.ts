@@ -32,6 +32,8 @@ import { RedisModule } from './common/redis/redis.module';
 import { RedisRateLimitGuard } from './common/guards/redis-rate-limit.guard';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { RssModule } from './modules/rss/rss.module';
+import { MemoryGraphModule } from './modules/memory-graph/memory-graph.module';
+import { JourneyModule } from './modules/journey/journey.module';
 
 @Module({
   imports: [
@@ -75,6 +77,8 @@ import { RssModule } from './modules/rss/rss.module';
     PlaceModule,
     AlbumModule,
     MemoryMapModule,
+    MemoryGraphModule,
+    JourneyModule,
     RssModule,
   ],
   controllers: [AppController],

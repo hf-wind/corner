@@ -15,6 +15,7 @@ import {
   type PlaceSnapshot,
 } from '../../common/location/public-location';
 import type { PublicMapMemory } from '../memory-map/memory-map.types';
+import { MemoryGraphService } from '../memory-graph/memory-graph.service';
 
 type PublishedMomentSnapshot = {
   title: string;
@@ -36,6 +37,7 @@ export class MomentService {
   constructor(
     private prisma: PrismaService,
     private notificationService: NotificationService,
+    private memoryGraph?: MemoryGraphService,
   ) {}
 
   private buildListSelect(currentUserId?: string): Prisma.MomentSelect {
@@ -207,6 +209,7 @@ export class MomentService {
       },
       include: this.buildInclude(),
     });
+    this.memoryGraph?.scheduleRebuild();
     return this.format(moment);
   }
 
@@ -259,6 +262,7 @@ export class MomentService {
       },
       include: this.buildInclude(),
     });
+    this.memoryGraph?.scheduleRebuild();
     return this.format(moment);
   }
 
@@ -277,6 +281,7 @@ export class MomentService {
       },
       include: this.buildInclude(),
     });
+    this.memoryGraph?.scheduleRebuild();
     return this.format(moment);
   }
 
@@ -322,6 +327,7 @@ export class MomentService {
     const existing = await this.prisma.moment.findUnique({ where: { slug } });
     if (!existing) throw new NotFoundException('Moment not found');
     await this.prisma.moment.delete({ where: { slug } });
+    this.memoryGraph?.scheduleRebuild();
   }
 
   async findPublicPlaces(query: { search?: string; city?: string; page?: number; limit?: number }) {

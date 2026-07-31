@@ -17,6 +17,12 @@ const routes: RouteRecordRaw[] = [
   { path: '/moments/:slug', component: () => import('./pages/moments/[slug].vue') },
   { path: '/places/:slug', component: () => import('./pages/places/[slug].vue') },
   { path: '/time/map', component: () => import('./pages/time/map.vue') },
+  { path: '/time/constellation', component: () => import('./pages/time/constellation.vue') },
+  { path: '/journeys', component: () => import('./pages/journeys/index.vue') },
+  { path: '/journeys/:slug', component: () => import('./pages/journeys/[slug].vue') },
+  { path: '/stories', component: () => import('./pages/stories/index.vue') },
+  { path: '/stories/share/:token', component: () => import('./pages/stories/share/[token].vue') },
+  { path: '/stories/:slug', component: () => import('./pages/stories/[slug].vue') },
   { path: '/albums', component: () => import('./pages/albums/index.vue') },
   { path: '/albums/:slug', component: () => import('./pages/albums/[slug].vue') },
   { path: '/library', component: () => import('./pages/library/index.vue') },
@@ -38,11 +44,13 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/friends', component: () => import('./pages/admin/friends.vue'), meta: adminMeta },
   { path: '/admin/info', component: () => import('./pages/admin/info.vue'), meta: adminMeta },
   { path: '/admin/library', component: () => import('./pages/admin/library/index.vue'), meta: adminMeta },
+  { path: '/admin/journeys', component: () => import('./pages/admin/journeys.vue'), meta: adminMeta },
   { path: '/admin/library/create', component: () => import('./pages/admin/library/create.vue'), meta: adminMeta },
   { path: '/admin/library/:id', component: () => import('./pages/admin/library/[id].vue'), meta: adminMeta },
   { path: '/admin/logs', component: () => import('./pages/admin/logs.vue'), meta: adminMeta },
   { path: '/admin/media', component: () => import('./pages/admin/media.vue'), meta: adminMeta },
   { path: '/admin/messages', component: () => import('./pages/admin/messages.vue'), meta: adminMeta },
+  { path: '/admin/memory-graph', component: () => import('./pages/admin/memory-graph.vue'), meta: adminMeta },
   { path: '/admin/moments', component: () => import('./pages/admin/moments/index.vue'), meta: adminMeta },
   { path: '/admin/moments/create', component: () => import('./pages/admin/moments/create.vue'), meta: adminMeta },
   { path: '/admin/moments/preview', component: () => import('./pages/admin/moments/preview.vue'), meta: adminMeta },
@@ -67,6 +75,14 @@ const router = createRouter({
 setCompatRouter(router)
 
 router.beforeEach(async (to) => {
+  if (to.path === '/time/constellation') {
+    const { constellationEnabled } = useFeatureFlags()
+    if (!constellationEnabled) return '/home'
+  }
+  if (to.path === '/stories' || to.path.startsWith('/stories/') || to.path === '/journeys' || to.path.startsWith('/journeys/')) {
+    const { storiesEnabled } = useFeatureFlags()
+    if (!storiesEnabled) return '/home'
+  }
   if (to.path === '/time/map') {
     const { mapEnabled } = useFeatureFlags()
     if (!mapEnabled) return '/home'

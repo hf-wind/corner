@@ -5,6 +5,7 @@ import { buildPublicLocation } from '../../common/location/public-location';
 import { CreateAlbumDto } from './dto/create-album.dto';
 import { UpdateAlbumDto } from './dto/update-album.dto';
 import type { PublicMapMemory } from '../memory-map/memory-map.types';
+import { MemoryGraphService } from '../memory-graph/memory-graph.service';
 
 const albumInclude = {
   coverMedia: true,
@@ -30,7 +31,7 @@ const albumListInclude = {
 
 @Injectable()
 export class AlbumService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private memoryGraph?: MemoryGraphService) {}
 
   private pagination(page?: string, limit?: string) {
     return {
@@ -119,7 +120,7 @@ export class AlbumService {
 
   async create(dto: CreateAlbumDto, authorId: string) {
     await this.validate(dto);
-    return this.prisma.album.create({
+    const album = await this.prisma.album.create({
       data: {
         title: dto.title.trim(),
         slug: dto.slug.trim(),
@@ -135,13 +136,15 @@ export class AlbumService {
       },
       include: albumInclude,
     });
+    this.memoryGraph?.scheduleRebuild();
+    return album;
   }
 
   async update(id: string, dto: UpdateAlbumDto) {
     const existing = await this.prisma.album.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Album not found');
     await this.validate(dto, id);
-    return this.prisma.$transaction(async (tx) => {
+    const album = await this.prisma.$transaction(async (tx) => {
       if (dto.items) {
         await tx.albumItem.deleteMany({ where: { albumId: id } });
       }
@@ -154,27 +157,36 @@ export class AlbumService {
         include: albumInclude,
       });
     });
+    this.memoryGraph?.scheduleRebuild();
+    return album;
   }
 
   async publish(id: string) {
     const album = await this.prisma.album.findUnique({ where: { id }, include: { _count: { select: { items: true } } } });
     if (!album) throw new NotFoundException('Album not found');
     if (!album._count.items) throw new BadRequestException('相册至少需要一张照片');
-    return this.prisma.album.update({ where: { id }, data: { status: 'published', publishedAt: album.publishedAt || new Date() }, include: albumInclude });
+    const updated = await this.prisma.album.update({ where: { id }, data: { status: 'published', publishedAt: album.publishedAt || new Date() }, include: albumInclude });
+    this.memoryGraph?.scheduleRebuild();
+    return updated;
   }
 
   async unpublish(id: string) {
-    return this.prisma.album.update({ where: { id }, data: { status: 'draft' }, include: albumInclude });
+    const album = await this.prisma.album.update({ where: { id }, data: { status: 'draft' }, include: albumInclude });
+    this.memoryGraph?.scheduleRebuild();
+    return album;
   }
 
   async makePrivate(id: string) {
-    return this.prisma.album.update({ where: { id }, data: { status: 'private' }, include: albumInclude });
+    const album = await this.prisma.album.update({ where: { id }, data: { status: 'private' }, include: albumInclude });
+    this.memoryGraph?.scheduleRebuild();
+    return album;
   }
 
   async remove(id: string) {
     const album = await this.prisma.album.findUnique({ where: { id }, select: { id: true } });
     if (!album) throw new NotFoundException('Album not found');
     await this.prisma.album.delete({ where: { id } });
+    this.memoryGraph?.scheduleRebuild();
   }
 
   private albumData(dto: UpdateAlbumDto) {

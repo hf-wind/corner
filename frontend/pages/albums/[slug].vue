@@ -60,6 +60,7 @@ const loading = ref(true)
 const album = ref<any>(null)
 const lightboxOpen = ref(false)
 const lightboxIndex = ref(0)
+const { selectMemory } = useMemorySelection()
 const issueNumber = computed(() => String(album.value?.publishedAt ? new Date(album.value.publishedAt).getFullYear() : new Date().getFullYear()))
 const lightboxImages = computed(() => (album.value?.items || []).map((item: any) => ({ src: item.media.path, caption: item.caption || undefined })))
 
@@ -69,7 +70,17 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? '未标日期' : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }).format(date)
 }
 function wallClass(index: number) { return index % 8 === 0 ? 'feature' : index % 5 === 0 ? 'portrait' : '' }
-function open(index: number) { lightboxIndex.value = index; lightboxOpen.value = true }
+function open(index: number) {
+  lightboxIndex.value = index
+  lightboxOpen.value = true
+  const item = album.value?.items?.[index]
+  if (item) selectMemory({ id: `photo:${item.id}`, type: 'photo', href: `/albums/${album.value.slug}?photo=${item.id}` })
+}
+watch(lightboxIndex, (index) => {
+  if (!lightboxOpen.value) return
+  const item = album.value?.items?.[index]
+  if (item) selectMemory({ id: `photo:${item.id}`, type: 'photo', href: `/albums/${album.value.slug}?photo=${item.id}` })
+})
 function mapLink(item: any) { const location = item.publicLocation; return { path: '/time/map', query: { lng: location.longitude, lat: location.latitude, cs: 'wgs84', place: location.slug || undefined, memory: `photo:${item.id}` } } }
 async function load() {
   loading.value = true

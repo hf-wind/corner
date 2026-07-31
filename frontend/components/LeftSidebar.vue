@@ -132,7 +132,7 @@ const router = useRouter()
 
 const isPanel = computed(() => props.variant === 'admin')
 const collapsed = computed(() => props.collapsed && isPanel.value)
-const { albumsEnabled, mapEnabled } = useFeatureFlags()
+const { albumsEnabled, mapEnabled, constellationEnabled, storiesEnabled } = useFeatureFlags()
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar))
 const playerSlotRef = ref<HTMLElement | null>(null)
 let registeredSlot: HTMLElement | null = null
@@ -158,7 +158,9 @@ const siteNav = [
   { to: '/library', icon: 'ph:books-bold', label: '书影' },
   { to: '/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/time/map', icon: 'ph:map-trifold-bold', label: '地图' },
+  { to: '/time/constellation', icon: 'ph:graph-bold', label: '星图' },
   { to: '/albums', icon: 'ph:images-square-bold', label: '相册' },
+  { to: '/stories', icon: 'ph:path-bold', label: '航线' },
   { to: '/friends', icon: 'ph:handshake-bold', label: '友链' },
   { to: '/about', icon: 'ph:info-bold', label: '关于' },
 ]
@@ -166,6 +168,8 @@ const siteNav = [
 const adminFullNav = [
   { to: '/admin/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/admin/albums', icon: 'ph:images-square-bold', label: '相册' },
+  { to: '/admin/memory-graph', icon: 'ph:graph-bold', label: '记忆关系' },
+  { to: '/admin/journeys', icon: 'ph:path-bold', label: '故事航线' },
   { to: '/admin', icon: 'ph:gauge-bold', label: '仪表盘' },
   { to: '/admin/analytics', icon: 'ph:chart-line-up-bold', label: '访问统计' },
   { to: '/admin/posts', icon: 'ph:article-bold', label: '文章' },
@@ -194,7 +198,10 @@ const userPanelNav = [
 
 const navItems = computed(() => {
   const filterFeatures = (items: typeof siteNav) => items.filter(item =>
-    (albumsEnabled || !item.to.includes('/albums')) && (mapEnabled || !item.to.includes('/time/map')),
+    (albumsEnabled || !item.to.includes('/albums'))
+    && (mapEnabled || !item.to.includes('/time/map'))
+    && (constellationEnabled || !item.to.includes('/time/constellation'))
+    && (storiesEnabled || !item.to.includes('/stories')),
   )
   if (!isPanel.value) return filterFeatures(siteNav)
   return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav

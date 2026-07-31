@@ -6,9 +6,10 @@ import { MomentController } from './moment.controller';
 import { MomentService } from './moment.service';
 import { MomentCommentController } from './moment-comment.controller';
 import { MomentCommentService } from './moment-comment.service';
+import { MemoryGraphModule } from '../memory-graph/memory-graph.module';
 
 @Module({
-  imports: [AiModule, EmailModule, NotificationModule],
+  imports: [AiModule, EmailModule, NotificationModule, MemoryGraphModule],
   controllers: [MomentController, MomentCommentController],
   providers: [MomentService, MomentCommentService],
   exports: [MomentService, MomentCommentService],

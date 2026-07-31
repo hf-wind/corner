@@ -1,0 +1,1 @@
+<template><StoryPlayer :story="story" :loading="loading" /></template><script setup lang="ts">const api=useApi();const route=useRoute();const loading=ref(true);const story=ref<any>();onMounted(async()=>{try{story.value=await api.get(`/stories/${route.params.slug}`)}catch{story.value=null}finally{loading.value=false}})</script>

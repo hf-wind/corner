@@ -15,6 +15,9 @@ interface ImportMetaEnv {
   readonly VITE_AMAP_SECURITY_CODE?: string
   readonly VITE_FEATURE_ALBUMS_ENABLED?: string
   readonly VITE_FEATURE_MAP_ENABLED?: string
+  readonly VITE_FEATURE_PLACES_ENABLED?: string
+  readonly VITE_FEATURE_CONSTELLATION_ENABLED?: string
+  readonly VITE_FEATURE_STORIES_ENABLED?: string
 }
 
 interface ImportMeta {
