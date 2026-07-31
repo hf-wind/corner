@@ -1,7 +1,7 @@
 <template>
   <div class="album-admin">
     <header class="admin-heading">
-      <div><span>PHOTO ARCHIVE</span><h1>相册</h1><p>编排照片、确认 EXIF，并控制每一处时间与地点如何被看见。</p></div>
+      <div><h1>相册</h1><p>编排照片、确认 EXIF，并控制每一处时间与地点如何被看见。</p></div>
       <a-button type="primary" @click="router.push('/admin/albums/create')"><Icon name="ph:plus-bold" /> 新建相册</a-button>
     </header>
     <div class="album-toolbar">

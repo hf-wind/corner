@@ -23,6 +23,7 @@ export function useProductionClientProtection(isAdmin: Ref<boolean>) {
 
   function onContextMenu(event: MouseEvent) {
     if (isAdmin.value) return
+    if (event.target instanceof Element && event.target.closest('.map-canvas')) return
     event.preventDefault()
     notifyBlocked()
   }

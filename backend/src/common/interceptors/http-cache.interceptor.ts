@@ -89,6 +89,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
   private isCacheable(request: Request): boolean {
     if (request.headers.authorization || request.headers.cookie) return false;
     const path = request.path;
+    if (path === '/rss.xml') return false;
     if (/\/(?:health|auth|notifications)(?:\/|$)/.test(path)) return false;
     if (/\/(?:admin)(?:\/|$)/.test(path)) return false;
     if (/\/(?:users|media|email)(?:\/|$)/.test(path)) return false;

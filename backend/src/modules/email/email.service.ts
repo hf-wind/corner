@@ -38,6 +38,15 @@ export class EmailService {
     return this.transporter;
   }
 
+  resetTransporter() {
+    this.transporter?.close();
+    this.transporter = null;
+  }
+
+  updateConfigValue(key: string, value: unknown) {
+    return this.settings.set(key, value);
+  }
+
   async getEmailConfig() {
     const [enabled, host, port, secure, user, pass, fromName, fromAddress, siteUrl] =
       await Promise.all([

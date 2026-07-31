@@ -15,7 +15,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>
     const response = ctx.getResponse();
     const request = ctx.getRequest();
 
-    if (request.url?.includes('/stream')) {
+    if (request.url?.includes('/stream') || request.url?.endsWith('/rss.xml')) {
       return next.handle() as Observable<ApiResponse<T>>;
     }
 

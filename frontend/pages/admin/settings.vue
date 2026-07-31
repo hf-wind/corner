@@ -46,7 +46,11 @@
             <a-input v-model:value="email.email_smtp_user" placeholder="1833079849@qq.com" @blur="saveEmailSetting('email_smtp_user')" />
           </a-form-item>
           <a-form-item label="SMTP密钥">
-            <a-input-password v-model:value="email.email_smtp_pass" placeholder="已配置则留空，输入新密码可替换" @blur="saveEmailSetting('email_smtp_pass')" />
+            <div class="secret-field">
+              <a-input-password v-model:value="email.email_smtp_pass" autocomplete="new-password" placeholder="已配置则留空，输入新密钥可替换" @input="emailPasswordDirty = true" />
+              <a-button :disabled="!emailPasswordDirty || !email.email_smtp_pass.trim()" @click="saveEmailPassword">更新密钥</a-button>
+            </div>
+            <div class="hint">密钥只会在点击“更新密钥”后提交，切换页面不会自动保存。</div>
           </a-form-item>
           <a-form-item label="显示名称">
             <a-input v-model:value="email.email_from_name" placeholder="风隅随笔" @blur="saveEmailSetting('email_from_name')" />
@@ -148,6 +152,7 @@ const mediaNaming = ref('timestamp')
 
 const emailTesting = ref(false)
 const emailTestTo = ref('')
+const emailPasswordDirty = ref(false)
 const email = reactive({
   email_enabled: true,
   email_smtp_host: 'smtp.qq.com',
@@ -213,6 +218,7 @@ async function loadEmail() {
       email.email_smtp_secure = emailRes.secure !== false
       email.email_smtp_user = emailRes.user || '1833079849@qq.com'
       email.email_smtp_pass = ''
+      emailPasswordDirty.value = false
       email.email_from_name = emailRes.fromName || '风隅随笔'
       email.email_from_address = emailRes.fromAddress || '1833079849@qq.com'
     }
@@ -224,10 +230,22 @@ async function loadEmail() {
 async function saveEmailSetting(key: string) {
   if (key === 'email_smtp_pass' && !email.email_smtp_pass.trim()) return
   try {
-    await api.put('/settings', { key, value: (email as any)[key] })
+    await api.put('/email/config', { [key]: (email as any)[key] })
     toast.success('已保存')
   } catch {
     toast.error('保存失败')
+  }
+}
+
+async function saveEmailPassword() {
+  if (!emailPasswordDirty.value || !email.email_smtp_pass.trim()) return
+  try {
+    await api.put('/email/config', { email_smtp_pass: email.email_smtp_pass })
+    email.email_smtp_pass = ''
+    emailPasswordDirty.value = false
+    toast.success('SMTP 密钥已更新')
+  } catch {
+    toast.error('密钥更新失败')
   }
 }
 
@@ -379,4 +397,6 @@ async function refreshCache() {
 .hint { font-size: 0.72rem; color: var(--c-text-3); margin-top: 4px; }
 .playlist-editor { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .playlist-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.secret-field { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+@media (max-width:520px) { .secret-field { grid-template-columns:1fr; } }
 </style>

@@ -1,45 +1,23 @@
 <template>
-  <aside class="sidebar-left">
+  <aside class="sidebar-left" :class="{ 'is-collapsed': collapsed }">
     <div class="sidebar-scroll">
     <div class="hero">
-      <svg class="hero-bg" viewBox="0 0 240 120" preserveAspectRatio="none">
-        <defs>
-          <radialGradient :id="glowId1" cx="30%" cy="20%" r="60%">
-            <stop offset="0%" stop-color="var(--c-primary)" stop-opacity="0.08" />
-            <stop offset="100%" stop-color="var(--c-primary)" stop-opacity="0" />
-          </radialGradient>
-          <radialGradient :id="glowId2" cx="70%" cy="40%" r="50%">
-            <stop offset="0%" stop-color="var(--c-primary)" stop-opacity="0.05" />
-            <stop offset="100%" stop-color="var(--c-primary)" stop-opacity="0" />
-          </radialGradient>
-        </defs>
-        <rect width="240" height="120" :fill="`url(#${glowId1})`" />
-        <rect width="240" height="120" :fill="`url(#${glowId2})`" />
-      </svg>
+      <span class="hero-glow hero-glow-one" aria-hidden="true" />
+      <span class="hero-glow hero-glow-two" aria-hidden="true" />
+      <span class="wind-stroke wind-stroke-one" aria-hidden="true" />
+      <span class="wind-stroke wind-stroke-two" aria-hidden="true" />
       <div class="hero-content">
-        <NuxtLink :to="heroLink" class="hero-row">
+        <NuxtLink :to="heroLink" class="hero-row" :title="heroTitle">
           <div class="logo-wrap">
-            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient :id="logoGlowId" x1=".5" y1=".5" x2="1" y2="1">
-                  <stop offset="0%" stop-color="currentColor" stop-opacity=".12" />
-                  <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
-                </linearGradient>
-              </defs>
-              <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M 22 40 Q 48 34, 66 30 Q 78 27, 84 18" stroke-width="5" />
-                <line x1="36" y1="38" x2="36" y2="76" stroke-width="4.5" />
-                <line x1="22" y1="76" x2="66" y2="76" stroke-width="1.5" opacity=".25" />
-                <line x1="66" y1="76" x2="66" y2="30" stroke-width="1.5" opacity=".15" />
-                <circle cx="51" cy="57" r="12" :fill="`url(#${logoGlowId})`" stroke="none" />
-                <circle cx="51" cy="57" r="4.5" fill="currentColor" stroke="none" />
-              </g>
-            </svg>
+            <span class="logo-orbit"><i /><i /></span>
+            <Icon name="ph:wind-bold" />
           </div>
           <div class="hero-text">
+            <span class="hero-kicker">WIND · CORNER</span>
             <div class="hero-name">{{ heroTitle }}</div>
             <div class="hero-slogan">{{ heroSlogan }}</div>
           </div>
+          <span class="hero-status" aria-hidden="true"><i /></span>
         </NuxtLink>
       </div>
     </div>
@@ -56,8 +34,9 @@
         :to="item.to"
         class="nav-item"
         :class="{ active: isNavActive(item.to) }"
+        :title="collapsed ? item.label : undefined"
       >
-        <Icon :name="item.icon" class="nav-icon" />{{ item.label }}
+        <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
       </NuxtLink>
     </nav>
     </div>
@@ -123,8 +102,10 @@ import { useFeatureFlags } from '~/composables/useFeatureFlags'
 
 const props = withDefaults(defineProps<{
   variant?: 'site' | 'admin'
+  collapsed?: boolean
 }>(), {
   variant: 'site',
+  collapsed: false,
 })
 
 const emit = defineEmits<{ openSearch: [] }>()
@@ -146,14 +127,11 @@ const route = useRoute()
 const router = useRouter()
 
 const isPanel = computed(() => props.variant === 'admin')
+const collapsed = computed(() => props.collapsed && isPanel.value)
 const { albumsEnabled, mapEnabled } = useFeatureFlags()
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar))
 const playerSlotRef = ref<HTMLElement | null>(null)
 let registeredSlot: HTMLElement | null = null
-const uid = useId()
-const glowId1 = `glow1-${uid}`
-const glowId2 = `glow2-${uid}`
-const logoGlowId = `l-glow-${uid}`
 
 watch(playerSlotRef, (el) => {
   if (registeredSlot && registeredSlot !== el) unregisterSlot(registeredSlot)
@@ -305,25 +283,23 @@ watch(() => route.fullPath, () => {
 /* ===== Hero ===== */
 .hero {
   position: relative;
-  padding: 16px 0 14px;
+  margin: 0 0 3px;
+  padding: 13px;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary-soft) 64%, var(--ld-bg-card)), var(--ld-bg-card) 70%);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
+  isolation: isolate;
 }
-
-.hero-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 120px;
-  z-index: 0;
-  opacity: 0.7;
-  border-radius: 12px;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
+.hero::after { position:absolute; top:-46px; right:-39px; width:112px; height:112px; border:1px dashed color-mix(in srgb,var(--c-primary) 22%,transparent); border-radius:50%; content:''; animation:hero-orbit 24s linear infinite; }
+.hero-glow { position:absolute; z-index:-1; border-radius:50%; filter:blur(18px); opacity:.5; }
+.hero-glow-one { top:-28px; left:-20px; width:90px; height:90px; background:color-mix(in srgb,var(--c-primary) 18%,transparent); animation:hero-drift 7s ease-in-out infinite alternate; }
+.hero-glow-two { right:-24px; bottom:-32px; width:88px; height:88px; background:color-mix(in srgb,#9b78df 14%,transparent); animation:hero-drift 9s ease-in-out -2s infinite alternate-reverse; }
+.wind-stroke { position:absolute; z-index:-1; height:1px; border-radius:99px; background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--c-primary) 35%,transparent),transparent); transform:rotate(-8deg); }
+.wind-stroke-one { top:20px; right:-8px; width:94px; animation:wind-pass 5.4s ease-in-out infinite; }
+.wind-stroke-two { right:8px; bottom:16px; width:64px; animation:wind-pass 6.8s ease-in-out -2s infinite; }
+.hero-content { position:relative; z-index:1; }
 
 .hero-row {
   display: flex;
@@ -334,16 +310,22 @@ watch(() => route.fullPath, () => {
 }
 
 .logo-wrap {
-  width: 52px;
-  height: 52px;
+  position:relative;
+  display:grid;
+  width: 50px;
+  height: 50px;
   flex-shrink: 0;
+  border:1px solid color-mix(in srgb,var(--c-primary) 34%,var(--border));
+  border-radius:15px;
+  background:color-mix(in srgb,var(--ld-bg-card) 80%,transparent);
+  box-shadow:inset 0 0 0 5px color-mix(in srgb,var(--c-primary-soft) 38%,transparent);
+  color:var(--c-primary);
+  font-size:1.35rem;
+  place-items:center;
 }
-
-.logo-wrap svg {
-  width: 100%;
-  height: 100%;
-  color: var(--c-text);
-}
+.logo-orbit { position:absolute; inset:-5px; border:1px solid color-mix(in srgb,var(--c-primary) 18%,transparent); border-radius:18px; animation:logo-breathe 3.4s ease-in-out infinite; }
+.logo-orbit i { position:absolute; width:5px; height:5px; border-radius:50%; background:var(--c-primary); box-shadow:0 0 8px color-mix(in srgb,var(--c-primary) 55%,transparent); }
+.logo-orbit i:first-child { top:-3px; right:10px; }.logo-orbit i:last-child { bottom:5px; left:-3px; background:#d99459; }
 
 .hero-text {
   flex: 1;
@@ -351,12 +333,16 @@ watch(() => route.fullPath, () => {
 }
 
 .hero-name {
-  font-size: 1.05rem;
+  margin-top:2px;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--c-text);
   letter-spacing: 0.04em;
   line-height: 1.3;
 }
+.hero-kicker { color:var(--c-primary); font-family:var(--font-mono); font-size:.43rem; font-weight:700; letter-spacing:.14em; }
+.hero-status { display:grid; width:18px; height:18px; flex:0 0 auto; border:1px solid var(--border); border-radius:50%; background:color-mix(in srgb,var(--ld-bg-card) 82%,transparent); place-items:center; }
+.hero-status i { width:5px; height:5px; border-radius:50%; background:#47b985; box-shadow:0 0 0 3px color-mix(in srgb,#47b985 13%,transparent); animation:status-pulse 2.4s ease-in-out infinite; }
 
 .hero-slogan {
   font-size: 0.65rem;
@@ -367,6 +353,11 @@ watch(() => route.fullPath, () => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+@keyframes hero-orbit { to { transform:rotate(360deg); } }
+@keyframes hero-drift { to { transform:translate3d(10px,8px,0) scale(1.12); } }
+@keyframes wind-pass { 0%,100% { opacity:.15; transform:translateX(-12px) rotate(-8deg); } 50% { opacity:.75; transform:translateX(12px) rotate(-8deg); } }
+@keyframes logo-breathe { 50% { opacity:.5; transform:scale(.94); } }
 
 /* ===== Search ===== */
 .search-box {
@@ -681,5 +672,28 @@ watch(() => route.fullPath, () => {
   color: var(--c-primary);
   font-weight: 700;
   box-shadow: 0.1em 0.2em 0.5em var(--ld-shadow);
+}
+
+.sidebar-left.is-collapsed { width:72px; padding-inline:9px; }
+.is-collapsed .sidebar-scroll { padding-right:0; }
+.is-collapsed .hero { padding:8px; border-radius:14px; }
+.is-collapsed .hero-row { justify-content:center; }
+.is-collapsed .logo-wrap { width:42px; height:42px; border-radius:13px; }
+.is-collapsed .hero-text,.is-collapsed .hero-status,.is-collapsed .search-box,.is-collapsed .nav-label,.is-collapsed .user-name,.is-collapsed .user-badge,.is-collapsed .user-logout,.is-collapsed .user-back span { display:none; }
+.is-collapsed .nav-menu { gap:5px; }
+.is-collapsed .nav-item { justify-content:center; padding:9px 0; }
+.is-collapsed .nav-icon { width:auto; font-size:1.08rem; }
+.is-collapsed .sidebar-bottom { align-items:center; }
+.is-collapsed .sidebar-player-slot { width:44px; }
+.is-collapsed .login-link { width:42px; height:42px; padding:0; font-size:0; }
+.is-collapsed .login-link :deep(svg) { font-size:1rem; }
+.is-collapsed .user-card { width:44px; padding:6px; }
+.is-collapsed .user-row,.is-collapsed .user-main { justify-content:center; }
+.is-collapsed .user-main { flex:0 0 auto; padding:0; }
+.is-collapsed .theme-pill { width:42px; flex-direction:column; border-radius:14px; }
+.is-collapsed .theme-pill button { width:34px; padding:7px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero::after,.hero-glow,.wind-stroke,.logo-orbit,.hero-status i { animation:none; }
 }
 </style>

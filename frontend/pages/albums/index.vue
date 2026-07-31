@@ -1,33 +1,104 @@
 <template>
-  <main class="albums-page">
-    <div class="ambient ambient-one" /><div class="ambient ambient-two" />
-    <header class="albums-hero"><span>WIND & MEMORY · PHOTO ARCHIVE</span><h1>风隅相册</h1><p>照片是光停下来的地方。这里收着走过的城、遇见的人，以及一些不愿被时间吹散的瞬间。</p><div class="hero-line"><i /><em>{{ total }} 册记忆</em><i /></div></header>
-    <section class="album-gallery">
-      <article v-for="(album, index) in albums" :key="album.id" class="public-album" :class="{ wide: index % 5 === 0 }">
-        <NuxtLink :to="`/albums/${album.slug}`" class="public-cover"><img v-if="album.cover?.path" :src="mediaUrl(album.cover.path)" :alt="album.title" loading="lazy"><span v-else><Icon name="ph:images-square" /></span><div class="cover-wash" /><small>{{ String(album.itemCount || 0).padStart(2, '0') }} PHOTOS</small></NuxtLink>
-        <div class="public-copy"><div><time>{{ formatDate(album.happenedAt || album.publishedAt) }}</time><span v-if="album.publicLocation"><Icon name="ph:map-pin-fill" />{{ album.publicLocation.name }}</span></div><h2><NuxtLink :to="`/albums/${album.slug}`">{{ album.title }}</NuxtLink></h2><p>{{ album.description || '一组被风留住的照片。' }}</p></div>
-      </article>
-      <div v-if="!loading && !albums.length" class="public-empty"><Icon name="ph:wind" /><h2>风还没有带来照片</h2><p>下一册记忆，正在路上。</p></div>
+  <main ref="pageEl" class="albums-page">
+    <section class="archive-intro">
+      <div class="intro-mark" aria-hidden="true"><Icon name="ph:aperture-bold" /><i /><i /></div>
+      <div class="intro-copy">
+        <span>PHOTO ARCHIVE · 风隅相册</span>
+        <h1>把路过的光，<em>慢慢装订成册</em></h1>
+        <p>不追求宏大的叙事，只留下走过的城、吹过的风，以及当时恰好按下快门的普通一天。</p>
+      </div>
+      <dl class="intro-stats">
+        <div><dt>{{ total }}</dt><dd>册公开记忆</dd></div>
+        <i />
+        <div><dt>{{ photoTotal }}</dt><dd>张照片</dd></div>
+      </dl>
+      <span class="intro-serial">ARCHIVE / {{ String(page).padStart(2, '0') }}</span>
     </section>
-    <div v-if="totalPages > 1" class="public-pagination"><button :disabled="page <= 1" @click="go(page - 1)"><Icon name="ph:arrow-left" /></button><span>{{ page }} / {{ totalPages }}</span><button :disabled="page >= totalPages" @click="go(page + 1)"><Icon name="ph:arrow-right" /></button></div>
+
+    <section class="archive-section" aria-labelledby="album-list-title">
+      <header class="section-heading">
+        <div><span>CONTACT SHEETS</span><h2 id="album-list-title">相册目录</h2></div>
+        <p><Icon name="ph:wind-bold" /> 按时间翻阅，新的在前</p>
+      </header>
+
+      <div v-if="loading" class="album-grid" aria-label="正在加载相册">
+        <div v-for="index in 6" :key="index" class="album-skeleton"><i /><span /></div>
+      </div>
+      <div v-else-if="albums.length" class="album-grid content-reveal">
+        <article v-for="(album, index) in albums" :key="album.id" class="album-card">
+          <NuxtLink :to="`/albums/${album.slug}`" class="album-frame">
+            <div class="film-edge" aria-hidden="true"><i v-for="dot in 8" :key="dot" /></div>
+            <img v-if="album.cover?.path" :src="mediaUrl(album.cover.path)" :alt="album.title" loading="lazy">
+            <span v-else class="cover-empty"><Icon name="ph:image-square" /></span>
+            <div class="cover-shade" />
+            <span class="card-number">{{ String((page - 1) * 12 + index + 1).padStart(2, '0') }}</span>
+            <span class="photo-count"><Icon name="ph:images-square-bold" /> {{ album.itemCount || 0 }}</span>
+            <div class="open-hint"><span>打开相册</span><Icon name="ph:arrow-up-right-bold" /></div>
+          </NuxtLink>
+          <div class="album-copy">
+            <div class="album-meta">
+              <time>{{ formatDate(album.happenedAt || album.publishedAt) }}</time>
+              <span v-if="album.publicLocation"><Icon name="ph:map-pin-fill" />{{ album.publicLocation.name }}</span>
+            </div>
+            <h2><NuxtLink :to="`/albums/${album.slug}`">{{ album.title }}</NuxtLink></h2>
+            <p>{{ album.description || '一组被风留住的照片。' }}</p>
+          </div>
+        </article>
+      </div>
+      <div v-else class="public-empty content-reveal"><Icon name="ph:wind" /><h2>风还没有带来照片</h2><p>下一册记忆，正在路上。</p></div>
+    </section>
+
+    <nav v-if="totalPages > 1" class="public-pagination" aria-label="相册分页">
+      <button type="button" :disabled="page <= 1" aria-label="上一页" @click="go(page - 1)"><Icon name="ph:arrow-left" /></button>
+      <span><b>{{ String(page).padStart(2, '0') }}</b><i />{{ String(totalPages).padStart(2, '0') }}</span>
+      <button type="button" :disabled="page >= totalPages" aria-label="下一页" @click="go(page + 1)"><Icon name="ph:arrow-right" /></button>
+    </nav>
   </main>
 </template>
 
 <script setup lang="ts">
+import type { Album } from '~/types/album'
+
 const api = useApi()
 const { mediaUrl } = useMediaUrl()
+const pageEl = ref<HTMLElement | null>(null)
 const loading = ref(true)
-const albums = ref<any[]>([])
+const albums = ref<Album[]>([])
 const page = ref(1)
 const total = ref(0)
 const totalPages = ref(1)
-function formatDate(value?: string) { if (!value) return '未标日期'; const date = new Date(value); return `${date.getFullYear()} · ${String(date.getMonth() + 1).padStart(2, '0')}` }
-async function load() { loading.value = true; try { const result = await api.get<any>('/albums', { page: page.value, limit: 12 }); albums.value = result.items || []; total.value = result.total || 0; totalPages.value = result.totalPages || 1 } catch { albums.value = [] } finally { loading.value = false } }
-function go(next: number) { page.value = next; void load(); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+const photoTotal = computed(() => albums.value.reduce((sum, album) => sum + Number(album.itemCount || 0), 0))
+
+function formatDate(value?: string | null) {
+  if (!value) return '未标日期'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '未标日期' : `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+async function load() {
+  loading.value = true
+  try {
+    const result = await api.get<any>('/albums', { page: page.value, limit: 12 })
+    albums.value = result.items || []
+    total.value = result.total || 0
+    totalPages.value = result.totalPages || 1
+  } catch {
+    albums.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+function go(next: number) {
+  page.value = next
+  void load()
+  pageEl.value?.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 onMounted(load)
 useHead({ title: '风隅相册', meta: [{ name: 'description', content: '风隅随笔的个人照片与时光相册。' }] })
 </script>
 
 <style scoped>
-.albums-page{position:relative;min-height:100%;padding:68px clamp(20px,6vw,86px) 54px;overflow:hidden}.ambient{position:fixed;z-index:-1;border-radius:50%;filter:blur(90px);opacity:.14}.ambient-one{top:8%;left:14%;width:300px;height:300px;background:var(--c-primary)}.ambient-two{right:8%;bottom:4%;width:250px;height:250px;background:#d4a06c}.albums-hero{max-width:760px;margin:0 auto 48px;text-align:center}.albums-hero>span{color:var(--c-primary);font-size:.62rem;font-weight:700;letter-spacing:.24em}.albums-hero h1{margin:14px 0 0;color:var(--c-text);font-family:var(--font-serif);font-size:clamp(2.3rem,6vw,4.5rem);font-weight:500;letter-spacing:.08em}.albums-hero p{max-width:620px;margin:17px auto 0;color:var(--c-text-2);font-size:.82rem;line-height:2}.hero-line{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:22px}.hero-line i{width:54px;height:1px;background:var(--border)}.hero-line em{color:var(--c-text-3);font-size:.58rem;font-style:normal;letter-spacing:.13em}.album-gallery{display:grid;max-width:1240px;margin:0 auto;grid-template-columns:repeat(3,minmax(0,1fr));gap:34px 22px}.public-album.wide{grid-column:span 2}.public-cover{position:relative;display:block;aspect-ratio:4/3;overflow:hidden;border-radius:4px;background:var(--c-bg-2);box-shadow:0 15px 45px color-mix(in srgb,var(--ld-shadow) 42%,transparent)}.wide .public-cover{aspect-ratio:16/9}.public-cover img{width:100%;height:100%;object-fit:cover;transition:transform .7s cubic-bezier(.2,.7,.2,1)}.public-cover>span{display:grid;width:100%;height:100%;color:var(--c-primary);font-size:3rem;place-items:center}.cover-wash{position:absolute;inset:0;background:linear-gradient(180deg,transparent 58%,rgb(5 8 11 / 52%))}.public-cover small{position:absolute;right:12px;bottom:10px;color:#fff;font-size:.52rem;letter-spacing:.15em}.public-album:hover img{transform:scale(1.045)}.public-copy{padding:14px 4px 0}.public-copy>div{display:flex;align-items:center;gap:13px;color:var(--c-text-3);font-size:.58rem;letter-spacing:.06em}.public-copy>div span{display:flex;align-items:center;gap:4px}.public-copy h2{margin:8px 0 0;font-size:1.22rem;font-weight:600}.public-copy h2 a{color:var(--c-text);text-decoration:none}.public-copy h2 a:hover{color:var(--c-primary)}.public-copy p{display:-webkit-box;margin:7px 0 0;overflow:hidden;color:var(--c-text-3);font-size:.68rem;line-height:1.75;-webkit-box-orient:vertical;-webkit-line-clamp:2}.public-empty{grid-column:1/-1;display:grid;min-height:360px;place-items:center;align-content:center;color:var(--c-text-3);text-align:center}.public-empty>svg{color:var(--c-primary);font-size:2.8rem}.public-empty h2{margin:12px 0 0;color:var(--c-text)}.public-empty p{font-size:.7rem}.public-pagination{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:45px}.public-pagination button{display:grid;width:36px;height:36px;border:1px solid var(--border);border-radius:50%;background:var(--ld-bg-card);color:var(--c-text-2);cursor:pointer;place-items:center}.public-pagination button:disabled{opacity:.35}.public-pagination span{color:var(--c-text-3);font-size:.62rem}@media(max-width:900px){.album-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.public-album.wide{grid-column:span 1}.wide .public-cover{aspect-ratio:4/3}}@media(max-width:580px){.albums-page{padding:56px 16px 40px}.albums-hero{margin-bottom:32px}.album-gallery{grid-template-columns:1fr;gap:28px}.public-cover,.wide .public-cover{aspect-ratio:4/3}}
+.albums-page{height:100%;padding:28px clamp(18px,4vw,58px) 48px;overflow-y:auto;background:radial-gradient(circle at 82% 0,color-mix(in srgb,var(--c-primary) 7%,transparent),transparent 28%),var(--c-bg);scrollbar-gutter:stable}.archive-intro{position:relative;display:grid;min-height:176px;grid-template-columns:112px minmax(0,1fr) auto;align-items:center;gap:26px;padding:28px 32px;overflow:hidden;border:1px solid color-mix(in srgb,var(--border) 72%,transparent);border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--c-primary-soft) 44%,var(--ld-bg-card)),var(--ld-bg-card) 70%);box-shadow:0 10px 34px color-mix(in srgb,var(--ld-shadow) 28%,transparent)}.archive-intro::before{position:absolute;top:26px;bottom:26px;left:0;width:3px;background:linear-gradient(var(--c-primary),transparent);content:''}.intro-mark{position:relative;display:grid;width:88px;height:88px;border:1px solid color-mix(in srgb,var(--c-primary) 28%,var(--border));border-radius:50%;color:var(--c-primary);font-size:2.1rem;place-items:center}.intro-mark::before{position:absolute;inset:12px;border:1px dashed color-mix(in srgb,var(--c-primary) 32%,transparent);border-radius:50%;content:'';animation:album-orbit 18s linear infinite}.intro-mark i{position:absolute;width:8px;height:8px;border:2px solid var(--ld-bg-card);border-radius:50%;background:var(--c-primary)}.intro-mark i:first-of-type{top:5px;right:15px}.intro-mark i:last-of-type{bottom:10px;left:5px;background:#d79558}.intro-copy>span,.section-heading span{color:var(--c-primary);font-size:.52rem;font-weight:750;letter-spacing:.19em}.intro-copy h1{max-width:650px;margin:8px 0 0;color:var(--c-text);font-family:var(--font-heading);font-size:clamp(1.55rem,3vw,2.35rem);line-height:1.28}.intro-copy h1 em{color:var(--c-primary);font-style:normal}.intro-copy p{max-width:610px;margin:9px 0 0;color:var(--c-text-2);font-size:.7rem;line-height:1.8}.intro-stats{display:flex;align-items:center;gap:18px;margin:0}.intro-stats div{text-align:right}.intro-stats dt{color:var(--c-text);font-family:var(--font-heading);font-size:1.75rem;font-weight:700;line-height:1}.intro-stats dd{margin-top:6px;color:var(--c-text-3);font-size:.52rem}.intro-stats>i{width:1px;height:38px;background:var(--border)}.intro-serial{position:absolute;right:10px;bottom:8px;color:var(--c-text-3);font-size:.42rem;letter-spacing:.16em;opacity:.6}.archive-section{margin-top:30px}.section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin:0 2px 14px}.section-heading h2{margin:4px 0 0;color:var(--c-text);font-size:1.15rem}.section-heading>p{display:flex;align-items:center;gap:5px;color:var(--c-text-3);font-size:.56rem}.album-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 16px}.album-card{min-width:0}.album-frame{position:relative;display:block;aspect-ratio:4/3;padding:7px 7px 7px 18px;overflow:hidden;border:1px solid color-mix(in srgb,var(--border) 72%,transparent);border-radius:14px;background:var(--ld-bg-card);box-shadow:0 8px 24px color-mix(in srgb,var(--ld-shadow) 28%,transparent);isolation:isolate}.album-frame>img,.cover-empty{width:100%;height:100%;border-radius:8px;object-fit:cover}.album-frame>img{transition:transform .65s cubic-bezier(.16,1,.3,1),filter .3s}.cover-empty{display:grid;background:linear-gradient(145deg,var(--c-primary-soft),var(--c-bg-2));color:var(--c-primary);font-size:2.5rem;place-items:center}.film-edge{position:absolute;z-index:3;top:10px;bottom:10px;left:5px;display:flex;width:8px;align-items:center;justify-content:space-around;flex-direction:column}.film-edge i{width:4px;height:7px;border-radius:2px;background:var(--c-bg-3)}.cover-shade{position:absolute;z-index:1;inset:7px 7px 7px 18px;border-radius:8px;background:linear-gradient(180deg,transparent 55%,rgb(5 8 12/52%));pointer-events:none}.card-number,.photo-count{position:absolute;z-index:2;color:#fff;font-size:.49rem;letter-spacing:.12em}.card-number{top:16px;left:28px}.photo-count{right:16px;bottom:15px;display:flex;align-items:center;gap:4px}.open-hint{position:absolute;z-index:4;inset:7px 7px 7px 18px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;background:rgb(8 13 20/38%);color:#fff;font-size:.62rem;opacity:0;transition:opacity .28s;backdrop-filter:blur(2px)}.album-card:hover .album-frame>img{filter:saturate(1.06);transform:scale(1.045)}.album-card:hover .open-hint{opacity:1}.album-copy{padding:12px 5px 0}.album-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--c-text-3);font-size:.52rem}.album-meta span{display:flex;min-width:0;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.album-copy h2{margin:7px 0 0;overflow:hidden;font-size:.96rem;text-overflow:ellipsis;white-space:nowrap}.album-copy h2 a{color:var(--c-text);transition:color .18s}.album-copy h2 a:hover{color:var(--c-primary)}.album-copy p{display:-webkit-box;margin:6px 0 0;overflow:hidden;color:var(--c-text-3);font-size:.61rem;line-height:1.65;-webkit-box-orient:vertical;-webkit-line-clamp:2}.album-skeleton{aspect-ratio:4/3;padding:8px;border:1px solid var(--border);border-radius:14px;background:var(--ld-bg-card)}.album-skeleton i{display:block;height:78%;border-radius:8px;background:linear-gradient(90deg,var(--c-bg-2),var(--c-bg-1),var(--c-bg-2));background-size:200% 100%;animation:album-shimmer 1.5s linear infinite}.album-skeleton span{display:block;width:55%;height:10px;margin:12px 4px;border-radius:99px;background:var(--c-bg-2)}.public-empty{display:grid;min-height:340px;place-items:center;align-content:center;border:1px dashed var(--border);border-radius:16px;color:var(--c-text-3);text-align:center}.public-empty>svg{color:var(--c-primary);font-size:2.6rem}.public-empty h2{margin:12px 0 0;color:var(--c-text);font-size:1rem}.public-empty p{margin-top:5px;font-size:.64rem}.public-pagination{display:flex;align-items:center;justify-content:center;gap:17px;margin-top:36px}.public-pagination button{display:grid;width:34px;height:34px;border:1px solid var(--border);border-radius:10px;background:var(--ld-bg-card);color:var(--c-text-2);cursor:pointer;place-items:center}.public-pagination button:disabled{cursor:not-allowed;opacity:.35}.public-pagination span{display:flex;align-items:center;gap:8px;color:var(--c-text-3);font-size:.57rem}.public-pagination span b{color:var(--c-primary);font-size:.72rem}.public-pagination span i{width:24px;height:1px;background:var(--border)}@keyframes album-orbit{to{transform:rotate(360deg)}}@keyframes album-shimmer{to{background-position:-200% 0}}@media(max-width:1050px){.archive-intro{grid-template-columns:88px minmax(0,1fr)}.intro-mark{width:74px;height:74px}.intro-stats{grid-column:2;justify-self:start}.album-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:900px){.albums-page{padding-top:max(70px,calc(env(safe-area-inset-top) + 64px))}}@media(max-width:620px){.albums-page{padding-right:14px;padding-left:14px}.archive-intro{grid-template-columns:1fr;padding:24px 21px}.intro-mark{display:none}.intro-stats{grid-column:auto}.album-grid{grid-template-columns:1fr}.section-heading{align-items:flex-start;flex-direction:column;gap:5px}.album-frame{aspect-ratio:4/3}}@media(prefers-reduced-motion:reduce){.intro-mark::before,.album-skeleton i{animation:none}.album-frame>img,.open-hint{transition:none}}
 </style>

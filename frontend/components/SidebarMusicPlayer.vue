@@ -518,9 +518,9 @@ watch(listOpen, (v) => {
   align-items: center;
   height: var(--smp-h);
   border-radius: var(--smp-r);
-  background: color-mix(in srgb, var(--ld-bg-card) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  box-shadow: 0 8px 24px color-mix(in srgb, #000 10%, var(--ld-shadow));
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
   backdrop-filter: blur(12px);
   overflow: hidden;
   transition:
@@ -534,6 +534,8 @@ watch(listOpen, (v) => {
 .smp.is-bar .smp-shell,
 .smp.is-list .smp-shell {
   width: var(--smp-expand-w);
+  background: color-mix(in srgb, var(--ld-bg-card) 94%, transparent);
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
   box-shadow: 0 12px 32px color-mix(in srgb, #000 14%, var(--ld-shadow));
 }
 
@@ -543,7 +545,8 @@ watch(listOpen, (v) => {
   height: var(--smp-h);
   flex-shrink: 0;
   border: none;
-  background: transparent;
+  border-radius:50%;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--c-primary-soft) 72%,transparent),transparent);
   padding: 0;
   cursor: pointer;
   display: grid;
@@ -551,18 +554,18 @@ watch(listOpen, (v) => {
 }
 
 .smp-cover {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   background:
     center / cover no-repeat,
     linear-gradient(135deg, var(--c-primary-soft), var(--c-bg-2));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent);
+  box-shadow:0 5px 15px color-mix(in srgb,var(--ld-shadow) 55%,transparent),inset 0 0 0 2px color-mix(in srgb,#fff 16%,transparent);
   transition: transform 0.35s ease;
 }
 
 .smp.is-playing .smp-cover {
-  animation: smp-spin 12s linear infinite;
+  animation: smp-spin 14s linear infinite;
   border-radius: 50%;
 }
 
@@ -599,8 +602,8 @@ watch(listOpen, (v) => {
 
 .smp-mini-play {
   position: absolute;
-  right: -2px;
-  bottom: -2px;
+  right: -1px;
+  bottom: -1px;
   width: 18px;
   height: 18px;
   border: none;
@@ -614,6 +617,8 @@ watch(listOpen, (v) => {
   box-shadow: 0 2px 8px color-mix(in srgb, var(--c-primary) 40%, transparent);
   transition: transform 0.15s ease, opacity 0.2s ease;
 }
+
+.smp:not(.is-bar):not(.is-list)::before { position:absolute; inset:3px; border:1px solid color-mix(in srgb,var(--c-primary) 22%,transparent); border-radius:50%; content:''; pointer-events:none; animation:smp-breathe 3.2s ease-in-out infinite; }
 
 .smp-mini-play:hover {
   transform: scale(1.08);
@@ -901,9 +906,12 @@ watch(listOpen, (v) => {
   50% { transform: scaleY(1); }
 }
 
+@keyframes smp-breathe { 50% { opacity:.32; transform:scale(1.08); } }
+
 @media (prefers-reduced-motion: reduce) {
   .smp.is-playing .smp-cover,
-  .smp-eq i {
+  .smp-eq i,
+  .smp:not(.is-bar):not(.is-list)::before {
     animation: none !important;
   }
   .smp-shell,

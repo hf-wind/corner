@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { SettingsService } from '../settings/settings.service';
+import { RedisService } from '../../common/redis/redis.service';
 import {
   MUSIC_DEFAULTS,
   MUSIC_SETTING_KEYS,
@@ -26,7 +28,10 @@ export class MusicService {
   private readonly logger = new Logger(MusicService.name);
   private cache = new Map<string, CacheEntry>();
 
-  constructor(private settings: SettingsService) {}
+  constructor(
+    private settings: SettingsService,
+    private redis: RedisService,
+  ) {}
 
   async getConfig(): Promise<MusicConfig & { apiConfigured: boolean }> {
     const all = await this.settings.findAll();
@@ -58,6 +63,7 @@ export class MusicService {
       await this.settings.set(key, this.coerce(key as keyof MusicConfig, value));
     }
     this.cache.clear();
+    await this.redis.client.incr('corner:music:cache-version').catch(() => undefined);
     return this.getConfig();
   }
 
@@ -132,6 +138,7 @@ export class MusicService {
 
   async refreshCache() {
     this.cache.clear();
+    await this.redis.client.incr('corner:music:cache-version').catch(() => undefined);
     return this.getPlaylist({ refresh: true });
   }
 
@@ -150,6 +157,15 @@ export class MusicService {
     const hit = this.cache.get(key);
     if (!force && hit && now - hit.fetchedAt < Math.max(60, ttlSec) * 1000) {
       return hit.tracks;
+    }
+    const cacheVersion = await this.redis.client.get('corner:music:cache-version').catch(() => null) || '1';
+    const redisKey = `corner:music:playlist:${cacheVersion}:${createHash('sha256').update(key).digest('hex')}`;
+    if (!force) {
+      const persistent = await this.redis.getJson<CacheEntry>(redisKey).catch(() => null);
+      if (persistent?.tracks?.length) {
+        this.cache.set(key, persistent);
+        return persistent.tracks;
+      }
     }
 
     const base = (api || MUSIC_DEFAULTS.music_api).replace(/\/$/, '');
@@ -170,7 +186,11 @@ export class MusicService {
       if (!tracks.length && hit?.tracks?.length) {
         return hit.tracks;
       }
-      this.cache.set(key, { tracks, fetchedAt: now, key });
+      const entry = { tracks, fetchedAt: now, key };
+      this.cache.set(key, entry);
+      await this.redis.setJson(redisKey, entry, Math.max(60, ttlSec)).catch((error: Error) => {
+        this.logger.warn(`cache playlist in redis failed: ${error.message}`);
+      });
       return tracks;
     } catch (e) {
       this.logger.warn(`fetch playlist failed: ${e}`);

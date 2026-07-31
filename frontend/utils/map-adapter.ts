@@ -17,6 +17,7 @@ export interface MapAdapter {
   zoom(): number
   center(): { longitude: number; latitude: number }
   setCenter(longitude: number, latitude: number, zoom?: number): void
+  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type']): void
   fitBounds(bounds: MapBounds): void
   setItems(items: MapMarkerItem[], selectedId?: string): void
   onViewChange(handler: () => void): void
@@ -94,6 +95,11 @@ export class AmapAdapter implements MapAdapter {
   private AMap: any
   private map: any
   private markers: any[] = []
+  private markerItems: Map<string, MapMarkerItem> = new Map()
+  private markerById: Map<string, any> = new Map()
+  private itemsSignature = ''
+  private selectedId = ''
+  private suppressViewEventsUntil = 0
   private themeObserver: MutationObserver | null = null
   private viewHandler: () => void = () => undefined
   private selectHandler: (item: MapMarkerItem) => void = () => undefined
@@ -104,18 +110,31 @@ export class AmapAdapter implements MapAdapter {
       zoom: initialView?.zoom ?? 5,
       center: [initialView?.longitude ?? 104.2, initialView?.latitude ?? 35.8],
       mapStyle: this.mapStyle(),
-      viewMode: '2D',
-      animateEnable: false,
+      viewMode: '3D',
+      pitch: 42,
+      rotation: 0,
+      pitchEnable: true,
+      rotateEnable: true,
+      dragEnable: true,
+      zoomEnable: true,
+      animateEnable: true,
       showLabel: true,
     })
-    this.map.on('moveend', () => this.viewHandler())
-    this.map.on('zoomend', () => this.viewHandler())
+    const notifyViewChange = () => {
+      if (Date.now() >= this.suppressViewEventsUntil) this.viewHandler()
+    }
+    this.map.on('moveend', notifyViewChange)
+    this.map.on('zoomend', notifyViewChange)
     this.themeObserver = new MutationObserver(() => this.map?.setMapStyle?.(this.mapStyle()))
     this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
   }
 
   destroy() {
     this.markers = []
+    this.markerItems.clear()
+    this.markerById.clear()
+    this.itemsSignature = ''
+    this.selectedId = ''
     this.themeObserver?.disconnect()
     this.themeObserver = null
     this.map?.destroy()
@@ -148,10 +167,21 @@ export class AmapAdapter implements MapAdapter {
   }
 
   setCenter(longitude: number, latitude: number, zoom?: number) {
-    this.map.setZoomAndCenter(zoom || this.map.getZoom(), [longitude, latitude], false)
+    this.suppressViewEventsUntil = Date.now() + 1200
+    this.map.setZoomAndCenter(zoom || this.map.getZoom(), [longitude, latitude], false, 620)
+  }
+
+  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type']) {
+    const zoom = type === 'photo' ? 18 : 17
+    const rotation = Math.round(((longitude * 13 + latitude * 7) % 34) - 17)
+    this.suppressViewEventsUntil = Date.now() + 1800
+    this.map.setZoomAndCenter(zoom, [longitude, latitude], false, 760)
+    this.map.setPitch?.(62, false, 760)
+    this.map.setRotation?.(rotation, false, 760)
   }
 
   fitBounds(bounds: MapBounds) {
+    this.suppressViewEventsUntil = Date.now() + 1200
     this.map.setBounds(new this.AMap.Bounds(
       [normalizeLongitude(bounds.west), bounds.south],
       [normalizeLongitude(bounds.east), bounds.north],
@@ -159,7 +189,28 @@ export class AmapAdapter implements MapAdapter {
   }
 
   setItems(items: MapMarkerItem[], selectedId?: string) {
+    const nextSelectedId = selectedId || ''
+    const signature = items.map(item => `${item.id}:${item.longitude.toFixed(6)}:${item.latitude.toFixed(6)}:${item.kind === 'cluster' ? item.count : item.thumbnail || ''}`).join('|')
+    if (signature === this.itemsSignature && this.markers.length === items.length) {
+      this.markerItems.clear()
+      for (const item of items) this.markerItems.set(item.id, item)
+      if (this.selectedId !== nextSelectedId) {
+        for (const id of [this.selectedId, nextSelectedId]) {
+          if (!id) continue
+          const marker = this.markerById.get(id)
+          const item = this.markerItems.get(id)
+          if (!marker || !item) continue
+          marker.setContent(markerHtml(item, id === nextSelectedId))
+          const zIndex = id === nextSelectedId ? 300 : item.kind === 'cluster' ? 180 : 120
+          if (typeof marker.setzIndex === 'function') marker.setzIndex(zIndex)
+          else marker.setOptions?.({ zIndex })
+        }
+      }
+      this.selectedId = nextSelectedId
+      return
+    }
     if (this.markers.length) this.map.remove(this.markers)
+    this.markerById.clear()
     const samePositionCounts = new Map<string, number>()
     const samePositionIndexes = new Map<string, number>()
     for (const item of items) {
@@ -180,9 +231,15 @@ export class AmapAdapter implements MapAdapter {
         offset: new this.AMap.Pixel(offset[0], offset[1]),
         zIndex: item.id === selectedId ? 300 : item.kind === 'cluster' ? 180 : 120,
       })
-      marker.on('click', () => this.selectHandler(item))
+      marker.__cornerId = item.id
+      marker.on('click', () => this.selectHandler(this.markerItems.get(item.id) || item))
+      this.markerById.set(item.id, marker)
       return marker
     })
+    this.itemsSignature = signature
+    this.selectedId = nextSelectedId
+    this.markerItems.clear()
+    for (const item of items) this.markerItems.set(item.id, item)
     if (this.markers.length) this.map.add(this.markers)
   }
 
