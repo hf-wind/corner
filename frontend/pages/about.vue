@@ -13,7 +13,7 @@
 
           <div class="hero-grid">
             <div class="profile-copy">
-              <p class="eyebrow">ABOUT / PROFILE</p>
+              <p class="eyebrow">ABOUT / A QUIET SELF-NARRATIVE</p>
               <div class="name-line">
                 <h1>{{ profile.name }}</h1>
                 <span v-if="profile.badge">{{ profile.badge }}</span>
@@ -58,7 +58,7 @@
         <section class="story-band reveal-block">
           <div class="section-heading">
             <span>01</span>
-            <div><p>MY STORY</p><h2>小传</h2></div>
+            <div><p>A BRIEF ACCOUNT</p><h2>小记其人</h2></div>
           </div>
 
           <div class="story-layout">
@@ -84,6 +84,22 @@
           </div>
         </section>
 
+        <section v-if="profile.notes.length" class="notes-band reveal-block">
+          <div class="section-heading">
+            <span>02</span>
+            <div><p>NOT A RESUME</p><h2>几页闲话</h2></div>
+          </div>
+          <div class="note-grid">
+            <article v-for="(note, index) in profile.notes" :key="`${note.title}-${index}`">
+              <div class="note-number">{{ padIndex(index + 1) }}</div>
+              <span class="note-icon"><Icon :name="note.icon || 'ph:leaf-bold'" /></span>
+              <small>{{ note.subtitle }}</small>
+              <h3>{{ note.title }}</h3>
+              <p>{{ note.content }}</p>
+            </article>
+          </div>
+        </section>
+
         <section v-if="profile.facts.length" class="facts-band reveal-block" aria-label="个人速记">
           <dl>
             <div v-for="fact in profile.facts" :key="fact.label">
@@ -95,8 +111,8 @@
 
         <section v-if="profile.timeline.length" class="journey-band reveal-block">
           <div class="section-heading">
-            <span>02</span>
-            <div><p>ON THE WAY</p><h2>走过的几站</h2></div>
+            <span>03</span>
+            <div><p>ON THE WAY</p><h2>来路拾记</h2></div>
           </div>
           <ol class="timeline-list">
             <li v-for="(item, index) in profile.timeline" :key="`${item.year}-${item.title}`">
@@ -109,8 +125,8 @@
 
         <section v-if="profile.skills.length" class="work-band reveal-block">
           <div class="section-heading">
-            <span>03</span>
-            <div><p>THINGS I HAVE DONE</p><h2>做过这些</h2></div>
+            <span>04</span>
+            <div><p>WHAT I AM LEARNING</p><h2>平日所习</h2></div>
           </div>
           <div class="work-list">
             <article v-for="(skill, index) in profile.skills" :key="skill.name">
@@ -324,7 +340,7 @@ useHead(() => ({
   max-width: 560px;
   margin: 46px 0 28px;
   color: var(--c-text-1);
-  font-family: var(--font-wenkai);
+  font-family: var(--font-heading);
   font-size: 1.28rem;
   line-height: 1.8;
 }
@@ -419,6 +435,7 @@ useHead(() => ({
 .portrait-note time { color: var(--c-text-1); font-size: .72rem; font-variant-numeric: tabular-nums; }
 
 .story-band,
+.notes-band,
 .journey-band,
 .work-band { padding: 78px 44px; border-bottom: 1px solid var(--border); }
 
@@ -437,7 +454,7 @@ useHead(() => ({
 .section-heading h2 { margin: 5px 0 0; color: var(--c-text); font-size: 1.65rem; }
 
 .story-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 72px; }
-.introduction { color: var(--c-text-2); font-family: var(--font-wenkai); font-size: .95rem; line-height: 2.15; }
+.introduction { color: var(--c-text-2); font-family: var(--font-body); font-size: .95rem; font-weight:420; line-height: 2.15; }
 .introduction p + p { margin-top: 18px; }
 
 .now-panel {
@@ -460,6 +477,15 @@ useHead(() => ({
 .ride-line > span { position: absolute; right: 0; bottom: 7px; left: 0; height: 1px; background: var(--border); }
 .ride-line > span::after { position: absolute; right: 12%; bottom: -2px; width: 5px; height: 5px; border-radius: 50%; background: var(--c-primary); content: ''; }
 .ride-line :deep(svg) { position: absolute; bottom: 8px; left: 0; font-size: 1.15rem; animation: ride-across 7s ease-in-out infinite; }
+
+.note-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.note-grid article { position: relative; min-height: 260px; padding: 30px 25px 26px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--border) 76%, transparent); border-radius: 20px; background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary-soft) 35%, var(--ld-bg-card)), var(--ld-bg-card) 55%); }
+.note-grid article::after { position: absolute; right: -42px; bottom: -48px; width: 125px; height: 125px; border: 1px dashed color-mix(in srgb, var(--c-primary) 18%, transparent); border-radius: 50%; content: ''; }
+.note-number { position: absolute; top: 16px; right: 18px; color: var(--c-text-3); font-family: var(--font-accent); font-size: .58rem; }
+.note-icon { display: grid; width: 42px; height: 42px; border-radius: 14px; background: var(--c-primary-soft); color: var(--c-primary); font-size: 1.2rem; place-items: center; }
+.note-grid small { display: block; margin-top: 25px; color: var(--c-primary); font-family: var(--font-accent); font-size: .48rem; font-weight: 750; letter-spacing: .13em; }
+.note-grid h3 { margin: 7px 0 0; font-size: 1.08rem; }
+.note-grid p { position: relative; z-index: 1; margin: 14px 0 0; color: var(--c-text-2); font-size: .75rem; line-height: 1.95; }
 
 .facts-band { padding: 0 44px; border-bottom: 1px solid var(--border); }
 .facts-band dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -484,9 +510,9 @@ useHead(() => ({
 .work-list p { color: var(--c-text-2); font-size: .75rem; line-height: 1.8; }
 
 .about-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding: 60px 44px 8px; }
-.about-footer p { color: var(--c-text-1); font-family: var(--font-wenkai); font-size: 1rem; }
+.about-footer p { color: var(--c-text-1); font-family: var(--font-heading); font-size: 1rem; }
 .about-footer span { display: block; margin-top: 8px; color: var(--c-text-3); font-family: var(--font-mono); font-size: .6rem; }
-.about-footer strong { color: var(--c-text); font-family: var(--font-wenkai); font-size: 1.7rem; font-weight: 400; }
+.about-footer strong { color: var(--c-text); font-family: var(--font-brand); font-size: 1.7rem; font-weight: 650; }
 
 .reveal-block { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s cubic-bezier(.16, 1, .3, 1); }
 .reveal-block.is-visible { opacity: 1; transform: none; }
@@ -515,8 +541,10 @@ useHead(() => ({
   .profile-copy { order: 2; padding: 42px 24px 50px; }
   .portrait-area { min-height: 420px; border-bottom: 1px solid var(--border); border-left: 0; }
   .profile-copy blockquote { margin-top: 34px; }
-  .story-band, .journey-band, .work-band { padding: 58px 24px; }
+  .story-band, .notes-band, .journey-band, .work-band { padding: 58px 24px; }
   .story-layout { grid-template-columns: 1fr; gap: 34px; }
+  .note-grid { grid-template-columns: 1fr; }
+  .note-grid article { min-height: 0; }
   .facts-band { padding: 0 24px; }
   .facts-band dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .facts-band dl > div:nth-child(3n) { border-right: 1px solid var(--border); }

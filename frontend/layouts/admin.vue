@@ -15,10 +15,7 @@
           @click="mobileNavOpen = false" />
       </Transition>
       <div class="sidebar-shell" :class="{ open: mobileNavOpen }">
-        <LeftSidebar variant="admin" :collapsed="sidebarCollapsed" />
-        <button class="sidebar-collapse" type="button" :title="sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'" :aria-label="sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'" @click="toggleSidebar">
-          <Icon :name="sidebarCollapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'" />
-        </button>
+        <LeftSidebar variant="admin" :collapsed="sidebarCollapsed" @toggle-collapse="toggleSidebar" />
       </div>
       <div class="admin-main">
         <slot />
@@ -35,7 +32,7 @@ import { theme } from 'ant-design-vue'
 const router = useRouter()
 const route = useRoute()
 const { resolvedTheme } = useTheme()
-const { readStorage, refreshProfile, isLoggedIn, canAccessAdminPath } = useAuth()
+const { readStorage, refreshProfile, isLoggedIn, isAdmin, canAccessAdminPath } = useAuth()
 const mobileNavOpen = ref(false)
 const sidebarCollapsed = ref(false)
 
@@ -63,12 +60,13 @@ async function guardPanel() {
   }
 }
 
-onMounted(() => {
-  sidebarCollapsed.value = localStorage.getItem('corner-admin-sidebar-collapsed') === '1'
-  void guardPanel()
+onMounted(async () => {
+  await guardPanel()
+  sidebarCollapsed.value = isAdmin.value && localStorage.getItem('corner-admin-sidebar-collapsed') === '1'
 })
 
 function toggleSidebar() {
+  if (!isAdmin.value) return
   sidebarCollapsed.value = !sidebarCollapsed.value
   localStorage.setItem('corner-admin-sidebar-collapsed', sidebarCollapsed.value ? '1' : '0')
 }
@@ -98,8 +96,6 @@ watch(() => route.path, () => {
   transition: flex-basis .32s cubic-bezier(.16,1,.3,1), width .32s cubic-bezier(.16,1,.3,1);
 }
 .admin-root.sidebar-collapsed .sidebar-shell { flex-basis:72px; width:72px; }
-.sidebar-collapse { position:absolute; z-index:50; top:92px; right:-12px; display:grid; width:24px; height:36px; padding:0; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); box-shadow:0 5px 16px color-mix(in srgb,var(--ld-shadow) 45%,transparent); color:var(--c-text-3); cursor:pointer; place-items:center; transition:color .18s,transform .18s; }
-.sidebar-collapse:hover { color:var(--c-primary); transform:translateX(1px); }
 
 .admin-main {
   background: var(--c-bg);
@@ -162,11 +158,11 @@ watch(() => route.path, () => {
   }
   .admin-root.sidebar-collapsed .sidebar-shell { width:min(82vw,300px); flex-basis:var(--left-w); }
   .sidebar-shell :deep(.sidebar-left.is-collapsed) { width:100%; padding-right:16px; padding-left:16px; }
-  .sidebar-shell :deep(.is-collapsed .hero-text),.sidebar-shell :deep(.is-collapsed .hero-status),.sidebar-shell :deep(.is-collapsed .nav-label),.sidebar-shell :deep(.is-collapsed .user-name),.sidebar-shell :deep(.is-collapsed .user-badge),.sidebar-shell :deep(.is-collapsed .user-logout),.sidebar-shell :deep(.is-collapsed .user-back span) { display:revert; }
+  .sidebar-shell :deep(.is-collapsed .hero-text),.sidebar-shell :deep(.is-collapsed .hero-status),.sidebar-shell :deep(.is-collapsed .nav-label),.sidebar-shell :deep(.is-collapsed .user-name),.sidebar-shell :deep(.is-collapsed .user-badge),.sidebar-shell :deep(.is-collapsed .user-logout),.sidebar-shell :deep(.is-collapsed .user-back span),.sidebar-shell :deep(.is-collapsed .admin-collapse-button span),.sidebar-shell :deep(.is-collapsed .admin-collapse-button svg:last-child) { display:revert; }
   .sidebar-shell :deep(.is-collapsed .search-box) { display:flex; }
   .sidebar-shell :deep(.is-collapsed .nav-item) { justify-content:flex-start; padding:7px 10px; }
   .sidebar-shell :deep(.is-collapsed .theme-pill) { width:fit-content; flex-direction:row; border-radius:1.2rem; }
-  .sidebar-collapse { display:none; }
+  .sidebar-shell :deep(.is-collapsed .admin-collapse-button) { width:100%; padding:7px 10px; }
 
   .sidebar-shell.open {
     transform: translate3d(0, 0, 0);

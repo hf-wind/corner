@@ -91,6 +91,8 @@ export class HttpCacheInterceptor implements NestInterceptor {
     const path = request.path;
     if (path === '/rss.xml') return false;
     if (/\/(?:health|auth|notifications)(?:\/|$)/.test(path)) return false;
+    // Weather has provider-specific stale caching and must still work while Redis reconnects.
+    if (/\/weather(?:\/|$)/.test(path)) return false;
     if (/\/(?:admin)(?:\/|$)/.test(path)) return false;
     if (/\/(?:users|media|email)(?:\/|$)/.test(path)) return false;
     if (path.endsWith('/stream')) return false;

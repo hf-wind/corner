@@ -20,6 +20,13 @@ export interface AboutFact {
   value: string
 }
 
+export interface AboutNote {
+  title: string
+  subtitle: string
+  content: string
+  icon: string
+}
+
 export interface AboutProfile {
   name: string
   badge: string
@@ -29,6 +36,7 @@ export interface AboutProfile {
   location: string
   availability: string
   introduction: string
+  notes: AboutNote[]
   socialLinks: AboutSocialLink[]
   skills: AboutSkill[]
   timeline: AboutTimelineItem[]
@@ -39,24 +47,29 @@ export interface AboutProfile {
 export function createAboutProfile(): AboutProfile {
   return {
     name: 'huifeng',
-    badge: '开发者',
-    role: '绍兴 · 写代码 · 骑车闲游',
+    badge: '一介写代码的人',
+    role: '生于青海，现居绍兴',
     motto: '听风于隅，漫写人间',
     avatarUrl: '',
     location: '中国 · 绍兴',
-    availability: '持续写作，也持续学习',
-    introduction: '我来自青海，现在生活和工作在绍兴。科班学的是计算机，后来很自然地做了软件开发。一路做过手机 App、小程序、PC 端和数据驾驶舱，也参与过数字孪生，让 UE 场景和前端数据互相听得懂。前端、后端、部署运维都碰，AI 也在认真学着用；谈不上样样精通，只是遇到问题愿意多看一眼，再把它拆小一点。\n\n我不太想把“会用什么”写成一排闪亮的标签。技术于我，更像是把想法安稳落地的工具：页面要让人用着舒服，接口要经得住折腾，服务上线后也得有人照看。偶尔借 AI 多一双眼睛，但最后的判断、验证和责任仍然要自己接住。会的东西有限，好在还愿意继续学，也不介意承认“这个我得先查查”。\n\n工作之外喜欢骑车、看书、看电影，也爱没有目的地到处溜达。与生活对线时胜率一般，幸好还能靠一顿好吃的、一阵晚风和一次不爆红的部署回血。这个站点不准备证明我有多厉害，只想安静保存技术所得、书影所感和普通日子。若这些记录偶尔能帮到谁，已经很好。',
+    availability: '所学尚浅，仍在慢慢做事',
+    introduction: '余籍青海，少习计算机之术，科班出身。癸卯年入某市电信实习，从软件开发之事；甲辰七月转正，遂以此为业。技未敢言精，不过逢题拆题，遇坑填坑，日拱一卒而已。\n\n性喜安静，亦不拒热闹。知世间能者甚众，故不敢以所会自矜；偶有所成，多赖前人之路、同伴之助。所愿不过把手边之事做稳，把不懂之处弄明白，得闲时留几行真话。',
+    notes: [
+      { title: '平日所习', subtitle: 'ABOUT THE WORK', icon: 'ph:code-bold', content: '前端、后端与部署运维都略有涉猎，也在学习如何让 AI 成为可靠的协作者。做过 App、小程序、PC 端、数据驾驶舱及数字孪生联动。它们不是履历墙，只是我用来解决问题的一只工具箱。' },
+      { title: '闲时所好', subtitle: 'OFF THE CLOCK', icon: 'ph:bicycle-bold', content: '喜欢骑车、看书、看电影，也爱没有目的地四处走走。与生活对线时胜率一般，幸好一顿好吃的、一阵晚风，或一次不爆红的部署，通常都能让血条慢慢回来。' },
+      { title: '此间缘起', subtitle: 'WHY THIS CORNER', icon: 'ph:wind-bold', content: '“风隅随笔”不是作品陈列柜，更像一张靠窗的旧书桌。这里收技术所得、书影所感与日常微末；不追赶喧哗，也不急着下结论。若偶然能给来客一点用处或片刻共鸣，便已足够。' },
+    ],
     socialLinks: [
       { label: 'Email', url: 'mailto:hello@corner.ink', icon: 'ph:envelope-simple-bold' },
       { label: 'RSS', url: '/rss.xml', icon: 'ph:rss-bold' },
     ],
     skills: [
-      { name: '前端与交互', description: '把界面、状态和细节收拾妥当，让功能不只“能用”。' },
-      { name: '后端与数据', description: '写接口、理数据、补边界，尽量让服务清楚而可靠。' },
-      { name: '运维与交付', description: 'Linux、Docker、反向代理与 CI/CD，负责把代码平稳送到线上。' },
-      { name: 'AI 协作', description: '接入模型与自动化工作流，也坚持人工判断、测试和复核。' },
-      { name: '跨端应用', description: '做过 App、小程序和 PC 端，在不同屏幕间解决同一件事。' },
-      { name: '可视化与孪生', description: '做数据驾驶舱，也参与 UE 与前端联动，让场景和数据对上话。' },
+      { name: '界面与交互', description: '把页面、状态与细节慢慢收拾妥当，希望功能不止能用，也能让人用得舒服。' },
+      { name: '服务与数据', description: '写接口、理数据、补边界；能力有限，便多做验证，让服务尽量清楚可靠。' },
+      { name: '部署与照看', description: '接触 Linux、Docker、反向代理与 CI/CD，也愿意对上线后的运行负责。' },
+      { name: 'AI 与自动化', description: '尝试模型接入和工作流，但不把判断交出去，结果仍需人工检查与承担。' },
+      { name: '跨端与大屏', description: '做过 App、小程序、PC 端与数据驾驶舱，在不同屏幕上解决具体问题。' },
+      { name: '场景与孪生', description: '参与 UE 与前端联动，让虚拟场景听懂真实数据；仍有许多地方要继续学。' },
     ],
     timeline: [
       { year: '大学', title: '与人同做一件事', description: '在青协写策划、张罗活动，慢慢懂得彼此搭手的分量。' },
@@ -65,10 +78,10 @@ export function createAboutProfile(): AboutProfile {
       { year: '至今', title: '仍在边做边学', description: '往来于三端、大屏与数字孪生之间，见得越多，越知所学尚浅。' },
     ],
     facts: [
-      { label: '年岁', value: '25' },
+      { label: '生年', value: '世纪之交后一年' },
       { label: '星座', value: '狮子座' },
       { label: '血型', value: 'A 型' },
-      { label: 'SBti', value: '吗喽' },
+      { label: 'SBti', value: '吗喽，自嘲而已' },
       { label: '烟酒', value: '不烟不酒，偶饮米酒果酒' },
       { label: '闲时', value: '骑行 / 到处溜达' },
     ],
@@ -92,6 +105,7 @@ export function normalizeAboutProfile(value: unknown): AboutProfile {
     location: typeof location === 'string' ? location : defaults.location,
     availability: typeof availability === 'string' ? availability : defaults.availability,
     socialLinks: Array.isArray(source.socialLinks) ? source.socialLinks.filter(isSocialLink) : defaults.socialLinks,
+    notes: Array.isArray(source.notes) ? source.notes.filter(isNote) : defaults.notes,
     skills: Array.isArray(source.skills) ? source.skills.filter(isSkill).map((item) => ({
       name: item.name,
       description: typeof item.description === 'string' ? item.description : '',
@@ -120,4 +134,9 @@ function isTimelineItem(value: unknown): value is AboutTimelineItem {
 
 function isFact(value: unknown): value is AboutFact {
   return isRecord(value) && typeof value.label === 'string' && typeof value.value === 'string'
+}
+
+function isNote(value: unknown): value is AboutNote {
+  return isRecord(value) && typeof value.title === 'string' && typeof value.subtitle === 'string'
+    && typeof value.content === 'string' && typeof value.icon === 'string'
 }

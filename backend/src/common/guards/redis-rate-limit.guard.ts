@@ -21,7 +21,7 @@ export class RedisRateLimitGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
-    if (request.path.endsWith('/health')) return true;
+    if (request.path.endsWith('/health') || request.path.endsWith('/weather')) return true;
 
     const rules = this.rulesFor(request);
     try {

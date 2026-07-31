@@ -1,5 +1,6 @@
 <template>
   <div class="home-sidebar" :class="{ ready: !loading }">
+    <WeatherClock />
     <section class="side-card overview-card" aria-labelledby="home-overview-title">
       <div class="side-card-head">
         <span id="home-overview-title"><Icon name="ph:pulse-bold" /> 站点一览</span>

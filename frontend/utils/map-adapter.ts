@@ -143,7 +143,7 @@ export class AmapAdapter implements MapAdapter {
 
   private mapStyle() {
     return document.documentElement.classList.contains('dark')
-      ? 'amap://styles/darkblue'
+      ? 'amap://styles/grey'
       : 'amap://styles/whitesmoke'
   }
 

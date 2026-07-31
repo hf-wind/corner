@@ -1,16 +1,20 @@
 :root {
   --hue-theme: 220deg;
 
-  --font-rounded: 'MiSans VF', 'MiSans', 'HarmonyOS Sans SC', 'OPPO Sans 4.0', 'OPPO Sans', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
-  --font-system-rounded: ui-rounded, 'SF Pro Rounded', 'Segoe UI Variable', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
-  --font-noto: 'Noto Sans SC', 'Source Han Sans SC', 'Source Han Sans CN', 'Microsoft YaHei', sans-serif;
+  --font-rounded: 'Noto Sans SC Variable', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --font-system-rounded: 'Nunito Variable', 'Noto Sans SC Variable', ui-rounded, 'SF Pro Rounded', 'PingFang SC', sans-serif;
+  --font-noto: 'Noto Sans SC Variable', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
   --font-wenkai: 'LXGW WenKai', 'KaiTi', 'STKaiti', serif;
   --font-mono-rounded: 'Maple Mono NF CN', 'Maple Mono SC NF', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
   --font-mono-system: 'Cascadia Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   --font-mono-modern: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
 
   --font-body: var(--font-rounded);
-  --font-heading: var(--font-rounded);
+  --font-heading: var(--font-system-rounded);
+  --font-brand: var(--font-system-rounded);
+  --font-summary: var(--font-rounded);
+  --font-accent: 'Nunito Variable', var(--font-rounded);
+  --font-serif: var(--font-heading);
   --font-mono: var(--font-mono-rounded);
   --font-heading-weight: 650;
   --font-letter-spacing: 0.01em;
@@ -50,15 +54,21 @@
 
 :root[data-font='rounded'] {
   --font-body: var(--font-rounded);
-  --font-heading: var(--font-rounded);
+  --font-heading: var(--font-system-rounded);
+  --font-brand: var(--font-system-rounded);
+  --font-summary: var(--font-rounded);
+  --font-accent: 'Nunito Variable', var(--font-rounded);
   --font-mono: var(--font-mono-rounded);
   --font-heading-weight: 650;
   --font-letter-spacing: 0.01em;
 }
 
 :root[data-font='system-rounded'] {
-  --font-body: var(--font-system-rounded);
+  --font-body: var(--font-rounded);
   --font-heading: var(--font-system-rounded);
+  --font-brand: var(--font-system-rounded);
+  --font-summary: var(--font-rounded);
+  --font-accent: 'Nunito Variable', var(--font-rounded);
   --font-mono: var(--font-mono-system);
   --font-heading-weight: 650;
   --font-letter-spacing: 0.005em;
@@ -67,6 +77,9 @@
 :root[data-font='noto'] {
   --font-body: var(--font-noto);
   --font-heading: var(--font-noto);
+  --font-brand: var(--font-system-rounded);
+  --font-summary: var(--font-noto);
+  --font-accent: 'Nunito Variable', var(--font-noto);
   --font-mono: var(--font-mono-modern);
   --font-heading-weight: 700;
   --font-letter-spacing: 0;
@@ -75,6 +88,9 @@
 :root[data-font='wenkai'] {
   --font-body: var(--font-wenkai);
   --font-heading: var(--font-wenkai);
+  --font-brand: var(--font-system-rounded);
+  --font-summary: var(--font-wenkai);
+  --font-accent: 'Nunito Variable', var(--font-wenkai);
   --font-mono: var(--font-mono-modern);
   --font-heading-weight: 700;
   --font-letter-spacing: 0.015em;
@@ -168,6 +184,10 @@ select {
   font-family: var(--font-heading);
   font-weight: var(--font-heading-weight);
 }
+
+:where(.site-title, .hero-name, .brand-name, .site-name) { font-family: var(--font-brand); font-weight: 760; letter-spacing: .025em; }
+:where(.excerpt, .summary, .description, .card-summary, .article-excerpt) { font-family: var(--font-summary); font-weight: 410; }
+:where(.eyebrow, .kicker, .hero-kicker, .section-kicker, .head-kicker) { font-family: var(--font-accent); font-weight: 720; }
 
 :where(code, pre, kbd, samp) {
   font-family: var(--font-mono);

@@ -9,8 +9,7 @@
       <div class="hero-content">
         <NuxtLink :to="heroLink" class="hero-row" :title="heroTitle">
           <div class="logo-wrap">
-            <span class="logo-orbit"><i /><i /></span>
-            <Icon name="ph:wind-bold" />
+            <SiteWindLogo />
           </div>
           <div class="hero-text">
             <span class="hero-kicker">WIND · CORNER</span>
@@ -78,6 +77,11 @@
           <Icon name="ph:monitor-bold" />
         </button>
       </div>
+      <button v-if="isPanel && isUserAdmin" class="admin-collapse-button" type="button" :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'" @click="emit('toggle-collapse')">
+        <Icon :name="collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-simple-bold'" />
+        <span>{{ collapsed ? '展开侧栏' : '收起侧栏' }}</span>
+        <Icon :name="collapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'" />
+      </button>
       <!-- 字体切换暂不展示，保留结构与样式便于后续恢复。
       <div v-if="!isPanel" class="font-pill" role="group" aria-label="全局字体">
         <button
@@ -108,7 +112,7 @@ const props = withDefaults(defineProps<{
   collapsed: false,
 })
 
-const emit = defineEmits<{ openSearch: [] }>()
+const emit = defineEmits<{ openSearch: []; 'toggle-collapse': [] }>()
 const { theme, setTheme } = useTheme()
 const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings()
 // 字体切换入口暂时隐藏：const { fontPreset, fontPresets, setFontPreset } = useTypography()
@@ -284,7 +288,7 @@ watch(() => route.fullPath, () => {
 .hero {
   position: relative;
   margin: 0 0 3px;
-  padding: 13px;
+  padding: 12px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
   border-radius: 16px;
@@ -292,7 +296,7 @@ watch(() => route.fullPath, () => {
   box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
   isolation: isolate;
 }
-.hero::after { position:absolute; top:-46px; right:-39px; width:112px; height:112px; border:1px dashed color-mix(in srgb,var(--c-primary) 22%,transparent); border-radius:50%; content:''; animation:hero-orbit 24s linear infinite; }
+.hero::after { position:absolute; top:-58px; right:-46px; width:126px; height:126px; border:1px dashed color-mix(in srgb,var(--c-primary) 18%,transparent); border-radius:50%; content:''; animation:hero-orbit 24s linear infinite; }
 .hero-glow { position:absolute; z-index:-1; border-radius:50%; filter:blur(18px); opacity:.5; }
 .hero-glow-one { top:-28px; left:-20px; width:90px; height:90px; background:color-mix(in srgb,var(--c-primary) 18%,transparent); animation:hero-drift 7s ease-in-out infinite alternate; }
 .hero-glow-two { right:-24px; bottom:-32px; width:88px; height:88px; background:color-mix(in srgb,#9b78df 14%,transparent); animation:hero-drift 9s ease-in-out -2s infinite alternate-reverse; }
@@ -304,7 +308,8 @@ watch(() => route.fullPath, () => {
 .hero-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  align-items:flex-start;
+  gap: 10px;
   text-decoration: none;
   color: inherit;
 }
@@ -312,20 +317,17 @@ watch(() => route.fullPath, () => {
 .logo-wrap {
   position:relative;
   display:grid;
-  width: 50px;
-  height: 50px;
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
   border:1px solid color-mix(in srgb,var(--c-primary) 34%,var(--border));
-  border-radius:15px;
+  padding:7px;
+  border-radius:14px;
   background:color-mix(in srgb,var(--ld-bg-card) 80%,transparent);
   box-shadow:inset 0 0 0 5px color-mix(in srgb,var(--c-primary-soft) 38%,transparent);
   color:var(--c-primary);
-  font-size:1.35rem;
   place-items:center;
 }
-.logo-orbit { position:absolute; inset:-5px; border:1px solid color-mix(in srgb,var(--c-primary) 18%,transparent); border-radius:18px; animation:logo-breathe 3.4s ease-in-out infinite; }
-.logo-orbit i { position:absolute; width:5px; height:5px; border-radius:50%; background:var(--c-primary); box-shadow:0 0 8px color-mix(in srgb,var(--c-primary) 55%,transparent); }
-.logo-orbit i:first-child { top:-3px; right:10px; }.logo-orbit i:last-child { bottom:5px; left:-3px; background:#d99459; }
 
 .hero-text {
   flex: 1;
@@ -334,24 +336,27 @@ watch(() => route.fullPath, () => {
 
 .hero-name {
   margin-top:2px;
-  font-size: 1rem;
+  font-family:var(--font-brand);
+  font-size: .94rem;
   font-weight: 700;
   color: var(--c-text);
   letter-spacing: 0.04em;
   line-height: 1.3;
 }
-.hero-kicker { color:var(--c-primary); font-family:var(--font-mono); font-size:.43rem; font-weight:700; letter-spacing:.14em; }
-.hero-status { display:grid; width:18px; height:18px; flex:0 0 auto; border:1px solid var(--border); border-radius:50%; background:color-mix(in srgb,var(--ld-bg-card) 82%,transparent); place-items:center; }
+.hero-kicker { color:var(--c-primary); font-family:var(--font-accent); font-size:.41rem; font-weight:760; letter-spacing:.11em; }
+.hero-status { display:grid; width:14px; height:14px; flex:0 0 auto; margin-top:2px; border:1px solid var(--border); border-radius:50%; background:color-mix(in srgb,var(--ld-bg-card) 82%,transparent); place-items:center; }
 .hero-status i { width:5px; height:5px; border-radius:50%; background:#47b985; box-shadow:0 0 0 3px color-mix(in srgb,#47b985 13%,transparent); animation:status-pulse 2.4s ease-in-out infinite; }
 
 .hero-slogan {
-  font-size: 0.65rem;
+  max-width:138px;
+  font-family:var(--font-summary);
+  font-size: 0.57rem;
   color: var(--c-text-2);
   margin-top: 1px;
   letter-spacing: 0.06em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height:1.45;
+  white-space:normal;
+  overflow-wrap:anywhere;
 }
 
 @keyframes hero-orbit { to { transform:rotate(360deg); } }
@@ -455,6 +460,10 @@ watch(() => route.fullPath, () => {
   opacity: 0.5;
   margin: 0 0 4px;
 }
+
+.admin-collapse-button { display:flex; width:100%; min-height:34px; align-items:center; justify-content:center; gap:8px; padding:7px 10px; border:1px solid color-mix(in srgb,var(--border) 78%,transparent); border-radius:11px; background:var(--c-bg-1); color:var(--c-text-3); cursor:pointer; font:inherit; font-size:.68rem; transition:.2s; }
+.admin-collapse-button:hover { border-color:color-mix(in srgb,var(--c-primary) 35%,var(--border)); background:var(--c-primary-soft); color:var(--c-primary); }
+.admin-collapse-button :deep(svg:last-child) { margin-left:auto; }
 
 .login-link {
   display: flex;
@@ -690,10 +699,13 @@ watch(() => route.fullPath, () => {
 .is-collapsed .user-card { width:44px; padding:6px; }
 .is-collapsed .user-row,.is-collapsed .user-main { justify-content:center; }
 .is-collapsed .user-main { flex:0 0 auto; padding:0; }
+.is-collapsed .user-card :deep(.notif-bell-wrap) { display:none; }
 .is-collapsed .theme-pill { width:42px; flex-direction:column; border-radius:14px; }
 .is-collapsed .theme-pill button { width:34px; padding:7px 0; }
+.is-collapsed .admin-collapse-button { width:42px; padding:8px 0; }
+.is-collapsed .admin-collapse-button span,.is-collapsed .admin-collapse-button :deep(svg:last-child) { display:none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero::after,.hero-glow,.wind-stroke,.logo-orbit,.hero-status i { animation:none; }
+  .hero::after,.hero-glow,.wind-stroke,.hero-status i { animation:none; }
 }
 </style>

@@ -36,8 +36,32 @@
             </div>
           </a-card>
 
-          <a-card :bordered="false" class="editor-section" title="自我介绍">
-            <a-textarea v-model:value="profile.introduction" :rows="8" :maxlength="2000" show-count />
+          <a-card :bordered="false" class="editor-section" title="文言小传">
+            <p class="field-help">只写来处、性情与自省；技能、兴趣和站点缘起请放在下方札记，避免把简介写成简历。</p>
+            <a-textarea v-model:value="profile.introduction" :rows="8" :maxlength="2400" show-count />
+          </a-card>
+
+          <a-card :bordered="false" class="editor-section">
+            <template #title><span>内容札记</span></template>
+            <template #extra><a-button size="small" @click="addNote"><Icon name="ph:plus-bold" /> 添加</a-button></template>
+            <div class="repeat-list">
+              <div v-for="(note, index) in profile.notes" :key="index" class="note-editor-row">
+                <span class="row-index">{{ padIndex(index + 1) }}</span>
+                <div class="note-fields">
+                  <div class="note-head-fields">
+                    <a-input v-model:value="note.title" placeholder="标题，如：闲时所好" :maxlength="40" />
+                    <a-input v-model:value="note.subtitle" placeholder="英文小标题" :maxlength="50" />
+                    <a-input v-model:value="note.icon" placeholder="ph:leaf-bold" :maxlength="60" />
+                  </div>
+                  <a-textarea v-model:value="note.content" placeholder="独立讲清这一面的内容" :rows="3" :maxlength="600" show-count />
+                </div>
+                <div class="row-actions">
+                  <a-button type="text" size="small" :disabled="index === 0" title="上移" @click="move(profile.notes, index, -1)"><Icon name="ph:arrow-up-bold" /></a-button>
+                  <a-button type="text" size="small" :disabled="index === profile.notes.length - 1" title="下移" @click="move(profile.notes, index, 1)"><Icon name="ph:arrow-down-bold" /></a-button>
+                  <a-button type="text" size="small" danger title="删除" @click="profile.notes.splice(index, 1)"><Icon name="ph:trash-bold" /></a-button>
+                </div>
+              </div>
+            </div>
           </a-card>
 
           <a-card :bordered="false" class="editor-section">
@@ -116,7 +140,7 @@
 <script setup lang="ts">
 import { Empty } from 'ant-design-vue'
 import avatarFallback from '~/assets/images/avatar.jpg'
-import type { AboutFact, AboutProfile, AboutSkill, AboutSocialLink, AboutTimelineItem } from '~/types/about'
+import type { AboutFact, AboutNote, AboutProfile, AboutSkill, AboutSocialLink, AboutTimelineItem } from '~/types/about'
 import { createAboutProfile, normalizeAboutProfile } from '~/types/about'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
@@ -183,6 +207,10 @@ async function chooseAvatar() {
 
 function addTimeline() {
   profile.timeline.push({ year: String(new Date().getFullYear()), title: '', description: '' } satisfies AboutTimelineItem)
+}
+
+function addNote() {
+  profile.notes.push({ title: '', subtitle: '', content: '', icon: 'ph:leaf-bold' } satisfies AboutNote)
 }
 
 function addSkill() {
@@ -262,6 +290,8 @@ useHead({ title: '关于我管理' })
   background: var(--ld-bg-card);
 }
 
+.field-help { margin: -3px 0 13px; color: var(--c-text-3); font-size: .68rem; line-height: 1.65; }
+
 .identity-grid {
   display: grid;
   grid-template-columns: 130px minmax(0, 1fr);
@@ -317,6 +347,10 @@ useHead({ title: '关于我管理' })
   border: 1px solid var(--border);
   background: var(--c-bg-1);
 }
+
+.note-editor-row { display:grid; grid-template-columns:28px minmax(0,1fr) 32px; align-items:start; gap:9px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--c-bg-1); }
+.note-fields { display:grid; gap:8px; }
+.note-head-fields { display:grid; grid-template-columns:minmax(120px,.8fr) minmax(140px,1fr) minmax(130px,.8fr); gap:8px; }
 
 .row-index {
   padding-top: 8px;
@@ -379,6 +413,15 @@ useHead({ title: '关于我管理' })
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+@media (max-width: 680px) {
+  .identity-grid,.two-cols,.note-head-fields { grid-template-columns:1fr; }
+  .avatar-editor { align-items:flex-start; }
+  .timeline-editor-row { grid-template-columns:24px minmax(0,1fr) 32px; }
+  .timeline-editor-row .year-input { grid-column:2; width:100%; }
+  .timeline-editor-row .grow-fields { grid-column:2; }
+  .timeline-editor-row .row-actions { grid-column:3; grid-row:1 / span 3; }
 }
 
 @media (max-width: 680px) {
