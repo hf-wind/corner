@@ -33,6 +33,19 @@ type MemoryRelation = {
   weight?: number
 }
 
+type CameraSnapshot = {
+  position: THREE.Vector3
+  target: THREE.Vector3
+}
+
+type CameraFlight = CameraSnapshot & {
+  fromPosition: THREE.Vector3
+  fromTarget: THREE.Vector3
+  startedAt: number
+  duration: number
+  arcHeight: number
+}
+
 const props = withDefaults(defineProps<{
   nodes: MemoryNode[]
   relations: MemoryRelation[]
@@ -81,6 +94,9 @@ let warpLines: THREE.LineSegments | null = null
 let warpMaterial: THREE.LineBasicMaterial | null = null
 let introStartedAt = 0
 let introInterrupted = false
+let cameraFlight: CameraFlight | null = null
+let overviewSnapshot: CameraSnapshot | null = null
+let activeSelectionId = ''
 const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2(2, 2)
 const nodeObjects = new Map<string, THREE.Object3D>()
@@ -88,6 +104,7 @@ const nodePositions = new Map<string, THREE.Vector3>()
 const nodeLookup = new Map<string, MemoryNode>()
 const interactive: THREE.Object3D[] = []
 const starLayers: THREE.Points[] = []
+const cosmicBodies: THREE.Group[] = []
 const disposables = new Set<{ dispose: () => void }>()
 const typeColors: Record<string, number> = {
   post: 0xb38a58,
@@ -404,7 +421,7 @@ function coronaTexture() {
 }
 
 function atmosphereMaterial(colorValue: number, opacity: number) {
-  return track(new THREE.ShaderMaterial({
+  const material = track(new THREE.ShaderMaterial({
     uniforms: {
       glowColor: { value: new THREE.Color(colorValue) },
       glowOpacity: { value: opacity },
@@ -434,6 +451,8 @@ function atmosphereMaterial(colorValue: number, opacity: number) {
     blending: THREE.AdditiveBlending,
     side: THREE.FrontSide,
   }))
+  material.userData.baseGlowOpacity = opacity
+  return material
 }
 
 function glowTexture(color = '#ffffff') {
@@ -633,6 +652,66 @@ function nodeGeometry(type: string, featured: boolean, variant: number) {
   return track(new THREE.SphereGeometry(nodeRadius(type, featured, variant), lowQuality ? 14 : 24, lowQuality ? 10 : 16))
 }
 
+function rememberOpacity(material: THREE.Material, opacity?: number) {
+  if (opacity !== undefined && 'opacity' in material) material.opacity = opacity
+  material.userData.baseOpacity = 'opacity' in material ? material.opacity : 1
+  return material
+}
+
+function addCosmicBodies() {
+  if (!scene) return
+  const random = randomFrom(0x6c756d65)
+  const bodyTypes = ['place', 'library', 'album', 'journey', 'photo']
+  const targetCount = Math.max(lowQuality ? 14 : 18, (lowQuality ? 24 : 38) - props.nodes.length)
+  for (let index = 0; index < targetCount; index++) {
+    const orbitIndex = index % 4
+    const angle = random() * Math.PI * 2 + orbitIndex * .31
+    const orbitRadius = 48 + orbitIndex * 28 + (random() - .5) * 12
+    const radius = .9 + random() * 1.45
+    const seedNode: MemoryNode = {
+      id: `cosmic-seed:${index}`,
+      type: bodyTypes[index % bodyTypes.length],
+      title: '',
+      coordinateSeed: index * 11939 + 701,
+    }
+    const group = new THREE.Group()
+    group.name = 'cosmic-seed'
+    group.position.set(
+      Math.cos(angle) * orbitRadius,
+      (random() - .5) * 28 - 3,
+      Math.sin(angle) * orbitRadius * .68,
+    )
+    group.rotation.set(random() * .5, random() * Math.PI * 2, random() * .35)
+    group.userData.spin = .025 + random() * .055
+    const mutedColor = [0x65717e, 0x596979, 0x77756d, 0x536879][index % 4]
+    const geometry = track(new THREE.SphereGeometry(radius, lowQuality ? 10 : 18, lowQuality ? 8 : 12))
+    const material = rememberOpacity(track(new THREE.MeshStandardMaterial({
+      color: 0xb8c0c7,
+      map: planetTexture(seedNode, mutedColor),
+      emissive: 0x10253a,
+      emissiveIntensity: .025,
+      roughness: .92,
+      metalness: .01,
+      transparent: true,
+      opacity: .62 + random() * .18,
+    })))
+    group.add(new THREE.Mesh(geometry, material))
+    if (index % 7 === 2) {
+      const ringMaterial = rememberOpacity(track(new THREE.MeshBasicMaterial({
+        color: 0x728394,
+        transparent: true,
+        opacity: .13,
+        depthWrite: false,
+      })))
+      const ring = new THREE.Mesh(track(new THREE.TorusGeometry(radius * 1.65, radius * .035, 4, lowQuality ? 24 : 42)), ringMaterial)
+      ring.rotation.set(1.12, .12, -.18)
+      group.add(ring)
+    }
+    cosmicBodies.push(group)
+    scene.add(group)
+  }
+}
+
 function addNode(node: MemoryNode, position: THREE.Vector3) {
   if (!scene) return
   const group = new THREE.Group()
@@ -643,16 +722,16 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
   const color = typeColors[node.type] || 0x9fb0b5
   const radius = nodeRadius(node.type, featured, variant)
   const geometry = nodeGeometry(node.type, featured, variant)
-  const material = track(new THREE.MeshStandardMaterial({
+  const material = rememberOpacity(track(new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: planetTexture(node, color),
     emissive: color,
-    emissiveIntensity: featured ? .24 : .11,
+    emissiveIntensity: featured ? .34 : .2,
     roughness: variant === 3 ? .82 : .72,
     metalness: .04,
     transparent: true,
     opacity: .98,
-  }))
+  })))
   const mesh = new THREE.Mesh(geometry, material)
   mesh.userData.nodeId = node.id
   group.add(mesh)
@@ -668,13 +747,26 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
   atmosphere.scale.setScalar(1.16)
   atmosphere.userData.nodeId = node.id
   group.add(atmosphere)
+  const signalMaterial = rememberOpacity(track(new THREE.SpriteMaterial({
+    map: glowTexture('#79caff'),
+    color,
+    transparent: true,
+    opacity: featured ? .26 : .18,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })))
+  const signal = new THREE.Sprite(signalMaterial)
+  signal.name = 'memory-signal'
+  signal.scale.setScalar(radius * (featured ? 6.4 : 5.2))
+  signal.userData.baseScale = signal.scale.x
+  group.add(signal)
   if (variant === 1 || hash(node.id) % 9 === 0) {
     const ringGroup = new THREE.Group()
     const ringColor = new THREE.Color(color).lerp(new THREE.Color(0xb9b2a2), .34)
     for (const [ringRadius, thickness, opacity] of [[1.38, .035, .28], [1.53, .06, .34], [1.7, .028, .2]] as const) {
       ringGroup.add(new THREE.Mesh(
         track(new THREE.TorusGeometry(radius * ringRadius, radius * thickness, 5, lowQuality ? 32 : 64)),
-        track(new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity, depthWrite: false })),
+        rememberOpacity(track(new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity, depthWrite: false }))),
       ))
     }
     ringGroup.rotation.set(1.12, .18, -.18)
@@ -689,7 +781,7 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
     group.add(moon)
     const moonOrbit = new THREE.Mesh(
       track(new THREE.TorusGeometry(radius * 1.95, .025, 4, lowQuality ? 28 : 48)),
-      track(new THREE.MeshBasicMaterial({ color: 0x9db1bd, transparent: true, opacity: .18, depthWrite: false })),
+      rememberOpacity(track(new THREE.MeshBasicMaterial({ color: 0x9db1bd, transparent: true, opacity: .18, depthWrite: false }))),
     )
     moonOrbit.rotation.x = Math.PI / 2
     group.add(moonOrbit)
@@ -770,6 +862,7 @@ function clearSceneContent() {
   nodeLookup.clear()
   interactive.length = 0
   starLayers.length = 0
+  cosmicBodies.length = 0
   core = null
   sun = null
   blackHole = null
@@ -787,8 +880,13 @@ function buildScene() {
   addBlackHole()
   addCore()
   const years = [...new Set(props.nodes.map(yearOf).filter((year): year is number => year != null))].sort((a, b) => b - a)
-  years.forEach((year, index) => addOrbit(46 + index * 26, year))
-  addOrbit(46 + years.length * 26, null)
+  if (years.length) {
+    years.forEach((year, index) => addOrbit(46 + index * 26, year))
+    addOrbit(46 + years.length * 26, null)
+  } else {
+    for (let index = 0; index < 3; index++) addOrbit(46 + index * 28, null)
+  }
+  addCosmicBodies()
   for (const node of props.nodes) {
     nodeLookup.set(node.id, node)
     const position = buildPosition(node, years)
@@ -827,7 +925,7 @@ function hitNode() {
 function onPointerMove(event: PointerEvent) {
   pointerPosition(event)
   const node = hitNode()
-  if (host.value) host.value.style.cursor = node && !props.ambient ? 'pointer' : 'grab'
+  if (host.value) host.value.style.cursor = props.ambient ? 'default' : node ? 'pointer' : 'grab'
   if (!tooltip.value || props.ambient) return
   tooltip.value.textContent = node?.title || ''
   tooltip.value.classList.toggle('visible', !!node)
@@ -838,6 +936,7 @@ function onPointerMove(event: PointerEvent) {
 }
 
 function onPointerDown() {
+  if (props.ambient || cameraFlight) return
   idleSince = performance.now()
   introInterrupted = true
 }
@@ -849,63 +948,112 @@ function onClick(event: PointerEvent) {
   else emit('clear')
 }
 
+function overviewPose(): CameraSnapshot {
+  const mobile = window.innerWidth < 720
+  return {
+    target: new THREE.Vector3(props.ambient && !mobile ? -44 : 0, mobile ? -42 : 0, 0),
+    position: new THREE.Vector3(0, mobile ? 62 : 68, mobile ? 238 : 218),
+  }
+}
+
+function startCameraFlight(destination: CameraSnapshot, duration = 1250, arcHeight = 12) {
+  if (!camera || !controls) return
+  introInterrupted = true
+  controls.autoRotate = false
+  controls.enabled = false
+  cameraFlight = {
+    fromPosition: camera.position.clone(),
+    fromTarget: controls.target.clone(),
+    position: destination.position.clone(),
+    target: destination.target.clone(),
+    startedAt: performance.now(),
+    duration: reducedMotion.value ? 0 : duration,
+    arcHeight,
+  }
+}
+
+function updateCameraFlight(now: number) {
+  if (!cameraFlight || !camera || !controls) return
+  const progress = cameraFlight.duration ? Math.min(1, (now - cameraFlight.startedAt) / cameraFlight.duration) : 1
+  const eased = progress * progress * progress * (progress * (progress * 6 - 15) + 10)
+  camera.position.lerpVectors(cameraFlight.fromPosition, cameraFlight.position, eased)
+  camera.position.y += Math.sin(progress * Math.PI) * cameraFlight.arcHeight
+  controls.target.lerpVectors(cameraFlight.fromTarget, cameraFlight.target, eased)
+  if (progress < 1) return
+  camera.position.copy(cameraFlight.position)
+  controls.target.copy(cameraFlight.target)
+  cameraFlight = null
+  controls.enabled = !props.ambient
+  controls.autoRotate = !props.selectedId && !props.ambient && !reducedMotion.value
+}
+
+function focusPose(target: THREE.Vector3): CameraSnapshot | null {
+  if (!camera || !controls) return null
+  const direction = camera.position.clone().sub(controls.target).normalize()
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
+  const offset = window.innerWidth < 700 ? 0 : 12
+  const sideOffset = right.clone().multiplyScalar(offset)
+  const lookTarget = target.clone().add(sideOffset)
+  return {
+    target: lookTarget,
+    position: target.clone().add(direction.multiplyScalar(44)).add(sideOffset.clone().multiplyScalar(.7)),
+  }
+}
+
 function applySelection(animate = true) {
   const selected = props.selectedId
   if (controls) controls.autoRotate = !selected && !props.ambient && !reducedMotion.value
   for (const [id, object] of nodeObjects) {
     const active = !selected || id === selected
-    object.scale.setScalar(id === selected ? 1.65 : selected ? .8 : 1)
+    object.scale.setScalar(id === selected ? 1.34 : selected ? .86 : 1)
     object.traverse((child) => {
-      const material = (child as THREE.Mesh).material as THREE.Material & { opacity?: number }
-      if (material && 'opacity' in material) material.opacity = active ? .98 : .28
+      const material = (child as THREE.Mesh).material as THREE.Material & { opacity?: number; uniforms?: Record<string, { value: number }> }
+      if (!material) return
+      const baseOpacity = Number(material.userData.baseOpacity)
+      if ('opacity' in material && Number.isFinite(baseOpacity)) {
+        const boost = id === selected && child.name === 'memory-signal' ? 1.65 : 1
+        material.opacity = Math.min(1, baseOpacity * (active ? boost : .2))
+      }
+      const baseGlow = Number(material.userData.baseGlowOpacity)
+      if (Number.isFinite(baseGlow) && material.uniforms?.glowOpacity) {
+        material.uniforms.glowOpacity.value = baseGlow * (id === selected ? 1.42 : active ? 1 : .22)
+      }
     })
   }
-  if (!selected || !camera || !controls) return
+  if (!camera || !controls) return
+  if (!selected) {
+    if (activeSelectionId) {
+      const destination = overviewSnapshot || overviewPose()
+      if (animate) startCameraFlight(destination, 1350, 10)
+      else {
+        camera.position.copy(destination.position)
+        controls.target.copy(destination.target)
+      }
+    }
+    activeSelectionId = ''
+    overviewSnapshot = null
+    return
+  }
   const target = nodePositions.get(selected)
   if (!target) return
-  const direction = camera.position.clone().sub(controls.target).normalize()
-  const destination = target.clone().add(direction.multiplyScalar(62))
+  if (!activeSelectionId) overviewSnapshot = { position: camera.position.clone(), target: controls.target.clone() }
+  activeSelectionId = selected
+  const destination = focusPose(target)
+  if (!destination) return
   if (!animate || reducedMotion.value) {
-    controls.target.copy(target)
-    camera.position.copy(destination)
+    controls.target.copy(destination.target)
+    camera.position.copy(destination.position)
     controls.update()
     return
   }
-  const started = performance.now()
-  const fromTarget = controls.target.clone()
-  const fromCamera = camera.position.clone()
-  const fly = (now: number) => {
-    if (!camera || !controls) return
-    const progress = Math.min(1, (now - started) / 900)
-    const eased = 1 - Math.pow(1 - progress, 3)
-    controls.target.lerpVectors(fromTarget, target, eased)
-    camera.position.lerpVectors(fromCamera, destination, eased)
-    controls.update()
-    if (progress < 1) requestAnimationFrame(fly)
-  }
-  requestAnimationFrame(fly)
+  startCameraFlight(destination, 1450, 14)
 }
 
 function resetView() {
   if (!camera || !controls) return
-  introInterrupted = true
-  const mobile = window.innerWidth < 720
-  const target = new THREE.Vector3(0, mobile ? -42 : 0, 0)
-  const destination = new THREE.Vector3(0, mobile ? 62 : 68, mobile ? 238 : 218)
-  const fromTarget = controls.target.clone()
-  const fromCamera = camera.position.clone()
-  const started = performance.now()
-  const fly = (now: number) => {
-    if (!camera || !controls) return
-    const progress = Math.min(1, (now - started) / 850)
-    const eased = 1 - Math.pow(1 - progress, 3)
-    controls.target.lerpVectors(fromTarget, target, eased)
-    camera.position.lerpVectors(fromCamera, destination, eased)
-    controls.update()
-    if (progress < 1) requestAnimationFrame(fly)
-    else controls.autoRotate = !props.ambient && !reducedMotion.value
-  }
-  requestAnimationFrame(fly)
+  activeSelectionId = ''
+  overviewSnapshot = null
+  startCameraFlight(overviewPose(), 1400, 12)
 }
 
 function animate(now = performance.now()) {
@@ -933,12 +1081,16 @@ function animate(now = performance.now()) {
       stars.rotation.y += delta * (.004 + index * .006)
       stars.rotation.x = Math.sin(elapsed * (.018 + index * .007)) * .018
     })
+    cosmicBodies.forEach((body, index) => {
+      body.rotation.y += delta * Number(body.userData.spin || .04)
+      body.position.y += Math.sin(elapsed * .18 + index) * delta * .018
+    })
     for (const [id, object] of nodeObjects) {
       const seed = hash(id) % 100
       object.rotation.y += delta * (.08 + seed / 900)
       const selected = id === props.selectedId
       const pulse = 1 + Math.sin(elapsed * 1.5 + seed) * (selected ? .08 : .025)
-      const base = selected ? 1.65 : props.selectedId ? .8 : 1
+      const base = selected ? 1.34 : props.selectedId ? .86 : 1
       object.scale.setScalar(base * pulse)
     }
     if (meteor && meteorTrail) {
@@ -971,7 +1123,7 @@ function animate(now = performance.now()) {
         THREE.MathUtils.lerp(20, mobile ? 62 : 68, eased),
         THREE.MathUtils.lerp(mobile ? 390 : 500, mobile ? 238 : 218, eased),
       )
-      controls.target.set(0, mobile ? -42 : 0, 0)
+      controls.target.set(props.ambient && !mobile ? -44 : 0, mobile ? -42 : 0, 0)
       if (warpMaterial) warpMaterial.opacity = .52 * Math.pow(1 - introProgress, 1.6)
     } else if (warpMaterial) {
       warpMaterial.opacity = .035
@@ -983,10 +1135,11 @@ function animate(now = performance.now()) {
       camera.position.x = Math.sin(elapsed * .035) * radius
       camera.position.z = Math.cos(elapsed * .035) * radius
       camera.position.y = 72 + Math.sin(elapsed * .018) * 18
-      controls.target.set(0, mobile ? -42 : 0, 0)
+      controls.target.set(!mobile ? -44 : 0, mobile ? -42 : 0, 0)
       camera.lookAt(controls.target)
     }
   }
+  updateCameraFlight(now)
   controls.update()
   if (sun && camera) {
     const viewOffset = (sun.userData.viewOffset as THREE.Vector3).clone()
@@ -1025,7 +1178,9 @@ async function initialize() {
     controls.maxDistance = 480
     controls.autoRotate = !props.ambient && !reducedMotion.value
     controls.autoRotateSpeed = .18
-    controls.enabled = true
+    controls.enableRotate = !props.ambient
+    controls.enableZoom = !props.ambient
+    controls.enabled = !props.ambient
     const ambientLight = new THREE.AmbientLight(0x5b7fa5, .48); ambientLight.name = 'ambient-light'; scene.add(ambientLight)
     const keyLight = new THREE.PointLight(0x5aaaf0, 620, 360); keyLight.name = 'key-light'; keyLight.position.set(0, 18, 28); scene.add(keyLight)
     buildScene()

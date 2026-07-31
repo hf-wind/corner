@@ -30,7 +30,7 @@
       </NuxtLink>
       <div class="signal" :class="{ offline: !!error }">
         <i />
-        <span>{{ graph.nodes.length ? `${graph.nodes.length} 枚记忆在线` : error ? '预览宇宙运行中' : '正在连接时间' }}</span>
+        <span>{{ signalText }}</span>
         <button v-if="error" type="button" title="重新连接真实记忆" aria-label="重新连接真实记忆" @click="loadGraph"><Icon name="ph:arrow-clockwise-bold" /></button>
         <button type="button" title="重置视角" aria-label="重置视角" @click="resetScene"><Icon name="ph:crosshair-simple-bold" /></button>
       </div>
@@ -43,7 +43,7 @@
     </section>
 
     <footer class="constellation-foot">
-      <span><i />{{ latestLabel }}</span>
+      <span><i />{{ latestLabel }}<b><em />发光天体为真实记忆</b></span>
       <div aria-label="星图交互状态">
         <Icon name="ph:cursor-click-bold" />
         <Icon name="ph:arrows-out-cardinal-bold" />
@@ -111,7 +111,6 @@ const neighbors = ref<GraphRelation[]>([])
 const error = ref('')
 const sceneReady = ref(false)
 const fallbackMode = ref(false)
-const currentYear = new Date().getFullYear()
 let requestSequence = 0
 
 const typeOptions = [
@@ -124,26 +123,20 @@ const typeOptions = [
   { value: 'journey', label: '旅行', icon: 'ph:path-bold' },
 ]
 
-const previewNodes: GraphNode[] = Array.from({ length: 44 }, (_, index) => ({
-  id: `preview:${index}`,
-  type: typeOptions[index % typeOptions.length].value,
-  title: ['海边的风把夏天吹回来了', '一页读到深夜的书', '城市边缘的黄昏', '相机里的一束光', '去过的地方仍在发光', '旅途中的意外晴天', '写给未来的短笺'][index % 7],
-  excerpt: '这是演示星图的预览节点。接入真实内容后，它会自动显示对应的文章、瞬间、照片或书影记录。',
-  occurredAt: new Date(currentYear - Math.floor(index / 13), index % 12, (index * 7) % 28 + 1).toISOString(),
-  coordinateSeed: index * 7919,
-}))
-
-const displayNodes = computed(() => graph.nodes.length ? graph.nodes : previewNodes)
-const displayRelations = computed(() => graph.nodes.length ? graph.relations : [])
-const displayGraphVersion = computed(() => graph.nodes.length ? graph.graphVersion : `preview-${currentYear}`)
+const displayNodes = computed(() => graph.nodes)
+const displayRelations = computed(() => graph.relations)
+const displayGraphVersion = computed(() => graph.graphVersion || `empty-${graph.nodes.length}`)
 const nodeYears = computed(() => graph.nodes
   .map(node => node.occurredAt ? new Date(node.occurredAt).getFullYear() : NaN)
   .filter(Number.isFinite))
-const timeRange = computed(() => nodeYears.value.length ? `${Math.min(...nodeYears.value)} — ${Math.max(...nodeYears.value)}` : `${currentYear - 3} — ${currentYear}`)
+const timeRange = computed(() => nodeYears.value.length ? `${Math.min(...nodeYears.value)} — ${Math.max(...nodeYears.value)}` : '等待第一段记忆')
 const latestNode = computed(() => [...graph.nodes]
   .filter(node => node.occurredAt)
   .sort((a, b) => new Date(b.occurredAt!).getTime() - new Date(a.occurredAt!).getTime())[0])
 const latestLabel = computed(() => latestNode.value ? `最近点亮 · ${formatDate(latestNode.value.occurredAt)}` : '每一次发布，都会点亮一颗新星')
+const signalText = computed(() => graph.nodes.length
+  ? `${graph.nodes.length} 枚真实记忆已点亮`
+  : error.value ? '宇宙底图运行中 · 真实记忆暂未连接' : '宇宙底图运行中 · 等待首次点亮')
 
 onMounted(loadGraph)
 
@@ -163,9 +156,6 @@ async function loadGraph() {
   } catch (exception: any) {
     if (sequence === requestSequence) {
       error.value = exception?.message || '真实记忆暂时无法连接'
-      const focus = String(route.query.focus || '')
-      const previewNode = previewNodes.find(item => item.id === focus)
-      if (previewNode) await selectNode(previewNode, false)
     }
   }
 }
@@ -173,11 +163,7 @@ async function loadGraph() {
 async function selectNode(node: GraphNode, syncUrl = true) {
   selected.value = node
   selectMemory({ id: node.id, type: node.type, href: node.href })
-  if (syncUrl && !node.id.startsWith('preview:')) await router.replace({ query: { focus: node.id } })
-  if (node.id.startsWith('preview:')) {
-    neighbors.value = []
-    return
-  }
+  if (syncUrl) await router.replace({ query: { focus: node.id } })
   try {
     const result = await api.get<any>(`/memories/graph/neighbors/${encodeURIComponent(node.id)}`)
     if (selected.value?.id === node.id) neighbors.value = result.relations || []
@@ -191,7 +177,12 @@ function handleSceneSelect(node: GraphNode) {
 }
 
 function resetScene() {
-  if (selected.value) clearSelected()
+  if (selected.value) {
+    selected.value = null
+    neighbors.value = []
+    clearMemory()
+    void router.replace({ query: {} })
+  }
   sceneRef.value?.resetView()
 }
 
@@ -263,6 +254,8 @@ useHead({ title: '时光星图' })
 .constellation-foot { position:absolute; z-index:8; right:22px; bottom:20px; left:22px; display:flex; align-items:center; justify-content:space-between; color:#7692a8; font-size:.55rem; pointer-events:none; }
 .constellation-foot>span { display:flex; align-items:center; gap:7px; }
 .constellation-foot>span i { width:22px; height:1px; background:#397eb8; }
+.constellation-foot>span b { display:inline-flex; align-items:center; gap:6px; margin-left:8px; color:#64849e; font-size:.49rem; font-weight:400; letter-spacing:.04em; }
+.constellation-foot>span b em { width:5px; height:5px; border-radius:50%; background:#6acbff; box-shadow:0 0 10px #4aaef0; }
 .constellation-foot div { display:flex; align-items:center; gap:10px; color:#5f8fb6; font-size:.78rem; }
 .memory-popup { position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(374px,calc(100vw - 40px)); max-height:min(680px,calc(100dvh - 150px)); overflow-x:hidden; overflow-y:auto; padding:22px; border:1px solid rgb(113 187 246 / .2); border-radius:8px; background:linear-gradient(145deg,rgb(7 22 43 / .9),rgb(2 10 22 / .94)); box-shadow:0 28px 90px rgb(0 0 0 / .52),inset 0 1px rgb(191 226 255 / .07); backdrop-filter:blur(26px) saturate(1.18); transform:translateY(-50%); }
 .popup-glow { position:absolute; z-index:-1; top:-90px; right:-70px; width:220px; height:180px; background:radial-gradient(circle,rgb(61 156 235 / .2),transparent 68%); pointer-events:none; }
@@ -296,6 +289,7 @@ useHead({ title: '时光星图' })
   .constellation-intro h1 { font-size:2.8rem; }
   .constellation-intro p { max-width:310px; font-size:.66rem; }
   .constellation-foot { right:14px; bottom:14px; left:14px; }
+  .constellation-foot>span b { display:none; }
   .memory-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(48dvh,430px); padding:18px; transform:none; }
   .popup-enter-from,.popup-leave-to { opacity:0; transform:translateY(24px); }
 }
