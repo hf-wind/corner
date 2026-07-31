@@ -59,7 +59,7 @@ function pascalCase(value: string) {
 }
 
 function autoComponentsPlugin(): Plugin {
-  const localComponents = new Map(
+  const readLocalComponents = () => new Map(
     sourceFiles(resolve(root, 'components')).map((file) => [file.split(/[\\/]/).pop()!.replace(/\.vue$/, ''), file]),
   )
   return {
@@ -69,6 +69,7 @@ function autoComponentsPlugin(): Plugin {
       if (!id.endsWith('.vue')) return undefined
       const setupTag = source.match(/<script\s+setup(?:\s[^>]*)?>/)
       if (!setupTag?.index) return undefined
+      const localComponents = readLocalComponents()
 
       const script = source.slice(setupTag.index + setupTag[0].length, source.indexOf('</script>', setupTag.index))
       const imports: string[] = []

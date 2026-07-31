@@ -50,6 +50,12 @@
   --left-w: 240px;
   --right-w: 260px;
   --code-bg: hsl(var(--hue-theme) 20% 96%);
+  --ui-accent-warm: #d58a45;
+  --ui-radius-hero: 18px;
+  --ui-radius-panel: 14px;
+  --ui-shadow-panel: 0 10px 32px color-mix(in srgb, var(--ld-shadow) 32%, transparent);
+  --ui-shadow-soft: 0 6px 20px color-mix(in srgb, var(--ld-shadow) 25%, transparent);
+  --ui-ease-out: cubic-bezier(.22, 1, .36, 1);
 }
 
 :root[data-font='rounded'] {
@@ -284,8 +290,13 @@ html.no-transition, html.no-transition body {
 a { text-decoration: none; color: inherit; }
 
 .content-reveal {
-  animation: content-reveal .36s cubic-bezier(.22, 1, .36, 1) both;
+  animation: content-reveal .42s var(--ui-ease-out) both;
 }
+
+.content-switch-enter-active,
+.content-switch-leave-active { transition:opacity .2s ease,transform .32s var(--ui-ease-out); }
+.content-switch-enter-from { opacity:0; transform:translateY(8px); }
+.content-switch-leave-to { opacity:0; transform:translateY(-4px); }
 
 @keyframes content-reveal {
   from { opacity: 0; transform: translateY(6px); }

@@ -17,18 +17,6 @@ export function useTheme(): ThemeContext {
   const theme: Ref<string> = useState('theme', () => 'auto')
   const resolvedTheme = useState<'light' | 'dark'>('resolved-theme', () => 'light')
 
-  function setFavicon(mode: string) {
-    const links = document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="apple-touch-icon"]')
-    const href = mode === 'dark' ? '/logo-dark.svg' : '/logo.svg'
-    links.forEach(el => { el.href = href })
-    // Force re-fetch by updating href (for browsers that cache)
-    const fav = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-    if (fav) {
-      fav.href = ''
-      fav.href = href
-    }
-  }
-
   function applyTheme() {
     const mode = theme.value
     const resolved: 'light' | 'dark' = mode === 'auto'
@@ -39,7 +27,6 @@ export function useTheme(): ThemeContext {
     document.documentElement.classList.toggle('dark', resolved === 'dark')
     document.documentElement.dataset.theme = resolved
     document.documentElement.style.colorScheme = resolved
-    setFavicon(resolved)
   }
 
   function setTheme(mode: string) {

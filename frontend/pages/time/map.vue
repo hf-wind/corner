@@ -18,25 +18,8 @@
         <div class="type-filter">
           <button v-for="option in typeOptions" :key="option.value" type="button" :class="{ active: types.includes(option.value) }" @click="toggleType(option.value)"><Icon :name="option.icon" />{{ option.label }}</button>
         </div>
-        <div class="place-filter">
-          <button type="button" :class="{ active: year }" aria-haspopup="listbox" :aria-expanded="yearMenuOpen" @click="yearMenuOpen = !yearMenuOpen">
-            <Icon name="ph:calendar-blank-bold" /><span>{{ selectedYearName }}</span><Icon name="ph:caret-down-bold" />
-          </button>
-          <div v-if="yearMenuOpen" class="place-menu" role="listbox">
-            <button type="button" role="option" :aria-selected="!year" :class="{ selected: !year }" @click="selectYear('')"><span><Icon name="ph:calendar-blank-bold" />全部年份</span></button>
-            <button v-for="item in years" :key="item" type="button" role="option" :aria-selected="year === String(item)" :class="{ selected: year === String(item) }" @click="selectYear(String(item))"><span><Icon name="ph:calendar-blank-bold" />{{ item }} 年</span></button>
-          </div>
-        </div>
-        <div class="place-filter">
-          <button type="button" :class="{ active: place }" aria-haspopup="listbox" :aria-expanded="placeMenuOpen" @click="placeMenuOpen = !placeMenuOpen">
-            <Icon name="ph:map-pin-line-bold" /><span>{{ selectedPlaceName }}</span><Icon name="ph:caret-down-bold" />
-          </button>
-          <div v-if="placeMenuOpen" class="place-menu" role="listbox">
-            <button type="button" role="option" :aria-selected="!place" :class="{ selected: !place }" @click="selectPlace('')"><span><Icon name="ph:globe-hemisphere-east-bold" />全部地点</span><em>{{ result.totalMemories }}</em></button>
-            <button v-for="item in result.places" :key="item.slug" type="button" role="option" :aria-selected="place === item.slug" :class="{ selected: place === item.slug }" @click="selectPlace(item.slug)"><span><Icon name="ph:map-pin-fill" />{{ item.name }}</span></button>
-            <p v-if="!result.places.length">当前视野暂无地点</p>
-          </div>
-        </div>
+        <PublicSelectMenu v-model="year" :options="yearOptions" icon="ph:calendar-blank-bold" label="年份筛选" @update:model-value="selectYear" />
+        <PublicSelectMenu v-model="place" :options="mapPlaceOptions" icon="ph:map-pin-line-bold" label="地点筛选" empty-text="当前视野暂无地点" @update:model-value="selectPlace" />
       </div>
 
       <div class="panel-meta"><span>{{ result.returned }} 个可见点位</span><small v-if="result.truncated">视野结果已限制为 500 项</small></div>
@@ -73,8 +56,6 @@ const types = ref<MapMemoryType[]>(['moment', 'album', 'photo'])
 const year = ref(String(route.query.year || ''))
 const place = ref(String(route.query.place || ''))
 const selectedId = ref(String(route.query.memory || ''))
-const yearMenuOpen = ref(false)
-const placeMenuOpen = ref(false)
 const loading = ref(true)
 const mapError = ref('')
 const mobileMode = ref<'map' | 'list'>('map')
@@ -89,8 +70,14 @@ const typeOptions = [
   { value: 'photo' as const, label: '照片', icon: 'ph:image-bold' },
 ]
 const years = Array.from({ length: 30 }, (_, index) => new Date().getFullYear() - index)
-const selectedYearName = computed(() => year.value ? `${year.value} 年` : '全部年份')
-const selectedPlaceName = computed(() => result.value.places.find(item => item.slug === place.value)?.name || '全部地点')
+const yearOptions = computed(() => [
+  { value: '', label: '全部年份', icon: 'ph:calendar-blank-bold' },
+  ...years.map(item => ({ value: String(item), label: `${item} 年`, icon: 'ph:calendar-blank-bold' })),
+])
+const mapPlaceOptions = computed(() => [
+  { value: '', label: '全部地点', icon: 'ph:globe-hemisphere-east-bold', count: result.value.totalMemories },
+  ...result.value.places.map(item => ({ value: item.slug, label: item.name, icon: 'ph:map-pin-fill' })),
+])
 
 onMounted(async () => {
   if (!mapEl.value) return
@@ -183,8 +170,8 @@ async function expandCluster(item: MemoryMapCluster) {
   mobileMode.value = 'map'
 }
 function openCluster(item: MemoryMapCluster) { void expandCluster(item) }
-function selectYear(value: string) { year.value = value; yearMenuOpen.value = false }
-function selectPlace(value: string) { place.value = value; placeMenuOpen.value = false }
+function selectYear(value: string) { year.value = value }
+function selectPlace(value: string) { place.value = value }
 function clusterSummary(item: MemoryMapCluster) { return [`${item.types.moment} 个瞬间`, `${item.types.album} 册相册`, `${item.types.photo} 张照片`].filter(text => !text.startsWith('0 ')).join(' · ') }
 
 function toggleType(type: MapMemoryType) {

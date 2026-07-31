@@ -3,32 +3,22 @@
     <main class="main-content moments-main">
       <div class="ambient ambient-one" aria-hidden="true" />
       <div class="moments-shell">
-        <section class="moments-hero">
-          <div class="hero-copy">
-            <span class="hero-kicker"><i /> MOMENTS · 日常手记</span>
-            <h1>日常不必完整，<em>记住一瞬就好。</em></h1>
-            <p>随手收藏生活里的光线、声音和没有说完的话。</p>
-          </div>
-          <div class="hero-count"><strong>{{ total }}</strong><span>篇生活切片</span></div>
-          <div class="hero-mark" aria-hidden="true"><Icon name="ph:sparkle" /></div>
-          <span class="hero-stamp">DAILY<br>JOURNAL</span>
-        </section>
+        <ContentPageHero
+          eyebrow="MOMENTS · 日常手记"
+          title="日常不必完整，记住一瞬就好"
+          description="随手收藏生活里的光线、声音和没有说完的话。"
+          icon="ph:sparkle-bold"
+          :metric="total"
+          metric-label="篇生活切片"
+          variant="moments"
+        />
 
         <div class="content-grid">
           <section class="feed-section" aria-labelledby="moment-stream-title">
             <header class="stream-header">
               <div><span>RECENT NOTES</span><h2 id="moment-stream-title">最近记录</h2></div>
               <div class="stream-tools">
-                <div class="place-filter">
-                  <button type="button" :class="{ active: selectedPlace }" aria-haspopup="listbox" :aria-expanded="placeMenuOpen" @click="placeMenuOpen = !placeMenuOpen">
-                    <Icon name="ph:map-pin-line-bold" /><span>{{ selectedPlaceName }}</span><Icon name="ph:caret-down-bold" />
-                  </button>
-                  <div v-if="placeMenuOpen" class="place-menu" role="listbox">
-                    <button type="button" role="option" :aria-selected="!selectedPlace" :class="{ selected: !selectedPlace }" @click="selectPlace('')"><span><Icon name="ph:globe-hemisphere-east-bold" />全部地点</span><em>{{ total }}</em></button>
-                    <button v-for="place in places" :key="place.slug" type="button" role="option" :aria-selected="selectedPlace === place.slug" :class="{ selected: selectedPlace === place.slug }" @click="selectPlace(place.slug)"><span><Icon name="ph:map-pin-fill" />{{ place.name }}</span><em>{{ place.momentCount }}</em></button>
-                    <p v-if="!places.length">地点需要发布后才会出现在这里</p>
-                  </div>
-                </div>
+                <PublicSelectMenu v-model="selectedPlace" :options="placeOptions" icon="ph:map-pin-line-bold" label="地点筛选" empty-text="地点需要发布后才会出现在这里" @update:model-value="selectPlace" />
                 <small class="sort-indicator"><Icon name="ph:arrow-down" /> 从新到旧</small>
               </div>
             </header>
@@ -102,8 +92,10 @@ const totalPages = ref(1)
 const moments = ref<any[]>([])
 const places = ref<any[]>([])
 const selectedPlace = ref(String(route.query.place || ''))
-const placeMenuOpen = ref(false)
-const selectedPlaceName = computed(() => places.value.find(place => place.slug === selectedPlace.value)?.name || '全部地点')
+const placeOptions = computed(() => [
+  { value: '', label: '全部地点', icon: 'ph:globe-hemisphere-east-bold', count: total.value },
+  ...places.value.map(place => ({ value: place.slug, label: place.name, icon: 'ph:map-pin-fill', count: place.momentCount })),
+])
 const focusSlug = computed(() => String(route.query.focus || ''))
 const visibleImageCount = computed(() => moments.value.reduce((sum, item) => sum + extractMomentImages(item.content).length, 0))
 const visibleCommentCount = computed(() => moments.value.reduce((sum, item) => sum + Number(item.commentCount || 0), 0))
@@ -161,7 +153,6 @@ async function applyPlaceFilter() {
 
 async function selectPlace(slug: string) {
   selectedPlace.value = slug
-  placeMenuOpen.value = false
   await applyPlaceFilter()
 }
 

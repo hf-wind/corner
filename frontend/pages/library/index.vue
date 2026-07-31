@@ -1,19 +1,16 @@
 <template>
   <main class="library-page">
     <div class="ambient ambient-one" /><div class="ambient ambient-two" />
-    <section class="library-hero">
-      <div class="hero-copy">
-        <span class="eyebrow"><i /> PERSONAL COLLECTION · 书与影</span>
-        <h1>在故事里，<br><em>收藏另一种人生。</em></h1>
-        <p>读过的页，追过的谜，和那些散场之后仍留在心里的回声。这里不做标准答案，只记录我的偏爱。</p>
-      </div>
-      <div class="hero-stats" aria-label="收藏统计">
-        <div><strong>{{ meta.books }}</strong><span>BOOKS<br>读过的书</span></div>
-        <i />
-        <div><strong>{{ meta.films }}</strong><span>FILMS<br>悬疑片单</span></div>
-      </div>
-      <span class="hero-number">COLLECTION<br>NO. {{ String(meta.total).padStart(2, '0') }}</span>
-    </section>
+    <ContentPageHero
+      eyebrow="PERSONAL COLLECTION · 书与影"
+      title="在故事里，收藏另一种人生"
+      description="读过的页，追过的谜，和那些散场之后仍留在心里的回声。这里不做标准答案，只记录我的偏爱。"
+      icon="ph:books-bold"
+      :metric="meta.total"
+      metric-label="份私人收藏"
+      variant="library"
+    />
+    <PageStatsBar :items="libraryStats" label="书影收藏统计" />
 
     <section class="collection-section">
       <header class="collection-toolbar">
@@ -32,8 +29,10 @@
         <p>{{ sectionDescription }}</p>
       </div>
 
-      <div v-if="!loading && items.length" class="card-grid content-reveal"><LibraryCard v-for="item in items" :key="item.id" :item="item" /></div>
-      <div v-else-if="!loading" class="empty-state content-reveal"><span><Icon name="ph:books" /></span><h3>这一格还空着</h3><p>或许下一本书、下一部电影就会出现在这里。</p></div>
+      <Transition name="content-switch" mode="out-in">
+        <div v-if="items.length" :key="`items-${contentVersion}`" class="card-grid content-reveal" :class="{ 'is-updating': switching }"><LibraryCard v-for="item in items" :key="item.id" :item="item" /></div>
+        <div v-else-if="!loading" :key="`empty-${contentVersion}`" class="empty-state content-reveal"><span><Icon name="ph:books" /></span><h3>这一格还空着</h3><p>或许下一本书、下一部电影就会出现在这里。</p></div>
+      </Transition>
 
       <div v-if="totalPages > 1" class="library-pagination">
         <button type="button" :disabled="page <= 1" @click="goPage(page - 1)"><Icon name="ph:arrow-left" /></button>
@@ -53,11 +52,14 @@ const route = useRoute()
 const router = useRouter()
 const items = ref<LibraryItem[]>([])
 const loading = ref(true)
+const switching = ref(false)
+const contentVersion = ref(0)
 const activeType = ref<FilterType>(['book', 'film'].includes(String(route.query.type)) ? route.query.type as LibraryType : 'all')
 const search = ref(String(route.query.q || ''))
 const page = ref(1)
 const totalPages = ref(1)
 const meta = reactive({ books: 0, films: 0, total: 0 })
+let requestSequence = 0
 const tabs = computed(() => [
   { value: 'all' as FilterType, label: '全部收藏', icon: 'ph:squares-four-bold', count: meta.total },
   { value: 'book' as FilterType, label: '阅读书架', icon: 'ph:book-open-text-bold', count: meta.books },
@@ -65,21 +67,36 @@ const tabs = computed(() => [
 ])
 const sectionTitle = computed(() => activeType.value === 'film' ? '迷雾剧场' : activeType.value === 'book' ? '枕边书页' : '最近收藏')
 const sectionDescription = computed(() => activeType.value === 'film' ? '偏爱那些线索藏在暗处、结局值得再想一遍的故事。排名是我的私人秩序。' : activeType.value === 'book' ? '一本书真正被读完，也许是在合上它之后。这里留下摘录，也留下当时的自己。' : '书和影不必分得太开，它们都是通往别处的一扇门。')
+const libraryStats = computed(() => [
+  { icon: 'ph:book-open-text-bold', value: meta.books, label: '读过的书' },
+  { icon: 'ph:film-strip-bold', value: meta.films, label: '悬疑片单' },
+])
 
 async function loadItems() {
-  loading.value = true
+  const sequence = ++requestSequence
+  switching.value = !loading.value
   try {
     const res = await api.get<any>('/library', { page: page.value, limit: 10, type: activeType.value, search: search.value, sort: activeType.value === 'film' ? 'rank' : undefined })
-    items.value = res.items || []; totalPages.value = res.totalPages || 1
-  } catch { items.value = []; totalPages.value = 1 }
-  finally { loading.value = false }
+    if (sequence !== requestSequence) return
+    items.value = res.items || []; totalPages.value = res.totalPages || 1; contentVersion.value++
+  } catch { if (sequence === requestSequence) { items.value = []; totalPages.value = 1; contentVersion.value++ } }
+  finally { if (sequence === requestSequence) { loading.value = false; switching.value = false } }
 }
 async function loadMeta() { try { Object.assign(meta, await api.get('/library/meta')) } catch { /* decorative counts */ } }
 function syncQuery() { router.replace({ query: { ...(activeType.value !== 'all' ? { type: activeType.value } : {}), ...(search.value ? { q: search.value } : {}) } }) }
-function changeType(type: FilterType) { activeType.value = type; page.value = 1; syncQuery(); loadItems() }
+function changeType(type: FilterType) { if (type === activeType.value) return; activeType.value = type; page.value = 1; syncQuery(); void loadItems() }
 function searchItems() { page.value = 1; syncQuery(); loadItems() }
 function clearSearch() { search.value = ''; searchItems() }
 function goPage(next: number) { page.value = next; loadItems(); document.querySelector('.collection-section')?.scrollIntoView({ behavior: 'smooth' }) }
+watch(() => [route.query.type, route.query.q], ([type, query]) => {
+  const nextType: FilterType = ['book', 'film'].includes(String(type)) ? String(type) as LibraryType : 'all'
+  const nextSearch = String(query || '')
+  if (nextType === activeType.value && nextSearch === search.value) return
+  activeType.value = nextType
+  search.value = nextSearch
+  page.value = 1
+  void loadItems()
+})
 onMounted(() => { void Promise.all([loadMeta(), loadItems()]) })
 useHead({ title: '书影', meta: [{ name: 'description', content: '风隅随笔的个人阅读记录与影视收藏。' }] })
 </script>
@@ -100,6 +117,7 @@ useHead({ title: '书影', meta: [{ name: 'description', content: '风隅随笔�
 .library-search { display:flex; width:min(270px,100%); height:38px; align-items:center; gap:8px; padding:0 11px; border-bottom:1px solid var(--border); color:var(--c-text-3); transition:border-color .2s; }.library-search:focus-within { border-color:var(--library-accent); }.library-search input { min-width:0; flex:1; border:0; outline:0; background:transparent; color:var(--c-text); font:inherit; font-size:.68rem; }.library-search button { display:grid; border:0; background:transparent; color:var(--c-text-3); cursor:pointer; place-items:center; }
 .section-intro { display:flex; align-items:flex-end; justify-content:space-between; gap:30px; margin:30px 0 16px; }.section-intro span { color:var(--library-accent); font-size:.48rem; font-weight:700; letter-spacing:.2em; }.section-intro h2 { margin:5px 0 0; font-family:var(--font-heading); font-size:1.3rem; }.section-intro p { max-width:465px; color:var(--c-text-3); font-size:.65rem; line-height:1.8; text-align:right; }
 .card-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.card-grid.is-updating { opacity:.58; transition:opacity .18s ease; }
 .empty-state { display:flex; min-height:300px; flex-direction:column; align-items:center; justify-content:center; color:var(--c-text-3); }.empty-state>span { display:grid; width:72px; height:72px; margin-bottom:15px; border-radius:50%; background:var(--c-bg-2); color:var(--library-accent); font-size:2rem; place-items:center; }.empty-state h3 { margin:0 0 6px; color:var(--c-text); font-size:1rem; }.empty-state p { font-size:.68rem; }
 .library-pagination { display:flex; align-items:center; justify-content:center; gap:24px; margin-top:36px; }.library-pagination button { display:grid; width:38px; height:38px; border:1px solid var(--border); border-radius:50%; background:var(--ld-bg-card); color:var(--c-text-2); cursor:pointer; place-items:center; }.library-pagination button:disabled { cursor:not-allowed; opacity:.35; }.library-pagination span { display:flex; align-items:center; gap:9px; color:var(--c-text-3); font-size:.62rem; font-variant-numeric:tabular-nums; }.library-pagination span i { width:28px; height:1px; background:var(--border); }
 .library-footer { display:flex; width:100%; align-items:center; gap:14px; margin:0 auto; padding:20px 0 max(20px,env(safe-area-inset-bottom)); border-top:1px solid var(--border); color:var(--c-text-3); font-size:.49rem; letter-spacing:.13em; }.library-footer i { flex:1; height:1px; background:linear-gradient(90deg,var(--border),transparent); }

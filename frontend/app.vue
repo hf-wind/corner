@@ -2,7 +2,7 @@
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">
       <Transition name="route-page" mode="out-in">
-        <component :is="Component" :key="viewRoute.fullPath" />
+        <component :is="Component" :key="viewRoute.path" />
       </Transition>
     </RouterView>
   </component>

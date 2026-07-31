@@ -9,8 +9,5 @@
     root.classList.toggle('dark', dark)
     root.dataset.theme = dark ? 'dark' : 'light'
     root.style.colorScheme = dark ? 'dark' : 'light'
-
-    var favicon = document.querySelector('link[rel="icon"]')
-    if (favicon) favicon.href = dark ? '/logo-dark.svg' : '/logo.svg'
   } catch (_) {}
 }()
