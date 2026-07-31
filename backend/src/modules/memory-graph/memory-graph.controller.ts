@@ -69,6 +69,11 @@ export class MemoryRelationAdminController {
     return this.graphService.searchNodes(search);
   }
 
+  @Get('health')
+  health() {
+    return this.graphService.health();
+  }
+
   @Post('rebuild')
   rebuild() {
     return this.graphService.rebuild();

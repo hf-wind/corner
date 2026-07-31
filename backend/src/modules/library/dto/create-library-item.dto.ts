@@ -11,8 +11,9 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { SpacetimeDto } from '../../../common/location/spacetime.dto';
 
-export class CreateLibraryItemDto {
+export class CreateLibraryItemDto extends SpacetimeDto {
   @IsIn(['book', 'film'])
   type: 'book' | 'film';
 

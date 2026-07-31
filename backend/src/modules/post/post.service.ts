@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
@@ -6,6 +6,14 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostQueryDto } from './dto/post-query.dto';
 import { createHash } from 'node:crypto';
+import {
+  buildPublicLocation,
+  type LocationPrecision,
+  type LocationSource,
+  type LocationVisibility,
+  type PlaceSnapshot,
+} from '../../common/location/public-location';
+import { prepareSpacetime } from '../../common/location/spacetime';
 
 type PublishedPostSnapshot = {
   title: string;
@@ -14,6 +22,12 @@ type PublishedPostSnapshot = {
   excerpt: string | null;
   coverImage: string | null;
   featured: boolean;
+  occurredAt: string | null;
+  place: PlaceSnapshot | null;
+  locationVisibility: LocationVisibility;
+  locationPrecision: LocationPrecision;
+  locationSource: LocationSource | null;
+  locationExactConfirmedAt: string | null;
   category: { id: string; name: string; slug: string } | null;
   tags: Array<{ id: string; name: string; slug: string }>;
 };
@@ -44,11 +58,18 @@ const postAdminSelect = {
   featured: true,
   needsPublish: true,
   publishedSnapshot: true,
+  occurredAt: true,
+  placeId: true,
+  locationVisibility: true,
+  locationPrecision: true,
+  locationSource: true,
+  locationExactConfirmedAt: true,
   publishedAt: true,
   createdAt: true,
   updatedAt: true,
   author: postInclude.author,
   category: postInclude.category,
+  place: true,
   tags: postInclude.tags,
   _count: { select: { comments: true } },
 } satisfies Prisma.PostSelect;
@@ -174,13 +195,19 @@ export class PostService {
   }
 
   async create(dto: CreatePostDto, authorId: string) {
-    const { tagIds, status, ...data } = dto;
+    const {
+      tagIds, status, placeId: _placeId, occurredAt: _occurredAt,
+      locationVisibility: _visibility, locationPrecision: _precision,
+      locationSource: _source, confirmExactLocation: _confirmExact, ...data
+    } = dto;
     const slug = await this.uniqueSlug(data.slug);
     const publishNow = status === 'published';
+    const spacetime = await this.prepareContentSpacetime(dto);
 
     const created = await this.prisma.post.create({
       data: {
         ...data,
+        ...spacetime,
         slug,
         authorId,
         status: publishNow ? 'published' : 'draft',
@@ -215,7 +242,12 @@ export class PostService {
     });
     if (!existing) throw new NotFoundException('Post not found');
 
-    const { tagIds, status, ...data } = dto;
+    const {
+      tagIds, status, placeId: _placeId, occurredAt: _occurredAt,
+      locationVisibility: _visibility, locationPrecision: _precision,
+      locationSource: _source, confirmExactLocation: _confirmExact, ...data
+    } = dto;
+    const spacetime = await this.prepareContentSpacetime(dto, existing);
     const nextSlug = data.slug ? await this.uniqueSlug(data.slug, existing.id) : undefined;
     const currentSnapshot =
       this.readSnapshot(existing.publishedSnapshot) ||
@@ -231,6 +263,7 @@ export class PostService {
         where: { id: existing.id },
         data: {
           ...data,
+          ...spacetime,
           ...(nextSlug ? { slug: nextSlug } : {}),
           ...(status ? { status } : {}),
           ...(publishNow && !existing.publishedAt ? { publishedAt: new Date() } : {}),
@@ -502,6 +535,14 @@ export class PostService {
       excerpt: post.excerpt ?? null,
       coverImage: post.coverImage ?? null,
       featured: !!post.featured,
+      occurredAt: post.occurredAt ? new Date(post.occurredAt).toISOString() : null,
+      place: this.placeSnapshot(post.place),
+      locationVisibility: this.visibility(post.locationVisibility),
+      locationPrecision: this.precision(post.locationPrecision),
+      locationSource: this.source(post.locationSource),
+      locationExactConfirmedAt: post.locationExactConfirmedAt
+        ? new Date(post.locationExactConfirmedAt).toISOString()
+        : null,
       category: post.category
         ? {
             id: String(post.category.id),
@@ -549,6 +590,14 @@ export class PostService {
       excerpt: snapshot.excerpt == null ? null : String(snapshot.excerpt),
       coverImage: snapshot.coverImage == null ? null : String(snapshot.coverImage),
       featured: !!snapshot.featured,
+      occurredAt: snapshot.occurredAt ? String(snapshot.occurredAt) : null,
+      place: this.placeSnapshot(snapshot.place),
+      locationVisibility: this.visibility(String(snapshot.locationVisibility || 'private')),
+      locationPrecision: this.precision(String(snapshot.locationPrecision || 'place')),
+      locationSource: this.source(snapshot.locationSource == null ? null : String(snapshot.locationSource)),
+      locationExactConfirmedAt: snapshot.locationExactConfirmedAt
+        ? String(snapshot.locationExactConfirmedAt)
+        : null,
       category: category?.id && category.name && category.slug ? category : null,
       tags,
     };
@@ -570,21 +619,66 @@ export class PostService {
   private formatPublic(post: any) {
     const snapshot = this.readSnapshot(post.publishedSnapshot);
     const base = this.format(post);
-    const { publishedSnapshot: _snapshot, needsPublish: _needsPublish, ...rest } = base;
-
-    if (!snapshot) return rest;
+    const active = snapshot || this.buildSnapshotFromPost(post);
+    const {
+      publishedSnapshot: _snapshot, needsPublish: _needsPublish, placeId: _placeId,
+      place: _place, locationVisibility: _visibility, locationPrecision: _precision,
+      locationSource: _source, locationExactConfirmedAt: _confirmed, ...rest
+    } = base;
 
     return {
       ...rest,
-      title: snapshot.title,
-      slug: snapshot.slug,
-      content: snapshot.content,
-      excerpt: snapshot.excerpt,
-      coverImage: snapshot.coverImage,
-      featured: snapshot.featured,
-      category: snapshot.category,
-      tags: snapshot.tags,
-      tagIds: snapshot.tags.map((tag) => tag.id),
+      title: active.title,
+      slug: active.slug,
+      content: active.content,
+      excerpt: active.excerpt,
+      coverImage: active.coverImage,
+      featured: active.featured,
+      category: active.category,
+      tags: active.tags,
+      tagIds: active.tags.map((tag) => tag.id),
+      occurredAt: active.occurredAt,
+      publicLocation: buildPublicLocation({
+        place: active.place,
+        visibility: active.locationVisibility,
+        precision: active.locationPrecision,
+        exactConfirmedAt: active.locationExactConfirmedAt,
+      }),
     };
+  }
+
+  private async prepareContentSpacetime(dto: CreatePostDto | UpdatePostDto, existing?: any) {
+    return prepareSpacetime(dto, existing, async (placeId) => {
+      const place = await this.prisma.place.findUnique({ where: { id: placeId }, select: { id: true } });
+      if (!place) throw new BadRequestException('所选地点不存在');
+    });
+  }
+
+  private placeSnapshot(raw: unknown): PlaceSnapshot | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const place = raw as Record<string, unknown>;
+    const latitude = Number(place.latitude);
+    const longitude = Number(place.longitude);
+    if (!place.id || !place.name || !place.slug || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return {
+      id: String(place.id), name: String(place.name), slug: String(place.slug),
+      address: place.address == null ? null : String(place.address),
+      city: place.city == null ? null : String(place.city),
+      province: place.province == null ? null : String(place.province),
+      country: place.country == null ? null : String(place.country),
+      latitude, longitude, type: String(place.type || 'poi'),
+    };
+  }
+
+  private visibility(value?: string | null): LocationVisibility {
+    return value === 'public' || value === 'blurred' ? value : 'private';
+  }
+
+  private precision(value?: string | null): LocationPrecision {
+    return value === 'exact' || value === 'city' || value === 'province' ? value : 'place';
+  }
+
+  private source(value?: string | null): LocationSource | null {
+    return value === 'manual' || value === 'exif' || value === 'map' || value === 'imported' ? value : null;
   }
 }

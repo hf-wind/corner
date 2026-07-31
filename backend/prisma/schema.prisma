@@ -76,17 +76,26 @@ model Post {
   featured    Boolean   @default(false)
   needsPublish Boolean  @default(true) @map("needs_publish")
   publishedSnapshot Json? @map("published_snapshot")
+  occurredAt  DateTime? @map("occurred_at")
+  placeId     String?   @map("place_id") @db.Uuid
+  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision String @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource String? @map("location_source") @db.VarChar(20)
+  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
   publishedAt DateTime? @map("published_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   author      User      @relation(fields: [authorId], references: [id])
   category    Category? @relation(fields: [categoryId], references: [id])
+  place       Place?    @relation(fields: [placeId], references: [id], onDelete: Restrict)
   tags        PostTag[]
   comments    Comment[]
   visitStats  VisitStat[]
 
   @@index([status, publishedAt])
   @@index([publishedAt])
+  @@index([placeId, occurredAt])
+  @@index([occurredAt])
   @@map("posts")
 }
 
@@ -140,6 +149,8 @@ model Place {
   updatedAt    DateTime @updatedAt @map("updated_at")
   coverMedia   Media?   @relation("PlaceCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
   moments      Moment[]
+  posts        Post[]
+  libraryItems LibraryItem[]
   albums       Album[]
   albumItems   AlbumItem[]
   confirmedMediaMetadata MediaMetadata[]
@@ -520,6 +531,11 @@ model LibraryItem {
   rating          Float?
   rank            Int?
   recommended     Boolean   @default(false)
+  placeId         String?   @map("place_id") @db.Uuid
+  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision String  @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource  String?   @map("location_source") @db.VarChar(20)
+  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
   startDate       DateTime? @map("start_date") @db.Date
   finishDate      DateTime? @map("finish_date") @db.Date
   releaseYear     Int?      @map("release_year")
@@ -537,9 +553,11 @@ model LibraryItem {
   publishedAt     DateTime? @map("published_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
+  place           Place?    @relation(fields: [placeId], references: [id], onDelete: Restrict)
 
   @@index([type, publishStatus])
   @@index([recommended, publishedAt])
+  @@index([placeId, finishDate])
   @@map("library_items")
 }
 

@@ -3,7 +3,7 @@
     <header class="dashboard-head">
       <div><span>CONTROL CENTER · 站点总览</span><h1>{{ greeting }}</h1><p>{{ today }}，这里汇总了内容与站点的最新状态。</p></div>
       <div class="head-actions">
-        <a-button @click="router.push('/home')"><Icon name="ph:arrow-square-out-bold" />查看前台</a-button>
+        <a-button @click="router.push('/')"><Icon name="ph:arrow-square-out-bold" />查看前台</a-button>
         <a-button type="primary" @click="router.push('/admin/posts/create')"><Icon name="ph:plus-bold" />写文章</a-button>
       </div>
     </header>

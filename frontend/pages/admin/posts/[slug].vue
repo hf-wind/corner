@@ -59,6 +59,16 @@
             </a-button>
           </a-card>
 
+          <MomentLocationEditor
+            v-model:happened-at="form.occurredAt"
+            v-model:place="form.place"
+            v-model:visibility="form.locationVisibility"
+            v-model:precision="form.locationPrecision"
+            date-label="故事发生时间"
+            context="记录文章中故事真实发生的时间和地点，发布后会自动进入时光星图。"
+            @source="form.locationSource = $event"
+          />
+
           <a-card :bordered="false" class="meta-card" size="small" title="封面图">
             <div class="cover-setter" @click="coverOpen = true">
               <div v-if="form.coverImage" class="cover-preview">
@@ -99,6 +109,7 @@ import 'md-editor-v3/lib/style.css'
 import { Modal } from 'ant-design-vue'
 import { ThunderboltOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { ensureSlug } from '~/utils/postMeta'
+import type { Place } from '~/types/place'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
@@ -123,7 +134,13 @@ const form = ref({
   categoryId: undefined as string | undefined,
   tagIds: [] as string[],
   featured: false,
+  occurredAt: '',
+  place: null as Place | null,
+  locationVisibility: 'private' as 'public' | 'blurred' | 'private',
+  locationPrecision: 'place' as 'exact' | 'place' | 'city' | 'province',
+  locationSource: 'manual' as 'manual' | 'map' | 'exif' | 'imported',
 })
+const confirmedLocationKey = ref('')
 const editorKey = ref(0)
 const coverOpen = ref(false)
 const coverUrlInput = ref('')
@@ -149,7 +166,11 @@ let autoSaveTimer: ReturnType<typeof setInterval> | null = null
 let hasUnsaved = false
 let originalContent = ''
 
-function postPayload() {
+function locationKey() {
+  return `${form.value.place?.id || ''}|${form.value.locationVisibility}|${form.value.locationPrecision}`
+}
+
+function postPayload(confirmExactLocation = false) {
   return {
     title: form.value.title,
     slug: form.value.slug,
@@ -159,6 +180,12 @@ function postPayload() {
     categoryId: form.value.categoryId,
     tagIds: [...form.value.tagIds],
     featured: form.value.featured,
+    occurredAt: form.value.occurredAt ? new Date(form.value.occurredAt).toISOString() : null,
+    placeId: form.value.place?.id || null,
+    locationVisibility: form.value.place ? form.value.locationVisibility : 'private',
+    locationPrecision: form.value.locationPrecision,
+    locationSource: form.value.place ? form.value.locationSource : null,
+    ...(confirmExactLocation ? { confirmExactLocation: true } : {}),
   }
 }
 
@@ -181,7 +208,13 @@ onMounted(async () => {
       categoryId: post.categoryId || undefined,
       tagIds: post.tagIds || [],
       featured: post.featured || false,
+      occurredAt: toLocalDateTime(post.occurredAt),
+      place: post.place || null,
+      locationVisibility: post.locationVisibility || 'private',
+      locationPrecision: post.locationPrecision || 'place',
+      locationSource: post.locationSource || 'manual',
     }
+    confirmedLocationKey.value = post.locationExactConfirmedAt ? locationKey() : ''
     needsPublish.value = !!post.needsPublish
     originalContent = JSON.stringify(form.value)
   }
@@ -216,6 +249,13 @@ async function autoSave() {
       await router.replace(`/admin/posts/${res.slug}`)
     }
   } catch { /* silent */ }
+}
+
+function toLocalDateTime(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
 }
 
 function coverConfirmUrl() {
@@ -302,11 +342,30 @@ async function generateExcerpt() {
 async function save() {
   if (!form.value.title) { toast.warning('标题不能为空'); return }
   form.value.slug = ensureSlug(form.value.slug, form.value.title)
+  const needsExactConfirmation = form.value.place
+    && form.value.locationVisibility === 'public'
+    && form.value.locationPrecision === 'exact'
+    && confirmedLocationKey.value !== locationKey()
+  if (needsExactConfirmation) {
+    Modal.confirm({
+      title: '确认公开精确位置？',
+      content: `保存后，前台会展示“${form.value.place?.name}”的精确坐标。`,
+      okText: '确认并保存',
+      cancelText: '暂不保存',
+      onOk: () => persistPost(true),
+    })
+    return
+  }
+  await persistPost(false)
+}
+
+async function persistPost(confirmExactLocation: boolean) {
   saving.value = true
   try {
-    const res = await api.put<any>(`/posts/${route.params.slug}`, postPayload())
+    const res = await api.put<any>(`/posts/${route.params.slug}`, postPayload(confirmExactLocation))
     needsPublish.value = res?.needsPublish ?? true
     toast.success('保存成功')
+    if (res?.locationExactConfirmedAt) confirmedLocationKey.value = locationKey()
     originalContent = JSON.stringify(form.value)
     hasUnsaved = false
     if (res?.slug && res.slug !== route.params.slug) {

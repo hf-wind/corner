@@ -1,6 +1,7 @@
 import { IsString, IsOptional, IsArray, IsBoolean, MaxLength } from 'class-validator';
+import { SpacetimeDto } from '../../../common/location/spacetime.dto';
 
-export class UpdatePostDto {
+export class UpdatePostDto extends SpacetimeDto {
   @IsOptional()
   @IsString()
   @MaxLength(255)

@@ -1,3 +1,5 @@
+import type { Place, PublicLocation } from './place'
+
 export type LibraryType = 'book' | 'film'
 export type LibraryPublishStatus = 'draft' | 'published'
 
@@ -21,6 +23,13 @@ export interface LibraryItem {
   rank?: number | null
   recommended: boolean
   experienceDate?: string | null
+  placeId?: string | null
+  place?: Place | null
+  locationVisibility?: 'public' | 'blurred' | 'private'
+  locationPrecision?: 'exact' | 'place' | 'city' | 'province'
+  locationSource?: 'manual' | 'map' | 'exif' | 'imported' | null
+  locationExactConfirmedAt?: string | null
+  publicLocation?: PublicLocation | null
   releaseYear?: number | null
   country?: string | null
   language?: string | null

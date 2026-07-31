@@ -17,7 +17,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/moments/:slug', component: () => import('./pages/moments/[slug].vue') },
   { path: '/places/:slug', component: () => import('./pages/places/[slug].vue') },
   { path: '/time/map', component: () => import('./pages/time/map.vue') },
-  { path: '/time/constellation', component: () => import('./pages/time/constellation.vue') },
+  { path: '/time/constellation', component: () => import('./pages/time/constellation.vue'), meta: { layout: 'welcome' } },
   { path: '/journeys', component: () => import('./pages/journeys/index.vue') },
   { path: '/journeys/:slug', component: () => import('./pages/journeys/[slug].vue') },
   { path: '/stories', component: () => import('./pages/stories/index.vue') },
@@ -64,7 +64,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/tags', component: () => import('./pages/admin/tags.vue'), meta: adminMeta },
   { path: '/admin/analytics', component: () => import('./pages/admin/analytics.vue'), meta: adminMeta },
   { path: '/admin/users', component: () => import('./pages/admin/users.vue'), meta: adminMeta },
-  { path: '/:pathMatch(.*)*', redirect: '/home' },
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({
@@ -75,6 +75,9 @@ const router = createRouter({
 setCompatRouter(router)
 
 router.beforeEach(async (to) => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.toggle('space-pending', to.path === '/' || to.path === '/time/constellation')
+  }
   if (to.path === '/time/constellation') {
     const { constellationEnabled } = useFeatureFlags()
     if (!constellationEnabled) return '/home'
@@ -106,6 +109,15 @@ router.beforeEach(async (to) => {
 
   if (!canAccessAdminPath(to.path)) return '/admin/profile'
   return true
+})
+
+router.afterEach(() => {
+  if (typeof document === 'undefined') return
+  window.requestAnimationFrame(() => document.documentElement.classList.remove('space-pending'))
+})
+
+router.onError(() => {
+  if (typeof document !== 'undefined') document.documentElement.classList.remove('space-pending')
 })
 
 export default router

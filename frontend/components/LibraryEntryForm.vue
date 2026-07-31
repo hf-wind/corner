@@ -96,9 +96,6 @@
               <a-form-item label="我的评分（10 分制）">
                 <a-input-number v-model:value="form.rating" :min="0" :max="10" :step="0.1" style="width:100%" />
               </a-form-item>
-              <a-form-item :label="form.type === 'book' ? '阅读日期' : '观看日期'" extra="记录到月份即可">
-                <input v-model="form.experienceDate" class="date-input" type="month">
-              </a-form-item>
             </div>
             <a-form-item :label="form.type === 'book' ? '摘录' : '印象深刻的段落 / 场景'" extra="每行一条，详情页会逐条展示">
               <a-textarea v-model:value="highlightsText" :rows="5" placeholder="每行记录一条" />
@@ -108,6 +105,17 @@
             </a-form-item>
           </a-form>
         </a-card>
+
+        <MomentLocationEditor
+          v-model:happened-at="form.experienceDate"
+          v-model:place="form.place"
+          v-model:visibility="form.locationVisibility"
+          v-model:precision="form.locationPrecision"
+          date-type="month"
+          :date-label="form.type === 'book' ? '阅读时间' : '观看时间'"
+          :context="form.type === 'book' ? '可选地记录这次阅读发生在哪里，而不是书中故事的地点。' : '可选地记录这次观看发生在哪里，而不是作品拍摄地。'"
+          @source="form.locationSource = $event"
+        />
 
         <a-card v-if="form.type === 'film'" :bordered="false" class="section-card">
           <div class="section-title"><span>03</span> 影视信息</div>
@@ -157,7 +165,9 @@
 </template>
 
 <script setup lang="ts">
+import { Modal } from 'ant-design-vue'
 import type { LibraryItem, LibraryType } from '~/types/library'
+import type { Place } from '~/types/place'
 
 const props = defineProps<{ item?: LibraryItem | null }>()
 const api = useApi()
@@ -173,12 +183,17 @@ const emptyForm = () => ({
   rating: undefined as number | undefined, rank: undefined as number | undefined, recommended: false,
   experienceDate: '', releaseYear: undefined as number | undefined, country: '', language: '',
   runtimeMinutes: undefined as number | undefined, episodeCount: undefined as number | undefined, platform: '',
+  place: null as Place | null,
+  locationVisibility: 'private' as 'public' | 'blurred' | 'private',
+  locationPrecision: 'place' as 'exact' | 'place' | 'city' | 'province',
+  locationSource: 'manual' as 'manual' | 'map' | 'exif' | 'imported',
 })
 const form = reactive(emptyForm())
 const genresText = ref('')
 const castText = ref('')
 const highlightsText = ref('')
 const quotesText = ref('')
+const confirmedLocationKey = ref('')
 
 const progressOptions = computed(() => form.type === 'book'
   ? [{ value: 'want-to-read', label: '想读' }, { value: 'reading', label: '在读' }, { value: 'finished', label: '已读' }, { value: 'paused', label: '搁置' }]
@@ -201,6 +216,7 @@ function applyItem(item?: LibraryItem | null) {
   castText.value = (item.cast || []).join(', ')
   highlightsText.value = (item.highlights || []).join('\n')
   quotesText.value = (item.quotes || []).join('\n')
+  confirmedLocationKey.value = item.locationExactConfirmedAt ? locationKey() : ''
 }
 
 watch(() => props.item, applyItem, { immediate: true })
@@ -258,10 +274,32 @@ async function pickCover() {
   if (urls.length) form.coverImage = urls[0]
 }
 
+function locationKey() {
+  return `${form.place?.id || ''}|${form.locationVisibility}|${form.locationPrecision}`
+}
+
 async function save() {
   ensureSlug()
   if (!form.title.trim()) { toast.warning('请填写名称'); return }
   if (!form.slug.trim()) { toast.warning('请填写 Slug'); return }
+  const needsExactConfirmation = form.place
+    && form.locationVisibility === 'public'
+    && form.locationPrecision === 'exact'
+    && confirmedLocationKey.value !== locationKey()
+  if (needsExactConfirmation) {
+    Modal.confirm({
+      title: '确认公开精确位置？',
+      content: `保存后，前台会展示“${form.place.name}”的精确坐标。`,
+      okText: '确认并保存',
+      cancelText: '暂不保存',
+      onOk: () => performSave(true),
+    })
+    return
+  }
+  await performSave(false)
+}
+
+async function performSave(confirmExactLocation: boolean) {
   const payload: Record<string, any> = {
     type: form.type,
     title: form.title.trim(),
@@ -286,14 +324,21 @@ async function save() {
     platform: form.platform,
     genres: splitComma(genresText.value), cast: splitComma(castText.value),
     highlights: splitLines(highlightsText.value), quotes: splitLines(quotesText.value),
+    placeId: form.place?.id || null,
+    locationVisibility: form.place ? form.locationVisibility : 'private',
+    locationPrecision: form.locationPrecision,
+    locationSource: form.place ? form.locationSource : null,
+    ...(confirmExactLocation ? { confirmExactLocation: true } : {}),
   }
   for (const key of Object.keys(payload)) {
     if (payload[key] === '' || payload[key] === undefined) delete payload[key]
   }
   saving.value = true
   try {
-    if (props.item?.id) await api.put(`/library/${props.item.id}`, payload)
-    else await api.post('/library', payload)
+    const result = props.item?.id
+      ? await api.put<any>(`/library/${props.item.id}`, payload)
+      : await api.post<any>('/library', payload)
+    if (result?.locationExactConfirmedAt) confirmedLocationKey.value = locationKey()
     toast.success(props.item ? '记录已更新' : '记录已创建')
     router.push('/admin/library')
   } catch (error: any) {

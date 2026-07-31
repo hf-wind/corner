@@ -1,7 +1,7 @@
 <template>
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">
-      <Transition name="route-page" mode="out-in">
+      <Transition :name="isSpaceRoute ? undefined : 'route-page'" :mode="isSpaceRoute ? undefined : 'out-in'">
         <component :is="Component" :key="viewRoute.path" />
       </Transition>
     </RouterView>
@@ -13,10 +13,10 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
+import DefaultLayout from './layouts/default.vue'
+import AdminLayout from './layouts/admin.vue'
+import WelcomeLayout from './layouts/welcome.vue'
 
-const DefaultLayout = defineAsyncComponent(() => import('./layouts/default.vue'))
-const AdminLayout = defineAsyncComponent(() => import('./layouts/admin.vue'))
-const WelcomeLayout = defineAsyncComponent(() => import('./layouts/welcome.vue'))
 const GlobalToast = defineAsyncComponent(() => import('./components/GlobalToast.vue'))
 const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/SidebarMusicPlayer.vue'))
 
@@ -27,6 +27,7 @@ const { connectRealtime, disconnectRealtime, refreshUnread } = useNotifications(
 const { toasts } = useToast()
 const { siteTitle, loadSiteSettings } = useSiteSettings()
 const route = useRoute()
+const isSpaceRoute = computed(() => route.path === '/' || route.path === '/time/constellation')
 const showPlayer = ref(false)
 const clientProtection = useProductionClientProtection(isAdmin)
 let playerIdleHandle: number | undefined
@@ -40,6 +41,16 @@ const activeLayout = computed(() => {
   if (route.meta.layout === 'welcome') return WelcomeLayout
   return DefaultLayout
 })
+
+watch(() => route.path, () => {
+  if (typeof document === 'undefined') return
+  document.documentElement.classList.toggle('space-route', isSpaceRoute.value)
+  const themeColor = document.querySelector('meta[name="theme-color"]')
+  if (themeColor) {
+    const dark = document.documentElement.classList.contains('dark')
+    themeColor.setAttribute('content', isSpaceRoute.value ? '#020814' : (dark ? '#030b18' : '#eaf5ff'))
+  }
+}, { immediate: true })
 
 onMounted(() => {
   clientProtection.start()
@@ -80,6 +91,15 @@ useHead(() => ({
 </script>
 
 <style>
+html.space-pending body::after {
+  position: fixed;
+  z-index: 2147483647;
+  inset: 0;
+  background: #020814;
+  content: '';
+  pointer-events: none;
+}
+
 .route-page-enter-active,
 .route-page-leave-active {
   will-change: opacity, transform;

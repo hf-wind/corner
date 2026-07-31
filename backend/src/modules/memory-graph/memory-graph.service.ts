@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Prisma, type Place } from '@prisma/client';
@@ -65,13 +66,17 @@ type MemoryGraphResult = {
 };
 
 @Injectable()
-export class MemoryGraphService {
+export class MemoryGraphService implements OnModuleInit {
   private rebuildTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
   ) {}
+
+  onModuleInit() {
+    this.scheduleRebuild(1200);
+  }
 
   scheduleRebuild(delayMs = 250) {
     if (this.rebuildTimer) clearTimeout(this.rebuildTimer);
@@ -212,7 +217,7 @@ export class MemoryGraphService {
       await Promise.all([
         this.prisma.post.findMany({
           where: { status: 'published' },
-          include: { tags: { include: { tag: true } } },
+          include: { place: true, tags: { include: { tag: true } } },
         }),
         this.prisma.moment.findMany({
           where: { status: 'published' },
@@ -237,6 +242,7 @@ export class MemoryGraphService {
         }),
         this.prisma.libraryItem.findMany({
           where: { publishStatus: 'published' },
+          include: { place: true },
         }),
         this.prisma.journey.findMany({
           where: { status: 'published' },
@@ -286,6 +292,9 @@ export class MemoryGraphService {
       const tags =
         this.snapshotTags(snapshot?.tags) ?? post.tags.map((item) => item.tag);
       const snapshotSlug = this.stringValue(snapshot?.slug);
+      const visibility = this.stringValue(snapshot?.locationVisibility) || post.locationVisibility;
+      const place = this.snapshotPlace(snapshot?.place) || post.place;
+      const placeId = visibility === 'private' ? null : String(place?.id || post.placeId || '') || null;
       addNode(
         this.node({
           id,
@@ -296,9 +305,12 @@ export class MemoryGraphService {
           excerpt: this.cleanText(snapshot?.excerpt || snapshot?.content),
           href: `/article/${snapshotSlug || post.slug}`,
           image: this.stringValue(snapshot?.coverImage) || post.coverImage,
-          occurredAt: post.publishedAt || post.createdAt,
-          placeId: null,
+          occurredAt: this.dateValue(snapshot?.occurredAt) || post.occurredAt || post.publishedAt || post.createdAt,
+          placeId,
           metadata: {
+            featured: post.featured,
+            locationVisibility: visibility,
+            locationPrecision: this.stringValue(snapshot?.locationPrecision) || post.locationPrecision,
             tags: tags.map((tag) => ({
               id: tag.id,
               name: tag.name,
@@ -307,6 +319,7 @@ export class MemoryGraphService {
           },
         }),
       );
+      rememberPlace(place, id, !!placeId);
       for (const tag of tags)
         addToGroup(tagGroups, String(tag.id || tag.slug), id);
     }
@@ -422,6 +435,7 @@ export class MemoryGraphService {
 
     for (const item of libraryItems) {
       const id = `library:${item.id}`;
+      const visible = item.locationVisibility !== 'private';
       addNode(
         this.node({
           id,
@@ -432,16 +446,20 @@ export class MemoryGraphService {
           excerpt: this.cleanText(item.reflection || item.summary),
           href: `/library/${item.slug}`,
           image: item.coverImage,
-          occurredAt: item.finishDate || item.publishedAt || item.createdAt,
-          placeId: null,
+          occurredAt: item.finishDate || item.startDate || item.publishedAt || item.createdAt,
+          placeId: visible ? item.placeId : null,
           metadata: {
             libraryType: item.type,
             creator: item.creator,
             rating: item.rating,
             genres: item.genres,
+            featured: item.recommended,
+            locationVisibility: item.locationVisibility,
+            locationPrecision: item.locationPrecision,
           },
         }),
       );
+      rememberPlace(item.place, id, visible);
     }
 
     for (const journey of journeys) {
@@ -785,6 +803,39 @@ export class MemoryGraphService {
       orderBy: { updatedAt: 'desc' },
       take: 50,
     });
+  }
+
+  async health() {
+    const [nodes, relations, candidateCount] = await Promise.all([
+      this.prisma.memoryNode.findMany({
+        select: { id: true, type: true, title: true, href: true, occurredAt: true, image: true, placeId: true },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.memoryRelation.findMany({
+        where: { hidden: false, status: 'active' },
+        select: { sourceId: true, targetId: true },
+      }),
+      this.prisma.memoryRelation.count({ where: { status: 'candidate' } }),
+    ]);
+    const connected = new Set(relations.flatMap((relation) => [relation.sourceId, relation.targetId]));
+    const isolated = nodes.filter((node) => !connected.has(node.id));
+    const missingTime = nodes.filter((node) => node.type !== 'place' && !node.occurredAt);
+    const visualTypes = new Set(['post', 'album', 'photo', 'library', 'journey']);
+    const missingImage = nodes.filter((node) => visualTypes.has(node.type) && !node.image);
+    const byType = nodes.reduce<Record<string, number>>((all, node) => {
+      all[node.type] = (all[node.type] || 0) + 1;
+      return all;
+    }, {});
+    const compact = (items: typeof nodes) => items.slice(0, 8).map(({ id, type, title, href }) => ({ id, type, title, href }));
+    return {
+      totals: { nodes: nodes.length, relations: relations.length, candidates: candidateCount },
+      byType,
+      issues: {
+        isolated: { count: isolated.length, items: compact(isolated) },
+        missingTime: { count: missingTime.length, items: compact(missingTime) },
+        missingImage: { count: missingImage.length, items: compact(missingImage) },
+      },
+    };
   }
 
   async createRelation(dto: CreateMemoryRelationDto) {

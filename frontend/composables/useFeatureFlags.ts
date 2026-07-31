@@ -8,7 +8,7 @@ export function useFeatureFlags() {
     albumsEnabled: envEnabled(import.meta.env.VITE_FEATURE_ALBUMS_ENABLED, true),
     mapEnabled: envEnabled(import.meta.env.VITE_FEATURE_MAP_ENABLED, true),
     placesEnabled: envEnabled(import.meta.env.VITE_FEATURE_PLACES_ENABLED, true),
-    constellationEnabled: envEnabled(import.meta.env.VITE_FEATURE_CONSTELLATION_ENABLED, false),
+    constellationEnabled: envEnabled(import.meta.env.VITE_FEATURE_CONSTELLATION_ENABLED, true),
     storiesEnabled: envEnabled(import.meta.env.VITE_FEATURE_STORIES_ENABLED, false),
   }
 }

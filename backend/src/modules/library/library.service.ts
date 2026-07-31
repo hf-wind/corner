@@ -4,6 +4,8 @@ import { CreateLibraryItemDto } from './dto/create-library-item.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
 import { AiService } from '../ai/ai.service';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
+import { buildPublicLocation, type PlaceSnapshot } from '../../common/location/public-location';
+import { prepareSpacetime } from '../../common/location/spacetime';
 
 type LibraryQuery = {
   page?: string;
@@ -152,11 +154,11 @@ export class LibraryService {
       ? [{ rank: { sort: 'asc', nulls: 'last' } }, { publishedAt: 'desc' }]
       : [{ recommended: 'desc' }, { publishedAt: 'desc' }, { createdAt: 'desc' }];
     const [items, total] = await Promise.all([
-      this.prisma.libraryItem.findMany({ where, orderBy: orderBy as any, skip: (page - 1) * limit, take: limit }),
+      this.prisma.libraryItem.findMany({ where, include: { place: true }, orderBy: orderBy as any, skip: (page - 1) * limit, take: limit }),
       this.prisma.libraryItem.count({ where }),
     ]);
     return {
-      items: items.map((item) => this.presentItem(item)),
+      items: items.map((item) => this.presentItem(item, query.admin)),
       total,
       page,
       limit,
@@ -173,24 +175,24 @@ export class LibraryService {
   }
 
   async findById(id: string) {
-    const item = await this.prisma.libraryItem.findUnique({ where: { id } });
+    const item = await this.prisma.libraryItem.findUnique({ where: { id }, include: { place: true } });
     if (!item) throw new NotFoundException('书影记录不存在');
-    return this.presentItem(item);
+    return this.presentItem(item, true);
   }
 
   async findPublishedBySlug(slug: string) {
-    const item = await this.prisma.libraryItem.findFirst({ where: { slug, publishStatus: 'published' } });
+    const item = await this.prisma.libraryItem.findFirst({ where: { slug, publishStatus: 'published' }, include: { place: true } });
     if (!item) throw new NotFoundException('书影记录不存在或尚未发布');
     void this.prisma.libraryItem.update({ where: { id: item.id }, data: { viewCount: { increment: 1 } } }).catch(() => undefined);
     return this.presentItem(item);
   }
 
   async create(dto: CreateLibraryItemDto) {
-    const data = this.toData(dto);
+    const data = await this.toData(dto);
     try {
-      const item = await this.prisma.libraryItem.create({ data: data as any });
+      const item = await this.prisma.libraryItem.create({ data: data as any, include: { place: true } });
       this.memoryGraph?.scheduleRebuild();
-      return this.presentItem(item);
+      return this.presentItem(item, true);
     } catch (error: any) {
       if (error?.code === 'P2002') throw new BadRequestException('Slug 已存在，请换一个');
       throw error;
@@ -199,11 +201,11 @@ export class LibraryService {
 
   async update(id: string, dto: UpdateLibraryItemDto) {
     const current = await this.findById(id);
-    const data = this.toData(dto, current.publishStatus);
+    const data = await this.toData(dto, current.publishStatus, current);
     try {
-      const item = await this.prisma.libraryItem.update({ where: { id }, data: data as any });
+      const item = await this.prisma.libraryItem.update({ where: { id }, data: data as any, include: { place: true } });
       this.memoryGraph?.scheduleRebuild();
-      return this.presentItem(item);
+      return this.presentItem(item, true);
     } catch (error: any) {
       if (error?.code === 'P2002') throw new BadRequestException('Slug 已存在，请换一个');
       throw error;
@@ -217,8 +219,18 @@ export class LibraryService {
     return { success: true };
   }
 
-  private toData(dto: UpdateLibraryItemDto, previousStatus = 'draft') {
-    const data: Record<string, any> = { ...dto };
+  private async toData(dto: UpdateLibraryItemDto, previousStatus = 'draft', existing?: any) {
+    const {
+      placeId: _placeId, occurredAt: _occurredAt, locationVisibility: _visibility,
+      locationPrecision: _precision, locationSource: _source,
+      confirmExactLocation: _confirmExact, ...data
+    }: Record<string, any> = { ...dto };
+    const spacetime = await prepareSpacetime({ ...dto, occurredAt: undefined }, existing, async (placeId) => {
+      const place = await this.prisma.place.findUnique({ where: { id: placeId }, select: { id: true } });
+      if (!place) throw new BadRequestException('所选地点不存在');
+    });
+    delete (spacetime as Record<string, unknown>).occurredAt;
+    Object.assign(data, spacetime);
     for (const key of ['originalTitle', 'coverImage', 'creator', 'summary', 'reflection', 'progressStatus', 'country', 'language', 'director', 'platform']) {
       if (key in data) data[key] = typeof data[key] === 'string' ? data[key].trim() || null : data[key];
     }
@@ -237,7 +249,7 @@ export class LibraryService {
     return data;
   }
 
-  private presentItem(item: Record<string, any>) {
+  private presentItem(item: Record<string, any>, admin = false) {
     const {
       startDate,
       finishDate,
@@ -245,12 +257,46 @@ export class LibraryService {
       isbn: _isbn,
       totalPages: _totalPages,
       sourceUrl: _sourceUrl,
+      placeId,
+      place,
+      locationVisibility,
+      locationPrecision,
+      locationSource,
+      locationExactConfirmedAt,
       ...visible
     } = item;
+    const placeSnapshot = this.placeSnapshot(place);
+    const location = buildPublicLocation({
+      place: placeSnapshot,
+      visibility: locationVisibility,
+      precision: locationPrecision,
+      exactConfirmedAt: locationExactConfirmedAt,
+    });
     return {
       ...visible,
+      ...(admin ? {
+        placeId, place: placeSnapshot, locationVisibility, locationPrecision,
+        locationSource, locationExactConfirmedAt,
+      } : {}),
+      publicLocation: location,
       publishStatus: item.publishStatus,
       experienceDate: finishDate || startDate || null,
+    };
+  }
+
+  private placeSnapshot(raw: unknown): PlaceSnapshot | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const place = raw as Record<string, unknown>;
+    const latitude = Number(place.latitude);
+    const longitude = Number(place.longitude);
+    if (!place.id || !place.name || !place.slug || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return {
+      id: String(place.id), name: String(place.name), slug: String(place.slug),
+      address: place.address == null ? null : String(place.address),
+      city: place.city == null ? null : String(place.city),
+      province: place.province == null ? null : String(place.province),
+      country: place.country == null ? null : String(place.country),
+      latitude, longitude, type: String(place.type || 'poi'),
     };
   }
 }

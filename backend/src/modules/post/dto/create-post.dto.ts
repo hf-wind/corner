@@ -1,6 +1,7 @@
 import { IsString, IsOptional, IsArray, IsBoolean, MaxLength } from 'class-validator';
+import { SpacetimeDto } from '../../../common/location/spacetime.dto';
 
-export class CreatePostDto {
+export class CreatePostDto extends SpacetimeDto {
   @IsString()
   @MaxLength(255)
   title: string;

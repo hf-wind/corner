@@ -56,6 +56,7 @@
   --ui-shadow-panel: 0 10px 32px color-mix(in srgb, var(--ld-shadow) 32%, transparent);
   --ui-shadow-soft: 0 6px 20px color-mix(in srgb, var(--ld-shadow) 25%, transparent);
   --ui-ease-out: cubic-bezier(.22, 1, .36, 1);
+  --app-transition-bg: #eaf5ff;
 }
 
 :root[data-font='rounded'] {
@@ -103,6 +104,7 @@
 }
 
 .dark {
+  --app-transition-bg: #030b18;
   --c-bg: hsl(var(--hue-theme) 0% 7%);
   --c-bg-1: hsl(var(--hue-theme) 10% 10%);
   --c-bg-2: hsl(var(--hue-theme) 10% 14%);
@@ -133,6 +135,9 @@
   --code-bg: hsl(var(--hue-theme) 10% 16%);
 }
 
+html.space-route { --app-transition-bg: #071a2d; }
+html.dark.space-route { --app-transition-bg: #020814; }
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
@@ -146,6 +151,12 @@ html, body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#app {
+  background-color: var(--app-transition-bg);
 }
 
 .layout,
