@@ -107,6 +107,7 @@ const starLayers: THREE.Points[] = []
 const cosmicBodies: THREE.Group[] = []
 const disposables = new Set<{ dispose: () => void }>()
 const typeColors: Record<string, number> = {
+  memory: 0x4f9bd4,
   post: 0xb38a58,
   moment: 0xad6258,
   album: 0x568c88,
@@ -115,7 +116,7 @@ const typeColors: Record<string, number> = {
   library: 0x687895,
   journey: 0x9c684b,
 }
-const typeLevels: Record<string, number> = { place: 0, journey: 6, album: -5, photo: -8, moment: 9, post: 3, library: -2 }
+const typeLevels: Record<string, number> = { memory: 2, place: 0, journey: 6, album: -5, photo: -8, moment: 9, post: 3, library: -2 }
 
 function supportsWebGL() {
   try {
@@ -644,7 +645,7 @@ function addOrbit(radius: number, year: number | null) {
 }
 
 function nodeRadius(type: string, featured: boolean, variant: number) {
-  const base = featured ? 3.6 : type === 'place' ? 2.45 : type === 'photo' ? 1.8 : 2.1
+  const base = featured ? 3.6 : type === 'memory' ? 2.65 : type === 'place' ? 2.45 : type === 'photo' ? 1.8 : 2.1
   return base * (variant === 1 ? 1.16 : variant === 0 ? .92 : 1)
 }
 

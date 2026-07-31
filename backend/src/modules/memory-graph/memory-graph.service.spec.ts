@@ -144,18 +144,23 @@ describe('MemoryGraphService', () => {
     const second = await service.rebuild();
 
     expect(first).toEqual(second);
-    expect(first.nodes).toBe(3);
+    expect(first.nodes).toBe(5);
     expect(createdNodeIds).toEqual([
       'post:p1',
       'moment:m1',
       'journey:j1',
+      expect.stringMatching(/^memory:/),
+      expect.stringMatching(/^memory:/),
       'post:p1',
       'moment:m1',
       'journey:j1',
+      expect.stringMatching(/^memory:/),
+      expect.stringMatching(/^memory:/),
     ]);
     expect(createdNodeIds).not.toContain('place:secret-place');
-    expect(createdRelationIds.slice(0, 2)).toEqual(
-      createdRelationIds.slice(2, 4),
+    const relationsPerRebuild = createdRelationIds.length / 2;
+    expect(createdRelationIds.slice(0, relationsPerRebuild)).toEqual(
+      createdRelationIds.slice(relationsPerRebuild),
     );
   });
 

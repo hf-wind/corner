@@ -25,10 +25,10 @@
       </section>
       <section v-if="providerPlaces.length">
         <span>高德地点</span>
-        <button v-for="place in providerPlaces" :key="`${place.providerId}-${place.name}`" type="button" @click="prepareCandidate(place)">
+        <button v-for="place in providerPlaces" :key="`${place.providerId}-${place.name}`" type="button" :disabled="creating" @click="resolveCandidate(place)">
           <Icon name="ph:magnifying-glass-bold" />
           <span><strong>{{ place.name }}</strong><small>{{ place.address || placeRegion(place) }}</small></span>
-          <em>新建</em>
+          <em>选用</em>
         </button>
       </section>
     </div>
@@ -38,19 +38,11 @@
       <div ref="mapElement" class="map-canvas" />
       <div v-if="mapLoading" class="map-state"><Icon name="ph:spinner-gap-bold" class="spinning" />加载地图</div>
       <div v-else-if="mapError" class="map-state"><Icon name="ph:map-trifold" />{{ mapError }}</div>
-      <button v-if="pickedCandidate" type="button" class="confirm-point" @click="openCandidateForm">
-        <Icon name="ph:plus-bold" />使用此点新建地点
+      <button v-if="pickedCandidate" type="button" class="confirm-point" :disabled="creating" @click="resolveCandidate(pickedCandidate)">
+        <Icon :name="creating ? 'ph:spinner-gap-bold' : 'ph:map-pin-plus-bold'" :class="{ spinning: creating }" />{{ creating ? '正在识别' : '使用此位置' }}
       </button>
     </div>
-    <p class="picker-hint"><Icon name="ph:cursor-click-bold" />点击地图可反查地址，确认后才会创建地点</p>
-
-    <a-modal v-model:open="candidateOpen" title="确认新地点" :confirm-loading="creating" ok-text="创建并选择" cancel-text="取消" @ok="createCandidate">
-      <div class="candidate-form">
-        <label>地点名称<a-input v-model:value="candidateForm.name" placeholder="例如：鲁迅故里" /></label>
-        <label>完整地址<a-input v-model:value="candidateForm.address" placeholder="可选" /></label>
-        <div><label>城市<a-input v-model:value="candidateForm.city" /></label><label>省份<a-input v-model:value="candidateForm.province" /></label></div>
-      </div>
-    </a-modal>
+    <p class="picker-hint"><Icon name="ph:magic-wand-bold" />选择搜索结果或地图点位，系统会自动复用或创建地点</p>
   </div>
 </template>
 
@@ -74,9 +66,7 @@ const mapError = ref('')
 const localPlaces = ref<Place[]>([])
 const providerPlaces = ref<PlaceCandidate[]>([])
 const pickedCandidate = ref<PlaceCandidate | null>(null)
-const candidateOpen = ref(false)
 const creating = ref(false)
-const candidateForm = reactive({ name: '', address: '', city: '', province: '', country: '中国' })
 let map: any
 let marker: any
 let searchTimer: ReturnType<typeof setTimeout> | undefined
@@ -110,37 +100,19 @@ function selectExisting(place: Place) {
   providerPlaces.value = []
 }
 
-function prepareCandidate(place: PlaceCandidate) {
-  pickedCandidate.value = place
-  setMapPoint(place.mapLocation)
-  openCandidateForm()
-}
-
-function openCandidateForm() {
-  const candidate = pickedCandidate.value
-  if (!candidate) return
-  candidateForm.name = candidate.name || ''
-  candidateForm.address = candidate.address || ''
-  candidateForm.city = candidate.city || ''
-  candidateForm.province = candidate.province || ''
-  candidateForm.country = candidate.country || '中国'
-  candidateOpen.value = true
-}
-
-async function createCandidate() {
-  const candidate = pickedCandidate.value
-  if (!candidate || !candidateForm.name.trim()) {
-    toast.warning('请填写地点名称')
+async function resolveCandidate(candidate: PlaceCandidate) {
+  if (!candidate?.name?.trim()) {
+    toast.warning('未能识别地点名称，请重新选择')
     return
   }
   creating.value = true
   try {
-    const place = await api.post<Place>('/places', {
-      name: candidateForm.name.trim(),
-      address: candidateForm.address.trim() || null,
-      city: candidateForm.city.trim() || null,
-      province: candidateForm.province.trim() || null,
-      country: candidateForm.country.trim() || null,
+    const place = await api.post<Place>('/places/resolve', {
+      name: candidate.name.trim(),
+      address: candidate.address?.trim() || null,
+      city: candidate.city?.trim() || null,
+      province: candidate.province?.trim() || null,
+      country: candidate.country?.trim() || '中国',
       longitude: candidate.mapLocation.longitude,
       latitude: candidate.mapLocation.latitude,
       coordinateSystem: 'gcj02',
@@ -148,14 +120,14 @@ async function createCandidate() {
     })
     emit('update:modelValue', place)
     emit('select', { place, source: 'map' })
-    candidateOpen.value = false
     keyword.value = ''
     localPlaces.value = []
     providerPlaces.value = []
+    pickedCandidate.value = null
     setMapPoint(place.mapLocation)
-    toast.success('地点已创建')
+    toast.success('地点已自动关联')
   } catch (error: any) {
-    toast.error(error?.message || '地点创建失败')
+    toast.error(error?.message || '地点关联失败')
   } finally {
     creating.value = false
   }
@@ -253,6 +225,5 @@ onBeforeUnmount(() => {
 .result-empty { margin:0; color:var(--c-text-3); font-size:.62rem; }
 .map-shell { position:relative; height:190px; overflow:hidden; border:1px solid var(--border); border-radius:7px; background:var(--c-bg-1); }.map-canvas { width:100%; height:100%; }.map-state { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:6px; background:var(--c-bg-1); color:var(--c-text-3); font-size:.65rem; }.confirm-point { position:absolute; right:8px; bottom:8px; display:flex; align-items:center; gap:5px; padding:7px 9px; border:1px solid var(--c-primary); border-radius:6px; background:var(--ld-bg-card); box-shadow:0 5px 16px var(--ld-shadow); color:var(--c-primary); cursor:pointer; font:inherit; font-size:.62rem; }
 .picker-hint { display:flex; align-items:center; gap:5px; margin:0; color:var(--c-text-3); font-size:.58rem; line-height:1.5; }
-.candidate-form { display:grid; gap:14px; padding-top:6px; }.candidate-form label { display:grid; gap:6px; color:var(--c-text-2); font-size:.72rem; }.candidate-form>div { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .spinning { animation:spin .8s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
 </style>

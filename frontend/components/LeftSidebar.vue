@@ -168,8 +168,7 @@ const siteNav = [
 const adminFullNav = [
   { to: '/admin/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
   { to: '/admin/albums', icon: 'ph:images-square-bold', label: '相册' },
-  { to: '/admin/memory-graph', icon: 'ph:graph-bold', label: '记忆关系' },
-  { to: '/admin/journeys', icon: 'ph:path-bold', label: '故事航线' },
+  { to: '/admin/memory-graph', icon: 'ph:planet-bold', label: '时光星图' },
   { to: '/admin', icon: 'ph:gauge-bold', label: '仪表盘' },
   { to: '/admin/analytics', icon: 'ph:chart-line-up-bold', label: '访问统计' },
   { to: '/admin/posts', icon: 'ph:article-bold', label: '文章' },

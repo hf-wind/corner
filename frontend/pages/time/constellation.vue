@@ -114,6 +114,7 @@ const fallbackMode = ref(false)
 let requestSequence = 0
 
 const typeOptions = [
+  { value: 'memory', label: '时光记忆', icon: 'ph:planet-bold' },
   { value: 'post', label: '文章', icon: 'ph:article-bold' },
   { value: 'moment', label: '瞬间', icon: 'ph:sparkle-bold' },
   { value: 'album', label: '相册', icon: 'ph:images-square-bold' },
@@ -144,7 +145,7 @@ async function loadGraph() {
   const sequence = ++requestSequence
   error.value = ''
   try {
-    const result = await api.get<any>('/memories/graph', { limit: 320 })
+    const result = await api.get<any>('/memories/graph', { view: 'constellation', limit: 320 })
     if (sequence !== requestSequence) return
     graph.nodes = Array.isArray(result?.nodes) ? result.nodes : []
     graph.relations = Array.isArray(result?.relations) ? result.relations : []
@@ -216,7 +217,7 @@ function formatDate(value?: string | null) {
 }
 
 function relationText(type: string) {
-  return ({ same_place: '同一地点', same_album: '同一相册', same_tag: '共同标签', time_adjacent: '时间相邻', reference: '内容引用', same_journey: '同一旅行', story_sequence: '故事顺序', same_theme: '同一主题', custom: '自定义' } as Record<string, string>)[type] || type
+  return ({ same_place: '同一地点', same_album: '同一相册', same_tag: '共同标签', time_adjacent: '时间相邻', reference: '内容引用', same_journey: '同一旅行', journey_sequence: '旅行轨迹', contains: '包含内容', story_sequence: '故事顺序', same_theme: '同一主题', custom: '自定义' } as Record<string, string>)[type] || type
 }
 
 function evidenceText(value?: Record<string, unknown>) {

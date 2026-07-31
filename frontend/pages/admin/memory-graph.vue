@@ -1,68 +1,166 @@
 <template>
-  <div class="graph-admin">
+  <div class="constellation-admin">
     <header class="page-header">
-      <div class="title-block"><span class="title-icon"><Icon name="ph:planet-bold" /></span><div><small>TIME CONSTELLATION</small><h1>时光星图运营台</h1><p>内容发布后自动入图，这里只处理数据健康和少量例外。</p></div></div>
-      <div class="header-actions"><NuxtLink to="/time/constellation" target="_blank"><Icon name="ph:arrow-square-out-bold" />前台预览</NuxtLink><a-button :loading="rebuilding" @click="rebuild"><Icon name="ph:arrows-clockwise-bold" />立即同步</a-button></div>
+      <div class="title-block">
+        <span class="title-icon"><Icon name="ph:planet-bold" /></span>
+        <div><small>TIME CONSTELLATION</small><h1>时光星图</h1><p>发布内容并记录时间、地点，系统会自动完成其余工作。</p></div>
+      </div>
+      <NuxtLink to="/time/constellation" target="_blank" class="preview-link"><Icon name="ph:arrow-square-out-bold" />查看前台星图</NuxtLink>
     </header>
 
-    <section class="status-band">
-      <span class="live-dot" /><div><strong>自动维护已运行</strong><small>文章、瞬间、相册、照片、地点、书影与旅行会在发布后自动更新</small></div><code>{{ graph.graphVersion ? `版本 ${graph.graphVersion.slice(0,10)}` : '等待首次同步' }}</code>
+    <section class="automation-card">
+      <span class="automation-orb"><i /><Icon name="ph:sparkle-bold" /></span>
+      <div><small>AUTOMATION ONLINE</small><strong>零配置建图正在运行</strong><p>文章、瞬间、相册、照片和书影发布后会自动汇聚为记忆；连续跨地点内容会自动形成旅行轨迹。</p></div>
+      <span class="sync-time"><i />{{ lastBuiltText }}</span>
     </section>
 
-    <a-alert v-if="error" type="error" show-icon :message="error" closable @close="error=''" />
+    <a-alert v-if="error" type="error" show-icon :message="error" closable @close="error = ''" />
     <a-spin :spinning="loading">
-      <section class="metrics" aria-label="图谱统计">
-        <article v-for="item in metricItems" :key="item.label" :class="item.tone"><span><Icon :name="item.icon" /></span><div><strong>{{ item.value }}</strong><small>{{ item.label }}</small></div><em>{{ item.note }}</em></article>
+      <section class="metrics" aria-label="星图统计">
+        <article v-for="item in metricItems" :key="item.label">
+          <span><Icon :name="item.icon" /></span>
+          <div><strong>{{ item.value }}</strong><small>{{ item.label }}</small></div>
+          <em>{{ item.note }}</em>
+        </article>
       </section>
 
       <section class="health-section">
-        <div class="section-head"><div><small>DATA HEALTH</small><h2>内容健康</h2></div><span>{{ healthScore }}% 完整</span></div>
+        <div class="section-head"><div><small>CONTENT READINESS</small><h2>内容完整度</h2></div><span>{{ healthScore }}%</span></div>
+        <p class="section-intro">这些不是星图配置，只是内容本身可以补充的信息；不处理也不会影响发布。</p>
         <div class="health-grid">
-          <article v-for="issue in issueItems" :key="issue.key" :class="{ clear:issue.count===0 }">
+          <article v-for="issue in issueItems" :key="issue.key" :class="{ clear: issue.count === 0 }">
             <span><Icon :name="issue.icon" /></span>
-            <div><strong>{{ issue.title }}</strong><p>{{ issue.count ? `${issue.count} 条内容需要留意` : '状态良好，无需处理' }}</p></div>
-            <button v-if="issue.count" type="button" @click="openIssue(issue)">查看</button><Icon v-else name="ph:check-circle-fill" class="clear-icon" />
+            <div><strong>{{ issue.title }}</strong><p>{{ issue.count ? `${issue.count} 条内容可以补充` : '已完整，无需处理' }}</p></div>
+            <button v-if="issue.count" type="button" @click="openIssue(issue)">查看内容</button>
+            <Icon v-else name="ph:check-circle-fill" class="clear-icon" />
           </article>
         </div>
       </section>
 
       <section class="preview-section">
-        <div class="section-head"><div><small>LIVE PREVIEW</small><h2>实时星图</h2></div><span v-if="selected">已聚焦 · {{ selected.title }}</span></div>
-        <div class="preview-shell"><MemoryGraph2D :nodes="graph.nodes" :relations="graph.relations" :selected-id="selected?.id" @select="selected=$event" /></div>
-        <div class="type-legend"><span v-for="item in typeBreakdown" :key="item.type"><i :class="`type-${item.type}`" />{{ typeText(item.type) }}<b>{{ item.count }}</b></span></div>
+        <div class="section-head"><div><small>LIVE PREVIEW</small><h2>自动聚合预览</h2></div><span>{{ graph.nodes.length }} 枚天体</span></div>
+        <div class="preview-shell"><MemoryGraph2D :nodes="graph.nodes" :relations="graph.relations" :selected-id="selected?.id" @select="selected = $event" /></div>
+        <div v-if="selected" class="selected-memory"><Icon :name="nodeIcon(selected.type)" /><span><small>{{ typeText(selected.type) }}</small><strong>{{ selected.title }}</strong></span><button type="button" @click="selected = null"><Icon name="ph:x-bold" /></button></div>
       </section>
 
-      <section v-if="candidatePage.items.length" class="candidate-section">
-        <div class="section-head"><div><small>AI REVIEW</small><h2>待确认建议</h2></div><span>{{ candidatePage.total }} 条</span></div>
-        <div class="candidate-list"><article v-for="relation in candidatePage.items" :key="relation.id"><div><small>{{ relationType(relation.type) }}</small><strong>{{ relation.source.title }}<Icon name="ph:arrow-right-bold" />{{ relation.target.title }}</strong><p>{{ evidenceText(relation.evidence)||'AI 发现这两段记忆可能存在联系' }}</p></div><span><button type="button" class="accept" @click="setStatus(relation,'active')"><Icon name="ph:check-bold" />采纳</button><button type="button" @click="setStatus(relation,'rejected')"><Icon name="ph:x-bold" />忽略</button></span></article></div>
-      </section>
-
-      <section class="advanced-section">
-        <button type="button" class="advanced-toggle" @click="advancedOpen=!advancedOpen"><span><Icon name="ph:wrench-bold" /><div><strong>高级关系维护</strong><small>仅在自动关系确实错误时使用</small></div></span><Icon name="ph:caret-down-bold" :class="{rotated:advancedOpen}" /></button>
-        <Transition name="advanced"><div v-if="advancedOpen" class="advanced-body"><div class="filters"><a-input v-model:value="filters.search" allow-clear placeholder="搜索节点或关系" @pressEnter="loadRelations(1)"/><a-select v-model:value="filters.origin" allow-clear placeholder="来源" :options="originOptions" @change="loadRelations(1)"/><a-button @click="createOpen=true"><Icon name="ph:plus-bold" />自定义关系</a-button></div><div class="relation-list"><article v-for="relation in relationPage.items" :key="relation.id" :class="{hidden:relation.hidden}"><div><strong>{{ relation.source.title }}<Icon name="ph:arrow-right-bold" />{{ relation.target.title }}</strong><small>{{ relationType(relation.type) }} · {{ originText(relation.origin) }}</small></div><button type="button" @click="toggleHidden(relation)"><Icon :name="relation.hidden?'ph:eye-bold':'ph:eye-slash-bold'" />{{ relation.hidden?'恢复':'隐藏' }}</button></article></div></div></Transition>
-      </section>
+      <details class="recovery-panel">
+        <summary><span><Icon name="ph:lifebuoy-bold" /><b>异常恢复</b><small>仅在新内容长时间没有进入星图时使用</small></span><Icon name="ph:caret-down-bold" /></summary>
+        <div><p>正常情况下无需任何操作。重新生成只会刷新派生数据，不会修改文章、瞬间、相册或旅行。</p><a-button :loading="rebuilding" @click="rebuild"><Icon name="ph:arrows-clockwise-bold" />重新生成星图</a-button></div>
+      </details>
     </a-spin>
 
-    <a-modal v-model:open="issueOpen" :title="activeIssue?.title" :footer="null"><div class="issue-list"><NuxtLink v-for="item in activeIssue?.items||[]" :key="item.id" :to="item.href" target="_blank"><span><Icon :name="nodeIcon(item.type)" /></span><div><small>{{ typeText(item.type) }}</small><strong>{{ item.title }}</strong></div><Icon name="ph:arrow-up-right-bold" /></NuxtLink><a-empty v-if="!activeIssue?.items?.length" description="暂无内容" /></div></a-modal>
-    <a-modal v-model:open="createOpen" title="创建例外关系" ok-text="创建" :confirm-loading="creating" @ok="createRelation"><a-form layout="vertical"><a-form-item label="起点"><a-select v-model:value="createForm.sourceId" show-search :filter-option="false" :options="nodeOptions" @search="searchNodes"/></a-form-item><a-form-item label="终点"><a-select v-model:value="createForm.targetId" show-search :filter-option="false" :options="nodeOptions" @search="searchNodes"/></a-form-item><a-form-item label="关系类型"><a-select v-model:value="createForm.type" :options="relationOptions"/></a-form-item><a-form-item label="关系理由"><a-textarea v-model:value="createForm.reason" :rows="3" maxlength="300"/></a-form-item></a-form></a-modal>
+    <a-modal v-model:open="issueOpen" :title="activeIssue?.title" :footer="null">
+      <div class="issue-list">
+        <NuxtLink v-for="item in activeIssue?.items || []" :key="item.id" :to="item.href" target="_blank"><span><Icon :name="nodeIcon(item.type)" /></span><div><small>{{ typeText(item.type) }}</small><strong>{{ item.title }}</strong></div><Icon name="ph:arrow-up-right-bold" /></NuxtLink>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-definePageMeta({layout:'admin',middleware:'auth',ssr:false})
-const api=useApi(),toast=useToast();const loading=ref(true),rebuilding=ref(false),creating=ref(false),createOpen=ref(false),issueOpen=ref(false),advancedOpen=ref(false),error=ref(''),selected=ref<any>(null),activeIssue=ref<any>(null)
-const graph=reactive<any>({graphVersion:'',nodes:[],relations:[]});const health=reactive<any>({totals:{nodes:0,relations:0,candidates:0},byType:{},issues:{isolated:{count:0,items:[]},missingTime:{count:0,items:[]},missingImage:{count:0,items:[]}}});const candidatePage=reactive<any>({items:[],total:0,page:1,limit:20});const relationPage=reactive<any>({items:[],total:0,page:1,limit:20});const filters=reactive({search:'',origin:undefined as string|undefined});const createForm=reactive({sourceId:'',targetId:'',type:'custom',reason:''});const nodeOptions=ref<any[]>([])
-const originOptions=[{label:'自动规则',value:'automatic'},{label:'人工创建',value:'manual'},{label:'AI 候选',value:'ai'}];const relationOptions=[{label:'自定义',value:'custom'},{label:'同一主题',value:'same_theme'},{label:'内容引用',value:'reference'},{label:'故事延续',value:'story_sequence'}]
-const metricItems=computed(()=>[{label:'记忆节点',value:health.totals.nodes||graph.nodes.length,note:'已自动收录',icon:'ph:star-four-bold',tone:'gold'},{label:'有效关系',value:health.totals.relations||graph.relations.length,note:'无需人工维护',icon:'ph:share-network-bold',tone:'green'},{label:'地点锚点',value:health.byType.place||0,note:'连接同地记忆',icon:'ph:map-pin-bold',tone:'blue'},{label:'待确认',value:health.totals.candidates||0,note:'仅 AI 建议',icon:'ph:sparkle-bold',tone:'violet'}])
-const issueItems=computed(()=>[{key:'isolated',title:'孤立记忆',icon:'ph:circles-three-plus-bold',...health.issues.isolated},{key:'missingTime',title:'缺少时间',icon:'ph:clock-countdown-bold',...health.issues.missingTime},{key:'missingImage',title:'缺少视觉',icon:'ph:image-square-bold',...health.issues.missingImage}]);const issueCount=computed(()=>issueItems.value.reduce((sum,item)=>sum+Number(item.count||0),0));const healthScore=computed(()=>Math.max(0,Math.round((1-Math.min(health.totals.nodes||1,issueCount.value)/(health.totals.nodes||1))*100)));const typeBreakdown=computed(()=>Object.entries(health.byType||{}).map(([type,count])=>({type,count})))
-onMounted(async()=>{await Promise.all([loadGraph(),loadHealth(),loadCandidates(),loadRelations(1),searchNodes('')]);loading.value=false})
-async function loadGraph(){try{Object.assign(graph,await api.get('/memory-relations/graph',{limit:300}))}catch(e:any){error.value=e?.message||'加载图谱失败'}}async function loadHealth(){try{Object.assign(health,await api.get('/memory-relations/health'))}catch(e:any){error.value=e?.message||'加载健康状态失败'}}async function loadCandidates(){try{Object.assign(candidatePage,await api.get('/memory-relations',{status:'candidate',page:1,limit:20}))}catch{candidatePage.items=[]}}
-async function loadRelations(page=1){try{Object.assign(relationPage,await api.get('/memory-relations',{...filters,page,limit:relationPage.limit,status:'active'}))}catch(e:any){error.value=e?.message||'加载关系失败'}}async function rebuild(){rebuilding.value=true;try{const result=await api.post<any>('/memory-relations/rebuild');toast.success(`已同步 ${result.nodes} 个节点、${result.relations} 条关系`);await Promise.all([loadGraph(),loadHealth(),loadCandidates(),loadRelations(1)])}catch(e:any){toast.error(e?.message||'同步失败')}finally{rebuilding.value=false}}
-function openIssue(issue:any){activeIssue.value=issue;issueOpen.value=true}async function searchNodes(search:string){try{const items=await api.get<any[]>('/memory-relations/nodes',{search});nodeOptions.value=items.map(node=>({label:`${typeText(node.type)} · ${node.title}`,value:node.id}))}catch{nodeOptions.value=[]}}async function toggleHidden(relation:any){await updateRelation(relation,{hidden:!relation.hidden})}async function setStatus(relation:any,status:string){await updateRelation(relation,{status});await Promise.all([loadCandidates(),loadHealth()])}async function updateRelation(relation:any,body:any){try{Object.assign(relation,await api.patch(`/memory-relations/${relation.id}`,body));await loadGraph()}catch(e:any){toast.error(e?.message||'更新失败')}}async function createRelation(){if(!createForm.sourceId||!createForm.targetId){toast.warning('请选择两个节点');return}creating.value=true;try{await api.post('/memory-relations',{...createForm});createOpen.value=false;Object.assign(createForm,{sourceId:'',targetId:'',type:'custom',reason:''});await Promise.all([loadGraph(),loadHealth(),loadRelations(1)]);toast.success('例外关系已创建')}catch(e:any){toast.error(e?.message||'创建失败')}finally{creating.value=false}}
-function typeText(type:string){return({post:'文章',moment:'瞬间',album:'相册',photo:'照片',place:'地点',library:'书影',journey:'旅行'}as any)[type]||type}function nodeIcon(type:string){return({post:'ph:article-bold',moment:'ph:sparkle-bold',album:'ph:images-square-bold',photo:'ph:image-bold',place:'ph:map-pin-bold',library:'ph:books-bold',journey:'ph:path-bold'}as any)[type]||'ph:star-four-bold'}function originText(origin:string){return({automatic:'自动规则',manual:'人工创建',ai:'AI 候选'}as any)[origin]||origin}function relationType(type:string){return({same_place:'同一地点',same_album:'同一相册',same_tag:'共同标签',time_adjacent:'时间相邻',reference:'内容引用',same_journey:'同一旅行',same_theme:'同一主题',story_sequence:'故事延续',custom:'自定义'}as any)[type]||type}function evidenceText(value:any){return value?.reason||value?.albumTitle||value?.stop||(value?.days!==undefined?`相隔 ${value.days} 天`:'')}
+definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
+
+const api = useApi()
+const toast = useToast()
+const loading = ref(true)
+const rebuilding = ref(false)
+const issueOpen = ref(false)
+const error = ref('')
+const selected = ref<any>(null)
+const activeIssue = ref<any>(null)
+const graph = reactive<any>({ graphVersion: '', nodes: [], relations: [] })
+const health = reactive<any>({
+  totals: { nodes: 0, memories: 0, journeys: 0, relations: 0 },
+  automation: { status: 'running', lastBuiltAt: null },
+  issues: {
+    isolated: { count: 0, items: [] },
+    missingTime: { count: 0, items: [] },
+    missingLocation: { count: 0, items: [] },
+  },
+})
+
+const metricItems = computed(() => [
+  { label: '真实内容', value: health.totals.nodes || 0, note: '自动收录', icon: 'ph:files-bold' },
+  { label: '聚合记忆', value: health.totals.memories || 0, note: '自动形成主行星', icon: 'ph:planet-bold' },
+  { label: '旅行轨迹', value: health.totals.journeys || 0, note: '连续移动自动识别', icon: 'ph:path-bold' },
+  { label: '记忆连接', value: health.totals.relations || 0, note: '规则自动维护', icon: 'ph:share-network-bold' },
+])
+const issueItems = computed(() => [
+  { key: 'missingTime', title: '缺少时间', icon: 'ph:clock-countdown-bold', ...health.issues.missingTime },
+  { key: 'missingLocation', title: '缺少地点', icon: 'ph:map-pin-line-bold', ...health.issues.missingLocation },
+  { key: 'isolated', title: '尚未关联', icon: 'ph:circles-three-plus-bold', ...health.issues.isolated },
+])
+const issueCount = computed(() => issueItems.value.reduce((sum, item) => sum + Number(item.count || 0), 0))
+const healthScore = computed(() => Math.max(0, Math.round((1 - Math.min(health.totals.nodes || 1, issueCount.value) / (health.totals.nodes || 1)) * 100)))
+const lastBuiltText = computed(() => health.automation.lastBuiltAt
+  ? `最近更新 ${new Date(health.automation.lastBuiltAt).toLocaleString('zh-CN', { hour12: false })}`
+  : '等待首次内容发布')
+
+onMounted(load)
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  try {
+    const [graphResult, healthResult] = await Promise.all([
+      api.get('/memory-relations/graph', { view: 'constellation', limit: 300 }),
+      api.get('/memory-relations/health'),
+    ])
+    Object.assign(graph, graphResult)
+    Object.assign(health, healthResult)
+  } catch (exception: any) {
+    error.value = exception?.message || '读取星图状态失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function rebuild() {
+  rebuilding.value = true
+  try {
+    const result = await api.post<any>('/memory-relations/rebuild')
+    await load()
+    toast.success(`已生成 ${result.memories || 0} 段记忆、${result.automaticJourneys || 0} 条自动旅行`)
+  } catch (exception: any) {
+    toast.error(exception?.message || '重新生成失败')
+  } finally {
+    rebuilding.value = false
+  }
+}
+
+function openIssue(issue: any) {
+  activeIssue.value = issue
+  issueOpen.value = true
+}
+
+function typeText(type: string) {
+  return ({ post: '文章', moment: '瞬间', album: '相册', photo: '照片', library: '书影', memory: '聚合记忆', journey: '旅行轨迹' } as Record<string, string>)[type] || type
+}
+
+function nodeIcon(type: string) {
+  return ({ post: 'ph:article-bold', moment: 'ph:sparkle-bold', album: 'ph:images-square-bold', photo: 'ph:image-bold', library: 'ph:books-bold', memory: 'ph:planet-bold', journey: 'ph:path-bold' } as Record<string, string>)[type] || 'ph:star-four-bold'
+}
+
+useHead({ title: '时光星图' })
 </script>
 
 <style scoped>
-.graph-admin{display:flex;width:min(1180px,100%);flex-direction:column;gap:20px;margin:0 auto;padding-bottom:36px}.page-header{display:flex;align-items:center;justify-content:space-between;gap:18px}.title-block{display:flex;align-items:center;gap:12px}.title-icon{display:grid;width:46px;height:46px;border:1px solid color-mix(in srgb,var(--c-primary) 24%,var(--border));border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary);font-size:1.25rem;place-items:center}.title-block small,.section-head small{color:var(--c-primary);font-size:.54rem;letter-spacing:.15em}.title-block h1{margin:2px 0 0;color:var(--c-text);font-size:1.38rem}.title-block p{margin:4px 0 0;color:var(--c-text-3);font-size:.7rem}.header-actions{display:flex;align-items:center;gap:8px}.header-actions>a{display:flex;height:32px;align-items:center;gap:6px;padding:0 11px;border:1px solid var(--border);border-radius:6px;color:var(--c-text-2);font-size:.7rem;text-decoration:none}.status-band{display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;gap:11px;padding:13px 15px;border:1px solid color-mix(in srgb,#4abf8a 26%,var(--border));border-radius:8px;background:color-mix(in srgb,#4abf8a 5%,var(--ld-bg-card))}.live-dot{width:8px;height:8px;border-radius:50%;background:#45c98a;box-shadow:0 0 0 5px rgba(69,201,138,.1)}.status-band div{display:flex;flex-direction:column;gap:2px}.status-band strong{color:var(--c-text);font-size:.75rem}.status-band small{color:var(--c-text-3);font-size:.6rem}.status-band code{color:var(--c-text-3);font-size:.57rem}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metrics article{display:grid;grid-template-columns:38px 1fr;align-items:center;gap:10px;min-height:82px;padding:13px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.metrics article>span{display:grid;width:38px;height:38px;border-radius:8px;background:var(--c-bg-2);color:var(--c-primary);font-size:1.05rem;place-items:center}.metrics article>div{display:flex;flex-direction:column}.metrics strong{color:var(--c-text);font-size:1.15rem;font-variant-numeric:tabular-nums}.metrics small{color:var(--c-text-3);font-size:.6rem}.metrics em{grid-column:2;color:var(--c-text-3);font-size:.54rem;font-style:normal}.metrics .green>span{color:#45a87b}.metrics .blue>span{color:#5597ce}.metrics .violet>span{color:#9174cd}.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}.section-head h2{margin:3px 0 0;color:var(--c-text);font-size:.98rem}.section-head>span{color:var(--c-text-3);font-size:.65rem}.health-section,.preview-section,.candidate-section{display:flex;flex-direction:column;gap:12px}.health-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.health-grid article{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px;border:1px solid color-mix(in srgb,#d48655 26%,var(--border));border-radius:8px;background:var(--ld-bg-card)}.health-grid article>span{display:grid;width:34px;height:34px;border-radius:7px;background:color-mix(in srgb,#d48655 10%,var(--c-bg-2));color:#c77748;place-items:center}.health-grid article>div{display:flex;min-width:0;flex-direction:column}.health-grid strong{color:var(--c-text);font-size:.72rem}.health-grid p{margin:3px 0 0;color:var(--c-text-3);font-size:.58rem}.health-grid button{border:0;background:none;color:var(--c-primary);cursor:pointer;font:inherit;font-size:.62rem}.health-grid article.clear{border-color:var(--border)}.health-grid article.clear>span{background:color-mix(in srgb,#45a87b 9%,var(--c-bg-2));color:#45a87b}.clear-icon{color:#45a87b}.preview-shell{height:390px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:#0a1216}.preview-shell :deep(.graph-preview){height:100%;min-height:0;border:0}.type-legend{display:flex;flex-wrap:wrap;gap:13px;color:var(--c-text-3);font-size:.59rem}.type-legend span{display:flex;align-items:center;gap:5px}.type-legend i{width:7px;height:7px;border-radius:50%;background:#87969a}.type-legend b{color:var(--c-text-2)}.type-post{background:#77a8ff!important}.type-moment{background:#ff7187!important}.type-album{background:#f1bd55!important}.type-photo{background:#d890e6!important}.type-place{background:#57d7a0!important}.type-library{background:#a992ff!important}.type-journey{background:#ff9564!important}.candidate-list{display:grid;gap:7px}.candidate-list article{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.candidate-list article>div{display:flex;min-width:0;flex-direction:column}.candidate-list small{color:var(--c-primary);font-size:.55rem}.candidate-list strong{display:flex;align-items:center;gap:7px;margin-top:3px;color:var(--c-text);font-size:.72rem}.candidate-list p{margin:3px 0 0;color:var(--c-text-3);font-size:.58rem}.candidate-list article>span{display:flex;gap:6px}.candidate-list button,.relation-list button{display:flex;align-items:center;gap:4px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--c-text-2);cursor:pointer;font:inherit;font-size:.6rem}.candidate-list button.accept{border-color:color-mix(in srgb,#45a87b 40%,var(--border));color:#45a87b}.advanced-section{border-block:1px solid var(--border)}.advanced-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;padding:14px 2px;border:0;background:transparent;color:var(--c-text);cursor:pointer;font:inherit;text-align:left}.advanced-toggle>span{display:flex;align-items:center;gap:9px}.advanced-toggle>span>svg{color:var(--c-text-3)}.advanced-toggle div{display:flex;flex-direction:column}.advanced-toggle strong{font-size:.72rem}.advanced-toggle small{margin-top:2px;color:var(--c-text-3);font-size:.57rem}.advanced-toggle>.rotated{transform:rotate(180deg)}.advanced-body{padding:0 0 14px}.filters{display:flex;gap:8px}.filters .ant-input-affix-wrapper{max-width:260px}.filters .ant-select{min-width:130px}.relation-list{margin-top:10px}.relation-list article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 2px;border-top:1px solid var(--border)}.relation-list article.hidden{opacity:.5}.relation-list article>div{display:flex;min-width:0;flex-direction:column}.relation-list strong{display:flex;align-items:center;gap:6px;color:var(--c-text-2);font-size:.67rem}.relation-list small{margin-top:2px;color:var(--c-text-3);font-size:.55rem}.issue-list{display:grid;gap:6px}.issue-list>a{display:grid;grid-template-columns:34px 1fr 18px;align-items:center;gap:9px;padding:8px;border:1px solid var(--border);border-radius:7px;color:var(--c-text);text-decoration:none}.issue-list>a>span{display:grid;width:34px;height:34px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.issue-list div{display:flex;flex-direction:column}.issue-list small{color:var(--c-text-3);font-size:.55rem}.issue-list strong{font-size:.68rem}.advanced-enter-active,.advanced-leave-active{transition:opacity .2s ease,transform .22s ease}.advanced-enter-from,.advanced-leave-to{opacity:0;transform:translateY(-5px)}
-@media(max-width:900px){.metrics{grid-template-columns:repeat(2,1fr)}.health-grid{grid-template-columns:1fr}.preview-shell{height:330px}}@media(max-width:640px){.page-header{align-items:flex-start;flex-direction:column}.header-actions{width:100%}.header-actions>*{flex:1;justify-content:center}.status-band{grid-template-columns:10px 1fr}.status-band code{display:none}.metrics{grid-template-columns:1fr 1fr}.candidate-list article{align-items:flex-start;flex-direction:column}.candidate-list article>span{width:100%;justify-content:flex-end}.filters{align-items:stretch;flex-direction:column}.filters .ant-input-affix-wrapper,.filters .ant-select{width:100%;max-width:none}.preview-shell{height:280px}.title-block p{line-height:1.55}}
+.constellation-admin { display:flex; width:min(1160px,100%); flex-direction:column; gap:20px; margin:0 auto; padding-bottom:36px; }
+.page-header { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+.title-block { display:flex; align-items:center; gap:12px; }.title-icon { display:grid; width:46px; height:46px; border:1px solid color-mix(in srgb,var(--c-primary) 28%,var(--border)); border-radius:12px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.25rem; place-items:center; }
+.title-block small,.section-head small,.automation-card div>small { color:var(--c-primary); font-size:.54rem; letter-spacing:.15em; }.title-block h1 { margin:2px 0 0; color:var(--c-text); font-size:1.38rem; }.title-block p { margin:4px 0 0; color:var(--c-text-3); font-size:.7rem; }
+.preview-link { display:flex; height:34px; align-items:center; gap:6px; padding:0 12px; border:1px solid var(--border); border-radius:8px; color:var(--c-text-2); font-size:.69rem; text-decoration:none; transition:.2s; }.preview-link:hover { border-color:color-mix(in srgb,var(--c-primary) 36%,var(--border)); color:var(--c-primary); }
+.automation-card { position:relative; display:grid; grid-template-columns:54px minmax(0,1fr) auto; align-items:center; gap:14px; overflow:hidden; padding:18px; border:1px solid color-mix(in srgb,var(--c-primary) 25%,var(--border)); border-radius:12px; background:linear-gradient(135deg,color-mix(in srgb,var(--c-primary) 8%,var(--ld-bg-card)),var(--ld-bg-card)); }.automation-card::after { position:absolute; top:-80px; right:12%; width:180px; height:180px; border:1px dashed color-mix(in srgb,var(--c-primary) 16%,transparent); border-radius:50%; content:''; animation:orbit 22s linear infinite; }
+.automation-orb { position:relative; z-index:1; display:grid; width:52px; height:52px; border-radius:50%; background:radial-gradient(circle at 35% 28%,#9edaff,var(--c-primary) 42%,#174b78); box-shadow:inset -9px -8px 18px rgb(2 18 38/.3),0 0 24px color-mix(in srgb,var(--c-primary) 28%,transparent); color:#fff; place-items:center; }.automation-orb i { position:absolute; width:66px; height:20px; border:1px solid color-mix(in srgb,var(--c-primary) 52%,transparent); border-radius:50%; transform:rotate(-14deg); }
+.automation-card div { position:relative; z-index:1; display:flex; flex-direction:column; }.automation-card strong { margin-top:3px; color:var(--c-text); font-size:.86rem; }.automation-card p { max-width:720px; margin:5px 0 0; color:var(--c-text-3); font-size:.63rem; line-height:1.65; }.sync-time { position:relative; z-index:1; display:flex; align-items:center; gap:6px; color:var(--c-text-3); font-size:.57rem; }.sync-time i { width:6px; height:6px; border-radius:50%; background:#46c78b; box-shadow:0 0 0 4px rgb(70 199 139/.1); }
+.metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }.metrics article { display:grid; min-height:88px; grid-template-columns:40px 1fr; align-items:center; gap:10px; padding:14px; border:1px solid var(--border); border-radius:10px; background:var(--ld-bg-card); }.metrics article>span { display:grid; width:40px; height:40px; border-radius:9px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.05rem; place-items:center; }.metrics article>div { display:flex; flex-direction:column; }.metrics strong { color:var(--c-text); font-size:1.18rem; font-variant-numeric:tabular-nums; }.metrics small { color:var(--c-text-3); font-size:.6rem; }.metrics em { grid-column:2; color:var(--c-text-3); font-size:.54rem; font-style:normal; }
+.health-section,.preview-section { display:flex; flex-direction:column; gap:11px; }.section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }.section-head h2 { margin:3px 0 0; color:var(--c-text); font-size:1rem; }.section-head>span { color:var(--c-text-3); font-size:.67rem; }.section-intro { margin:-5px 0 0; color:var(--c-text-3); font-size:.59rem; }
+.health-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }.health-grid article { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:10px; padding:13px; border:1px solid color-mix(in srgb,#d48655 24%,var(--border)); border-radius:9px; background:var(--ld-bg-card); }.health-grid article>span { display:grid; width:36px; height:36px; border-radius:8px; background:color-mix(in srgb,#d48655 10%,var(--c-bg-2)); color:#c77748; place-items:center; }.health-grid article>div { display:flex; min-width:0; flex-direction:column; }.health-grid strong { color:var(--c-text); font-size:.7rem; }.health-grid p { margin:3px 0 0; color:var(--c-text-3); font-size:.56rem; }.health-grid button { border:0; background:none; color:var(--c-primary); cursor:pointer; font:inherit; font-size:.59rem; }.health-grid article.clear { border-color:var(--border); }.health-grid article.clear>span { background:color-mix(in srgb,#45a87b 9%,var(--c-bg-2)); color:#45a87b; }.clear-icon { color:#45a87b; }
+.preview-shell { height:400px; overflow:hidden; border:1px solid var(--border); border-radius:10px; background:#06111f; }.preview-shell :deep(.graph-preview) { height:100%; min-height:0; border:0; }.selected-memory { display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); color:var(--c-primary); }.selected-memory>span { display:flex; min-width:0; flex:1; flex-direction:column; }.selected-memory small { color:var(--c-text-3); font-size:.53rem; }.selected-memory strong { overflow:hidden; color:var(--c-text); font-size:.66rem; text-overflow:ellipsis; white-space:nowrap; }.selected-memory button { border:0; background:none; color:var(--c-text-3); cursor:pointer; }
+.recovery-panel { border-block:1px solid var(--border); }.recovery-panel summary { display:flex; align-items:center; justify-content:space-between; padding:14px 2px; color:var(--c-text); cursor:pointer; list-style:none; }.recovery-panel summary>span { display:grid; grid-template-columns:20px 1fr; align-items:center; gap:2px 7px; }.recovery-panel summary>span>svg { grid-row:1/3; color:var(--c-text-3); }.recovery-panel summary b { font-size:.7rem; }.recovery-panel summary small { color:var(--c-text-3); font-size:.55rem; }.recovery-panel[open] summary>svg { transform:rotate(180deg); }.recovery-panel>div { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 2px 14px; }.recovery-panel p { margin:0; color:var(--c-text-3); font-size:.59rem; }
+.issue-list { display:grid; gap:7px; }.issue-list>a { display:grid; grid-template-columns:34px 1fr 18px; align-items:center; gap:9px; padding:9px; border:1px solid var(--border); border-radius:8px; color:var(--c-text); text-decoration:none; }.issue-list>a>span { display:grid; width:34px; height:34px; border-radius:7px; background:var(--c-primary-soft); color:var(--c-primary); place-items:center; }.issue-list div { display:flex; min-width:0; flex-direction:column; }.issue-list small { color:var(--c-text-3); font-size:.54rem; }.issue-list strong { overflow:hidden; font-size:.66rem; text-overflow:ellipsis; white-space:nowrap; }
+@keyframes orbit { to { transform:rotate(360deg); } }
+@media(max-width:900px) { .metrics { grid-template-columns:repeat(2,1fr); }.health-grid { grid-template-columns:1fr; } }
+@media(max-width:620px) { .page-header { align-items:flex-start; flex-direction:column; }.automation-card { grid-template-columns:48px 1fr; }.sync-time { grid-column:1/-1; }.metrics { grid-template-columns:1fr 1fr; }.recovery-panel>div { align-items:flex-start; flex-direction:column; } }
+@media(prefers-reduced-motion:reduce) { .automation-card::after { animation:none; } }
 </style>

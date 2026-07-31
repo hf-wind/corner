@@ -1,7 +1,8 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class MemoryGraphQueryDto {
+  @IsOptional() @IsIn(['all', 'constellation']) view?: 'all' | 'constellation';
   @IsOptional() @IsString() types?: string;
   @IsOptional() @IsString() search?: string;
   @IsOptional()

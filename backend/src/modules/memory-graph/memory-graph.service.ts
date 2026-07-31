@@ -18,6 +18,16 @@ import type {
 
 const GRAPH_CACHE_TTL = 300;
 const MAX_TAG_NEIGHBORS = 3;
+const MEMORY_WINDOW_DAYS = 14;
+const JOURNEY_GAP_DAYS = 4;
+const JOURNEY_DISTANCE_KM = 30;
+const SOURCE_NODE_TYPES = new Set([
+  'post',
+  'moment',
+  'album',
+  'photo',
+  'library',
+]);
 
 type GraphPlace = Pick<
   Place,
@@ -63,6 +73,13 @@ type MemoryGraphResult = {
   relations: Array<
     Prisma.MemoryRelationGetPayload<{ select: typeof graphRelationSelect }>
   >;
+};
+
+type MemoryCluster = {
+  id: string;
+  key: string;
+  members: MemoryNodeInput[];
+  place: GraphPlace | null;
 };
 
 @Injectable()
@@ -165,6 +182,28 @@ export class MemoryGraphService implements OnModuleInit {
     if (typeof value !== 'string' && typeof value !== 'number') return null;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private dayBucket(date: Date, days = MEMORY_WINDOW_DAYS) {
+    return Math.floor(date.getTime() / (days * 86400000));
+  }
+
+  private dateLabel(date: Date) {
+    return `${date.getUTCFullYear()}年${date.getUTCMonth() + 1}月`;
+  }
+
+  private distanceKm(a: GraphPlace, b: GraphPlace) {
+    const radians = (value: number) => (value * Math.PI) / 180;
+    const latitudeDelta = radians(b.latitude - a.latitude);
+    const longitudeDelta = radians(b.longitude - a.longitude);
+    const latitudeA = radians(a.latitude);
+    const latitudeB = radians(b.latitude);
+    const value =
+      Math.sin(latitudeDelta / 2) ** 2 +
+      Math.cos(latitudeA) *
+        Math.cos(latitudeB) *
+        Math.sin(longitudeDelta / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
   }
 
   private snapshotTags(value: unknown): GraphTag[] | null {
@@ -292,9 +331,14 @@ export class MemoryGraphService implements OnModuleInit {
       const tags =
         this.snapshotTags(snapshot?.tags) ?? post.tags.map((item) => item.tag);
       const snapshotSlug = this.stringValue(snapshot?.slug);
-      const visibility = this.stringValue(snapshot?.locationVisibility) || post.locationVisibility;
+      const visibility =
+        this.stringValue(snapshot?.locationVisibility) ||
+        post.locationVisibility;
       const place = this.snapshotPlace(snapshot?.place) || post.place;
-      const placeId = visibility === 'private' ? null : String(place?.id || post.placeId || '') || null;
+      const placeId =
+        visibility === 'private'
+          ? null
+          : String(place?.id || post.placeId || '') || null;
       addNode(
         this.node({
           id,
@@ -305,12 +349,19 @@ export class MemoryGraphService implements OnModuleInit {
           excerpt: this.cleanText(snapshot?.excerpt || snapshot?.content),
           href: `/article/${snapshotSlug || post.slug}`,
           image: this.stringValue(snapshot?.coverImage) || post.coverImage,
-          occurredAt: this.dateValue(snapshot?.occurredAt) || post.occurredAt || post.publishedAt || post.createdAt,
+          occurredAt:
+            this.dateValue(snapshot?.occurredAt) ||
+            post.occurredAt ||
+            post.publishedAt ||
+            post.createdAt,
           placeId,
           metadata: {
             featured: post.featured,
+            hasLocation: !!place,
             locationVisibility: visibility,
-            locationPrecision: this.stringValue(snapshot?.locationPrecision) || post.locationPrecision,
+            locationPrecision:
+              this.stringValue(snapshot?.locationPrecision) ||
+              post.locationPrecision,
             tags: tags.map((tag) => ({
               id: tag.id,
               name: tag.name,
@@ -350,6 +401,7 @@ export class MemoryGraphService implements OnModuleInit {
             moment.publishedAt,
           placeId,
           metadata: {
+            hasLocation: !!place,
             locationVisibility: visibility,
             locationPrecision:
               this.stringValue(snapshot?.locationPrecision) ||
@@ -377,6 +429,7 @@ export class MemoryGraphService implements OnModuleInit {
           placeId: albumVisible ? album.placeId : null,
           metadata: {
             photoCount: album.items.length,
+            hasLocation: !!album.place,
             locationVisibility: album.locationVisibility,
           },
         }),
@@ -401,10 +454,11 @@ export class MemoryGraphService implements OnModuleInit {
               item.happenedAt ||
               item.media.metadata?.confirmedCapturedAt ||
               item.media.metadata?.capturedAt,
-            placeId: itemVisible ? item.placeId : null,
+            placeId: itemVisible ? itemPlace?.id || null : null,
             metadata: {
               albumId: album.id,
               albumTitle: album.title,
+              hasLocation: !!itemPlace,
               width: item.media.metadata?.width,
               height: item.media.metadata?.height,
             },
@@ -446,10 +500,15 @@ export class MemoryGraphService implements OnModuleInit {
           excerpt: this.cleanText(item.reflection || item.summary),
           href: `/library/${item.slug}`,
           image: item.coverImage,
-          occurredAt: item.finishDate || item.startDate || item.publishedAt || item.createdAt,
+          occurredAt:
+            item.finishDate ||
+            item.startDate ||
+            item.publishedAt ||
+            item.createdAt,
           placeId: visible ? item.placeId : null,
           metadata: {
             libraryType: item.type,
+            hasLocation: !!item.place,
             creator: item.creator,
             rating: item.rating,
             genres: item.genres,
@@ -585,7 +644,7 @@ export class MemoryGraphService implements OnModuleInit {
       }
     }
     const timed = [...nodes.values()]
-      .filter((item) => item.occurredAt)
+      .filter((item) => item.occurredAt && item.type !== 'place')
       .sort((a, b) => a.occurredAt!.getTime() - b.occurredAt!.getTime());
     for (let i = 1; i < timed.length; i += 1) {
       const days = Math.round(
@@ -603,6 +662,292 @@ export class MemoryGraphService implements OnModuleInit {
           ),
         );
     }
+
+    const clustersByKey = new Map<string, MemoryNodeInput[]>();
+    const memberClusterIds = new Map<string, string>();
+    for (const item of nodes.values()) {
+      if (!SOURCE_NODE_TYPES.has(item.type)) continue;
+      const metadata = item.metadata;
+      const albumId = this.stringValue(metadata.albumId);
+      const key =
+        item.type === 'album'
+          ? `album:${item.sourceId}`
+          : albumId
+            ? `album:${albumId}`
+            : item.occurredAt && item.placeId
+              ? `place:${item.placeId}:${this.dayBucket(item.occurredAt)}`
+              : `single:${item.id}`;
+      const values = clustersByKey.get(key) || [];
+      values.push(item);
+      clustersByKey.set(key, values);
+    }
+
+    const memoryClusters: MemoryCluster[] = [];
+    for (const [key, unorderedMembers] of clustersByKey) {
+      const members = [...unorderedMembers].sort((a, b) => {
+        const time =
+          (a.occurredAt?.getTime() || 0) - (b.occurredAt?.getTime() || 0);
+        return time || a.id.localeCompare(b.id);
+      });
+      const first = members[0];
+      const locatedMember = members.find(
+        (item) => item.placeId && publicPlaces.has(item.placeId),
+      );
+      const place = locatedMember?.placeId
+        ? publicPlaces.get(locatedMember.placeId) || null
+        : null;
+      const occurredAt =
+        members.find((item) => item.occurredAt)?.occurredAt || null;
+      const album = members.find((item) => item.type === 'album');
+      const title =
+        album?.title ||
+        (members.length === 1
+          ? first.title
+          : place && occurredAt
+            ? `${place.name} · ${this.dateLabel(occurredAt)}`
+            : occurredAt
+              ? `${this.dateLabel(occurredAt)} · 时光切片`
+              : first.title);
+      const image = members.find((item) => item.image)?.image || null;
+      const id = `memory:${this.hash(key).slice(0, 32)}`;
+      const sourceTypes = [...new Set(members.map((item) => item.type))];
+      const memory = this.node({
+        id,
+        type: 'memory',
+        sourceId: this.hash(key).slice(0, 40),
+        title,
+        slug: null,
+        excerpt:
+          members.length === 1
+            ? first.excerpt
+            : `由 ${members.length} 段真实内容自动汇聚的时光记忆`,
+        href: members.length === 1 ? first.href : '',
+        image,
+        occurredAt,
+        placeId: place?.id || null,
+        metadata: {
+          automatic: true,
+          memberCount: members.length,
+          memberIds: members.map((item) => item.id),
+          sourceTypes,
+          placeName: place?.name || null,
+        },
+      });
+      addNode(memory);
+      memoryClusters.push({ id, key, members, place });
+      for (const member of members) {
+        memberClusterIds.set(member.id, id);
+        addRelation(
+          this.relation(id, member.id, 'contains', { automatic: true }, 1),
+        );
+      }
+    }
+
+    const clusterRelations = [...relations.values()];
+    for (const value of clusterRelations) {
+      const sourceCluster = memberClusterIds.get(value.sourceId);
+      const targetCluster = memberClusterIds.get(value.targetId);
+      if (sourceCluster && targetCluster && sourceCluster !== targetCluster) {
+        addRelation(
+          this.relation(
+            sourceCluster,
+            targetCluster,
+            value.type,
+            {
+              automatic: true,
+              derivedFrom: value.type,
+            },
+            value.weight,
+          ),
+        );
+      } else if (
+        sourceCluster &&
+        nodes.get(value.targetId)?.type === 'journey'
+      ) {
+        addRelation(
+          this.relation(
+            sourceCluster,
+            value.targetId,
+            value.type,
+            {
+              automatic: true,
+              derivedFrom: value.type,
+            },
+            value.weight,
+          ),
+        );
+      } else if (
+        targetCluster &&
+        nodes.get(value.sourceId)?.type === 'journey'
+      ) {
+        addRelation(
+          this.relation(
+            value.sourceId,
+            targetCluster,
+            value.type,
+            {
+              automatic: true,
+              derivedFrom: value.type,
+            },
+            value.weight,
+          ),
+        );
+      }
+    }
+
+    const timedClusters = memoryClusters
+      .filter((cluster) => cluster.members.some((item) => item.occurredAt))
+      .sort(
+        (a, b) =>
+          a.members.find((item) => item.occurredAt)!.occurredAt!.getTime() -
+          b.members.find((item) => item.occurredAt)!.occurredAt!.getTime(),
+      );
+    for (let index = 1; index < timedClusters.length; index += 1) {
+      const previous = timedClusters[index - 1];
+      const current = timedClusters[index];
+      const previousTime = previous.members.find(
+        (item) => item.occurredAt,
+      )!.occurredAt!;
+      const currentTime = current.members.find(
+        (item) => item.occurredAt,
+      )!.occurredAt!;
+      const days = Math.round(
+        (currentTime.getTime() - previousTime.getTime()) / 86400000,
+      );
+      if (days <= 45) {
+        addRelation(
+          this.relation(
+            previous.id,
+            current.id,
+            'time_adjacent',
+            {
+              automatic: true,
+              days,
+            },
+            Math.max(0.4, 0.78 - days / 120),
+          ),
+        );
+      }
+    }
+
+    const locatedClusters = timedClusters.filter((cluster) => cluster.place);
+    const automaticJourneys: MemoryNodeInput[] = [];
+    let route: MemoryCluster[] = [];
+    const commitRoute = () => {
+      const uniquePlaces = new Set(route.map((cluster) => cluster.place!.id));
+      if (route.length < 2 || uniquePlaces.size < 2) {
+        route = [];
+        return;
+      }
+      let farthest: [MemoryCluster, MemoryCluster] = [
+        route[0],
+        route[route.length - 1],
+      ];
+      let maxDistance = 0;
+      for (let sourceIndex = 0; sourceIndex < route.length; sourceIndex += 1) {
+        for (
+          let targetIndex = sourceIndex + 1;
+          targetIndex < route.length;
+          targetIndex += 1
+        ) {
+          const distance = this.distanceKm(
+            route[sourceIndex].place!,
+            route[targetIndex].place!,
+          );
+          if (distance > maxDistance) {
+            maxDistance = distance;
+            farthest = [route[sourceIndex], route[targetIndex]];
+          }
+        }
+      }
+      if (maxDistance < JOURNEY_DISTANCE_KM) {
+        route = [];
+        return;
+      }
+      const first = route[0];
+      const last = route[route.length - 1];
+      const routeKey = `${first.id}|${last.id}`;
+      const id = `auto-journey:${this.hash(routeKey).slice(0, 27)}`;
+      const occurredAt = first.members.find(
+        (item) => item.occurredAt,
+      )!.occurredAt!;
+      const endedAt = last.members.find((item) => item.occurredAt)!.occurredAt!;
+      const journey = this.node({
+        id,
+        type: 'journey',
+        sourceId: this.hash(routeKey).slice(0, 40),
+        title: `${farthest[0].place!.name} → ${farthest[1].place!.name}`,
+        slug: null,
+        excerpt: `系统根据 ${route.length} 段带位置的连续记忆自动识别`,
+        href: '',
+        image:
+          route.flatMap((cluster) => cluster.members).find((item) => item.image)
+            ?.image || null,
+        occurredAt,
+        placeId: first.place!.id,
+        metadata: {
+          automatic: true,
+          route: true,
+          memoryIds: route.map((cluster) => cluster.id),
+          stopCount: uniquePlaces.size,
+          endedAt: endedAt.toISOString(),
+        },
+      });
+      addNode(journey);
+      automaticJourneys.push(journey);
+      route.forEach((cluster, index) => {
+        addRelation(
+          this.relation(
+            id,
+            cluster.id,
+            'same_journey',
+            {
+              automatic: true,
+              sort: index,
+            },
+            0.94,
+          ),
+        );
+        if (index) {
+          addRelation(
+            this.relation(
+              route[index - 1].id,
+              cluster.id,
+              'journey_sequence',
+              {
+                automatic: true,
+                journeyId: id,
+                from: index - 1,
+                to: index,
+              },
+              0.9,
+            ),
+          );
+        }
+      });
+      route = [];
+    };
+    for (const cluster of locatedClusters) {
+      if (!route.length) {
+        route = [cluster];
+        continue;
+      }
+      const previous = route[route.length - 1];
+      const previousTime = previous.members.find(
+        (item) => item.occurredAt,
+      )!.occurredAt!;
+      const currentTime = cluster.members.find(
+        (item) => item.occurredAt,
+      )!.occurredAt!;
+      const gapDays =
+        (currentTime.getTime() - previousTime.getTime()) / 86400000;
+      if (gapDays <= JOURNEY_GAP_DAYS) route.push(cluster);
+      else {
+        commitRoute();
+        route = [cluster];
+      }
+    }
+    commitRoute();
 
     await this.prisma.$transaction(async (tx) => {
       const nodeIds = [...nodes.keys()];
@@ -643,7 +988,12 @@ export class MemoryGraphService implements OnModuleInit {
       }
     });
     await this.invalidate();
-    return { nodes: nodes.size, relations: relations.size };
+    return {
+      nodes: nodes.size,
+      relations: relations.size,
+      memories: memoryClusters.length,
+      automaticJourneys: automaticJourneys.length,
+    };
   }
 
   async graph(query: MemoryGraphQueryDto = {}) {
@@ -654,8 +1004,9 @@ export class MemoryGraphService implements OnModuleInit {
       .sort();
     const search = String(query.search || '').trim();
     const limit = Math.min(query.limit || 300, 500);
+    const view = query.view || 'all';
     const version = await this.graphVersion();
-    const cacheKey = `corner:memory-graph:${version}:${this.hash({ types, search, year: query.year, limit }).slice(0, 16)}`;
+    const cacheKey = `corner:memory-graph:${version}:${this.hash({ view, types, search, year: query.year, limit }).slice(0, 16)}`;
     try {
       const cached = await this.redis.getJson<MemoryGraphResult>(cacheKey);
       if (cached) return cached;
@@ -671,7 +1022,11 @@ export class MemoryGraphService implements OnModuleInit {
       : undefined;
     const nodes = await this.prisma.memoryNode.findMany({
       where: {
-        ...(types.length ? { type: { in: types } } : {}),
+        ...(types.length
+          ? { type: { in: types } }
+          : view === 'constellation'
+            ? { type: { in: ['memory', 'journey'] } }
+            : {}),
         ...(occurredAt ? { occurredAt } : {}),
         ...(search
           ? {
@@ -808,7 +1163,17 @@ export class MemoryGraphService implements OnModuleInit {
   async health() {
     const [nodes, relations, candidateCount] = await Promise.all([
       this.prisma.memoryNode.findMany({
-        select: { id: true, type: true, title: true, href: true, occurredAt: true, image: true, placeId: true },
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          href: true,
+          occurredAt: true,
+          image: true,
+          placeId: true,
+          metadata: true,
+          updatedAt: true,
+        },
         orderBy: { updatedAt: 'desc' },
       }),
       this.prisma.memoryRelation.findMany({
@@ -817,23 +1182,66 @@ export class MemoryGraphService implements OnModuleInit {
       }),
       this.prisma.memoryRelation.count({ where: { status: 'candidate' } }),
     ]);
-    const connected = new Set(relations.flatMap((relation) => [relation.sourceId, relation.targetId]));
-    const isolated = nodes.filter((node) => !connected.has(node.id));
-    const missingTime = nodes.filter((node) => node.type !== 'place' && !node.occurredAt);
-    const visualTypes = new Set(['post', 'album', 'photo', 'library', 'journey']);
-    const missingImage = nodes.filter((node) => visualTypes.has(node.type) && !node.image);
+    const sourceNodes = nodes.filter((node) =>
+      SOURCE_NODE_TYPES.has(node.type),
+    );
+    const memories = nodes.filter((node) => node.type === 'memory');
+    const automaticJourneys = nodes.filter(
+      (node) =>
+        node.type === 'journey' &&
+        this.record(node.metadata)?.automatic === true,
+    );
+    const connected = new Set(
+      relations.flatMap((relation) => [relation.sourceId, relation.targetId]),
+    );
+    const isolated = sourceNodes.filter((node) => !connected.has(node.id));
+    const missingTime = sourceNodes.filter((node) => !node.occurredAt);
+    const missingLocation = sourceNodes.filter(
+      (node) => this.record(node.metadata)?.hasLocation !== true,
+    );
+    const visualTypes = new Set([
+      'post',
+      'album',
+      'photo',
+      'library',
+      'journey',
+    ]);
+    const missingImage = sourceNodes.filter(
+      (node) => visualTypes.has(node.type) && !node.image,
+    );
     const byType = nodes.reduce<Record<string, number>>((all, node) => {
       all[node.type] = (all[node.type] || 0) + 1;
       return all;
     }, {});
-    const compact = (items: typeof nodes) => items.slice(0, 8).map(({ id, type, title, href }) => ({ id, type, title, href }));
+    const compact = (items: typeof nodes) =>
+      items
+        .slice(0, 8)
+        .map(({ id, type, title, href }) => ({ id, type, title, href }));
     return {
-      totals: { nodes: nodes.length, relations: relations.length, candidates: candidateCount },
+      totals: {
+        nodes: sourceNodes.length,
+        memories: memories.length,
+        journeys: automaticJourneys.length,
+        relations: relations.length,
+        candidates: candidateCount,
+      },
       byType,
+      automation: {
+        status: 'running',
+        lastBuiltAt: nodes[0]?.updatedAt || null,
+        sources: ['post', 'moment', 'album', 'photo', 'library'],
+      },
       issues: {
         isolated: { count: isolated.length, items: compact(isolated) },
         missingTime: { count: missingTime.length, items: compact(missingTime) },
-        missingImage: { count: missingImage.length, items: compact(missingImage) },
+        missingLocation: {
+          count: missingLocation.length,
+          items: compact(missingLocation),
+        },
+        missingImage: {
+          count: missingImage.length,
+          items: compact(missingImage),
+        },
       },
     };
   }

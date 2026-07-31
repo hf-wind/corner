@@ -83,7 +83,7 @@ const statItems = computed(() => [
 onMounted(async () => {
   await Promise.allSettled([
     loadSiteSettings(),
-    api.get<any>('/memories/graph',{limit:320}).then(result=>Object.assign(graph,result)),
+    api.get<any>('/memories/graph',{view:'constellation',limit:320}).then(result=>Object.assign(graph,result)),
     api.get<any>('/stats/overview').then(result=>Object.assign(overview,result)),
   ])
   graphLoaded.value = true
@@ -91,7 +91,7 @@ onMounted(async () => {
 
 function formatNumber(value:number){return new Intl.NumberFormat('zh-CN',{notation:value>=10000?'compact':'standard',maximumFractionDigits:1}).format(value||0)}
 function formatDate(value?:string|null){return value?new Date(value).toLocaleDateString('zh-CN',{year:'numeric',month:'short'}):'未标时间'}
-function nodeIcon(type:string){return ({post:'ph:article-bold',moment:'ph:sparkle-bold',album:'ph:images-square-bold',photo:'ph:image-bold',place:'ph:map-pin-bold',library:'ph:books-bold',journey:'ph:path-bold'} as Record<string,string>)[type]||'ph:star-four-bold'}
+function nodeIcon(type:string){return ({memory:'ph:planet-bold',journey:'ph:path-bold'} as Record<string,string>)[type]||'ph:star-four-bold'}
 function go(path:string){if(leaving.value)return;leaving.value=true;window.setTimeout(()=>void router.push(path),window.matchMedia('(prefers-reduced-motion:reduce)').matches?0:420)}
 function fallbackStar(index:number){const seed=(index*47)%100;return{left:`${(seed*13)%100}%`,top:`${(seed*29)%100}%`,animationDelay:`${index*.13}s`}}
 useHead({title:computed(()=>siteTitle.value)})

@@ -1,4 +1,16 @@
-import { Controller, Delete, Get, NotFoundException, Param, Post, Put, Query, Body, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Put,
+  Query,
+  Body,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -6,7 +18,10 @@ import { RolesGuard } from '../auth/roles.guard';
 import { MomentService } from '../moment/moment.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { PlaceQueryDto } from './dto/place-query.dto';
-import { ProviderReverseQueryDto, ProviderSearchQueryDto } from './dto/provider-place-query.dto';
+import {
+  ProviderReverseQueryDto,
+  ProviderSearchQueryDto,
+} from './dto/provider-place-query.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { PlaceService } from './place.service';
 
@@ -41,7 +56,11 @@ export class PlaceController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':slug/memories')
-  findMemories(@Param('slug') slug: string, @Query() query: PlaceQueryDto, @Req() req: any) {
+  findMemories(
+    @Param('slug') slug: string,
+    @Query() query: PlaceQueryDto,
+    @Req() req: any,
+  ) {
     return this.moment.findAll(
       { page: query.page, limit: query.limit, place: slug, sort: 'latest' },
       req.user?.id,
@@ -56,6 +75,13 @@ export class PlaceController {
     const place = result.items.find((item) => item.slug === slug);
     if (!place) throw new NotFoundException('地点不存在或暂无公开内容');
     return place;
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post('resolve')
+  resolve(@Body() dto: CreatePlaceDto) {
+    return this.place.resolve(dto);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
