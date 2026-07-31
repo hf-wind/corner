@@ -2,6 +2,7 @@ import type { MemoryMapCluster, MemoryMapItem } from '~/types/memory-map'
 
 export type MapBounds = { west: number; south: number; east: number; north: number }
 export type MapMarkerItem = MemoryMapItem | MemoryMapCluster
+export type MapInitialView = { longitude: number; latitude: number; zoom: number }
 
 function normalizeLongitude(value: number) {
   if (!Number.isFinite(value)) return 0
@@ -10,7 +11,7 @@ function normalizeLongitude(value: number) {
 }
 
 export interface MapAdapter {
-  mount(container: HTMLElement): Promise<void>
+  mount(container: HTMLElement, initialView?: MapInitialView): Promise<void>
   destroy(): void
   bounds(): MapBounds
   zoom(): number
@@ -79,33 +80,52 @@ function markerHtml(item: MapMarkerItem, selected: boolean) {
     return `<button class="corner-map-cluster${selected ? ' selected' : ''}" type="button"><strong>${item.count}</strong><span>处记忆</span></button>`
   }
   const icon = item.type === 'moment' ? '✦' : item.type === 'album' ? '▣' : '●'
-  return `<button class="corner-map-marker ${item.type}${selected ? ' selected' : ''}" type="button"><span>${icon}</span></button>`
+  const image = item.thumbnail
+    ? `<img src="${escapeHtml(item.thumbnail)}" alt="" loading="lazy">`
+    : `<span>${icon}</span>`
+  return `<button class="corner-map-marker ${item.type}${item.thumbnail ? ' has-image' : ''}${selected ? ' selected' : ''}" type="button">${image}</button>`
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] || character)
 }
 
 export class AmapAdapter implements MapAdapter {
   private AMap: any
   private map: any
   private markers: any[] = []
+  private themeObserver: MutationObserver | null = null
   private viewHandler: () => void = () => undefined
   private selectHandler: (item: MapMarkerItem) => void = () => undefined
 
-  async mount(container: HTMLElement) {
+  async mount(container: HTMLElement, initialView?: MapInitialView) {
     this.AMap = await loadAmap()
     this.map = new this.AMap.Map(container, {
-      zoom: 5,
-      center: [104.2, 35.8],
-      mapStyle: document.documentElement.classList.contains('dark') ? 'amap://styles/darkblue' : 'amap://styles/whitesmoke',
+      zoom: initialView?.zoom ?? 5,
+      center: [initialView?.longitude ?? 104.2, initialView?.latitude ?? 35.8],
+      mapStyle: this.mapStyle(),
       viewMode: '2D',
+      animateEnable: false,
       showLabel: true,
     })
     this.map.on('moveend', () => this.viewHandler())
     this.map.on('zoomend', () => this.viewHandler())
+    this.themeObserver = new MutationObserver(() => this.map?.setMapStyle?.(this.mapStyle()))
+    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
   }
 
   destroy() {
     this.markers = []
+    this.themeObserver?.disconnect()
+    this.themeObserver = null
     this.map?.destroy()
     this.map = null
+  }
+
+  private mapStyle() {
+    return document.documentElement.classList.contains('dark')
+      ? 'amap://styles/darkblue'
+      : 'amap://styles/whitesmoke'
   }
 
   bounds(): MapBounds {
@@ -140,12 +160,24 @@ export class AmapAdapter implements MapAdapter {
 
   setItems(items: MapMarkerItem[], selectedId?: string) {
     if (this.markers.length) this.map.remove(this.markers)
+    const samePositionCounts = new Map<string, number>()
+    const samePositionIndexes = new Map<string, number>()
+    for (const item of items) {
+      const key = `${item.longitude.toFixed(6)}:${item.latitude.toFixed(6)}`
+      samePositionCounts.set(key, (samePositionCounts.get(key) || 0) + 1)
+    }
     this.markers = items.map((item) => {
+      const positionKey = `${item.longitude.toFixed(6)}:${item.latitude.toFixed(6)}`
+      const positionCount = samePositionCounts.get(positionKey) || 1
+      const positionIndex = samePositionIndexes.get(positionKey) || 0
+      samePositionIndexes.set(positionKey, positionIndex + 1)
+      const angle = positionCount > 1 ? (positionIndex / positionCount) * Math.PI * 2 - Math.PI / 2 : 0
+      const offset = positionCount > 1 ? [Math.cos(angle) * 18, Math.sin(angle) * 18] : [0, 0]
       const marker = new this.AMap.Marker({
         position: [item.longitude, item.latitude],
         content: markerHtml(item, item.id === selectedId),
         anchor: 'center',
-        offset: new this.AMap.Pixel(0, 0),
+        offset: new this.AMap.Pixel(offset[0], offset[1]),
         zIndex: item.id === selectedId ? 300 : item.kind === 'cluster' ? 180 : 120,
       })
       marker.on('click', () => this.selectHandler(item))

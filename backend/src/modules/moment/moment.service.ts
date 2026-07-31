@@ -379,6 +379,7 @@ export class MomentService {
         type: 'moment' as const,
         title: moment.title,
         excerpt: moment.excerpt,
+        thumbnail: firstMomentImage(moment.content),
         occurredAt: moment.happenedAt || moment.publishedAt,
         href: `/moments?focus=${encodeURIComponent(moment.slug)}`,
         publicLocation: moment.publicLocation,
@@ -679,4 +680,8 @@ export class MomentService {
     const value = location as { latitude?: unknown; longitude?: unknown };
     return Number.isFinite(Number(value.latitude)) && Number.isFinite(Number(value.longitude));
   }
+}
+
+function firstMomentImage(content?: string | null) {
+  return String(content || '').match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1]?.trim() || null;
 }
