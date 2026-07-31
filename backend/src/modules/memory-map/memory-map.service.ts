@@ -40,7 +40,7 @@ export class MemoryMapService {
     this.validateBounds(query);
     const normalized = this.normalizeQuery(query);
     const version = await this.redis.cacheVersion().catch(() => '1');
-    const cacheKey = `corner:memory-map:v1:${version}:${createHash('sha256').update(JSON.stringify(normalized)).digest('hex')}`;
+    const cacheKey = `corner:memory-map:v2:${version}:${createHash('sha256').update(JSON.stringify(normalized)).digest('hex')}`;
     const cached = await this.redis.getJson<any>(cacheKey).catch(() => null);
     if (cached) return cached;
 
@@ -95,7 +95,7 @@ export class MemoryMapService {
 
   private async allPoints(): Promise<MapPoint[]> {
     const version = await this.redis.cacheVersion().catch(() => '1');
-    const cacheKey = `corner:memory-map:v1:${version}:public-points`;
+    const cacheKey = `corner:memory-map:v2:${version}:public-points`;
     const cached = await this.redis.getJson<MapPoint[]>(cacheKey).catch(() => null);
     if (cached) return cached;
     const memories = (await Promise.all([
