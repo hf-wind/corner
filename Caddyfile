@@ -27,7 +27,7 @@ corner.ink {
 		X-Frame-Options "SAMEORIGIN"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-		Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://challenges.cloudflare.com https://cloud.umami.is https://*.amap.com; script-src-elem 'self' https://challenges.cloudflare.com https://cloud.umami.is https://*.amap.com; frame-src https://challenges.cloudflare.com https://cloud.umami.is; connect-src 'self' https://challenges.cloudflare.com https://cloud.umami.is https://gateway.umami.is https://*.amap.com https://*.amap.cn; img-src 'self' data: blob: https:; media-src 'self' blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; worker-src 'self' blob:"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://cloud.umami.is https://*.amap.com; script-src-elem 'self' 'unsafe-inline' https://challenges.cloudflare.com https://cloud.umami.is https://*.amap.com; frame-src https://challenges.cloudflare.com https://cloud.umami.is; connect-src 'self' https://challenges.cloudflare.com https://cloud.umami.is https://gateway.umami.is https://*.amap.com https://*.amap.cn; img-src 'self' data: blob: https:; media-src 'self' blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; worker-src 'self' blob:"
 		-Server
 	}
 

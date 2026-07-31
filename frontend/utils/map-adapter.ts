@@ -3,6 +3,12 @@ import type { MemoryMapCluster, MemoryMapItem } from '~/types/memory-map'
 export type MapBounds = { west: number; south: number; east: number; north: number }
 export type MapMarkerItem = MemoryMapItem | MemoryMapCluster
 
+function normalizeLongitude(value: number) {
+  if (!Number.isFinite(value)) return 0
+  const normalized = ((value + 180) % 360 + 360) % 360 - 180
+  return normalized === -180 && value > 0 ? 180 : normalized
+}
+
 export interface MapAdapter {
   mount(container: HTMLElement): Promise<void>
   destroy(): void
@@ -106,7 +112,12 @@ export class AmapAdapter implements MapAdapter {
     const bounds = this.map.getBounds()
     const southWest = bounds.getSouthWest()
     const northEast = bounds.getNorthEast()
-    return { west: southWest.lng, south: southWest.lat, east: northEast.lng, north: northEast.lat }
+    return {
+      west: normalizeLongitude(southWest.lng),
+      south: Math.max(-90, Math.min(90, southWest.lat)),
+      east: normalizeLongitude(northEast.lng),
+      north: Math.max(-90, Math.min(90, northEast.lat)),
+    }
   }
 
   zoom() { return this.map.getZoom() }
@@ -121,7 +132,10 @@ export class AmapAdapter implements MapAdapter {
   }
 
   fitBounds(bounds: MapBounds) {
-    this.map.setBounds(new this.AMap.Bounds([bounds.west, bounds.south], [bounds.east, bounds.north]), false, [60, 60, 60, 60])
+    this.map.setBounds(new this.AMap.Bounds(
+      [normalizeLongitude(bounds.west), bounds.south],
+      [normalizeLongitude(bounds.east), bounds.north],
+    ), false, [60, 60, 60, 60])
   }
 
   setItems(items: MapMarkerItem[], selectedId?: string) {
