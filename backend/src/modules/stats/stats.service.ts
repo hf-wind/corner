@@ -7,11 +7,15 @@ export class StatsService {
   constructor(private prisma: PrismaService) {}
 
   async overview() {
-    const [postCount, commentCount, userCount, totalViews] = await Promise.all([
+    const [postCount, commentCount, userCount, totalViews, visitors] = await Promise.all([
       this.prisma.post.count({ where: { status: 'published' } }),
       this.prisma.comment.count({ where: { status: 'approved' } }),
       this.prisma.user.count(),
       this.prisma.post.aggregate({ _sum: { viewCount: true } }),
+      this.prisma.visitStat.groupBy({
+        by: ['ipHash'],
+        where: { ipHash: { not: null } },
+      }),
     ]);
 
     return {
@@ -19,6 +23,7 @@ export class StatsService {
       comments: commentCount,
       users: userCount,
       views: totalViews._sum.viewCount ?? 0,
+      visitors: visitors.length,
     };
   }
 

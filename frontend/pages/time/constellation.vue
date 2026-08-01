@@ -24,10 +24,10 @@
     </section>
 
     <header class="constellation-nav">
-      <NuxtLink to="/" class="brand" title="返回时光门面">
+      <button type="button" class="brand" title="返回时光门面" @click="navigate('/')">
         <img src="/logo_192.png" alt="" width="42" height="42">
         <span><strong>时光星图</strong><small>TIME CONSTELLATION</small></span>
-      </NuxtLink>
+      </button>
       <div class="signal" :class="{ offline: !!error }">
         <i />
         <span>{{ signalText }}</span>
@@ -103,6 +103,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const { mediaUrl } = useMediaUrl()
+const { navigate } = useCosmicNavigation()
 const { selectMemory, clearMemory } = useMemorySelection()
 const graph = reactive<{ nodes: GraphNode[]; relations: GraphRelation[]; graphVersion: string }>({ nodes: [], relations: [], graphVersion: '' })
 const sceneRef = ref<{ resetView: () => void } | null>(null)
@@ -229,18 +230,18 @@ useHead({ title: '时光星图' })
 </script>
 
 <style scoped>
-.constellation-page { position:fixed; z-index:40; inset:0; overflow:hidden; background:#030b18; color:#edf6ff; }
+.constellation-page { position:fixed; z-index:40; inset:0; overflow:hidden; background:#05090c; color:#f4efe4; }
 .constellation-stage { position:absolute; inset:0; overflow:hidden; }
 .constellation-stage :deep(.constellation-scene) { position:absolute; inset:0; }
-.constellation-stage :deep(.graph-preview) { height:100%; min-height:100%; border:0; background:#030b18; }
+.constellation-stage :deep(.graph-preview) { height:100%; min-height:100%; border:0; background:#05090c; }
 .constellation-stage :deep(svg) { width:100%; height:100%; min-height:100%; }
 .constellation-nav { position:absolute; z-index:10; top:20px; right:22px; left:22px; display:flex; align-items:center; justify-content:space-between; pointer-events:none; }
 .brand,.signal { pointer-events:auto; }
-.brand { display:inline-flex; align-items:center; gap:11px; color:#edf6ff; text-decoration:none; }
+.brand { display:inline-flex; align-items:center; gap:11px; padding:0; border:0; background:none; color:#f4efe4; cursor:pointer; font:inherit; text-align:left; }
 .brand img { width:42px; height:42px; border-radius:8px; box-shadow:0 0 26px rgb(73 157 232 / .22); }
 .brand span { display:flex; flex-direction:column; gap:1px; }
 .brand strong { font-size:.82rem; letter-spacing:0; }
-.brand small { color:#78b8ed; font-size:.48rem; letter-spacing:.13em; }
+.brand small { color:#d3a35d; font-size:.48rem; letter-spacing:.13em; }
 .signal { display:flex; align-items:center; gap:8px; color:#8fabc1; font-size:.57rem; }
 .signal>i { width:6px; height:6px; border-radius:50%; background:#62c8e8; box-shadow:0 0 12px #4caee9; }
 .signal.offline>i { background:#8399aa; box-shadow:0 0 10px #55758f; }

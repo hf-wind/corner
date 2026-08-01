@@ -2,7 +2,7 @@ import type { RedisService } from '../../common/redis/redis.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import { MemoryGraphService } from './memory-graph.service';
 
-type UpsertArgs = { create: { id: string } };
+type UpsertArgs = { create: { id: string; coordinateSeed?: number } };
 type RelationFindManyArgs = {
   where?: { hidden?: boolean; status?: string };
 };
@@ -58,6 +58,7 @@ describe('MemoryGraphService', () => {
 
   function setup() {
     const createdNodeIds: string[] = [];
+    const coordinateSeeds: number[] = [];
     const createdRelationIds: string[] = [];
     const memoryNodeResults: unknown[][] = [];
     const memoryRelationResults: unknown[][] = [];
@@ -97,6 +98,9 @@ describe('MemoryGraphService', () => {
         deleteMany: () => Promise.resolve({ count: 0 }),
         upsert: (args: UpsertArgs) => {
           createdNodeIds.push(args.create.id);
+          if (args.create.coordinateSeed !== undefined) {
+            coordinateSeeds.push(args.create.coordinateSeed);
+          }
           return Promise.resolve({});
         },
         findMany: () => Promise.resolve(memoryNodeResults.shift() ?? []),
@@ -127,6 +131,7 @@ describe('MemoryGraphService', () => {
     };
     return {
       createdNodeIds,
+      coordinateSeeds,
       createdRelationIds,
       memoryNodeResults,
       memoryRelationResults,
@@ -139,7 +144,7 @@ describe('MemoryGraphService', () => {
   }
 
   it('rebuilds idempotently with stable IDs and excludes private place nodes', async () => {
-    const { service, createdNodeIds, createdRelationIds } = setup();
+    const { service, createdNodeIds, createdRelationIds, coordinateSeeds } = setup();
     const first = await service.rebuild();
     const second = await service.rebuild();
 
@@ -158,6 +163,8 @@ describe('MemoryGraphService', () => {
       expect.stringMatching(/^memory:/),
     ]);
     expect(createdNodeIds).not.toContain('place:secret-place');
+    expect(coordinateSeeds.length).toBeGreaterThan(0);
+    expect(coordinateSeeds.every((seed) => seed >= 0 && seed <= 2147483647)).toBe(true);
     const relationsPerRebuild = createdRelationIds.length / 2;
     expect(createdRelationIds.slice(0, relationsPerRebuild)).toEqual(
       createdRelationIds.slice(relationsPerRebuild),

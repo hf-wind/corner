@@ -85,6 +85,12 @@ type MemoryCluster = {
 @Injectable()
 export class MemoryGraphService implements OnModuleInit {
   private rebuildTimer?: ReturnType<typeof setTimeout>;
+  private rebuildInProgress?: Promise<{
+    nodes: number;
+    relations: number;
+    memories: number;
+    automaticJourneys: number;
+  }>;
 
   constructor(
     private prisma: PrismaService,
@@ -108,7 +114,8 @@ export class MemoryGraphService implements OnModuleInit {
   }
 
   private seed(id: string) {
-    return Number.parseInt(this.hash(id).slice(0, 8), 16) >>> 0;
+    // PostgreSQL INTEGER is signed; keep the deterministic hash in its range.
+    return (Number.parseInt(this.hash(id).slice(0, 8), 16) >>> 0) & 0x7fffffff;
   }
 
   private node(
@@ -252,6 +259,16 @@ export class MemoryGraphService implements OnModuleInit {
   }
 
   async rebuild() {
+    if (this.rebuildInProgress) return this.rebuildInProgress;
+    this.rebuildInProgress = this.performRebuild();
+    try {
+      return await this.rebuildInProgress;
+    } finally {
+      this.rebuildInProgress = undefined;
+    }
+  }
+
+  private async performRebuild() {
     const [posts, moments, albums, libraryItems, journeys, stories] =
       await Promise.all([
         this.prisma.post.findMany({

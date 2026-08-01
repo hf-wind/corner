@@ -91,6 +91,44 @@ useHead(() => ({
 </script>
 
 <style>
+::view-transition-group(root) {
+  animation-duration: 0.72s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(root) {
+  animation: cosmic-route-out 0.46s cubic-bezier(0.55, 0, 0.8, 0.2) both;
+}
+
+::view-transition-new(root) {
+  animation: cosmic-route-in 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+html[data-cosmic-transition='constellation']::view-transition-new(root) {
+  animation-name: constellation-route-in;
+}
+
+html[data-cosmic-transition='home']::view-transition-new(root) {
+  animation-name: home-route-in;
+}
+
+@keyframes cosmic-route-out {
+  to { opacity: 0; transform: scale(1.025); filter: blur(3px); }
+}
+
+@keyframes cosmic-route-in {
+  from { opacity: 0; transform: scale(0.985); }
+}
+
+@keyframes constellation-route-in {
+  from { opacity: 0; clip-path: circle(7% at 66% 50%); transform: scale(1.035); }
+  to { opacity: 1; clip-path: circle(150% at 66% 50%); transform: scale(1); }
+}
+
+@keyframes home-route-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.99); }
+}
+
 html.space-pending body::after {
   position: fixed;
   z-index: 2147483647;
@@ -133,6 +171,12 @@ html.space-pending body::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms;
+  }
+
   .route-page-enter-active,
   .route-page-leave-active,
   .route-page-enter-active .sidebar-right {

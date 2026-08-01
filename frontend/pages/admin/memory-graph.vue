@@ -37,12 +37,6 @@
         </div>
       </section>
 
-      <section class="preview-section">
-        <div class="section-head"><div><small>LIVE PREVIEW</small><h2>自动聚合预览</h2></div><span>{{ graph.nodes.length }} 枚天体</span></div>
-        <div class="preview-shell"><MemoryGraph2D :nodes="graph.nodes" :relations="graph.relations" :selected-id="selected?.id" @select="selected = $event" /></div>
-        <div v-if="selected" class="selected-memory"><Icon :name="nodeIcon(selected.type)" /><span><small>{{ typeText(selected.type) }}</small><strong>{{ selected.title }}</strong></span><button type="button" @click="selected = null"><Icon name="ph:x-bold" /></button></div>
-      </section>
-
       <details class="recovery-panel">
         <summary><span><Icon name="ph:lifebuoy-bold" /><b>异常恢复</b><small>仅在新内容长时间没有进入星图时使用</small></span><Icon name="ph:caret-down-bold" /></summary>
         <div><p>正常情况下无需任何操作。重新生成只会刷新派生数据，不会修改文章、瞬间、相册或旅行。</p><a-button :loading="rebuilding" @click="rebuild"><Icon name="ph:arrows-clockwise-bold" />重新生成星图</a-button></div>
@@ -66,9 +60,7 @@ const loading = ref(true)
 const rebuilding = ref(false)
 const issueOpen = ref(false)
 const error = ref('')
-const selected = ref<any>(null)
 const activeIssue = ref<any>(null)
-const graph = reactive<any>({ graphVersion: '', nodes: [], relations: [] })
 const health = reactive<any>({
   totals: { nodes: 0, memories: 0, journeys: 0, relations: 0 },
   automation: { status: 'running', lastBuiltAt: null },
@@ -81,7 +73,7 @@ const health = reactive<any>({
 
 const metricItems = computed(() => [
   { label: '真实内容', value: health.totals.nodes || 0, note: '自动收录', icon: 'ph:files-bold' },
-  { label: '聚合记忆', value: health.totals.memories || 0, note: '自动形成主行星', icon: 'ph:planet-bold' },
+  { label: '点亮星球', value: health.totals.memories || 0, note: '由真实内容生成', icon: 'ph:planet-bold' },
   { label: '旅行轨迹', value: health.totals.journeys || 0, note: '连续移动自动识别', icon: 'ph:path-bold' },
   { label: '记忆连接', value: health.totals.relations || 0, note: '规则自动维护', icon: 'ph:share-network-bold' },
 ])
@@ -102,11 +94,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [graphResult, healthResult] = await Promise.all([
-      api.get('/memory-relations/graph', { view: 'constellation', limit: 300 }),
-      api.get('/memory-relations/health'),
-    ])
-    Object.assign(graph, graphResult)
+    const healthResult = await api.get('/memory-relations/health')
     Object.assign(health, healthResult)
   } catch (exception: any) {
     error.value = exception?.message || '读取星图状态失败'
@@ -154,9 +142,8 @@ useHead({ title: '时光星图' })
 .automation-orb { position:relative; z-index:1; display:grid; width:52px; height:52px; border-radius:50%; background:radial-gradient(circle at 35% 28%,#9edaff,var(--c-primary) 42%,#174b78); box-shadow:inset -9px -8px 18px rgb(2 18 38/.3),0 0 24px color-mix(in srgb,var(--c-primary) 28%,transparent); color:#fff; place-items:center; }.automation-orb i { position:absolute; width:66px; height:20px; border:1px solid color-mix(in srgb,var(--c-primary) 52%,transparent); border-radius:50%; transform:rotate(-14deg); }
 .automation-card div { position:relative; z-index:1; display:flex; flex-direction:column; }.automation-card strong { margin-top:3px; color:var(--c-text); font-size:.86rem; }.automation-card p { max-width:720px; margin:5px 0 0; color:var(--c-text-3); font-size:.63rem; line-height:1.65; }.sync-time { position:relative; z-index:1; display:flex; align-items:center; gap:6px; color:var(--c-text-3); font-size:.57rem; }.sync-time i { width:6px; height:6px; border-radius:50%; background:#46c78b; box-shadow:0 0 0 4px rgb(70 199 139/.1); }
 .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }.metrics article { display:grid; min-height:88px; grid-template-columns:40px 1fr; align-items:center; gap:10px; padding:14px; border:1px solid var(--border); border-radius:10px; background:var(--ld-bg-card); }.metrics article>span { display:grid; width:40px; height:40px; border-radius:9px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.05rem; place-items:center; }.metrics article>div { display:flex; flex-direction:column; }.metrics strong { color:var(--c-text); font-size:1.18rem; font-variant-numeric:tabular-nums; }.metrics small { color:var(--c-text-3); font-size:.6rem; }.metrics em { grid-column:2; color:var(--c-text-3); font-size:.54rem; font-style:normal; }
-.health-section,.preview-section { display:flex; flex-direction:column; gap:11px; }.section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }.section-head h2 { margin:3px 0 0; color:var(--c-text); font-size:1rem; }.section-head>span { color:var(--c-text-3); font-size:.67rem; }.section-intro { margin:-5px 0 0; color:var(--c-text-3); font-size:.59rem; }
+.health-section { display:flex; flex-direction:column; gap:11px; }.section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }.section-head h2 { margin:3px 0 0; color:var(--c-text); font-size:1rem; }.section-head>span { color:var(--c-text-3); font-size:.67rem; }.section-intro { margin:-5px 0 0; color:var(--c-text-3); font-size:.59rem; }
 .health-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }.health-grid article { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:10px; padding:13px; border:1px solid color-mix(in srgb,#d48655 24%,var(--border)); border-radius:9px; background:var(--ld-bg-card); }.health-grid article>span { display:grid; width:36px; height:36px; border-radius:8px; background:color-mix(in srgb,#d48655 10%,var(--c-bg-2)); color:#c77748; place-items:center; }.health-grid article>div { display:flex; min-width:0; flex-direction:column; }.health-grid strong { color:var(--c-text); font-size:.7rem; }.health-grid p { margin:3px 0 0; color:var(--c-text-3); font-size:.56rem; }.health-grid button { border:0; background:none; color:var(--c-primary); cursor:pointer; font:inherit; font-size:.59rem; }.health-grid article.clear { border-color:var(--border); }.health-grid article.clear>span { background:color-mix(in srgb,#45a87b 9%,var(--c-bg-2)); color:#45a87b; }.clear-icon { color:#45a87b; }
-.preview-shell { height:400px; overflow:hidden; border:1px solid var(--border); border-radius:10px; background:#06111f; }.preview-shell :deep(.graph-preview) { height:100%; min-height:0; border:0; }.selected-memory { display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); color:var(--c-primary); }.selected-memory>span { display:flex; min-width:0; flex:1; flex-direction:column; }.selected-memory small { color:var(--c-text-3); font-size:.53rem; }.selected-memory strong { overflow:hidden; color:var(--c-text); font-size:.66rem; text-overflow:ellipsis; white-space:nowrap; }.selected-memory button { border:0; background:none; color:var(--c-text-3); cursor:pointer; }
 .recovery-panel { border-block:1px solid var(--border); }.recovery-panel summary { display:flex; align-items:center; justify-content:space-between; padding:14px 2px; color:var(--c-text); cursor:pointer; list-style:none; }.recovery-panel summary>span { display:grid; grid-template-columns:20px 1fr; align-items:center; gap:2px 7px; }.recovery-panel summary>span>svg { grid-row:1/3; color:var(--c-text-3); }.recovery-panel summary b { font-size:.7rem; }.recovery-panel summary small { color:var(--c-text-3); font-size:.55rem; }.recovery-panel[open] summary>svg { transform:rotate(180deg); }.recovery-panel>div { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 2px 14px; }.recovery-panel p { margin:0; color:var(--c-text-3); font-size:.59rem; }
 .issue-list { display:grid; gap:7px; }.issue-list>a { display:grid; grid-template-columns:34px 1fr 18px; align-items:center; gap:9px; padding:9px; border:1px solid var(--border); border-radius:8px; color:var(--c-text); text-decoration:none; }.issue-list>a>span { display:grid; width:34px; height:34px; border-radius:7px; background:var(--c-primary-soft); color:var(--c-primary); place-items:center; }.issue-list div { display:flex; min-width:0; flex-direction:column; }.issue-list small { color:var(--c-text-3); font-size:.54rem; }.issue-list strong { overflow:hidden; font-size:.66rem; text-overflow:ellipsis; white-space:nowrap; }
 @keyframes orbit { to { transform:rotate(360deg); } }

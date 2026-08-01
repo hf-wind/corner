@@ -107,14 +107,14 @@ const starLayers: THREE.Points[] = []
 const cosmicBodies: THREE.Group[] = []
 const disposables = new Set<{ dispose: () => void }>()
 const typeColors: Record<string, number> = {
-  memory: 0x4f9bd4,
-  post: 0xb38a58,
-  moment: 0xad6258,
-  album: 0x568c88,
-  photo: 0x85819d,
-  place: 0x66866a,
-  library: 0x687895,
-  journey: 0x9c684b,
+  memory: 0xe0a95b,
+  post: 0xd97a58,
+  moment: 0xd96776,
+  album: 0x4fa69a,
+  photo: 0x9985bd,
+  place: 0x77a66a,
+  library: 0x718ab6,
+  journey: 0xd07943,
 }
 const typeLevels: Record<string, number> = { memory: 2, place: 0, journey: 6, album: -5, photo: -8, moment: 9, post: 3, library: -2 }
 
@@ -170,7 +170,7 @@ function track(resource: { dispose: () => void }) {
 }
 
 function spaceBackground() {
-  return 0x020814
+  return 0x05090c
 }
 
 function planetVariant(node: MemoryNode) {
@@ -485,10 +485,10 @@ function addStarField() {
   if (!scene) return
   const random = randomFrom(20260731)
   const layerSettings = lowQuality
-    ? [{ count: 850, near: 170, depth: 430, size: 1.15, opacity: .72 }]
+    ? [{ count: 850, near: 170, depth: 430, size: 1.28, opacity: .82 }]
     : [
-        { count: 1700, near: 160, depth: 480, size: 1.05, opacity: .72 },
-        { count: 760, near: 85, depth: 250, size: 1.8, opacity: .46 },
+        { count: 1700, near: 160, depth: 480, size: 1.12, opacity: .82 },
+        { count: 760, near: 85, depth: 250, size: 1.9, opacity: .56 },
       ]
   for (const [layerIndex, settings] of layerSettings.entries()) {
     const positions = new Float32Array(settings.count * 3)
@@ -555,18 +555,18 @@ function addCore() {
     color: 0xffffff,
     map: coreTexture,
     emissiveMap: coreTexture,
-    emissive: 0x69c6f4,
-    emissiveIntensity: .22,
+    emissive: 0xd59a4f,
+    emissiveIntensity: .32,
     roughness: .58,
     metalness: .12,
   }))
   const orb = new THREE.Mesh(track(new THREE.SphereGeometry(8, lowQuality ? 18 : 32, lowQuality ? 12 : 22)), orbMaterial)
   core.add(orb)
-  const coreAtmosphere = new THREE.Mesh(orb.geometry, atmosphereMaterial(0x78c9ff, .9))
+  const coreAtmosphere = new THREE.Mesh(orb.geometry, atmosphereMaterial(0xe5b967, .94))
   coreAtmosphere.scale.setScalar(1.16)
   coreAtmosphere.renderOrder = 4
   core.add(coreAtmosphere)
-  const ringMaterial = track(new THREE.MeshBasicMaterial({ color: 0x83d5ff, transparent: true, opacity: .38, blending: THREE.AdditiveBlending, depthWrite: false }))
+  const ringMaterial = track(new THREE.MeshBasicMaterial({ color: 0xd8a75b, transparent: true, opacity: .46, blending: THREE.AdditiveBlending, depthWrite: false }))
   for (const [scale, tilt] of [[16, .9], [21, -1.15]] as const) {
     const ring = new THREE.Mesh(track(new THREE.TorusGeometry(scale, .1, 5, 96)), ringMaterial)
     ring.rotation.set(tilt, .25, .12)
@@ -634,9 +634,9 @@ function addOrbit(radius: number, year: number | null) {
   }
   const geometry = track(new THREE.BufferGeometry().setFromPoints(points))
   const material = track(new THREE.LineBasicMaterial({
-    color: year == null ? 0x244e78 : 0x4b8dc8,
+    color: year == null ? 0x554a3c : 0xa57d4a,
     transparent: true,
-    opacity: year == null ? .14 : .26,
+    opacity: year == null ? .2 : .34,
     blending: THREE.AdditiveBlending,
   }))
   const line = new THREE.Line(geometry, material)
@@ -663,7 +663,7 @@ function addCosmicBodies() {
   if (!scene) return
   const random = randomFrom(0x6c756d65)
   const bodyTypes = ['place', 'library', 'album', 'journey', 'photo']
-  const targetCount = Math.max(lowQuality ? 14 : 18, (lowQuality ? 24 : 38) - props.nodes.length)
+  const targetCount = Math.max(lowQuality ? 16 : 22, (lowQuality ? 26 : 42) - props.nodes.length)
   for (let index = 0; index < targetCount; index++) {
     const orbitIndex = index % 4
     const angle = random() * Math.PI * 2 + orbitIndex * .31
@@ -684,24 +684,24 @@ function addCosmicBodies() {
     )
     group.rotation.set(random() * .5, random() * Math.PI * 2, random() * .35)
     group.userData.spin = .025 + random() * .055
-    const mutedColor = [0x65717e, 0x596979, 0x77756d, 0x536879][index % 4]
+    const mutedColor = [0x987452, 0x527d73, 0x7d675f, 0x68739a, 0x667d51][index % 5]
     const geometry = track(new THREE.SphereGeometry(radius, lowQuality ? 10 : 18, lowQuality ? 8 : 12))
     const material = rememberOpacity(track(new THREE.MeshStandardMaterial({
-      color: 0xb8c0c7,
+      color: 0xe0d1ba,
       map: planetTexture(seedNode, mutedColor),
-      emissive: 0x10253a,
-      emissiveIntensity: .025,
-      roughness: .92,
+      emissive: mutedColor,
+      emissiveIntensity: .12,
+      roughness: .86,
       metalness: .01,
       transparent: true,
-      opacity: .62 + random() * .18,
+      opacity: .84 + random() * .14,
     })))
     group.add(new THREE.Mesh(geometry, material))
     if (index % 7 === 2) {
       const ringMaterial = rememberOpacity(track(new THREE.MeshBasicMaterial({
-        color: 0x728394,
+        color: 0xb79a70,
         transparent: true,
-        opacity: .13,
+        opacity: .28,
         depthWrite: false,
       })))
       const ring = new THREE.Mesh(track(new THREE.TorusGeometry(radius * 1.65, radius * .035, 4, lowQuality ? 24 : 42)), ringMaterial)
@@ -727,7 +727,7 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
     color: 0xffffff,
     map: planetTexture(node, color),
     emissive: color,
-    emissiveIntensity: featured ? .34 : .2,
+    emissiveIntensity: featured ? .48 : .3,
     roughness: variant === 3 ? .82 : .72,
     metalness: .04,
     transparent: true,
@@ -744,7 +744,7 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
   hitTarget.userData.nodeId = node.id
   group.add(hitTarget)
   interactive.push(hitTarget)
-  const atmosphere = new THREE.Mesh(geometry, atmosphereMaterial(color, featured ? .66 : .44))
+  const atmosphere = new THREE.Mesh(geometry, atmosphereMaterial(color, featured ? .78 : .58))
   atmosphere.scale.setScalar(1.16)
   atmosphere.userData.nodeId = node.id
   group.add(atmosphere)
@@ -752,7 +752,7 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
     map: glowTexture('#79caff'),
     color,
     transparent: true,
-    opacity: featured ? .26 : .18,
+    opacity: featured ? .38 : .28,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   })))
@@ -1182,8 +1182,8 @@ async function initialize() {
     controls.enableRotate = !props.ambient
     controls.enableZoom = !props.ambient
     controls.enabled = !props.ambient
-    const ambientLight = new THREE.AmbientLight(0x5b7fa5, .48); ambientLight.name = 'ambient-light'; scene.add(ambientLight)
-    const keyLight = new THREE.PointLight(0x5aaaf0, 620, 360); keyLight.name = 'key-light'; keyLight.position.set(0, 18, 28); scene.add(keyLight)
+    const ambientLight = new THREE.AmbientLight(0xb9a98b, .72); ambientLight.name = 'ambient-light'; scene.add(ambientLight)
+    const keyLight = new THREE.PointLight(0xf0b76b, 880, 420); keyLight.name = 'key-light'; keyLight.position.set(0, 18, 28); scene.add(keyLight)
     buildScene()
     resizeObserver = new ResizeObserver(resize)
     resizeObserver.observe(host.value)
@@ -1229,9 +1229,9 @@ watch(() => [props.graphVersion, props.nodes, props.relations, props.routeNodeId
   renderer.toneMappingExposure = 1.02
   scene.fog = new THREE.FogExp2(spaceBackground(), .0016)
   const ambientLight = scene.getObjectByName('ambient-light') as THREE.AmbientLight | undefined
-  if (ambientLight) { ambientLight.color.setHex(0x5b7fa5); ambientLight.intensity = .48 }
+  if (ambientLight) { ambientLight.color.setHex(0xb9a98b); ambientLight.intensity = .72 }
   const keyLight = scene.getObjectByName('key-light') as THREE.PointLight | undefined
-  if (keyLight) { keyLight.color.setHex(0x5aaaf0); keyLight.intensity = 620 }
+  if (keyLight) { keyLight.color.setHex(0xf0b76b); keyLight.intensity = 880 }
   buildScene()
 })
 watch(() => props.selectedId, () => applySelection())
@@ -1245,11 +1245,11 @@ defineExpose({
 </script>
 
 <style scoped>
-.constellation-scene { position:absolute; inset:0; min-width:0; min-height:0; overflow:hidden; background:#030b18; transition:background-color .45s ease; }
+.constellation-scene { position:absolute; inset:0; min-width:0; min-height:0; overflow:hidden; background:#05090c; transition:background-color .45s ease; }
 .scene-host { position:absolute; inset:0; min-width:0; min-height:0; touch-action:none; }
 .constellation-scene :deep(canvas) { display:block; width:100%; height:100%; outline:none; opacity:0; transform:scale(1.04); transition:opacity 1.2s ease,transform 1.8s cubic-bezier(.16,1,.3,1); }.constellation-scene.is-ready :deep(canvas){opacity:1;transform:scale(1)}
-.scene-awakening { position:absolute; z-index:2; inset:0; display:grid; align-content:center; justify-items:center; gap:20px; background:#030b18; color:#8baac4; pointer-events:none; }
-.awakening-core { position:relative; display:grid; width:72px; height:72px; border:1px solid rgb(102 183 255/.34); border-radius:50%; place-items:center; animation:awakening-turn 6s linear infinite; }.awakening-core::before { width:13px; height:13px; border-radius:50%; background:#78beff; box-shadow:0 0 28px #58a9f5; content:''; }.awakening-core i { position:absolute; inset:8px; border:1px solid rgb(126 184 232/.28); border-radius:50%; transform:rotate(62deg); }.awakening-core i:nth-child(2){inset:-9px;transform:rotate(-28deg)}.awakening-core i:nth-child(3){inset:24px -14px;transform:rotate(18deg)}.scene-awakening small{font-size:.62rem;letter-spacing:.12em}
+.scene-awakening { position:absolute; z-index:2; inset:0; display:grid; align-content:center; justify-items:center; gap:20px; background:#05090c; color:#b9ad95; pointer-events:none; }
+.awakening-core { position:relative; display:grid; width:72px; height:72px; border:1px solid rgb(221 173 91/.42); border-radius:50%; place-items:center; animation:awakening-turn 6s linear infinite; }.awakening-core::before { width:13px; height:13px; border-radius:50%; background:#e1b362; box-shadow:0 0 28px #d89a45; content:''; }.awakening-core i { position:absolute; inset:8px; border:1px solid rgb(203 177 127/.3); border-radius:50%; transform:rotate(62deg); }.awakening-core i:nth-child(2){inset:-9px;transform:rotate(-28deg)}.awakening-core i:nth-child(3){inset:24px -14px;transform:rotate(18deg)}.scene-awakening small{font-size:.62rem;letter-spacing:.12em}
 .scene-tooltip { position:fixed; z-index:20; max-width:220px; padding:7px 9px; border:1px solid rgb(118 185 246/.2); border-radius:6px; background:rgb(5 15 30/.9); box-shadow:0 8px 24px rgb(0 0 0/.28); color:#edf6ff; font-size:.66rem; opacity:0; pointer-events:none; transform:translateY(4px); transition:opacity .15s ease,transform .15s ease; }.scene-tooltip.visible{opacity:1;transform:none}
 @keyframes awakening-turn{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.constellation-scene :deep(canvas),.scene-tooltip{transition:none}.awakening-core{animation:none}}
