@@ -46,6 +46,15 @@ type CameraFlight = CameraSnapshot & {
   arcHeight: number
 }
 
+type PlanetProfile = {
+  surface: number
+  atmosphere: number
+  glow: number
+  accent: number
+  surfaceCss: string
+  accentCss: string
+}
+
 const props = withDefaults(defineProps<{
   nodes: MemoryNode[]
   relations: MemoryRelation[]
@@ -54,11 +63,13 @@ const props = withDefaults(defineProps<{
   routeNodeIds?: string[]
   resolveImage?: (source: string) => string
   ambient?: boolean
+  introDelayMs?: number
 }>(), {
   selectedId: '',
   routeNodeIds: () => [],
   resolveImage: (source: string) => source,
   ambient: false,
+  introDelayMs: 0,
 })
 
 const emit = defineEmits<{
@@ -88,6 +99,7 @@ let disposed = false
 let core: THREE.Group | null = null
 let sun: THREE.Group | null = null
 let blackHole: THREE.Group | null = null
+let spaceStation: THREE.Group | null = null
 let meteor: THREE.Sprite | null = null
 let meteorTrail: THREE.Line | null = null
 let warpLines: THREE.LineSegments | null = null
@@ -106,16 +118,16 @@ const interactive: THREE.Object3D[] = []
 const starLayers: THREE.Points[] = []
 const cosmicBodies: THREE.Group[] = []
 const disposables = new Set<{ dispose: () => void }>()
-const typeColors: Record<string, number> = {
-  memory: 0xe0a95b,
-  post: 0xd97a58,
-  moment: 0xd96776,
-  album: 0x4fa69a,
-  photo: 0x9985bd,
-  place: 0x77a66a,
-  library: 0x718ab6,
-  journey: 0xd07943,
-}
+const planetProfiles: PlanetProfile[] = [
+  { surface: 0x4679a8, atmosphere: 0x6fc8f0, glow: 0x56c5f1, accent: 0x91c5a6, surfaceCss: '#4679a8', accentCss: '#91c5a6' },
+  { surface: 0xb75d49, atmosphere: 0xf18d67, glow: 0xeb8060, accent: 0xd2a06e, surfaceCss: '#b75d49', accentCss: '#d2a06e' },
+  { surface: 0xb47d5d, atmosphere: 0xe4b892, glow: 0xe2a66e, accent: 0xf0d1ab, surfaceCss: '#b47d5d', accentCss: '#f0d1ab' },
+  { surface: 0x3f63b8, atmosphere: 0x63a9ff, glow: 0x4d97ff, accent: 0x9cd9ff, surfaceCss: '#3f63b8', accentCss: '#9cd9ff' },
+  { surface: 0x5ba8a7, atmosphere: 0x9ee9df, glow: 0x79e5dc, accent: 0xc1f3ec, surfaceCss: '#5ba8a7', accentCss: '#c1f3ec' },
+  { surface: 0xc2965f, atmosphere: 0xf0cb8c, glow: 0xf0b972, accent: 0xf4ddb2, surfaceCss: '#c2965f', accentCss: '#f4ddb2' },
+  { surface: 0xb48655, atmosphere: 0xeec788, glow: 0xe5b16e, accent: 0xebd5a7, surfaceCss: '#b48655', accentCss: '#ebd5a7' },
+  { surface: 0x738ca8, atmosphere: 0xc4def7, glow: 0x91c4ff, accent: 0xdceafa, surfaceCss: '#738ca8', accentCss: '#dceafa' },
+]
 const typeLevels: Record<string, number> = { memory: 2, place: 0, journey: 6, album: -5, photo: -8, moment: 9, post: 3, library: -2 }
 
 function supportsWebGL() {
@@ -170,24 +182,35 @@ function track(resource: { dispose: () => void }) {
 }
 
 function spaceBackground() {
-  return 0x05090c
+  return 0x030817
 }
 
 function planetVariant(node: MemoryNode) {
   return hash(`${node.id}:variant`) % 5
 }
 
-function planetTexture(node: MemoryNode, colorValue: number) {
+function planetProfile(node: MemoryNode) {
+  const typeOffset: Record<string, number> = { memory: 0, post: 1, moment: 4, album: 3, photo: 7, place: 0, library: 2, journey: 5 }
+  const index = (hash(`${node.id}:planet-profile`) + (typeOffset[node.type] || 0)) % planetProfiles.length
+  return planetProfiles[index]
+}
+
+function planetTexture(node: MemoryNode, profile: PlanetProfile) {
   const canvas = document.createElement('canvas')
   canvas.width = 256
   canvas.height = 128
   const context = canvas.getContext('2d')!
   const random = randomFrom(hash(`${node.id}:surface`))
   const variant = planetVariant(node)
-  const color = new THREE.Color(colorValue)
+  const color = new THREE.Color(profile.surface)
+  const accentColor = new THREE.Color(profile.accent)
   const hsl = { h: 0, s: 0, l: 0 }
+  const accentHsl = { h: 0, s: 0, l: 0 }
   color.getHSL(hsl)
+  accentColor.getHSL(accentHsl)
   const hue = Math.round(hsl.h * 360)
+  const accentHue = Math.round(accentHsl.h * 360)
+  const accentSaturation = Math.round(accentHsl.s * 100)
   const saturation = Math.min(56, Math.max(26, Math.round(hsl.s * 82)))
   const base = context.createLinearGradient(0, 0, 0, canvas.height)
   base.addColorStop(0, `hsl(${hue} ${Math.min(64, saturation + 5)}% 58%)`)
@@ -213,7 +236,7 @@ function planetTexture(node: MemoryNode, colorValue: number) {
     const radiusY = 2 + random() * 11
     context.beginPath()
     context.ellipse(x, y, radiusX, radiusY, (random() - .5) * .7, 0, Math.PI * 2)
-    context.fillStyle = `hsla(${(hue + 28 + random() * 22) % 360} ${Math.max(24, saturation - 18)}% ${28 + random() * 24}% / ${.14 + random() * .24})`
+    context.fillStyle = `hsla(${(accentHue + (random() - .5) * 12 + 360) % 360} ${Math.max(18, accentSaturation)}% ${28 + random() * 24}% / ${.16 + random() * .28})`
     context.fill()
   }
 
@@ -481,6 +504,38 @@ function circleMaskTexture() {
   return track(new THREE.CanvasTexture(canvas))
 }
 
+function accretionDiskTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 512
+  const context = canvas.getContext('2d')!
+  const random = randomFrom(0xb1ac4a1e)
+  context.translate(256, 256)
+  context.globalCompositeOperation = 'screen'
+  for (let index = 0; index < 220; index++) {
+    const radius = 78 + Math.pow(random(), .68) * 166
+    const start = random() * Math.PI * 2
+    const length = .08 + random() * .72
+    const hot = radius < 126
+    context.beginPath()
+    context.arc(0, 0, radius, start, start + length)
+    context.lineWidth = .35 + random() * (hot ? 3.6 : 2.2)
+    context.strokeStyle = hot
+      ? `rgba(255, ${190 + Math.floor(random() * 60)}, ${126 + Math.floor(random() * 90)}, ${.1 + random() * .46})`
+      : `rgba(${104 + Math.floor(random() * 80)}, ${118 + Math.floor(random() * 90)}, 255, ${.04 + random() * .25})`
+    context.stroke()
+  }
+  const veil = context.createRadialGradient(0, 0, 62, 0, 0, 252)
+  veil.addColorStop(0, 'rgba(255,228,185,0)')
+  veil.addColorStop(.27, 'rgba(255,185,104,.42)')
+  veil.addColorStop(.48, 'rgba(123,145,255,.18)')
+  veil.addColorStop(1, 'rgba(51,70,194,0)')
+  context.fillStyle = veil
+  context.fillRect(-256, -256, 512, 512)
+  const texture = track(new THREE.CanvasTexture(canvas))
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 function addStarField() {
   if (!scene) return
   const random = randomFrom(20260731)
@@ -555,18 +610,18 @@ function addCore() {
     color: 0xffffff,
     map: coreTexture,
     emissiveMap: coreTexture,
-    emissive: 0xd59a4f,
-    emissiveIntensity: .32,
+    emissive: 0x2f83bd,
+    emissiveIntensity: .24,
     roughness: .58,
     metalness: .12,
   }))
   const orb = new THREE.Mesh(track(new THREE.SphereGeometry(8, lowQuality ? 18 : 32, lowQuality ? 12 : 22)), orbMaterial)
   core.add(orb)
-  const coreAtmosphere = new THREE.Mesh(orb.geometry, atmosphereMaterial(0xe5b967, .94))
+  const coreAtmosphere = new THREE.Mesh(orb.geometry, atmosphereMaterial(0x69caff, .92))
   coreAtmosphere.scale.setScalar(1.16)
   coreAtmosphere.renderOrder = 4
   core.add(coreAtmosphere)
-  const ringMaterial = track(new THREE.MeshBasicMaterial({ color: 0xd8a75b, transparent: true, opacity: .46, blending: THREE.AdditiveBlending, depthWrite: false }))
+  const ringMaterial = track(new THREE.MeshBasicMaterial({ color: 0x67bdf2, transparent: true, opacity: .42, blending: THREE.AdditiveBlending, depthWrite: false }))
   for (const [scale, tilt] of [[16, .9], [21, -1.15]] as const) {
     const ring = new THREE.Mesh(track(new THREE.TorusGeometry(scale, .1, 5, 96)), ringMaterial)
     ring.rotation.set(tilt, .25, .12)
@@ -601,7 +656,7 @@ function addSun() {
   const outerHalo = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture('#ef6c2e'), transparent: true, opacity: .1, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })))
   outerHalo.scale.set(112, 112, 1)
   sun.add(outerHalo)
-  const sunlight = new THREE.PointLight(0xffb76a, 2600, 720, 1.32)
+  const sunlight = new THREE.PointLight(0xffe6c8, 1500, 720, 1.32)
   sun.add(sunlight)
   scene.add(sun)
 }
@@ -610,19 +665,110 @@ function addBlackHole() {
   if (!scene) return
   blackHole = new THREE.Group()
   blackHole.name = 'distant-black-hole'
-  blackHole.position.set(-176, 78, -286)
-  blackHole.add(new THREE.Mesh(track(new THREE.SphereGeometry(12.5, lowQuality ? 18 : 32, lowQuality ? 12 : 20)), track(new THREE.MeshBasicMaterial({ color: 0x000106, fog: false }))))
-  const photonRing = track(new THREE.MeshBasicMaterial({ color: 0xf1a35a, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }))
-  const ringA = new THREE.Mesh(track(new THREE.TorusGeometry(16, .72, 8, 128)), photonRing)
-  ringA.rotation.set(1.15, .18, -.28)
-  blackHole.add(ringA)
-  const ringB = new THREE.Mesh(track(new THREE.TorusGeometry(21, .28, 6, 128)), track(new THREE.MeshBasicMaterial({ color: 0x5f9df4, transparent: true, opacity: .72, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })))
-  ringB.rotation.set(1.16, .2, -.28)
-  blackHole.add(ringB)
-  const halo = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture('#7346d8'), transparent: true, opacity: .42, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })))
-  halo.scale.set(68, 68, 1)
+  blackHole.position.set(-172, 76, -276)
+  const eventHorizon = new THREE.Mesh(
+    track(new THREE.SphereGeometry(12.8, lowQuality ? 20 : 40, lowQuality ? 14 : 28)),
+    track(new THREE.MeshBasicMaterial({ color: 0x000003, fog: false })),
+  )
+  eventHorizon.renderOrder = 8
+  blackHole.add(eventHorizon)
+
+  const disk = new THREE.Mesh(
+    track(new THREE.RingGeometry(14.2, 43, lowQuality ? 72 : 160, 1)),
+    track(new THREE.MeshBasicMaterial({ map: accretionDiskTexture(), color: 0xffffff, transparent: true, opacity: .92, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })),
+  )
+  disk.name = 'black-hole-disk'
+  disk.rotation.set(1.12, .2, -.28)
+  blackHole.add(disk)
+
+  const photonRing = new THREE.Mesh(
+    track(new THREE.TorusGeometry(14.8, .54, 10, lowQuality ? 72 : 160)),
+    track(new THREE.MeshBasicMaterial({ color: 0xffd49a, transparent: true, opacity: .96, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })),
+  )
+  photonRing.name = 'black-hole-photon-ring'
+  photonRing.rotation.copy(disk.rotation)
+  blackHole.add(photonRing)
+
+  const lensRing = new THREE.Mesh(
+    track(new THREE.TorusGeometry(19.8, .22, 6, lowQuality ? 72 : 160)),
+    track(new THREE.MeshBasicMaterial({ color: 0x7b9cff, transparent: true, opacity: .58, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })),
+  )
+  lensRing.rotation.set(1.18, .16, -.28)
+  blackHole.add(lensRing)
+
+  const halo = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture('#6554d9'), transparent: true, opacity: .34, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })))
+  halo.name = 'black-hole-halo'
+  halo.scale.set(78, 78, 1)
   blackHole.add(halo)
+
+  const jetMaterial = track(new THREE.MeshBasicMaterial({ color: 0x668dff, transparent: true, opacity: .16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }))
+  for (const direction of [-1, 1]) {
+    const jet = new THREE.Mesh(track(new THREE.ConeGeometry(2.2, 36, lowQuality ? 8 : 16, 1, true)), jetMaterial)
+    jet.position.y = direction * 22
+    if (direction < 0) jet.rotation.z = Math.PI
+    jet.rotation.x = -.2
+    blackHole.add(jet)
+  }
   scene.add(blackHole)
+}
+
+function addSpaceStation() {
+  if (!scene) return
+  spaceStation = new THREE.Group()
+  spaceStation.name = 'memory-space-station'
+  spaceStation.position.set(118, -34, -132)
+  spaceStation.rotation.set(.18, -.44, -.12)
+  spaceStation.scale.setScalar(lowQuality ? 1.02 : 1.42)
+
+  const hull = track(new THREE.MeshStandardMaterial({ color: 0xa9bccb, roughness: .36, metalness: .76, emissive: 0x071421, emissiveIntensity: .24 }))
+  const darkHull = track(new THREE.MeshStandardMaterial({ color: 0x263a4a, roughness: .48, metalness: .72 }))
+  const windowMaterial = track(new THREE.MeshBasicMaterial({ color: 0x77d7ff, transparent: true, opacity: .94, blending: THREE.AdditiveBlending }))
+  const solarMaterial = track(new THREE.MeshStandardMaterial({ color: 0x244f88, roughness: .38, metalness: .5, emissive: 0x12365d, emissiveIntensity: .5, side: THREE.DoubleSide }))
+
+  const axis = new THREE.Mesh(track(new THREE.CylinderGeometry(1.15, 1.15, 15, lowQuality ? 10 : 18)), hull)
+  axis.rotation.z = Math.PI / 2
+  spaceStation.add(axis)
+  const hub = new THREE.Mesh(track(new THREE.SphereGeometry(2.35, lowQuality ? 12 : 22, lowQuality ? 8 : 14)), darkHull)
+  spaceStation.add(hub)
+
+  const habitatRing = new THREE.Mesh(track(new THREE.TorusGeometry(6.6, .55, lowQuality ? 6 : 10, lowQuality ? 36 : 72)), hull)
+  habitatRing.name = 'station-habitat-ring'
+  habitatRing.rotation.y = Math.PI / 2
+  spaceStation.add(habitatRing)
+  const innerRing = new THREE.Mesh(track(new THREE.TorusGeometry(5.7, .1, 4, lowQuality ? 32 : 64)), windowMaterial)
+  innerRing.rotation.copy(habitatRing.rotation)
+  spaceStation.add(innerRing)
+
+  for (const side of [-1, 1]) {
+    const truss = new THREE.Mesh(track(new THREE.BoxGeometry(8, .28, .28)), darkHull)
+    truss.position.x = side * 10.5
+    spaceStation.add(truss)
+    const panel = new THREE.Mesh(track(new THREE.BoxGeometry(8.4, .1, 4.4)), solarMaterial)
+    panel.position.x = side * 16
+    panel.rotation.x = side * .08
+    spaceStation.add(panel)
+    for (let stripe = -3; stripe <= 3; stripe++) {
+      const line = new THREE.Mesh(track(new THREE.BoxGeometry(.035, .12, 4.3)), windowMaterial)
+      line.position.set(side * 16 + stripe * .95, .08, 0)
+      spaceStation.add(line)
+    }
+  }
+
+  const antenna = new THREE.Mesh(track(new THREE.CylinderGeometry(.08, .08, 7, 6)), hull)
+  antenna.position.y = 5.8
+  spaceStation.add(antenna)
+  const dish = new THREE.Mesh(track(new THREE.SphereGeometry(2.1, lowQuality ? 12 : 20, 7, 0, Math.PI * 2, 0, Math.PI / 2)), hull)
+  dish.position.y = 9
+  dish.rotation.x = Math.PI
+  spaceStation.add(dish)
+
+  for (const [x, y, z] of [[-6.6, 0, 0], [6.6, 0, 0], [0, 6.8, 0]] as const) {
+    const beacon = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture('#7bdcff'), color: 0x7bdcff, transparent: true, opacity: .82, blending: THREE.AdditiveBlending, depthWrite: false })))
+    beacon.position.set(x, y, z)
+    beacon.scale.set(2.2, 2.2, 1)
+    spaceStation.add(beacon)
+  }
+  scene.add(spaceStation)
 }
 
 function addOrbit(radius: number, year: number | null) {
@@ -634,9 +780,9 @@ function addOrbit(radius: number, year: number | null) {
   }
   const geometry = track(new THREE.BufferGeometry().setFromPoints(points))
   const material = track(new THREE.LineBasicMaterial({
-    color: year == null ? 0x554a3c : 0xa57d4a,
+    color: year == null ? 0x27445d : 0x477da5,
     transparent: true,
-    opacity: year == null ? .2 : .34,
+    opacity: year == null ? .16 : .27,
     blending: THREE.AdditiveBlending,
   }))
   const line = new THREE.Line(geometry, material)
@@ -684,13 +830,13 @@ function addCosmicBodies() {
     )
     group.rotation.set(random() * .5, random() * Math.PI * 2, random() * .35)
     group.userData.spin = .025 + random() * .055
-    const mutedColor = [0x987452, 0x527d73, 0x7d675f, 0x68739a, 0x667d51][index % 5]
+    const profile = planetProfile(seedNode)
     const geometry = track(new THREE.SphereGeometry(radius, lowQuality ? 10 : 18, lowQuality ? 8 : 12))
     const material = rememberOpacity(track(new THREE.MeshStandardMaterial({
       color: 0xe0d1ba,
-      map: planetTexture(seedNode, mutedColor),
-      emissive: mutedColor,
-      emissiveIntensity: .12,
+      map: planetTexture(seedNode, profile),
+      emissive: profile.glow,
+      emissiveIntensity: .08,
       roughness: .86,
       metalness: .01,
       transparent: true,
@@ -699,7 +845,7 @@ function addCosmicBodies() {
     group.add(new THREE.Mesh(geometry, material))
     if (index % 7 === 2) {
       const ringMaterial = rememberOpacity(track(new THREE.MeshBasicMaterial({
-        color: 0xb79a70,
+        color: profile.accent,
         transparent: true,
         opacity: .28,
         depthWrite: false,
@@ -720,14 +866,15 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
   group.userData.nodeId = node.id
   const featured = Boolean(node.metadata?.featured)
   const variant = planetVariant(node)
-  const color = typeColors[node.type] || 0x9fb0b5
+  const profile = planetProfile(node)
+  const color = profile.glow
   const radius = nodeRadius(node.type, featured, variant)
   const geometry = nodeGeometry(node.type, featured, variant)
   const material = rememberOpacity(track(new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    map: planetTexture(node, color),
-    emissive: color,
-    emissiveIntensity: featured ? .48 : .3,
+    map: planetTexture(node, profile),
+    emissive: profile.glow,
+    emissiveIntensity: featured ? .32 : .18,
     roughness: variant === 3 ? .82 : .72,
     metalness: .04,
     transparent: true,
@@ -744,15 +891,15 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
   hitTarget.userData.nodeId = node.id
   group.add(hitTarget)
   interactive.push(hitTarget)
-  const atmosphere = new THREE.Mesh(geometry, atmosphereMaterial(color, featured ? .78 : .58))
+  const atmosphere = new THREE.Mesh(geometry, atmosphereMaterial(profile.atmosphere, featured ? .84 : .64))
   atmosphere.scale.setScalar(1.16)
   atmosphere.userData.nodeId = node.id
   group.add(atmosphere)
   const signalMaterial = rememberOpacity(track(new THREE.SpriteMaterial({
-    map: glowTexture('#79caff'),
-    color,
+    map: glowTexture(`#${profile.glow.toString(16).padStart(6, '0')}`),
+    color: profile.glow,
     transparent: true,
-    opacity: featured ? .38 : .28,
+    opacity: featured ? .46 : .34,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   })))
@@ -763,7 +910,7 @@ function addNode(node: MemoryNode, position: THREE.Vector3) {
   group.add(signal)
   if (variant === 1 || hash(node.id) % 9 === 0) {
     const ringGroup = new THREE.Group()
-    const ringColor = new THREE.Color(color).lerp(new THREE.Color(0xb9b2a2), .34)
+    const ringColor = new THREE.Color(profile.accent).lerp(new THREE.Color(0xd8e4ed), .22)
     for (const [ringRadius, thickness, opacity] of [[1.38, .035, .28], [1.53, .06, .34], [1.7, .028, .2]] as const) {
       ringGroup.add(new THREE.Mesh(
         track(new THREE.TorusGeometry(radius * ringRadius, radius * thickness, 5, lowQuality ? 32 : 64)),
@@ -867,6 +1014,7 @@ function clearSceneContent() {
   core = null
   sun = null
   blackHole = null
+  spaceStation = null
   meteor = null
   meteorTrail = null
   warpLines = null
@@ -879,6 +1027,7 @@ function buildScene() {
   addStarField()
   addSun()
   addBlackHole()
+  addSpaceStation()
   addCore()
   const years = [...new Set(props.nodes.map(yearOf).filter((year): year is number => year != null))].sort((a, b) => b - a)
   if (years.length) {
@@ -1073,10 +1222,17 @@ function animate(now = performance.now()) {
       sun.scale.setScalar(pulse)
     }
     if (blackHole) {
-      blackHole.rotation.y -= delta * .045
+      blackHole.rotation.y -= delta * .055
       blackHole.rotation.z = Math.sin(elapsed * .18) * .025
-      const halo = blackHole.children[3]
-      if (halo) halo.scale.setScalar(68 + Math.sin(elapsed * .7) * 2.5)
+      const disk = blackHole.getObjectByName('black-hole-disk')
+      if (disk) disk.rotation.z += delta * .16
+      const halo = blackHole.getObjectByName('black-hole-halo')
+      if (halo) halo.scale.setScalar(78 + Math.sin(elapsed * .7) * 3.5)
+    }
+    if (spaceStation) {
+      spaceStation.rotation.y += delta * .045
+      const habitatRing = spaceStation.getObjectByName('station-habitat-ring')
+      if (habitatRing) habitatRing.rotation.z += delta * .22
     }
     starLayers.forEach((stars, index) => {
       stars.rotation.y += delta * (.004 + index * .006)
@@ -1115,7 +1271,7 @@ function animate(now = performance.now()) {
       meteorTrail.visible = visible
     }
 
-    const introProgress = Math.min(1, (now - introStartedAt) / 3200)
+    const introProgress = Math.max(0, Math.min(1, (now - introStartedAt) / 3200))
     if (!introInterrupted && introProgress < 1) {
       const eased = 1 - Math.pow(1 - introProgress, 4)
       const mobile = window.innerWidth < 720
@@ -1182,8 +1338,8 @@ async function initialize() {
     controls.enableRotate = !props.ambient
     controls.enableZoom = !props.ambient
     controls.enabled = !props.ambient
-    const ambientLight = new THREE.AmbientLight(0xb9a98b, .72); ambientLight.name = 'ambient-light'; scene.add(ambientLight)
-    const keyLight = new THREE.PointLight(0xf0b76b, 880, 420); keyLight.name = 'key-light'; keyLight.position.set(0, 18, 28); scene.add(keyLight)
+    const ambientLight = new THREE.AmbientLight(0x8caed2, .56); ambientLight.name = 'ambient-light'; scene.add(ambientLight)
+    const keyLight = new THREE.PointLight(0xbad7f5, 620, 420); keyLight.name = 'key-light'; keyLight.position.set(0, 18, 28); scene.add(keyLight)
     buildScene()
     resizeObserver = new ResizeObserver(resize)
     resizeObserver.observe(host.value)
@@ -1191,7 +1347,7 @@ async function initialize() {
     host.value.addEventListener('pointerdown', onPointerDown)
     host.value.addEventListener('click', onClick)
     idleSince = performance.now()
-    introStartedAt = performance.now()
+    introStartedAt = performance.now() + Math.max(0, props.introDelayMs)
     introInterrupted = Boolean(props.selectedId)
     lastFrame = 0
     resize()
@@ -1229,9 +1385,9 @@ watch(() => [props.graphVersion, props.nodes, props.relations, props.routeNodeId
   renderer.toneMappingExposure = 1.02
   scene.fog = new THREE.FogExp2(spaceBackground(), .0016)
   const ambientLight = scene.getObjectByName('ambient-light') as THREE.AmbientLight | undefined
-  if (ambientLight) { ambientLight.color.setHex(0xb9a98b); ambientLight.intensity = .72 }
+  if (ambientLight) { ambientLight.color.setHex(0x8caed2); ambientLight.intensity = .56 }
   const keyLight = scene.getObjectByName('key-light') as THREE.PointLight | undefined
-  if (keyLight) { keyLight.color.setHex(0xf0b76b); keyLight.intensity = 880 }
+  if (keyLight) { keyLight.color.setHex(0xbad7f5); keyLight.intensity = 620 }
   buildScene()
 })
 watch(() => props.selectedId, () => applySelection())
