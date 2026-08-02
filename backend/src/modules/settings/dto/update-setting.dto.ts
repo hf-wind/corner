@@ -1,9 +1,10 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { Allow, IsString, IsNotEmpty } from 'class-validator';
 
 export class UpdateSettingDto {
   @IsString()
   @IsNotEmpty()
   key: string;
 
-  value: any;
+  @Allow()
+  value: unknown;
 }

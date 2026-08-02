@@ -1,4 +1,4 @@
-import { IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateTagDto {
   @IsString()
@@ -8,4 +8,14 @@ export class CreateTagDto {
   @IsString()
   @MaxLength(50)
   slug: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  icon?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  color?: string | null;
 }

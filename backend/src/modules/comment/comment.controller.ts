@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { OptionalReasonDto } from '../../common/dto/request-body.dto';
 
 @Controller('comments')
 export class CommentController {
@@ -15,8 +26,14 @@ export class CommentController {
   @Get()
   findAll(@Query() query: { page?: string; limit?: string; status?: string }) {
     return this.comment.findAll({
-      page: Math.max(1, Math.min(500, query.page ? parseInt(query.page) || 1 : 1)),
-      limit: Math.max(1, Math.min(100, query.limit ? parseInt(query.limit) || 20 : 20)),
+      page: Math.max(
+        1,
+        Math.min(500, query.page ? parseInt(query.page) || 1 : 1),
+      ),
+      limit: Math.max(
+        1,
+        Math.min(100, query.limit ? parseInt(query.limit) || 20 : 20),
+      ),
       status: query.status,
     });
   }
@@ -85,8 +102,8 @@ export class CommentController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post(':id/reject')
-  reject(@Param('id') id: string, @Body('reason') reason?: string) {
-    return this.comment.reject(id, reason);
+  reject(@Param('id') id: string, @Body() dto: OptionalReasonDto) {
+    return this.comment.reject(id, dto.reason);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

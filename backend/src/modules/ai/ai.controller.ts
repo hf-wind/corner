@@ -22,6 +22,7 @@ import { GenerateArticleDto } from './dto/generate-article.dto';
 import { PolishMomentDto } from './dto/polish-moment.dto';
 import { CreateAiModelConfigDto } from './dto/create-ai-model-config.dto';
 import { UpdateAiModelConfigDto } from './dto/update-ai-model-config.dto';
+import { TestAiConnectionDto } from './dto/test-ai-connection.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -153,8 +154,8 @@ export class AiController {
   @Post('admin/test')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  testConnection(@Body() body?: { modelConfigId?: string }) {
-    return this.ai.testConnection(body?.modelConfigId);
+  testConnection(@Body() dto: TestAiConnectionDto) {
+    return this.ai.testConnection(dto?.modelConfigId);
   }
 
   @Get('admin/models')
@@ -175,7 +176,10 @@ export class AiController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   updateModel(@Param('id') id: string, @Body() dto: UpdateAiModelConfigDto) {
-    return this.ai.updateModelConfig(id, dto as unknown as Record<string, unknown>);
+    return this.ai.updateModelConfig(
+      id,
+      dto as unknown as Record<string, unknown>,
+    );
   }
 
   @Delete('admin/models/:id')

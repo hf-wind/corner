@@ -1,8 +1,17 @@
-import { Body, Controller, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { MusicService } from './music.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { UpdateMusicConfigDto } from './dto/update-music-config.dto';
 
 @Controller('music')
 export class MusicController {
@@ -48,8 +57,8 @@ export class MusicController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Put('admin/config')
-  async updateConfig(@Body() body: { config?: Record<string, unknown> }) {
-    const config = await this.music.updateConfig(body?.config || {});
+  async updateConfig(@Body() dto: UpdateMusicConfigDto) {
+    const config = await this.music.updateConfig(dto.config || {});
     return {
       config,
       defaults: this.music.getDefaults(),

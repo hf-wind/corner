@@ -1,4 +1,19 @@
-import { BadRequestException, Controller, ForbiddenException, Get, Post, Put, Delete, Param, Query, UseGuards, UseInterceptors, UploadedFile, Req, Body } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  ForbiddenException,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Req,
+  Body,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -6,6 +21,14 @@ import { MediaService } from './media.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { MediaMetadataService } from './media-metadata.service';
+import {
+  ConfirmMediaMetadataDto,
+  CreateMediaFolderDto,
+  ImportMediaUrlDto,
+  MediaIdsDto,
+  MoveMediaDto,
+  UploadMediaDto,
+} from './dto/media-request.dto';
 
 @Controller('media')
 export class MediaController {
@@ -41,8 +64,8 @@ export class MediaController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post('folders')
-  createFolder(@Body() body: { name: string }) {
-    return this.media.createFolder(body.name);
+  createFolder(@Body() dto: CreateMediaFolderDto) {
+    return this.media.createFolder(dto.name);
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -53,39 +76,55 @@ export class MediaController {
       limits: { fileSize: 30 * 1024 * 1024 },
     }),
   )
-  upload(@UploadedFile() file: Express.Multer.File, @Req() req: any, @Body() body: any) {
+  upload(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+    @Body() dto: UploadMediaDto,
+  ) {
     const isAdmin = req.user?.role === 'admin';
-    if (!isAdmin && body?.folder !== 'avatar') {
+    if (!isAdmin && dto?.folder !== 'avatar') {
       throw new ForbiddenException('普通用户只能上传头像');
     }
-    if (!isAdmin && !['image/jpeg', 'image/png', 'image/webp'].includes(file?.mimetype)) {
+    if (
+      !isAdmin &&
+      !['image/jpeg', 'image/png', 'image/webp'].includes(file?.mimetype)
+    ) {
       throw new BadRequestException('头像仅支持 JPG、PNG 或 WebP');
     }
     if (!isAdmin && file?.size > 8 * 1024 * 1024) {
       throw new BadRequestException('头像文件不能超过 8MB');
     }
-    return this.media.create(file, req.user?.id, isAdmin ? body?.folder : 'avatar', isAdmin && body?.compressAnimated === 'true');
+    return this.media.create(
+      file,
+      req.user?.id,
+      isAdmin ? dto?.folder : 'avatar',
+      isAdmin && dto?.compressAnimated === 'true',
+    );
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post('import-url')
-  importUrl(@Body() body: { url?: string; folder?: string }, @Req() req: any) {
-    return this.media.importFromUrl(body?.url || '', req.user?.id, body?.folder || 'cover');
+  importUrl(@Body() dto: ImportMediaUrlDto, @Req() req: any) {
+    return this.media.importFromUrl(
+      dto.url,
+      req.user?.id,
+      dto.folder || 'cover',
+    );
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Put('batch/move')
-  batchMove(@Body() body: { ids: string[]; folder: string }) {
-    return this.media.batchMove(body.ids, body.folder);
+  batchMove(@Body() dto: MoveMediaDto) {
+    return this.media.batchMove(dto.ids, dto.folder);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post('batch/delete')
-  batchRemove(@Body() body: { ids: string[] }) {
-    return this.media.batchRemove(body.ids);
+  batchRemove(@Body() dto: MediaIdsDto) {
+    return this.media.batchRemove(dto.ids);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -98,8 +137,11 @@ export class MediaController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Put(':id/metadata')
-  confirmMetadata(@Param('id') id: string, @Body() body: { capturedAt?: string | null; placeId?: string | null }) {
-    return this.metadata.confirm(id, body);
+  confirmMetadata(
+    @Param('id') id: string,
+    @Body() dto: ConfirmMediaMetadataDto,
+  ) {
+    return this.metadata.confirm(id, dto);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

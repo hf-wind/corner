@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { AssignPostIdsDto } from '../../common/dto/request-body.dto';
 
 @Controller('categories')
 export class CategoryController {
@@ -32,8 +43,8 @@ export class CategoryController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post(':slug/posts')
-  assignPosts(@Param('slug') slug: string, @Body('postIds') postIds: string[]) {
-    return this.cat.assignPosts(slug, postIds);
+  assignPosts(@Param('slug') slug: string, @Body() dto: AssignPostIdsDto) {
+    return this.cat.assignPosts(slug, dto.postIds);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

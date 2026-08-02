@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { TagService } from './tag.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { AssignPostIdsDto } from '../../common/dto/request-body.dto';
 
 @Controller('tags')
 export class TagController {
@@ -32,8 +43,8 @@ export class TagController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post(':slug/posts')
-  assignPosts(@Param('slug') slug: string, @Body('postIds') postIds: string[]) {
-    return this.tag.assignPosts(slug, postIds);
+  assignPosts(@Param('slug') slug: string, @Body() dto: AssignPostIdsDto) {
+    return this.tag.assignPosts(slug, dto.postIds);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

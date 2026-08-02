@@ -148,7 +148,7 @@ async function generate() {
 async function generateArticle(text:string) {
   const result=await api.post<any>('/ai/generate-article',{outline:text})
   const title=result.title || text.slice(0,40); const slug=result.slug || buildSlug(title)
-  const post=await api.post<any>('/posts',{title,slug,content:result.content || '',excerpt:result.excerpt || '',coverImage:result.coverImage || '',categoryId:result.categoryId || undefined,tagIds:result.tagIds || [],featured:false,type:'article'})
+  const post=await api.post<any>('/posts',{title,slug,content:result.content || '',excerpt:result.excerpt || '',coverImage:result.coverImage || '',categoryId:result.categoryId || undefined,tagIds:result.tagIds || [],featured:false})
   const finalSlug=post?.slug || slug
   Modal.confirm({title:'文章草稿已创建',content:`《${title}》已保存，可以继续编辑或预览。`,okText:'继续编辑',cancelText:'返回列表',onOk:()=>router.push(`/admin/posts/${encodeURIComponent(finalSlug)}`),onCancel:()=>router.push('/admin/posts')})
 }

@@ -1,10 +1,25 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { FriendLinkService } from './friend-link.service';
 import { CreateFriendApplicationDto } from './dto/create-friend-application.dto';
 import { SendRemoveCodeDto, VerifyRemoveDto } from './dto/remove-friend.dto';
+import {
+  InspectSiteDto,
+  UpdateMySiteInfoDto,
+} from './dto/friend-link-request.dto';
+import { OptionalReasonDto } from '../../common/dto/request-body.dto';
 
 @Controller('friend-link')
 export class FriendLinkController {
@@ -21,8 +36,8 @@ export class FriendLinkController {
   }
 
   @Post('inspect-site')
-  inspectSite(@Body('url') url: string) {
-    return this.friendLinkService.inspectSite(url);
+  inspectSite(@Body() dto: InspectSiteDto) {
+    return this.friendLinkService.inspectSite(dto.url);
   }
 
   @Post('remove/send-code')
@@ -67,8 +82,8 @@ export class FriendLinkController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Post('applications/:id/reject')
-  rejectApplication(@Param('id') id: string, @Body('reason') reason?: string) {
-    return this.friendLinkService.rejectApplication(id, reason);
+  rejectApplication(@Param('id') id: string, @Body() dto: OptionalReasonDto) {
+    return this.friendLinkService.rejectApplication(id, dto.reason);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -81,7 +96,7 @@ export class FriendLinkController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Put('my-site')
-  updateMySiteInfo(@Body() data: Record<string, any>) {
-    return this.friendLinkService.updateMySiteInfo(data);
+  updateMySiteInfo(@Body() dto: UpdateMySiteInfoDto) {
+    return this.friendLinkService.updateMySiteInfo({ ...dto });
   }
 }
