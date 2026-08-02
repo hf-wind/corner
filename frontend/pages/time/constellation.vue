@@ -42,21 +42,6 @@
       </div>
     </header>
 
-    <nav class="cosmic-dock" aria-label="深空信标">
-      <button
-        v-for="item in discoveries"
-        :key="item.id"
-        type="button"
-        :class="{ active: activeDiscovery?.id === item.id }"
-        :title="item.title"
-        :aria-label="item.title"
-        @click="openDiscovery(item.id)"
-      >
-        <Icon :name="item.icon" />
-        <span>{{ item.shortLabel }}</span>
-      </button>
-    </nav>
-
     <section class="constellation-intro" aria-labelledby="constellation-title">
       <div class="intro-kicker"><span>MY TIME UNIVERSE</span><i /><em>{{ timeRange }}</em></div>
       <h1 id="constellation-title">时光星图</h1>
@@ -64,7 +49,7 @@
     </section>
 
     <footer class="constellation-foot">
-      <span><i />{{ latestLabel }}<b><em />发光天体为真实记忆 · 深空信标藏有回声</b></span>
+      <span><i />{{ latestLabel }}<b><em />点击太阳、黑洞、空间站、卫星与风隅号读取遥测</b></span>
       <div aria-label="星图交互状态">
         <Icon name="ph:cursor-click-bold" />
         <Icon name="ph:arrows-out-cardinal-bold" />
@@ -97,21 +82,38 @@
       <aside
         v-if="activeDiscovery"
         class="discovery-popup"
+        :class="`discovery-${activeDiscovery.id}`"
         :style="{ '--discovery-accent': activeDiscovery.accent }"
+        role="dialog"
+        :aria-label="`${activeDiscovery.title}遥测档案`"
       >
         <button class="popup-close" type="button" title="关闭" aria-label="关闭" @click="clearDiscovery"><Icon name="ph:x-bold" /></button>
-        <div class="discovery-orbit" aria-hidden="true"><i /><i /><i /></div>
-        <div class="discovery-identity"><Icon :name="activeDiscovery.icon" /><span>{{ activeDiscovery.kicker }}</span></div>
-        <h2>{{ activeDiscovery.title }}</h2>
+        <header class="discovery-identity">
+          <span><Icon :name="activeDiscovery.icon" /></span>
+          <div><small>{{ activeDiscovery.kicker }}</small><b>{{ activeDiscovery.status }}</b></div>
+          <em><i />科学模拟</em>
+        </header>
+        <div class="discovery-title"><h2>{{ activeDiscovery.title }}</h2><span>{{ activeDiscovery.catalog }}</span></div>
         <p>{{ activeDiscovery.description }}</p>
-        <div class="discovery-signal" aria-live="polite">
-          <small>{{ activeDiscovery.signalLabel }}</small>
-          <strong>{{ discoveryResult || activeDiscovery.signal }}</strong>
+        <div class="telemetry-grid">
+          <div v-for="metric in activeTelemetry.metrics" :key="metric.label">
+            <small>{{ metric.label }}</small><strong>{{ metric.value }}</strong>
+          </div>
         </div>
-        <button class="discovery-action" type="button" @click="runDiscoveryEffect">
-          <Icon :name="activeDiscovery.actionIcon" />
-          <span>{{ activeDiscovery.action }}</span>
-        </button>
+        <div class="discovery-signal" aria-live="polite">
+          <div><small>{{ activeDiscovery.signalLabel }}</small><time>{{ activeTelemetry.sampleTime }}</time></div>
+          <strong>{{ discoveryResult || activeTelemetry.report }}</strong>
+          <span>{{ activeTelemetry.basis }}</span>
+        </div>
+        <div class="discovery-commands" :aria-label="`${activeDiscovery.title}指令`">
+          <button
+            v-for="command in activeDiscovery.commands"
+            :key="command.id"
+            type="button"
+            :class="{ active: activeCommandId === command.id }"
+            @click="runDiscoveryCommand(command.id)"
+          ><Icon :name="command.icon" /><span>{{ command.label }}</span></button>
+        </div>
       </aside>
     </Transition>
   </main>
@@ -144,20 +146,26 @@ type GraphRelation = {
 }
 
 type DiscoveryId = 'sun' | 'black-hole' | 'station' | 'satellite' | 'spacecraft'
+type DiscoveryCommandId = 'sample' | 'scan' | 'tour' | 'log' | 'signal' | 'orbit' | 'bridge' | 'warp'
 
 type Discovery = {
   id: DiscoveryId
   title: string
-  shortLabel: string
+  catalog: string
   kicker: string
+  status: string
   description: string
   signalLabel: string
-  signal: string
   icon: string
-  actionIcon: string
-  action: string
   accent: string
-  responses: string[]
+  commands: { id: DiscoveryCommandId; label: string; icon: string }[]
+}
+
+type DiscoveryTelemetry = {
+  report: string
+  sampleTime: string
+  basis: string
+  metrics: { label: string; value: string }[]
 }
 
 const api = useApi()
@@ -171,17 +179,21 @@ const sceneRef = ref<{
   resetView: () => void
   focusDiscovery: (id: DiscoveryId) => void
   triggerDiscoveryEffect: (id: DiscoveryId) => void
+  startDiscoveryTour: (id: DiscoveryId) => void
 } | null>(null)
 const selected = ref<GraphNode | null>(null)
 const activeDiscoveryId = ref<DiscoveryId | ''>('')
 const discoveryResult = ref('')
 const discoverySequence = ref(0)
+const activeCommandId = ref<DiscoveryCommandId | ''>('')
+const telemetryNow = ref(new Date())
 const neighbors = ref<GraphRelation[]>([])
 const error = ref('')
 const sceneReady = ref(false)
 const fallbackMode = ref(false)
 const graphReady = ref(false)
 let requestSequence = 0
+let telemetryTimer: ReturnType<typeof setInterval> | null = null
 
 const typeOptions = [
   { value: 'memory', label: '时光记忆', icon: 'ph:planet-bold' },
@@ -196,39 +208,88 @@ const typeOptions = [
 
 const discoveries: Discovery[] = [
   {
-    id: 'sun', title: '日冕观测站', shortLabel: '太阳', kicker: 'SOLAR ARCHIVE · 01',
-    description: '这里保存所有被晨光照亮的时刻。每一束离开日冕的光，都要走八分二十秒才能抵达我们。',
-    signalLabel: '当前日冕回声', signal: '光球层稳定 · 一束旧日晨光正在抵达', icon: 'ph:sun-bold', actionIcon: 'ph:sparkle-bold', action: '采集一束日冕光', accent: '#ffbd68',
-    responses: ['光子样本 08:20 已封存：来自八分钟前的太阳。', '日冕里浮出一句话：今天也值得被照亮。', '捕获到一次微型耀斑，它把此刻标成了金色。'],
+    id: 'sun', title: '太阳', catalog: 'G2V · 黄矮星', kicker: 'SOL HELIOPHYSICS · 01', status: '日球层遥测在线',
+    description: '核心以质子－质子链持续把氢聚变为氦；能量穿过辐射区与对流区，最终以光和太阳风抵达星图。',
+    signalLabel: '太阳活动简报', icon: 'ph:sun-bold', accent: '#ffb95e',
+    commands: [{ id: 'sample', label: '刷新聚变遥测', icon: 'ph:wave-sine-bold' }],
   },
   {
-    id: 'black-hole', title: '事件视界', shortLabel: '黑洞', kicker: 'GRAVITY WELL · 02',
-    description: '光与时间在这里弯曲。投入事件视界的东西不会消失，只会变成宇宙无法复述的秘密。',
-    signalLabel: '引力读数', signal: '时间膨胀 1.37× · 边界稳定', icon: 'ph:circle-half-tilt-bold', actionIcon: 'ph:paper-plane-tilt-bold', action: '投递一封无人信', accent: '#a99aff',
-    responses: ['信件已越过事件视界。它不会回来，也不会再打扰你。', '引力潮汐收走了这段噪声，只留下安静。', '无人信失去时间戳，成为宇宙里一个温柔的秘密。'],
+    id: 'black-hole', title: '玄渊 X-1', catalog: '超大质量黑洞模型', kicker: 'EVENT HORIZON · 02', status: '吸积盘稳定',
+    description: '中央阴影不是实体表面，而是光无法逃逸的事件视界投影；明亮新月来自高速等离子体的相对论性多普勒增亮。',
+    signalLabel: '引力透镜重建', icon: 'ph:circle-half-tilt-bold', accent: '#ff8a4c',
+    commands: [{ id: 'scan', label: '扫描光子环', icon: 'ph:scan-bold' }],
   },
   {
-    id: 'station', title: '记忆空间站', shortLabel: '空间站', kicker: 'ORBITAL LOG · 03',
-    description: '一座绕记忆轨道运行的中继站。舷窗朝向被点亮的星球，值班员把偶然的幸福写进航行日志。',
-    signalLabel: '今日值班频道', signal: '舱压正常 · 远端记忆链路已接通', icon: 'ph:broadcast-bold', actionIcon: 'ph:radio-bold', action: '接收一则航行日志', accent: '#72d9ff',
-    responses: ['航行日志 021：窗外有一颗记忆刚刚亮起。', '航行日志 034：我们绕过旧日，仍在向前。', '航行日志 089：今日宇宙安静，适合想念。'],
+    id: 'station', title: '风隅轨道站', catalog: 'FYOS-01 · 近地轨道站', kicker: 'ORBITAL OPERATIONS · 03', status: '乘组值守中',
+    description: '一座长期在轨的记忆实验平台，承担材料暴露、生命支持与深空通信验证任务，每 92 分钟完成一圈轨道。',
+    signalLabel: '任务控制中心', icon: 'ph:broadcast-bold', accent: '#72d9ff',
+    commands: [{ id: 'tour', label: '环站视角巡航', icon: 'ph:orbit-bold' }, { id: 'log', label: '读取任务日志', icon: 'ph:notebook-bold' }],
   },
   {
-    id: 'satellite', title: '深空信标卫星', shortLabel: '卫星', kicker: 'BEACON ARRAY · 04',
-    description: '它在星图边缘缓慢巡航，替那些尚未相连的记忆寻找频率相同的邻居。',
-    signalLabel: '校准频段', signal: '1420.405 MHz · 弱信号持续靠近', icon: 'ph:planet-bold', actionIcon: 'ph:crosshair-simple-bold', action: '校准深空频率', accent: '#70e7cf',
-    responses: ['频率已锁定：一段久远的笑声正在返航。', '坐标校准完成：孤独信号找到了同频回声。', '信标完成握手：下一颗记忆星等待被点亮。'],
+    id: 'satellite', title: '听风一号', catalog: 'TF-1 · 光学通信卫星', kicker: 'BEACON NETWORK · 04', status: '太阳同步轨道运行',
+    description: '一颗兼具星间激光通信与光学遥感能力的试验卫星，在晨昏轨道上持续为离散记忆寻找同频信标。',
+    signalLabel: '星间链路状态', icon: 'ph:satellite-bold', accent: '#70e7cf',
+    commands: [{ id: 'signal', label: '发送窄带信号', icon: 'ph:broadcast-bold' }, { id: 'orbit', label: '重新锁定轨道', icon: 'ph:crosshair-simple-bold' }],
   },
   {
-    id: 'spacecraft', title: '远航信使', shortLabel: '飞船', kicker: 'COURIER FLIGHT · 05',
-    description: '它不运送货物，只携带尚未说出口的话。每次跃迁，都会在星图上留下一条短暂的蓝色航迹。',
-    signalLabel: '跃迁引擎', signal: '曲率核心待命 · 航路净空', icon: 'ph:rocket-launch-bold', actionIcon: 'ph:lightning-bold', action: '启动一次跃迁', accent: '#7ca8ff',
-    responses: ['跃迁完成：那句没说出口的话，正在前往它该去的地方。', '航路折叠成功，信使已穿过三段旧时光。', '曲率核心熄火，身后留下一条蓝色回声。'],
+    id: 'spacecraft', title: '风隅号', catalog: 'FY-01 · 深空巡航舰', kicker: 'WIND CORNER FLIGHT · 05', status: '三联离子驱动在线',
+    description: '以陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰，任务是把尚未说出口的话送往更远的恒星。',
+    signalLabel: '舰桥航行简报', icon: 'ph:rocket-launch-bold', accent: '#7ca8ff',
+    commands: [{ id: 'bridge', label: '舰桥追航', icon: 'ph:steering-wheel-bold' }, { id: 'warp', label: '曲率跃迁', icon: 'ph:lightning-bold' }],
   },
+]
+
+const solarReports = [
+  '核心区质子－质子链 I 分支保持主导，四个质子最终转化为一个氦-4 核，并以中微子与伽马光子带走能量。',
+  '辐射区光子仍在随机游走；核心产生的能量通常需要数万至数十万年才能抵达对流区边界。',
+  '对流区上涌等离子体形成新的米粒组织，单个米粒尺度接近一千公里，寿命约数分钟。',
+  '光球层有效温度维持在约 5772 K，当前可见光谱仍符合 G2V 型主序星特征。',
+  '色球层磁拱出现轻微剪切，模型未发现足以触发强耀斑的快速磁重联。',
+  '日冕温度模型超过一百万开尔文，远高于光球；加热机制仍与磁波和纳米耀斑有关。',
+  '一束光球光子已离开太阳，约 8 分 20 秒后抵达地球轨道附近。',
+  '太阳风跨过临界点进入超声速外流，预计数日后与地球磁层发生耦合。',
+  '当前扇区磁场以闭合磁力线为主，带电粒子被约束在日冕环内往返运动。',
+  '日震学模型捕获到 p 模振荡，五分钟尺度的声波正在反演太阳内部密度结构。',
+  '光球暗化区温度低于周围数千开尔文，因此在明亮背景上表现为太阳黑子。',
+  '差异自转仍然明显：太阳赤道约 25 天转一周，高纬区域接近 35 天。',
+  '核心每秒约将六亿吨氢转化为氦，其中约四百万吨质量以能量形式释放。',
+  '中微子几乎不与物质作用，产生后只需数秒便穿出太阳，为核心聚变提供即时证据。',
+  '辐照度模型在地球轨道处接近 1361 W/m²，短时波动主要由磁活动调制。',
+  '日冕洞区域的开放磁力线正在向行星际空间输送高速太阳风。',
+  '磁通管穿越光球后形成成对活动区，极性方向符合当前太阳活动周的统计规律。',
+  '一条暗色日珥沿磁场悬浮于色球层上方，冷而致密的等离子体尚未发生喷发。',
+  '当前紫外辐射模型平稳，电离层受扰风险维持在低水平。',
+  '太阳常数并非绝对不变，完整活动周内总辐照度变化约为千分之一。',
+  '光球谱线出现轻微多普勒位移，对应米粒组织上升与下沉的对流速度。',
+  '核心温度约一千五百万开尔文，量子隧穿让质子在低于经典阈值时仍能发生聚变。',
+  '太阳年龄约 46 亿年，核心氢储量足以让主序阶段再持续约 50 亿年。',
+  '日球层顶之外是星际介质；太阳风塑造的巨大磁泡保护着整个行星系统。',
+]
+
+const blackHoleReports = [
+  '靠近我们的吸积盘一侧因相对论性多普勒增亮形成明亮新月，远离侧则被红移并显著变暗。',
+  '光子环来自绕黑洞多次偏折的极少量光线，它比事件视界更外侧，也比吸积盘更细锐。',
+  '中央阴影直径大于事件视界本身，因为强引力把本应掠过的光线再次弯向黑洞。',
+  '吸积盘内缘接近最内稳定圆轨道；再向内，物质无法维持圆轨道并快速坠入事件视界。',
+  '事件视界不是固体表面，而是一条因果边界；一旦越过，任何信号都无法返回外部宇宙。',
+  '模型质量设为 65 亿倍太阳质量，对应史瓦西半径约 128 个天文单位。',
+  '盘面等离子体被摩擦与磁湍流加热，辐射颜色由外侧暗红逐渐过渡到内侧白热。',
+  '引力透镜同时显示吸积盘正面与被弯曲到上方的背面影像，视觉上形成双层光带。',
+  '磁旋转不稳定性从吸积盘抽取角动量，使物质可以缓慢向内迁移。',
+  '极轴喷流由强磁场准直，并非从事件视界内部射出，而是源于其外侧的旋转等离子体。',
+  '越接近事件视界，远方观察者看到的时钟越慢；自由落体者自身却不会在边界处感到停顿。',
+  '黑洞本身不发光，画面中的所有亮度都来自周围物质、喷流以及被引力弯曲的背景光。',
+  '克尔黑洞的自旋会拖拽邻近时空，能层中的粒子无法相对遥远恒星保持静止。',
+  '当前偏振模型显示磁场沿吸积流呈螺旋结构，为喷流形成提供了能量通道。',
+  '潮汐力取决于黑洞质量；对超大质量黑洞而言，跨越事件视界时局部潮汐梯度可能并不剧烈。',
+  '霍金辐射对恒星级以上黑洞极其微弱，其温度远低于宇宙微波背景。',
+  '吸积流亮度保持在爱丁顿极限以下，辐射压力暂未能阻止物质继续落入。',
+  '这是一套基于广义相对论视觉特征的艺术模拟，并非对某个真实天体的实时观测。',
 ]
 
 const displayNodes = computed(() => graph.nodes)
 const activeDiscovery = computed(() => discoveries.find(item => item.id === activeDiscoveryId.value) || null)
+const activeTelemetry = computed<DiscoveryTelemetry>(() => buildDiscoveryTelemetry(activeDiscoveryId.value, telemetryNow.value, discoverySequence.value))
 const displayRelations = computed(() => graph.relations)
 const displayGraphVersion = computed(() => graph.graphVersion || `empty-${graph.nodes.length}`)
 const nodeYears = computed(() => graph.nodes
@@ -243,7 +304,105 @@ const signalText = computed(() => graph.nodes.length
   ? `${graph.nodes.length} 枚真实记忆已点亮`
   : error.value ? '宇宙底图运行中 · 真实记忆暂未连接' : '宇宙底图运行中 · 等待首次点亮')
 
-onMounted(loadGraph)
+const stationLogs = [
+  '任务日志 184：乘组完成材料暴露载荷回收，样品已转入恒温舱。',
+  '任务日志 197：机械臂完成自主巡检，桁架节点热控状态正常。',
+  '任务日志 203：舷窗掠过晨昏线，太阳能翼完成新一轮对日定向。',
+  '任务日志 216：生命支持闭环效率维持 93.8%，下一次维护窗口已排定。',
+  '任务日志 229：深空链路捕获一颗新记忆星，时间戳已写入轨道档案。',
+]
+
+function daysSince(value: string, now = telemetryNow.value) {
+  return Math.max(0, Math.floor((now.getTime() - new Date(value).getTime()) / 86_400_000))
+}
+
+function sample<T>(items: T[], seed: number) {
+  return items[Math.abs(seed) % items.length]!
+}
+
+function buildDiscoveryTelemetry(id: DiscoveryId | '', now: Date, sequence: number): DiscoveryTelemetry {
+  const sampleTime = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+  const minuteSeed = Math.floor(now.getTime() / 60_000) + sequence * 17
+  const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600
+  const hourAngle = (hours - 12) * 15
+  const solarLongitude = ((now.getTime() / 86_400_000) % 27.2753) / 27.2753 * 360
+  const empty = { report: '', sampleTime, basis: '', metrics: [] }
+  if (id === 'sun') {
+    return {
+      report: `${sample(solarReports, minuteSeed)} 当前本地时角 ${hourAngle >= 0 ? '+' : ''}${hourAngle.toFixed(1)}°，可见日面模型已旋转至 ${solarLongitude.toFixed(1)}°。`,
+      sampleTime,
+      basis: '基于标准太阳模型、27.2753 日会合自转周期与客户端本地时间生成',
+      metrics: [
+        { label: '本地太阳时角', value: `${hourAngle >= 0 ? '+' : ''}${hourAngle.toFixed(1)}°` },
+        { label: '模型日面经度', value: `${solarLongitude.toFixed(1)}°` },
+        { label: '光行时间', value: '08m 20s' },
+        { label: '辐照度模型', value: `${(1361 + Math.sin(hours / 24 * Math.PI * 2) * 1.1).toFixed(1)} W/m²` },
+      ],
+    }
+  }
+  if (id === 'black-hole') {
+    return {
+      report: sample(blackHoleReports, minuteSeed), sampleTime,
+      basis: '参考克尔黑洞、广义相对论光线弯曲与 M87* 量级参数构建的视觉模型',
+      metrics: [
+        { label: '模型质量', value: '65 亿 M☉' },
+        { label: '史瓦西半径', value: '约 128 AU' },
+        { label: '阴影角直径', value: '约 40 μas' },
+        { label: '吸积盘倾角', value: '17.2°' },
+      ],
+    }
+  }
+  if (id === 'station') {
+    const days = daysSince('2022-04-16T09:42:00+08:00', now)
+    const evaDays = daysSince('2026-07-23T14:10:00+08:00', now)
+    return {
+      report: `风隅轨道站已连续运行 ${days} 天。本轨道圈生命支持、姿态控制与热控系统均在标称范围，上次出舱任务完成于 ${evaDays} 天前。`,
+      sampleTime,
+      basis: '任务档案为叙事模拟；轨道周期按 400 km 级近地圆轨道估算',
+      metrics: [
+        { label: '连续在轨', value: `${days} 天` },
+        { label: '累计绕行', value: `${new Intl.NumberFormat('zh-CN').format(Math.floor(days * 15.65))} 圈` },
+        { label: '完成任务', value: `${126 + Math.floor(days / 9)} 项` },
+        { label: '上次出舱', value: `${evaDays} 天前` },
+      ],
+    }
+  }
+  if (id === 'satellite') {
+    const days = daysSince('2024-10-24T06:32:00+08:00', now)
+    return {
+      report: `听风一号正通过降交点晨昏轨道，星敏感器已锁定。第 ${Math.floor(days * 14.72)} 圈遥测帧完整，下一通信窗口约 ${7 + Math.abs(minuteSeed % 14)} 分钟后开启。`,
+      sampleTime,
+      basis: '按 612 km 太阳同步圆轨道与每日约 14.72 圈的工程模型生成',
+      metrics: [
+        { label: '卫星类型', value: '光学通信' },
+        { label: '在轨时间', value: `${days} 天` },
+        { label: '轨道高度', value: '612 km' },
+        { label: '链路时延', value: `${(4.1 + Math.sin(hours) * .6).toFixed(1)} ms` },
+      ],
+    }
+  }
+  if (id === 'spacecraft') {
+    const days = daysSince('2026-03-21T20:26:00+08:00', now)
+    return {
+      report: `风隅号正在执行 FY-01 第 ${days} 航日巡航。三联离子驱动阵列同步率 ${(99.94 + Math.sin(hours) * .03).toFixed(2)}%，舰桥已将下一颗记忆星设为航向基准。`,
+      sampleTime,
+      basis: '深空舰为科幻工程设定，推进与曲率数据用于交互叙事，不代表现实可用技术',
+      metrics: [
+        { label: '任务航日', value: `D+${days}` },
+        { label: '巡航速度', value: `${(38.6 + Math.sin(hours * .7) * 1.8).toFixed(1)} km/s` },
+        { label: '驱动阵列', value: '3 / 3 在线' },
+        { label: '航向误差', value: `${Math.abs(Math.sin(hours * 1.3) * .06).toFixed(3)}°` },
+      ],
+    }
+  }
+  return empty
+}
+
+onMounted(() => {
+  void loadGraph()
+  telemetryTimer = setInterval(() => { telemetryNow.value = new Date() }, 30_000)
+})
+onBeforeUnmount(() => { if (telemetryTimer) clearInterval(telemetryTimer) })
 
 async function loadGraph() {
   const sequence = ++requestSequence
@@ -270,6 +429,7 @@ async function loadGraph() {
 async function selectNode(node: GraphNode, syncUrl = true) {
   activeDiscoveryId.value = ''
   discoveryResult.value = ''
+  activeCommandId.value = ''
   selected.value = node
   selectMemory({ id: node.id, type: node.type, href: node.href })
   if (syncUrl) await router.replace({ query: { focus: node.id } })
@@ -291,26 +451,47 @@ function handleDiscovery(id: DiscoveryId) {
   clearMemory()
   activeDiscoveryId.value = id
   discoveryResult.value = ''
+  activeCommandId.value = ''
+  discoverySequence.value += 1
   void router.replace({ query: {} })
-}
-
-function openDiscovery(id: DiscoveryId) {
-  handleDiscovery(id)
-  sceneRef.value?.focusDiscovery(id)
 }
 
 function clearDiscovery() {
   activeDiscoveryId.value = ''
   discoveryResult.value = ''
+  activeCommandId.value = ''
   sceneRef.value?.resetView()
 }
 
-function runDiscoveryEffect() {
+function runDiscoveryCommand(commandId: DiscoveryCommandId) {
   const discovery = activeDiscovery.value
   if (!discovery) return
-  discoveryResult.value = discovery.responses[discoverySequence.value % discovery.responses.length] || discovery.signal
+  activeCommandId.value = commandId
   discoverySequence.value += 1
-  sceneRef.value?.triggerDiscoveryEffect(discovery.id)
+  telemetryNow.value = new Date()
+  if (commandId === 'tour') {
+    discoveryResult.value = '环站巡航已接管视角：正沿桁架、实验舱与太阳翼外缘飞行。'
+    sceneRef.value?.startDiscoveryTour('station')
+  } else if (commandId === 'bridge') {
+    discoveryResult.value = '舰桥追航已启动：视角锁定风隅号尾部，航向由飞船实时姿态驱动。'
+    sceneRef.value?.startDiscoveryTour('spacecraft')
+  } else if (commandId === 'log') {
+    discoveryResult.value = sample(stationLogs, discoverySequence.value)
+    sceneRef.value?.triggerDiscoveryEffect('station')
+  } else if (commandId === 'signal') {
+    discoveryResult.value = `窄带信标 FY-${String(discoverySequence.value).padStart(4, '0')} 已发射，载频 1420.405 MHz，等待同频回执。`
+    sceneRef.value?.triggerDiscoveryEffect('satellite')
+  } else if (commandId === 'orbit') {
+    discoveryResult.value = '轨道解算完成：听风一号已重新锁定晨昏面，姿态误差回落至 0.02°。'
+    sceneRef.value?.focusDiscovery('satellite')
+    sceneRef.value?.triggerDiscoveryEffect('satellite')
+  } else if (commandId === 'warp') {
+    discoveryResult.value = '曲率航路已展开：风隅号正在穿越星图，舰桥将持续追踪跃迁航迹。'
+    sceneRef.value?.triggerDiscoveryEffect('spacecraft')
+  } else {
+    discoveryResult.value = ''
+    sceneRef.value?.triggerDiscoveryEffect(discovery.id)
+  }
 }
 
 function resetScene() {
@@ -322,6 +503,7 @@ function resetScene() {
   }
   activeDiscoveryId.value = ''
   discoveryResult.value = ''
+  activeCommandId.value = ''
   sceneRef.value?.resetView()
 }
 
@@ -333,6 +515,7 @@ function clearSelected() {
   if (activeDiscoveryId.value) {
     activeDiscoveryId.value = ''
     discoveryResult.value = ''
+    activeCommandId.value = ''
     sceneRef.value?.resetView()
   }
 }
@@ -396,13 +579,6 @@ useHead({ title: '时光星图' })
 .signal.offline>i { background:#8298ad; box-shadow:0 0 10px #55758f; }
 .signal button { display:grid; width:30px; height:30px; border:1px solid rgb(117 181 236 / .2); border-radius:50%; background:rgb(4 15 31 / .5); color:#8fc8f5; place-items:center; transition:background .25s ease,transform .25s ease; }
 .signal button:hover { background:rgb(35 91 141 / .4); transform:translateY(-2px); }
-.cosmic-dock { position:absolute; z-index:12; top:22px; left:50%; display:flex; height:38px; align-items:stretch; gap:2px; padding:2px; border:1px solid rgb(110 189 235 / .16); border-radius:8px; background:rgb(3 14 30 / .62); box-shadow:0 12px 34px rgb(0 0 0 / .24); backdrop-filter:blur(16px); transform:translateX(-50%); }
-.cosmic-dock button { display:flex; min-width:66px; align-items:center; justify-content:center; gap:6px; padding:0 9px; border:1px solid transparent; border-radius:6px; background:transparent; color:#7898af; cursor:pointer; font:inherit; transition:background .22s ease,border-color .22s ease,color .22s ease,transform .22s ease; }
-.cosmic-dock button :deep(svg) { flex:none; font-size:.78rem; }
-.cosmic-dock button span { font-size:.54rem; white-space:nowrap; }
-.cosmic-dock button:hover { border-color:rgb(111 207 245 / .2); background:rgb(48 119 165 / .16); color:#c8edff; transform:translateY(-1px); }
-.cosmic-dock button.active { border-color:rgb(118 216 255 / .38); background:rgb(53 139 190 / .22); color:#dff6ff; box-shadow:inset 0 0 18px rgb(78 181 231 / .08); }
-.cosmic-dock button:focus-visible { outline:2px solid #4a9fe6; outline-offset:3px; }
 .constellation-intro { position:absolute; z-index:8; bottom:74px; left:clamp(22px,6vw,92px); width:min(540px,calc(100vw - 44px)); pointer-events:none; opacity:0; transform:translateY(18px); transition:opacity 1s ease .9s,transform 1.3s cubic-bezier(.16,1,.3,1) .9s; }
 .ready .constellation-intro { opacity:1; transform:none; }
 .intro-kicker { display:flex; align-items:center; gap:9px; color:#73c7ee; font-size:.54rem; letter-spacing:.11em; }
@@ -440,49 +616,58 @@ useHead({ title: '时光星图' })
 .memory-popup section button>span { grid-column:1; color:#669fc4; font-size:.5rem; }
 .memory-popup section button>b { grid-column:1; overflow:hidden; font-size:.63rem; text-overflow:ellipsis; white-space:nowrap; }
 .memory-popup section button>small { grid-column:2; grid-row:1/3; align-self:center; color:#6f94b0; font-size:.48rem; }
-.discovery-popup { --discovery-accent:#72d9ff; position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(354px,calc(100vw - 40px)); padding:26px; overflow:hidden; border:1px solid color-mix(in srgb,var(--discovery-accent) 28%,transparent); border-radius:8px; background:linear-gradient(150deg,rgb(7 24 45 / .88),rgb(2 9 22 / .94)); box-shadow:0 26px 80px rgb(0 0 0 / .46),inset 0 1px rgb(213 240 255 / .07); backdrop-filter:blur(24px) saturate(1.16); transform:translateY(-50%); }
-.discovery-popup::before { position:absolute; top:-90px; right:-70px; width:240px; height:210px; border-radius:50%; background:radial-gradient(circle,color-mix(in srgb,var(--discovery-accent) 24%,transparent),transparent 68%); content:''; pointer-events:none; }
-.discovery-orbit { position:relative; width:72px; height:72px; margin:2px 0 23px; border:1px solid color-mix(in srgb,var(--discovery-accent) 44%,transparent); border-radius:50%; animation:discovery-spin 12s linear infinite; }
-.discovery-orbit::before { position:absolute; inset:17px; border:1px solid color-mix(in srgb,var(--discovery-accent) 32%,transparent); border-radius:50%; content:''; }
-.discovery-orbit i { position:absolute; width:7px; height:7px; border-radius:50%; background:var(--discovery-accent); box-shadow:0 0 15px var(--discovery-accent); }
-.discovery-orbit i:nth-child(1) { top:-4px; left:31px; }.discovery-orbit i:nth-child(2) { right:4px; bottom:7px; width:4px; height:4px; }.discovery-orbit i:nth-child(3) { top:28px; left:15px; width:3px; height:3px; }
-.discovery-identity { display:flex; align-items:center; gap:8px; color:var(--discovery-accent); font-size:.55rem; letter-spacing:.08em; }
-.discovery-identity :deep(svg) { font-size:.92rem; }
-.discovery-popup h2 { margin:10px 34px 9px 0; color:#f0f7fc; font-size:1.45rem; line-height:1.2; letter-spacing:0; }
-.discovery-popup>p { margin:0; color:#8da7ba; font-size:.69rem; line-height:1.85; }
-.discovery-signal { display:flex; min-height:58px; flex-direction:column; justify-content:center; gap:5px; margin-top:19px; padding:10px 12px; border-left:2px solid var(--discovery-accent); background:color-mix(in srgb,var(--discovery-accent) 7%,transparent); }
-.discovery-signal small { color:color-mix(in srgb,var(--discovery-accent) 76%,#8aa2b4); font-size:.49rem; letter-spacing:.06em; }
-.discovery-signal strong { color:#c8dbe7; font-size:.62rem; font-weight:560; line-height:1.55; }
-.discovery-action { display:flex; width:100%; height:40px; align-items:center; justify-content:center; gap:8px; margin-top:17px; border:1px solid color-mix(in srgb,var(--discovery-accent) 38%,transparent); border-radius:6px; background:color-mix(in srgb,var(--discovery-accent) 10%,transparent); color:#e5f5fc; cursor:pointer; font:inherit; font-size:.62rem; transition:background .22s ease,border-color .22s ease,transform .22s ease; }
-.discovery-action:hover { border-color:color-mix(in srgb,var(--discovery-accent) 66%,transparent); background:color-mix(in srgb,var(--discovery-accent) 17%,transparent); transform:translateY(-1px); }
-.discovery-action:focus-visible { outline:2px solid var(--discovery-accent); outline-offset:3px; }
+.discovery-popup { --discovery-accent:#72d9ff; position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(412px,calc(100vw - 40px)); max-height:calc(100dvh - 118px); padding:24px; overflow-x:hidden; overflow-y:auto; border:1px solid color-mix(in srgb,var(--discovery-accent) 30%,transparent); border-radius:8px; background:linear-gradient(155deg,rgb(7 21 38 / .94),rgb(2 8 19 / .97)); box-shadow:0 28px 90px rgb(0 0 0 / .52),inset 0 1px rgb(225 244 255 / .06); backdrop-filter:blur(24px) saturate(1.12); transform:translateY(-50%); }
+.discovery-popup::before { position:absolute; top:0; right:0; left:0; height:2px; background:linear-gradient(90deg,transparent,var(--discovery-accent),transparent); content:''; opacity:.7; pointer-events:none; }
+.discovery-black-hole { background:linear-gradient(150deg,rgb(24 13 15 / .96),rgb(3 6 12 / .98) 72%); box-shadow:0 30px 100px rgb(0 0 0 / .7),inset 0 0 70px rgb(128 37 12 / .08); }
+.discovery-identity { display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:10px; padding-right:30px; }
+.discovery-identity>span { display:grid; width:38px; height:38px; border:1px solid color-mix(in srgb,var(--discovery-accent) 38%,transparent); border-radius:50%; background:color-mix(in srgb,var(--discovery-accent) 10%,transparent); color:var(--discovery-accent); font-size:1.05rem; place-items:center; }
+.discovery-identity>div { display:flex; min-width:0; flex-direction:column; gap:3px; }
+.discovery-identity small { overflow:hidden; color:color-mix(in srgb,var(--discovery-accent) 78%,#7d94a6); font-size:.48rem; letter-spacing:.08em; text-overflow:ellipsis; white-space:nowrap; }
+.discovery-identity b { color:#c7d7e2; font-size:.58rem; font-weight:560; }
+.discovery-identity em { display:flex; align-items:center; gap:5px; color:#688196; font-size:.47rem; font-style:normal; white-space:nowrap; }
+.discovery-identity em i { width:5px; height:5px; border-radius:50%; background:#5ee2bb; box-shadow:0 0 9px #43cba6; }
+.discovery-title { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-top:19px; }
+.discovery-title h2 { min-width:0; margin:0; color:#f1f7fb; font-size:1.48rem; line-height:1.15; letter-spacing:0; }
+.discovery-title>span { flex:none; color:#667f94; font-size:.5rem; }
+.discovery-popup>p { margin:10px 0 0; color:#8fa5b5; font-size:.68rem; line-height:1.8; }
+.telemetry-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:19px; border-top:1px solid rgb(133 172 199 / .13); border-bottom:1px solid rgb(133 172 199 / .13); }
+.telemetry-grid>div { display:flex; min-width:0; flex-direction:column; gap:4px; padding:10px 9px 10px 0; }
+.telemetry-grid>div:nth-child(even) { padding-left:12px; border-left:1px solid rgb(133 172 199 / .11); }
+.telemetry-grid small { color:#607b90; font-size:.46rem; }
+.telemetry-grid strong { overflow:hidden; color:#d4e2eb; font-size:.62rem; font-weight:620; text-overflow:ellipsis; white-space:nowrap; }
+.discovery-signal { display:flex; flex-direction:column; gap:7px; margin-top:18px; padding-left:12px; border-left:2px solid var(--discovery-accent); }
+.discovery-signal>div { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.discovery-signal small { color:color-mix(in srgb,var(--discovery-accent) 78%,#8399a9); font-size:.49rem; letter-spacing:.06em; }
+.discovery-signal time { color:#526b7e; font-size:.47rem; font-variant-numeric:tabular-nums; }
+.discovery-signal strong { color:#c9d9e4; font-size:.62rem; font-weight:560; line-height:1.65; }
+.discovery-signal>span { color:#526a7c; font-size:.46rem; line-height:1.55; }
+.discovery-commands { display:flex; gap:5px; margin-top:18px; }
+.discovery-commands button { display:flex; min-width:0; height:39px; flex:1; align-items:center; justify-content:center; gap:7px; padding:0 9px; border:1px solid color-mix(in srgb,var(--discovery-accent) 30%,transparent); border-radius:6px; background:color-mix(in srgb,var(--discovery-accent) 8%,transparent); color:#bcd2df; cursor:pointer; font:inherit; font-size:.58rem; transition:background .22s ease,border-color .22s ease,color .22s ease,transform .22s ease; }
+.discovery-commands button:hover,.discovery-commands button.active { border-color:color-mix(in srgb,var(--discovery-accent) 62%,transparent); background:color-mix(in srgb,var(--discovery-accent) 16%,transparent); color:#effaff; transform:translateY(-1px); }
+.discovery-commands button:focus-visible { outline:2px solid var(--discovery-accent); outline-offset:3px; }
 .popup-enter-active,.popup-leave-active { transition:transform .52s cubic-bezier(.16,1,.3,1),opacity .3s ease; }
 .popup-enter-from,.popup-leave-to { opacity:0; transform:translate(26px,-48%); }
 .signal button:focus-visible,.popup-close:focus-visible { outline:2px solid #4a9fe6; outline-offset:3px; }
 @keyframes loading-spin { to { transform:rotate(360deg); } }
-@keyframes discovery-spin { to { transform:rotate(360deg); } }
 @media (max-width:700px) {
   .constellation-nav { top:14px; right:14px; left:14px; }
   .brand img { width:38px; height:38px; }
   .brand span { display:none; }
   .signal span { display:none; }
-  .cosmic-dock { top:68px; width:auto; max-width:calc(100vw - 28px); height:38px; }
-  .cosmic-dock button { width:42px; min-width:42px; padding:0; }
-  .cosmic-dock button span { display:none; }
   .constellation-intro { bottom:68px; left:20px; width:calc(100vw - 40px); }
   .constellation-intro h1 { font-size:2.8rem; }
   .constellation-intro p { max-width:310px; font-size:.66rem; }
   .constellation-foot { right:14px; bottom:14px; left:14px; }
   .constellation-foot>span b { display:none; }
   .memory-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(52dvh,440px); padding:18px 18px 18px 24px; border-radius:20px 20px 20px 8px; transform:none; }
-  .discovery-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(58dvh,470px); padding:21px; transform:none; }
-  .discovery-orbit { width:54px; height:54px; margin-bottom:17px; }
-  .discovery-orbit::before { inset:13px; }.discovery-orbit i:nth-child(1) { left:23px; }.discovery-orbit i:nth-child(2) { right:3px; bottom:5px; }.discovery-orbit i:nth-child(3) { top:21px; left:11px; }
+  .discovery-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(67dvh,560px); padding:19px; transform:none; }
+  .discovery-title { align-items:flex-start; flex-direction:column; gap:4px; }
+  .discovery-identity em { display:none; }
   .popup-rail { top:21px; bottom:19px; left:9px; }
   .popup-enter-from,.popup-leave-to { opacity:0; transform:translateY(24px); }
 }
 @media (prefers-reduced-motion:reduce) {
-  .constellation-intro,.popup-enter-active,.popup-leave-active,.loading-orbit,.discovery-orbit { transition:none; animation:none; }
+  .constellation-intro,.popup-enter-active,.popup-leave-active,.loading-orbit { transition:none; animation:none; }
   .constellation-intro { opacity:1; transform:none; }
 }
 </style>

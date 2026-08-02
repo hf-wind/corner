@@ -119,10 +119,24 @@ let ambientOrbitPhase = -.18
 let discoveryEffect: DiscoveryId | '' = ''
 let discoveryEffectStartedAt = 0
 let spacecraftLaunchAt = -20
+let spacecraftLaunchActive = false
 let cameraFlight: CameraFlight | null = null
 let overviewSnapshot: CameraSnapshot | null = null
 let activeSelectionId = ''
 let focusedDiscoveryId: DiscoveryId | '' = ''
+let discoveryTourId: DiscoveryId | '' = ''
+let pendingDiscoveryTourId: DiscoveryId | '' = ''
+let cruisePausedUntil = 0
+let cruiseHeight = 68
+let cruiseOrbitRadius = 218
+let cruiseBobPhase = 0
+let discoveryTourPhase = 0
+let discoveryTourHeight = 0
+let satelliteOrbitPhase = -2.28
+let spacecraftCruisePhase = -.56
+const spacecraftLaunchFrom = new THREE.Vector3()
+const spacecraftLaunchControl = new THREE.Vector3()
+const spacecraftLaunchTo = new THREE.Vector3()
 const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2(2, 2)
 const nodeObjects = new Map<string, THREE.Object3D>()
@@ -531,24 +545,24 @@ function accretionDiskTexture() {
   const random = randomFrom(0xb1ac4a1e)
   context.translate(256, 256)
   context.globalCompositeOperation = 'screen'
-  for (let index = 0; index < 220; index++) {
+  for (let index = 0; index < 360; index++) {
     const radius = 78 + Math.pow(random(), .68) * 166
     const start = random() * Math.PI * 2
     const length = .08 + random() * .72
-    const hot = radius < 126
+    const hot = radius < 136
     context.beginPath()
     context.arc(0, 0, radius, start, start + length)
     context.lineWidth = .35 + random() * (hot ? 3.6 : 2.2)
     context.strokeStyle = hot
-      ? `rgba(255, ${190 + Math.floor(random() * 60)}, ${126 + Math.floor(random() * 90)}, ${.1 + random() * .46})`
-      : `rgba(${104 + Math.floor(random() * 80)}, ${118 + Math.floor(random() * 90)}, 255, ${.04 + random() * .25})`
+      ? `rgba(255, ${172 + Math.floor(random() * 72)}, ${72 + Math.floor(random() * 95)}, ${.12 + random() * .58})`
+      : `rgba(210, ${76 + Math.floor(random() * 80)}, ${28 + Math.floor(random() * 52)}, ${.04 + random() * .24})`
     context.stroke()
   }
   const veil = context.createRadialGradient(0, 0, 62, 0, 0, 252)
   veil.addColorStop(0, 'rgba(255,228,185,0)')
   veil.addColorStop(.27, 'rgba(255,185,104,.42)')
-  veil.addColorStop(.48, 'rgba(123,145,255,.18)')
-  veil.addColorStop(1, 'rgba(51,70,194,0)')
+  veil.addColorStop(.48, 'rgba(229,91,32,.16)')
+  veil.addColorStop(1, 'rgba(105,25,12,0)')
   context.fillStyle = veil
   context.fillRect(-256, -256, 512, 512)
   const texture = track(new THREE.CanvasTexture(canvas))
@@ -698,66 +712,77 @@ function addBlackHole() {
   if (!scene) return
   blackHole = new THREE.Group()
   blackHole.name = 'distant-black-hole'
-  blackHole.position.set(-172, 76, -276)
+  const horizontalOffset = window.innerWidth < 720 ? -.18 : -.46
+  blackHole.userData.viewOffset = new THREE.Vector3(horizontalOffset, .22, -1).normalize()
+  blackHole.position.set(-112, 64, -164)
+  blackHole.rotation.set(.04, -.16, -.08)
+  blackHole.scale.setScalar(1.12)
   const eventHorizon = new THREE.Mesh(
-    track(new THREE.SphereGeometry(12.8, lowQuality ? 20 : 40, lowQuality ? 14 : 28)),
+    track(new THREE.SphereGeometry(13.6, lowQuality ? 24 : 48, lowQuality ? 16 : 32)),
     track(new THREE.MeshBasicMaterial({ color: 0x000003, fog: false })),
   )
-  eventHorizon.renderOrder = 8
+  eventHorizon.renderOrder = 12
   blackHole.add(eventHorizon)
 
-  const disk = new THREE.Mesh(
-    track(new THREE.RingGeometry(14.2, 43, lowQuality ? 72 : 160, 1)),
-    track(new THREE.MeshBasicMaterial({ map: accretionDiskTexture(), color: 0xffffff, transparent: true, opacity: .92, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })),
-  )
-  disk.name = 'black-hole-disk'
-  disk.rotation.set(1.12, .2, -.28)
-  blackHole.add(disk)
+  const diskTexture = accretionDiskTexture()
+  const diskMaterial = track(new THREE.MeshBasicMaterial({ map: diskTexture, color: 0xffffff, transparent: true, opacity: .95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }))
+  for (const [name, inner, outer, tilt, opacity] of [
+    ['black-hole-disk', 14.4, 49, 1.34, .98],
+    ['black-hole-lensed-disk', 15.2, 42, -.58, .42],
+  ] as const) {
+    const layerMaterial = name === 'black-hole-disk' ? diskMaterial : track(diskMaterial.clone())
+    layerMaterial.opacity = opacity
+    const layer = new THREE.Mesh(track(new THREE.RingGeometry(inner, outer, lowQuality ? 96 : 220, 1)), layerMaterial)
+    layer.name = name
+    layer.rotation.set(tilt, .06, -.18)
+    layer.renderOrder = name === 'black-hole-disk' ? 10 : 6
+    blackHole.add(layer)
+  }
 
   const photonRing = new THREE.Mesh(
-    track(new THREE.TorusGeometry(14.8, .54, 10, lowQuality ? 72 : 160)),
-    track(new THREE.MeshBasicMaterial({ color: 0xffd49a, transparent: true, opacity: .96, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })),
+    track(new THREE.TorusGeometry(14.7, .28, 10, lowQuality ? 96 : 220)),
+    track(new THREE.MeshBasicMaterial({ color: 0xffbd72, transparent: true, opacity: .78, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })),
   )
   photonRing.name = 'black-hole-photon-ring'
-  photonRing.rotation.copy(disk.rotation)
+  photonRing.rotation.set(.12, .08, -.18)
+  photonRing.renderOrder = 14
   blackHole.add(photonRing)
 
-  const lensRing = new THREE.Mesh(
-    track(new THREE.TorusGeometry(19.8, .22, 6, lowQuality ? 72 : 160)),
-    track(new THREE.MeshBasicMaterial({ color: 0x7b9cff, transparent: true, opacity: .58, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })),
-  )
-  lensRing.rotation.set(1.18, .16, -.28)
-  blackHole.add(lensRing)
+  const crescentMaterial = track(new THREE.MeshBasicMaterial({ color: 0xff9a42, transparent: true, opacity: .78, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
+  for (const [radius, tube, arc, rotationZ, opacity] of [[17.2, .75, Math.PI * 1.42, -.82, .92], [21.4, .28, Math.PI * 1.18, 2.46, .48]] as const) {
+    const material = track(crescentMaterial.clone()); material.opacity = opacity
+    const crescent = new THREE.Mesh(track(new THREE.TorusGeometry(radius, tube, 8, lowQuality ? 72 : 150, arc)), material)
+    crescent.name = 'black-hole-crescent'
+    crescent.rotation.set(.1, .04, rotationZ)
+    crescent.renderOrder = 15
+    blackHole.add(crescent)
+  }
 
-  const halo = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture('#6554d9'), transparent: true, opacity: .34, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })))
+  const halo = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture('#ff5d24'), transparent: true, opacity: .22, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })))
   halo.name = 'black-hole-halo'
-  halo.scale.set(78, 78, 1)
+  halo.scale.set(92, 92, 1)
   blackHole.add(halo)
 
-  const jetMaterial = track(new THREE.MeshBasicMaterial({ color: 0x668dff, transparent: true, opacity: .16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }))
-  for (const direction of [-1, 1]) {
-    const jet = new THREE.Mesh(track(new THREE.ConeGeometry(2.2, 36, lowQuality ? 8 : 16, 1, true)), jetMaterial)
-    jet.position.y = direction * 22
-    if (direction < 0) jet.rotation.z = Math.PI
-    jet.rotation.x = -.2
-    blackHole.add(jet)
-  }
-  registerDiscovery('black-hole', '事件视界', blackHole, 45)
+  registerDiscovery('black-hole', '玄渊 X-1 · 事件视界', blackHole, 52)
   scene.add(blackHole)
 }
 
 function addSpaceStation() {
   if (!scene) return
+  const mobile = window.innerWidth < 720
   spaceStation = new THREE.Group()
   spaceStation.name = 'memory-space-station'
-  spaceStation.position.set(118, -34, -132)
+  spaceStation.position.set(mobile ? 52 : 108, mobile ? 4 : 18, mobile ? -96 : -124)
   spaceStation.rotation.set(.18, -.44, -.12)
-  spaceStation.scale.setScalar(lowQuality ? 1.02 : 1.42)
+  spaceStation.scale.setScalar(lowQuality ? 1.14 : 1.58)
 
   const hull = track(new THREE.MeshStandardMaterial({ color: 0xa9bccb, roughness: .36, metalness: .76, emissive: 0x071421, emissiveIntensity: .24 }))
   const darkHull = track(new THREE.MeshStandardMaterial({ color: 0x263a4a, roughness: .48, metalness: .72 }))
   const windowMaterial = track(new THREE.MeshBasicMaterial({ color: 0x77d7ff, transparent: true, opacity: .94, blending: THREE.AdditiveBlending }))
   const solarMaterial = track(new THREE.MeshStandardMaterial({ color: 0x244f88, roughness: .38, metalness: .5, emissive: 0x12365d, emissiveIntensity: .5, side: THREE.DoubleSide }))
+  const stationLight = new THREE.PointLight(0x85dcff, 34, 46, 1.8)
+  stationLight.position.set(0, 8, 8)
+  spaceStation.add(stationLight)
 
   const axis = new THREE.Mesh(track(new THREE.CylinderGeometry(1.15, 1.15, 15, lowQuality ? 10 : 18)), hull)
   axis.rotation.z = Math.PI / 2
@@ -802,7 +827,7 @@ function addSpaceStation() {
     beacon.scale.set(2.2, 2.2, 1)
     spaceStation.add(beacon)
   }
-  registerDiscovery('station', '记忆空间站', spaceStation, 23)
+  registerDiscovery('station', '风隅轨道站 · FYOS-01', spaceStation, 26)
   scene.add(spaceStation)
 }
 
@@ -812,7 +837,6 @@ function addSatellite() {
   satellite.name = 'signal-satellite'
   satellite.position.set(-72, -38, -86)
   satellite.rotation.set(.18, .42, -.12)
-  satellite.userData.orbitPhase = -2.28
 
   const hull = track(new THREE.MeshStandardMaterial({ color: 0xb7c7d2, roughness: .35, metalness: .76, emissive: 0x102235, emissiveIntensity: .28 }))
   const panel = track(new THREE.MeshStandardMaterial({ color: 0x285b9a, roughness: .42, metalness: .42, emissive: 0x0d3765, emissiveIntensity: .58, side: THREE.DoubleSide }))
@@ -848,28 +872,81 @@ function addSatellite() {
 function addSpacecraft() {
   if (!scene) return
   spacecraft = new THREE.Group()
-  spacecraft.name = 'memory-courier'
+  spacecraft.name = 'wind-corner-starship'
   spacecraft.position.set(92, 18, -42)
-  const hull = track(new THREE.MeshStandardMaterial({ color: 0xd4dde3, roughness: .28, metalness: .72, emissive: 0x14273a, emissiveIntensity: .34 }))
-  const dark = track(new THREE.MeshStandardMaterial({ color: 0x263745, roughness: .42, metalness: .66 }))
-  const engine = track(new THREE.SpriteMaterial({ map: glowTexture('#75ddff'), color: 0x75ddff, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }))
-  const fuselage = new THREE.Mesh(track(new THREE.ConeGeometry(2.4, 10.5, lowQuality ? 8 : 14)), hull)
-  fuselage.rotation.z = -Math.PI / 2
-  spacecraft.add(fuselage)
+  const ceramic = track(new THREE.MeshStandardMaterial({ color: 0xd9e2e8, roughness: .2, metalness: .82, emissive: 0x10263a, emissiveIntensity: .22 }))
+  const titanium = track(new THREE.MeshStandardMaterial({ color: 0x31485a, roughness: .3, metalness: .9, emissive: 0x07131d, emissiveIntensity: .3 }))
+  const carbon = track(new THREE.MeshStandardMaterial({ color: 0x101c26, roughness: .5, metalness: .7 }))
+  const canopy = track(new THREE.MeshStandardMaterial({ color: 0x4dbbe8, roughness: .08, metalness: .68, emissive: 0x1475a4, emissiveIntensity: .82, transparent: true, opacity: .88 }))
+  const engineGlow = track(new THREE.SpriteMaterial({ map: glowTexture('#63dcff'), color: 0x85e9ff, transparent: true, opacity: .94, blending: THREE.AdditiveBlending, depthWrite: false }))
+  const navigationGlow = track(new THREE.MeshBasicMaterial({ color: 0x78e9ff, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }))
+  const shipLight = new THREE.PointLight(0x9bdfff, 42, 52, 1.6)
+  shipLight.position.set(3, 8, 10)
+  spacecraft.add(shipLight)
+
+  const spine = new THREE.Mesh(track(new THREE.CapsuleGeometry(2.45, 11.5, lowQuality ? 5 : 9, lowQuality ? 10 : 20)), ceramic)
+  spine.rotation.z = -Math.PI / 2
+  spacecraft.add(spine)
+  const nose = new THREE.Mesh(track(new THREE.ConeGeometry(2.38, 5.8, lowQuality ? 12 : 24)), ceramic)
+  nose.position.x = 10.1
+  nose.rotation.z = -Math.PI / 2
+  spacecraft.add(nose)
+  const keel = new THREE.Mesh(track(new THREE.BoxGeometry(13.8, .72, 1.2)), titanium)
+  keel.position.set(-.5, -2.15, 0)
+  spacecraft.add(keel)
+
+  const cockpit = new THREE.Mesh(track(new THREE.SphereGeometry(2.4, lowQuality ? 14 : 28, lowQuality ? 8 : 16)), canopy)
+  cockpit.position.set(4.9, 1.25, 0)
+  cockpit.scale.set(1.35, .54, .78)
+  spacecraft.add(cockpit)
+
+  const wingGeometry = track(new THREE.BufferGeometry())
+  wingGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    3, 0, 0, -4.5, 0, 0, -8.5, 0, 8.8,
+    3, -.38, 0, -4.5, -.38, 0, -8.5, -.38, 8.8,
+  ], 3))
+  wingGeometry.setIndex([0, 1, 2, 5, 4, 3, 0, 3, 4, 0, 4, 1, 1, 4, 5, 1, 5, 2, 2, 5, 3, 2, 3, 0])
+  wingGeometry.computeVertexNormals()
   for (const side of [-1, 1]) {
-    const wing = new THREE.Mesh(track(new THREE.BoxGeometry(5.5, .28, 2.7)), dark)
-    wing.position.set(-1.2, 0, side * 2.7)
-    wing.rotation.y = side * .2
+    const wing = new THREE.Mesh(wingGeometry, carbon)
+    wing.scale.z = side
+    wing.position.y = -.3
     spacecraft.add(wing)
+    const edge = new THREE.Mesh(track(new THREE.BoxGeometry(9.8, .16, .26)), navigationGlow)
+    edge.position.set(-3.1, -.25, side * 5.2)
+    edge.rotation.y = side * -.49
+    spacecraft.add(edge)
   }
-  for (const z of [-1.2, 1.2]) {
-    const exhaust = new THREE.Sprite(engine)
-    exhaust.position.set(-6, 0, z)
-    exhaust.scale.set(7.5, 2.4, 1)
+
+  for (const z of [-1.42, 0, 1.42]) {
+    const nacelle = new THREE.Mesh(track(new THREE.CylinderGeometry(1.02, 1.35, 4.1, lowQuality ? 12 : 24)), titanium)
+    nacelle.position.set(-8.1, 0, z)
+    nacelle.rotation.z = Math.PI / 2
+    spacecraft.add(nacelle)
+    const ring = new THREE.Mesh(track(new THREE.TorusGeometry(1.02, .16, 8, lowQuality ? 24 : 48)), navigationGlow)
+    ring.name = 'spacecraft-drive-ring'
+    ring.position.set(-10.18, 0, z)
+    ring.rotation.y = Math.PI / 2
+    spacecraft.add(ring)
+    const exhaust = new THREE.Sprite(engineGlow)
+    exhaust.position.set(-12.3, 0, z)
+    exhaust.scale.set(9.5, 2.1, 1)
     spacecraft.add(exhaust)
   }
-  spacecraft.scale.setScalar(lowQuality ? .72 : .92)
-  registerDiscovery('spacecraft', '远航信使', spacecraft, 12)
+
+  const markingCanvas = document.createElement('canvas')
+  markingCanvas.width = 384; markingCanvas.height = 96
+  const markingContext = markingCanvas.getContext('2d')!
+  markingContext.fillStyle = 'rgba(6,18,28,.86)'; markingContext.fillRect(0, 0, 384, 96)
+  markingContext.fillStyle = '#9de8ff'; markingContext.font = '700 42px sans-serif'; markingContext.textAlign = 'center'; markingContext.textBaseline = 'middle'
+  markingContext.fillText('风隅号  FY-01', 192, 48)
+  const markingTexture = track(new THREE.CanvasTexture(markingCanvas)); markingTexture.colorSpace = THREE.SRGBColorSpace
+  const marking = new THREE.Mesh(track(new THREE.PlaneGeometry(7.4, 1.85)), track(new THREE.MeshBasicMaterial({ map: markingTexture, transparent: true, opacity: .88, side: THREE.DoubleSide })))
+  marking.position.set(-.5, .2, 2.46)
+  spacecraft.add(marking)
+
+  spacecraft.scale.setScalar(lowQuality ? .62 : .8)
+  registerDiscovery('spacecraft', '风隅号 · FY-01', spacecraft, 16)
   scene.add(spacecraft)
 }
 
@@ -1208,6 +1285,24 @@ function onPointerDown() {
     camera.updateProjectionMatrix()
   }
 }
+
+function syncCruiseFromCamera() {
+  if (!camera || !controls) return
+  const offset = camera.position.clone().sub(controls.target)
+  ambientOrbitPhase = Math.atan2(offset.x, offset.z)
+  cruiseOrbitRadius = Math.max(38, Math.hypot(offset.x, offset.z))
+  cruiseHeight = offset.y
+  cruiseBobPhase = 0
+}
+
+function onControlsStart() {
+  cruisePausedUntil = Number.POSITIVE_INFINITY
+}
+
+function onControlsEnd() {
+  syncCruiseFromCamera()
+  cruisePausedUntil = performance.now() + 1600
+}
 function onClick(event: PointerEvent) {
   if (props.ambient) return
   pointerPosition(event)
@@ -1276,7 +1371,10 @@ function applyIntroCamera(now: number) {
   camera.updateProjectionMatrix()
   if (progress >= 1 && !introCompleted) {
     introCompleted = true
-    controls.autoRotate = !props.ambient && !props.selectedId && !reducedMotion.value
+    cruiseOrbitRadius = radius
+    cruiseHeight = mobile ? 62 : 68
+    cruiseBobPhase = 0
+    cruisePausedUntil = 0
   }
   return progress
 }
@@ -1287,8 +1385,8 @@ function startCameraFlight(destination: CameraSnapshot, duration = 1250, arcHeig
   introCompleted = true
   camera.fov = 48
   camera.updateProjectionMatrix()
-  controls.autoRotate = false
   controls.enabled = false
+  discoveryTourId = ''
   cameraFlight = {
     fromPosition: camera.position.clone(),
     fromTarget: controls.target.clone(),
@@ -1304,7 +1402,10 @@ function focusDiscovery(id: DiscoveryId) {
   if (!camera || !controls) return
   const object = discoveryObjects.get(id)
   if (!object) return
+  discoveryTourId = ''
+  pendingDiscoveryTourId = ''
   focusedDiscoveryId = id
+  if (id === 'spacecraft') spacecraftLaunchActive = false
   if (id === 'sun') return
   const target = object.getWorldPosition(new THREE.Vector3())
   const direction = camera.position.clone().sub(controls.target).normalize()
@@ -1320,7 +1421,58 @@ function focusDiscovery(id: DiscoveryId) {
 function triggerDiscoveryEffect(id: DiscoveryId) {
   discoveryEffect = id
   discoveryEffectStartedAt = performance.now()
-  if (id === 'spacecraft') spacecraftLaunchAt = elapsed
+  if (id === 'spacecraft' && spacecraft) {
+    spacecraftLaunchActive = true
+    spacecraftLaunchAt = elapsed
+    spacecraftLaunchFrom.copy(spacecraft.position)
+    const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(spacecraft.quaternion).normalize()
+    spacecraftLaunchTo.copy(spacecraft.position).add(forward.multiplyScalar(430)).add(new THREE.Vector3(0, 92, -140))
+    spacecraftLaunchControl.copy(spacecraftLaunchFrom).lerp(spacecraftLaunchTo, .52).add(new THREE.Vector3(0, 110, 38))
+  }
+}
+
+function startDiscoveryTour(id: DiscoveryId) {
+  if (id !== 'station' && id !== 'spacecraft') return
+  focusDiscovery(id)
+  pendingDiscoveryTourId = id
+  if (!cameraFlight) activateDiscoveryTour(id)
+}
+
+function activateDiscoveryTour(id: DiscoveryId) {
+  if (!camera || !controls) return
+  const object = discoveryObjects.get(id)
+  if (!object) return
+  const target = object.getWorldPosition(new THREE.Vector3())
+  const offset = camera.position.clone().sub(target)
+  discoveryTourPhase = Math.atan2(offset.z, offset.x)
+  discoveryTourHeight = offset.y
+  discoveryTourId = id
+  pendingDiscoveryTourId = ''
+  controls.enabled = false
+}
+
+function updateDiscoveryTour(delta: number) {
+  if (!camera || !controls || !discoveryTourId || cameraFlight) return
+  const object = discoveryObjects.get(discoveryTourId)
+  if (!object) return
+  const target = object.getWorldPosition(new THREE.Vector3())
+  if (discoveryTourId === 'station') {
+    discoveryTourPhase -= delta * .16
+    const desired = new THREE.Vector3(
+      target.x + Math.cos(discoveryTourPhase) * 74,
+      target.y + discoveryTourHeight + Math.sin(elapsed * .42) * 4,
+      target.z + Math.sin(discoveryTourPhase) * 74,
+    )
+    camera.position.lerp(desired, 1 - Math.exp(-delta * 2.8))
+    controls.target.lerp(target, 1 - Math.exp(-delta * 4))
+  } else if (spacecraft) {
+    const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(spacecraft.quaternion).normalize()
+    const desired = target.clone().addScaledVector(forward, -28).add(new THREE.Vector3(0, 8.5, 0))
+    const lookAhead = target.clone().addScaledVector(forward, 26)
+    camera.position.lerp(desired, 1 - Math.exp(-delta * 3.6))
+    controls.target.lerp(lookAhead, 1 - Math.exp(-delta * 5))
+  }
+  camera.lookAt(controls.target)
 }
 
 function updateCameraFlight(now: number) {
@@ -1334,8 +1486,10 @@ function updateCameraFlight(now: number) {
   camera.position.copy(cameraFlight.position)
   controls.target.copy(cameraFlight.target)
   cameraFlight = null
-  controls.enabled = !props.ambient
-  controls.autoRotate = !props.selectedId && !props.ambient && !reducedMotion.value
+  if (pendingDiscoveryTourId) activateDiscoveryTour(pendingDiscoveryTourId)
+  else controls.enabled = !props.ambient
+  syncCruiseFromCamera()
+  cruisePausedUntil = now
 }
 
 function focusPose(target: THREE.Vector3): CameraSnapshot | null {
@@ -1354,7 +1508,6 @@ function focusPose(target: THREE.Vector3): CameraSnapshot | null {
 function applySelection(animate = true) {
   const selected = props.selectedId
   if (selected) focusedDiscoveryId = ''
-  if (controls) controls.autoRotate = !selected && !props.ambient && !reducedMotion.value
   for (const [id, object] of nodeObjects) {
     const active = !selected || id === selected
     object.scale.setScalar(id === selected ? 1.34 : selected ? .86 : 1)
@@ -1405,8 +1558,28 @@ function resetView() {
   if (!camera || !controls) return
   activeSelectionId = ''
   focusedDiscoveryId = ''
+  spacecraftLaunchActive = false
+  discoveryTourId = ''
+  pendingDiscoveryTourId = ''
   overviewSnapshot = null
+  controls.enabled = !props.ambient
   startCameraFlight(overviewPose(), 1400, 12)
+}
+
+function applyCruiseCamera(now: number, delta: number) {
+  if (!camera || !controls || !introCompleted || cameraFlight || discoveryTourId || props.selectedId || focusedDiscoveryId) return
+  if (!props.ambient && now < cruisePausedUntil) return
+  ambientOrbitPhase -= delta * CRUISE_ANGULAR_SPEED
+  cruiseBobPhase += delta * .18
+  const target = sceneTarget()
+  const bob = Math.sin(cruiseBobPhase) * (props.ambient ? 7 : 2.4)
+  camera.position.set(
+    target.x + Math.sin(ambientOrbitPhase) * cruiseOrbitRadius,
+    target.y + cruiseHeight + bob,
+    target.z + Math.cos(ambientOrbitPhase) * cruiseOrbitRadius,
+  )
+  controls.target.copy(target)
+  camera.lookAt(target)
 }
 
 function animate(now = performance.now()) {
@@ -1416,8 +1589,9 @@ function animate(now = performance.now()) {
   elapsed += delta
   if (!reducedMotion.value) {
     const effectAge = discoveryEffect ? (now - discoveryEffectStartedAt) / 1000 : Number.POSITIVE_INFINITY
-    const effectPulse = effectAge < 2.8 ? Math.sin(Math.min(1, effectAge / 2.8) * Math.PI) : 0
-    if (effectAge >= 2.8) discoveryEffect = ''
+    const effectDuration = discoveryEffect === 'spacecraft' ? 4.2 : 2.8
+    const effectPulse = effectAge < effectDuration ? Math.sin(Math.min(1, effectAge / effectDuration) * Math.PI) : 0
+    if (effectAge >= effectDuration) discoveryEffect = ''
     if (core) {
       core.rotation.y += delta * .18
       core.rotation.z = Math.sin(elapsed * .3) * .08
@@ -1428,12 +1602,12 @@ function animate(now = performance.now()) {
       sun.scale.setScalar(pulse)
     }
     if (blackHole) {
-      blackHole.rotation.y -= delta * .055
-      blackHole.rotation.z = Math.sin(elapsed * .18) * .025
       const disk = blackHole.getObjectByName('black-hole-disk')
-      if (disk) disk.rotation.z += delta * (.16 + (discoveryEffect === 'black-hole' ? effectPulse * 1.2 : 0))
+      if (disk) disk.rotation.z += delta * (.12 + (discoveryEffect === 'black-hole' ? effectPulse * 1.05 : 0))
+      const lensedDisk = blackHole.getObjectByName('black-hole-lensed-disk')
+      if (lensedDisk) lensedDisk.rotation.z -= delta * (.045 + (discoveryEffect === 'black-hole' ? effectPulse * .32 : 0))
       const halo = blackHole.getObjectByName('black-hole-halo')
-      if (halo) halo.scale.setScalar(78 + Math.sin(elapsed * .7) * 3.5 + (discoveryEffect === 'black-hole' ? effectPulse * 18 : 0))
+      if (halo) halo.scale.setScalar(92 + Math.sin(elapsed * .7) * 3.5 + (discoveryEffect === 'black-hole' ? effectPulse * 22 : 0))
     }
     if (spaceStation) {
       spaceStation.rotation.y += delta * .045
@@ -1442,8 +1616,8 @@ function animate(now = performance.now()) {
     }
     if (satellite) {
       if (focusedDiscoveryId !== 'satellite') {
-        const orbitPhase = Number(satellite.userData.orbitPhase || 0) - elapsed * .032
-        satellite.position.set(Math.cos(orbitPhase) * 92, -34 + Math.sin(elapsed * .42) * 4, Math.sin(orbitPhase) * 68)
+        satelliteOrbitPhase -= delta * .032
+        satellite.position.set(Math.cos(satelliteOrbitPhase) * 92, -34 + Math.sin(satelliteOrbitPhase * 4.2) * 4, Math.sin(satelliteOrbitPhase) * 68)
       }
       satellite.rotation.y += delta * .12
       satellite.traverse((child) => {
@@ -1454,21 +1628,28 @@ function animate(now = performance.now()) {
     }
     if (spacecraft) {
       const launchAge = elapsed - spacecraftLaunchAt
-      if (launchAge >= 0 && launchAge < 4.2) {
+      if (spacecraftLaunchActive && launchAge >= 0 && launchAge < 4.2) {
         const progress = Math.min(1, launchAge / 4.2)
         const eased = progress * progress * (3 - 2 * progress)
-        const start = new THREE.Vector3(-210, -58, 126)
-        const end = new THREE.Vector3(230, 74, -238)
-        const control = new THREE.Vector3(12, 110, 42)
-        spacecraft.position.copy(new THREE.QuadraticBezierCurve3(start, control, end).getPoint(eased))
-        spacecraft.rotation.set(.12, -1.02 + progress * .34, -.18)
-        spacecraft.scale.setScalar((lowQuality ? .72 : .92) * (1 + Math.sin(progress * Math.PI) * .34))
-      } else if (focusedDiscoveryId !== 'spacecraft') {
-        const cruise = (elapsed % 18) / 18 * Math.PI * 2
-        spacecraft.position.set(Math.cos(cruise) * 126, 18 + Math.sin(cruise * 2) * 22, Math.sin(cruise) * 92)
-        spacecraft.rotation.set(.08, -cruise - .25, Math.sin(cruise) * .12)
-        spacecraft.scale.setScalar(lowQuality ? .72 : .92)
+        spacecraft.position.copy(new THREE.QuadraticBezierCurve3(spacecraftLaunchFrom, spacecraftLaunchControl, spacecraftLaunchTo).getPoint(eased))
+        const tangent = new THREE.QuadraticBezierCurve3(spacecraftLaunchFrom, spacecraftLaunchControl, spacecraftLaunchTo).getTangent(eased)
+        spacecraft.rotation.set(.08, -Math.atan2(tangent.z, tangent.x), -.12)
+        spacecraft.scale.setScalar((lowQuality ? .62 : .8) * (1 + Math.sin(progress * Math.PI) * .22))
+      } else if (spacecraftLaunchActive && launchAge >= 4.2 && focusedDiscoveryId === 'spacecraft') {
+        spacecraft.position.copy(spacecraftLaunchTo)
+        spacecraft.scale.setScalar(lowQuality ? .62 : .8)
+      } else if (focusedDiscoveryId !== 'spacecraft' || discoveryTourId === 'spacecraft') {
+        spacecraftCruisePhase += delta * Math.PI * 2 / 42
+        spacecraft.position.set(Math.cos(spacecraftCruisePhase) * 126, 18 + Math.sin(spacecraftCruisePhase * 2) * 22, Math.sin(spacecraftCruisePhase) * 92)
+        const tangentX = -Math.sin(spacecraftCruisePhase) * 126
+        const tangentZ = Math.cos(spacecraftCruisePhase) * 92
+        spacecraft.rotation.set(.08, -Math.atan2(tangentZ, tangentX), Math.sin(spacecraftCruisePhase) * .12)
+        spacecraft.scale.setScalar(lowQuality ? .62 : .8)
       }
+      spacecraft.traverse((child) => {
+        if (child.name !== 'spacecraft-drive-ring') return
+        child.scale.setScalar(1 + Math.sin(elapsed * 3.6) * .08 + (discoveryEffect === 'spacecraft' ? effectPulse * .38 : 0))
+      })
     }
     starLayers.forEach((stars, index) => {
       stars.rotation.y += delta * (.004 + index * .006)
@@ -1509,18 +1690,6 @@ function animate(now = performance.now()) {
 
     let introProgress = 1
     if (!introInterrupted && !introCompleted) introProgress = applyIntroCamera(now)
-    if (props.ambient && introCompleted && !cameraFlight) {
-      ambientOrbitPhase -= delta * CRUISE_ANGULAR_SPEED
-      const target = sceneTarget()
-      const radius = cruiseRadius()
-      camera.position.set(
-        target.x + Math.sin(ambientOrbitPhase) * radius,
-        (window.innerWidth < 720 ? 62 : 68) + Math.sin(elapsed * .18) * 7,
-        target.z + Math.cos(ambientOrbitPhase) * radius,
-      )
-      controls.target.copy(target)
-      camera.lookAt(target)
-    }
     if (warpMaterial) {
       const introWarp = introProgress < 1 ? .04 + .9 * Math.pow(1 - introProgress, 1.45) : .035
       const effectWarp = discoveryEffect === 'spacecraft' ? effectPulse * .72 : discoveryEffect === 'black-hole' ? effectPulse * .18 : 0
@@ -1528,12 +1697,22 @@ function animate(now = performance.now()) {
     }
   }
   updateCameraFlight(now)
+  if (!reducedMotion.value) {
+    applyCruiseCamera(now, delta)
+    updateDiscoveryTour(delta)
+  }
   controls.update(delta)
   if (sun && camera) {
     const viewOffset = (sun.userData.viewOffset as THREE.Vector3).clone()
       .multiplyScalar(320)
       .applyQuaternion(camera.quaternion)
     sun.position.copy(camera.position).add(viewOffset)
+  }
+  if (blackHole && camera && focusedDiscoveryId !== 'black-hole') {
+    const viewOffset = (blackHole.userData.viewOffset as THREE.Vector3).clone()
+      .multiplyScalar(370)
+      .applyQuaternion(camera.quaternion)
+    blackHole.position.copy(camera.position).add(viewOffset)
   }
   renderer.render(scene, camera)
   lastFrame = now
@@ -1565,7 +1744,6 @@ async function initialize() {
     controls.minDistance = 38
     controls.maxDistance = 480
     controls.autoRotate = false
-    controls.autoRotateSpeed = .18
     controls.enableRotate = !props.ambient
     controls.enableZoom = !props.ambient
     controls.enabled = !props.ambient
@@ -1573,6 +1751,9 @@ async function initialize() {
     introInterrupted = skipIntro
     introCompleted = skipIntro
     ambientOrbitPhase = skipIntro ? INTRO_END_PHASE : INTRO_START_PHASE
+    cruiseOrbitRadius = cruiseRadius()
+    cruiseHeight = window.innerWidth < 720 ? 62 : 68
+    cruiseBobPhase = 0
     const initialPose = overviewPose()
     if (skipIntro) {
       camera.position.copy(initialPose.position)
@@ -1595,6 +1776,8 @@ async function initialize() {
     host.value.addEventListener('pointermove', onPointerMove)
     host.value.addEventListener('pointerdown', onPointerDown)
     host.value.addEventListener('click', onClick)
+    controls.addEventListener('start', onControlsStart)
+    controls.addEventListener('end', onControlsEnd)
     lastFrame = 0
     resize()
     renderer.render(scene, camera)
@@ -1615,6 +1798,8 @@ function destroy() {
   host.value?.removeEventListener('pointermove', onPointerMove)
   host.value?.removeEventListener('pointerdown', onPointerDown)
   host.value?.removeEventListener('click', onClick)
+  controls?.removeEventListener('start', onControlsStart)
+  controls?.removeEventListener('end', onControlsEnd)
   controls?.dispose()
   clearSceneContent()
   renderer?.dispose()
@@ -1644,6 +1829,7 @@ defineExpose({
   focusNode: (id: string) => { const node = nodeLookup.get(id); if (node) emit('select', node) },
   focusDiscovery,
   triggerDiscoveryEffect,
+  startDiscoveryTour,
   resetView,
 })
 </script>
