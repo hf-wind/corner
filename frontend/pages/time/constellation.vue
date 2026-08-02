@@ -9,9 +9,10 @@
         :graph-version="displayGraphVersion"
         :selected-id="selected?.id"
         :resolve-image="mediaUrl"
-        :intro-delay-ms="760"
+        :intro-delay-ms="180"
         @ready="sceneReady = true"
         @select="handleSceneSelect"
+        @discover="handleDiscovery"
         @clear="clearSelected"
         @fallback="fallbackMode = true"
       />
@@ -41,6 +42,21 @@
       </div>
     </header>
 
+    <nav class="cosmic-dock" aria-label="深空信标">
+      <button
+        v-for="item in discoveries"
+        :key="item.id"
+        type="button"
+        :class="{ active: activeDiscovery?.id === item.id }"
+        :title="item.title"
+        :aria-label="item.title"
+        @click="openDiscovery(item.id)"
+      >
+        <Icon :name="item.icon" />
+        <span>{{ item.shortLabel }}</span>
+      </button>
+    </nav>
+
     <section class="constellation-intro" aria-labelledby="constellation-title">
       <div class="intro-kicker"><span>MY TIME UNIVERSE</span><i /><em>{{ timeRange }}</em></div>
       <h1 id="constellation-title">时光星图</h1>
@@ -48,7 +64,7 @@
     </section>
 
     <footer class="constellation-foot">
-      <span><i />{{ latestLabel }}<b><em />发光天体为真实记忆</b></span>
+      <span><i />{{ latestLabel }}<b><em />发光天体为真实记忆 · 深空信标藏有回声</b></span>
       <div aria-label="星图交互状态">
         <Icon name="ph:cursor-click-bold" />
         <Icon name="ph:arrows-out-cardinal-bold" />
@@ -74,6 +90,28 @@
             <small>{{ evidenceText(relation.evidence) }}</small>
           </button>
         </section>
+      </aside>
+    </Transition>
+
+    <Transition name="popup">
+      <aside
+        v-if="activeDiscovery"
+        class="discovery-popup"
+        :style="{ '--discovery-accent': activeDiscovery.accent }"
+      >
+        <button class="popup-close" type="button" title="关闭" aria-label="关闭" @click="clearDiscovery"><Icon name="ph:x-bold" /></button>
+        <div class="discovery-orbit" aria-hidden="true"><i /><i /><i /></div>
+        <div class="discovery-identity"><Icon :name="activeDiscovery.icon" /><span>{{ activeDiscovery.kicker }}</span></div>
+        <h2>{{ activeDiscovery.title }}</h2>
+        <p>{{ activeDiscovery.description }}</p>
+        <div class="discovery-signal" aria-live="polite">
+          <small>{{ activeDiscovery.signalLabel }}</small>
+          <strong>{{ discoveryResult || activeDiscovery.signal }}</strong>
+        </div>
+        <button class="discovery-action" type="button" @click="runDiscoveryEffect">
+          <Icon :name="activeDiscovery.actionIcon" />
+          <span>{{ activeDiscovery.action }}</span>
+        </button>
       </aside>
     </Transition>
   </main>
@@ -105,6 +143,23 @@ type GraphRelation = {
   evidence?: Record<string, unknown>
 }
 
+type DiscoveryId = 'sun' | 'black-hole' | 'station' | 'satellite' | 'spacecraft'
+
+type Discovery = {
+  id: DiscoveryId
+  title: string
+  shortLabel: string
+  kicker: string
+  description: string
+  signalLabel: string
+  signal: string
+  icon: string
+  actionIcon: string
+  action: string
+  accent: string
+  responses: string[]
+}
+
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
@@ -112,8 +167,15 @@ const { mediaUrl } = useMediaUrl()
 const { navigate } = useCosmicNavigation()
 const { selectMemory, clearMemory } = useMemorySelection()
 const graph = reactive<{ nodes: GraphNode[]; relations: GraphRelation[]; graphVersion: string }>({ nodes: [], relations: [], graphVersion: '' })
-const sceneRef = ref<{ resetView: () => void } | null>(null)
+const sceneRef = ref<{
+  resetView: () => void
+  focusDiscovery: (id: DiscoveryId) => void
+  triggerDiscoveryEffect: (id: DiscoveryId) => void
+} | null>(null)
 const selected = ref<GraphNode | null>(null)
+const activeDiscoveryId = ref<DiscoveryId | ''>('')
+const discoveryResult = ref('')
+const discoverySequence = ref(0)
 const neighbors = ref<GraphRelation[]>([])
 const error = ref('')
 const sceneReady = ref(false)
@@ -132,7 +194,41 @@ const typeOptions = [
   { value: 'journey', label: '旅行', icon: 'ph:path-bold' },
 ]
 
+const discoveries: Discovery[] = [
+  {
+    id: 'sun', title: '日冕观测站', shortLabel: '太阳', kicker: 'SOLAR ARCHIVE · 01',
+    description: '这里保存所有被晨光照亮的时刻。每一束离开日冕的光，都要走八分二十秒才能抵达我们。',
+    signalLabel: '当前日冕回声', signal: '光球层稳定 · 一束旧日晨光正在抵达', icon: 'ph:sun-bold', actionIcon: 'ph:sparkle-bold', action: '采集一束日冕光', accent: '#ffbd68',
+    responses: ['光子样本 08:20 已封存：来自八分钟前的太阳。', '日冕里浮出一句话：今天也值得被照亮。', '捕获到一次微型耀斑，它把此刻标成了金色。'],
+  },
+  {
+    id: 'black-hole', title: '事件视界', shortLabel: '黑洞', kicker: 'GRAVITY WELL · 02',
+    description: '光与时间在这里弯曲。投入事件视界的东西不会消失，只会变成宇宙无法复述的秘密。',
+    signalLabel: '引力读数', signal: '时间膨胀 1.37× · 边界稳定', icon: 'ph:circle-half-tilt-bold', actionIcon: 'ph:paper-plane-tilt-bold', action: '投递一封无人信', accent: '#a99aff',
+    responses: ['信件已越过事件视界。它不会回来，也不会再打扰你。', '引力潮汐收走了这段噪声，只留下安静。', '无人信失去时间戳，成为宇宙里一个温柔的秘密。'],
+  },
+  {
+    id: 'station', title: '记忆空间站', shortLabel: '空间站', kicker: 'ORBITAL LOG · 03',
+    description: '一座绕记忆轨道运行的中继站。舷窗朝向被点亮的星球，值班员把偶然的幸福写进航行日志。',
+    signalLabel: '今日值班频道', signal: '舱压正常 · 远端记忆链路已接通', icon: 'ph:broadcast-bold', actionIcon: 'ph:radio-bold', action: '接收一则航行日志', accent: '#72d9ff',
+    responses: ['航行日志 021：窗外有一颗记忆刚刚亮起。', '航行日志 034：我们绕过旧日，仍在向前。', '航行日志 089：今日宇宙安静，适合想念。'],
+  },
+  {
+    id: 'satellite', title: '深空信标卫星', shortLabel: '卫星', kicker: 'BEACON ARRAY · 04',
+    description: '它在星图边缘缓慢巡航，替那些尚未相连的记忆寻找频率相同的邻居。',
+    signalLabel: '校准频段', signal: '1420.405 MHz · 弱信号持续靠近', icon: 'ph:planet-bold', actionIcon: 'ph:crosshair-simple-bold', action: '校准深空频率', accent: '#70e7cf',
+    responses: ['频率已锁定：一段久远的笑声正在返航。', '坐标校准完成：孤独信号找到了同频回声。', '信标完成握手：下一颗记忆星等待被点亮。'],
+  },
+  {
+    id: 'spacecraft', title: '远航信使', shortLabel: '飞船', kicker: 'COURIER FLIGHT · 05',
+    description: '它不运送货物，只携带尚未说出口的话。每次跃迁，都会在星图上留下一条短暂的蓝色航迹。',
+    signalLabel: '跃迁引擎', signal: '曲率核心待命 · 航路净空', icon: 'ph:rocket-launch-bold', actionIcon: 'ph:lightning-bold', action: '启动一次跃迁', accent: '#7ca8ff',
+    responses: ['跃迁完成：那句没说出口的话，正在前往它该去的地方。', '航路折叠成功，信使已穿过三段旧时光。', '曲率核心熄火，身后留下一条蓝色回声。'],
+  },
+]
+
 const displayNodes = computed(() => graph.nodes)
+const activeDiscovery = computed(() => discoveries.find(item => item.id === activeDiscoveryId.value) || null)
 const displayRelations = computed(() => graph.relations)
 const displayGraphVersion = computed(() => graph.graphVersion || `empty-${graph.nodes.length}`)
 const nodeYears = computed(() => graph.nodes
@@ -172,6 +268,8 @@ async function loadGraph() {
 }
 
 async function selectNode(node: GraphNode, syncUrl = true) {
+  activeDiscoveryId.value = ''
+  discoveryResult.value = ''
   selected.value = node
   selectMemory({ id: node.id, type: node.type, href: node.href })
   if (syncUrl) await router.replace({ query: { focus: node.id } })
@@ -187,6 +285,34 @@ function handleSceneSelect(node: GraphNode) {
   void selectNode(node)
 }
 
+function handleDiscovery(id: DiscoveryId) {
+  selected.value = null
+  neighbors.value = []
+  clearMemory()
+  activeDiscoveryId.value = id
+  discoveryResult.value = ''
+  void router.replace({ query: {} })
+}
+
+function openDiscovery(id: DiscoveryId) {
+  handleDiscovery(id)
+  sceneRef.value?.focusDiscovery(id)
+}
+
+function clearDiscovery() {
+  activeDiscoveryId.value = ''
+  discoveryResult.value = ''
+  sceneRef.value?.resetView()
+}
+
+function runDiscoveryEffect() {
+  const discovery = activeDiscovery.value
+  if (!discovery) return
+  discoveryResult.value = discovery.responses[discoverySequence.value % discovery.responses.length] || discovery.signal
+  discoverySequence.value += 1
+  sceneRef.value?.triggerDiscoveryEffect(discovery.id)
+}
+
 function resetScene() {
   if (selected.value) {
     selected.value = null
@@ -194,6 +320,8 @@ function resetScene() {
     clearMemory()
     void router.replace({ query: {} })
   }
+  activeDiscoveryId.value = ''
+  discoveryResult.value = ''
   sceneRef.value?.resetView()
 }
 
@@ -202,6 +330,11 @@ function clearSelected() {
   neighbors.value = []
   clearMemory()
   void router.replace({ query: {} })
+  if (activeDiscoveryId.value) {
+    activeDiscoveryId.value = ''
+    discoveryResult.value = ''
+    sceneRef.value?.resetView()
+  }
 }
 
 function selectNeighbor(relation: GraphRelation) {
@@ -263,6 +396,13 @@ useHead({ title: '时光星图' })
 .signal.offline>i { background:#8298ad; box-shadow:0 0 10px #55758f; }
 .signal button { display:grid; width:30px; height:30px; border:1px solid rgb(117 181 236 / .2); border-radius:50%; background:rgb(4 15 31 / .5); color:#8fc8f5; place-items:center; transition:background .25s ease,transform .25s ease; }
 .signal button:hover { background:rgb(35 91 141 / .4); transform:translateY(-2px); }
+.cosmic-dock { position:absolute; z-index:12; top:22px; left:50%; display:flex; height:38px; align-items:stretch; gap:2px; padding:2px; border:1px solid rgb(110 189 235 / .16); border-radius:8px; background:rgb(3 14 30 / .62); box-shadow:0 12px 34px rgb(0 0 0 / .24); backdrop-filter:blur(16px); transform:translateX(-50%); }
+.cosmic-dock button { display:flex; min-width:66px; align-items:center; justify-content:center; gap:6px; padding:0 9px; border:1px solid transparent; border-radius:6px; background:transparent; color:#7898af; cursor:pointer; font:inherit; transition:background .22s ease,border-color .22s ease,color .22s ease,transform .22s ease; }
+.cosmic-dock button :deep(svg) { flex:none; font-size:.78rem; }
+.cosmic-dock button span { font-size:.54rem; white-space:nowrap; }
+.cosmic-dock button:hover { border-color:rgb(111 207 245 / .2); background:rgb(48 119 165 / .16); color:#c8edff; transform:translateY(-1px); }
+.cosmic-dock button.active { border-color:rgb(118 216 255 / .38); background:rgb(53 139 190 / .22); color:#dff6ff; box-shadow:inset 0 0 18px rgb(78 181 231 / .08); }
+.cosmic-dock button:focus-visible { outline:2px solid #4a9fe6; outline-offset:3px; }
 .constellation-intro { position:absolute; z-index:8; bottom:74px; left:clamp(22px,6vw,92px); width:min(540px,calc(100vw - 44px)); pointer-events:none; opacity:0; transform:translateY(18px); transition:opacity 1s ease .9s,transform 1.3s cubic-bezier(.16,1,.3,1) .9s; }
 .ready .constellation-intro { opacity:1; transform:none; }
 .intro-kicker { display:flex; align-items:center; gap:9px; color:#73c7ee; font-size:.54rem; letter-spacing:.11em; }
@@ -300,26 +440,49 @@ useHead({ title: '时光星图' })
 .memory-popup section button>span { grid-column:1; color:#669fc4; font-size:.5rem; }
 .memory-popup section button>b { grid-column:1; overflow:hidden; font-size:.63rem; text-overflow:ellipsis; white-space:nowrap; }
 .memory-popup section button>small { grid-column:2; grid-row:1/3; align-self:center; color:#6f94b0; font-size:.48rem; }
+.discovery-popup { --discovery-accent:#72d9ff; position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(354px,calc(100vw - 40px)); padding:26px; overflow:hidden; border:1px solid color-mix(in srgb,var(--discovery-accent) 28%,transparent); border-radius:8px; background:linear-gradient(150deg,rgb(7 24 45 / .88),rgb(2 9 22 / .94)); box-shadow:0 26px 80px rgb(0 0 0 / .46),inset 0 1px rgb(213 240 255 / .07); backdrop-filter:blur(24px) saturate(1.16); transform:translateY(-50%); }
+.discovery-popup::before { position:absolute; top:-90px; right:-70px; width:240px; height:210px; border-radius:50%; background:radial-gradient(circle,color-mix(in srgb,var(--discovery-accent) 24%,transparent),transparent 68%); content:''; pointer-events:none; }
+.discovery-orbit { position:relative; width:72px; height:72px; margin:2px 0 23px; border:1px solid color-mix(in srgb,var(--discovery-accent) 44%,transparent); border-radius:50%; animation:discovery-spin 12s linear infinite; }
+.discovery-orbit::before { position:absolute; inset:17px; border:1px solid color-mix(in srgb,var(--discovery-accent) 32%,transparent); border-radius:50%; content:''; }
+.discovery-orbit i { position:absolute; width:7px; height:7px; border-radius:50%; background:var(--discovery-accent); box-shadow:0 0 15px var(--discovery-accent); }
+.discovery-orbit i:nth-child(1) { top:-4px; left:31px; }.discovery-orbit i:nth-child(2) { right:4px; bottom:7px; width:4px; height:4px; }.discovery-orbit i:nth-child(3) { top:28px; left:15px; width:3px; height:3px; }
+.discovery-identity { display:flex; align-items:center; gap:8px; color:var(--discovery-accent); font-size:.55rem; letter-spacing:.08em; }
+.discovery-identity :deep(svg) { font-size:.92rem; }
+.discovery-popup h2 { margin:10px 34px 9px 0; color:#f0f7fc; font-size:1.45rem; line-height:1.2; letter-spacing:0; }
+.discovery-popup>p { margin:0; color:#8da7ba; font-size:.69rem; line-height:1.85; }
+.discovery-signal { display:flex; min-height:58px; flex-direction:column; justify-content:center; gap:5px; margin-top:19px; padding:10px 12px; border-left:2px solid var(--discovery-accent); background:color-mix(in srgb,var(--discovery-accent) 7%,transparent); }
+.discovery-signal small { color:color-mix(in srgb,var(--discovery-accent) 76%,#8aa2b4); font-size:.49rem; letter-spacing:.06em; }
+.discovery-signal strong { color:#c8dbe7; font-size:.62rem; font-weight:560; line-height:1.55; }
+.discovery-action { display:flex; width:100%; height:40px; align-items:center; justify-content:center; gap:8px; margin-top:17px; border:1px solid color-mix(in srgb,var(--discovery-accent) 38%,transparent); border-radius:6px; background:color-mix(in srgb,var(--discovery-accent) 10%,transparent); color:#e5f5fc; cursor:pointer; font:inherit; font-size:.62rem; transition:background .22s ease,border-color .22s ease,transform .22s ease; }
+.discovery-action:hover { border-color:color-mix(in srgb,var(--discovery-accent) 66%,transparent); background:color-mix(in srgb,var(--discovery-accent) 17%,transparent); transform:translateY(-1px); }
+.discovery-action:focus-visible { outline:2px solid var(--discovery-accent); outline-offset:3px; }
 .popup-enter-active,.popup-leave-active { transition:transform .52s cubic-bezier(.16,1,.3,1),opacity .3s ease; }
 .popup-enter-from,.popup-leave-to { opacity:0; transform:translate(26px,-48%); }
 .signal button:focus-visible,.popup-close:focus-visible { outline:2px solid #4a9fe6; outline-offset:3px; }
 @keyframes loading-spin { to { transform:rotate(360deg); } }
+@keyframes discovery-spin { to { transform:rotate(360deg); } }
 @media (max-width:700px) {
   .constellation-nav { top:14px; right:14px; left:14px; }
   .brand img { width:38px; height:38px; }
   .brand span { display:none; }
   .signal span { display:none; }
+  .cosmic-dock { top:68px; width:auto; max-width:calc(100vw - 28px); height:38px; }
+  .cosmic-dock button { width:42px; min-width:42px; padding:0; }
+  .cosmic-dock button span { display:none; }
   .constellation-intro { bottom:68px; left:20px; width:calc(100vw - 40px); }
   .constellation-intro h1 { font-size:2.8rem; }
   .constellation-intro p { max-width:310px; font-size:.66rem; }
   .constellation-foot { right:14px; bottom:14px; left:14px; }
   .constellation-foot>span b { display:none; }
   .memory-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(52dvh,440px); padding:18px 18px 18px 24px; border-radius:20px 20px 20px 8px; transform:none; }
+  .discovery-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(58dvh,470px); padding:21px; transform:none; }
+  .discovery-orbit { width:54px; height:54px; margin-bottom:17px; }
+  .discovery-orbit::before { inset:13px; }.discovery-orbit i:nth-child(1) { left:23px; }.discovery-orbit i:nth-child(2) { right:3px; bottom:5px; }.discovery-orbit i:nth-child(3) { top:21px; left:11px; }
   .popup-rail { top:21px; bottom:19px; left:9px; }
   .popup-enter-from,.popup-leave-to { opacity:0; transform:translateY(24px); }
 }
 @media (prefers-reduced-motion:reduce) {
-  .constellation-intro,.popup-enter-active,.popup-leave-active,.loading-orbit { transition:none; animation:none; }
+  .constellation-intro,.popup-enter-active,.popup-leave-active,.loading-orbit,.discovery-orbit { transition:none; animation:none; }
   .constellation-intro { opacity:1; transform:none; }
 }
 </style>

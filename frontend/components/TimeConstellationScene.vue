@@ -46,6 +46,12 @@ type CameraFlight = CameraSnapshot & {
   arcHeight: number
 }
 
+type DiscoveryId = 'sun' | 'black-hole' | 'station' | 'satellite' | 'spacecraft'
+
+type SceneHit =
+  | { kind: 'memory'; node: MemoryNode; label: string }
+  | { kind: 'discovery'; id: DiscoveryId; label: string }
+
 type PlanetProfile = {
   surface: number
   atmosphere: number
@@ -74,6 +80,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   select: [node: MemoryNode]
+  discover: [id: DiscoveryId]
   clear: []
   ready: []
   fallback: [reason: 'webgl' | 'initialization']
@@ -91,7 +98,6 @@ let camera: THREE.PerspectiveCamera | null = null
 let controls: OrbitControls | null = null
 let resizeObserver: ResizeObserver | null = null
 let animationFrame = 0
-let idleSince = 0
 let elapsed = 0
 let lastFrame = 0
 let lowQuality = false
@@ -100,24 +106,38 @@ let core: THREE.Group | null = null
 let sun: THREE.Group | null = null
 let blackHole: THREE.Group | null = null
 let spaceStation: THREE.Group | null = null
+let satellite: THREE.Group | null = null
+let spacecraft: THREE.Group | null = null
 let meteor: THREE.Sprite | null = null
 let meteorTrail: THREE.Line | null = null
 let warpLines: THREE.LineSegments | null = null
 let warpMaterial: THREE.LineBasicMaterial | null = null
 let introStartedAt = 0
 let introInterrupted = false
+let introCompleted = false
+let ambientOrbitPhase = -.18
+let discoveryEffect: DiscoveryId | '' = ''
+let discoveryEffectStartedAt = 0
+let spacecraftLaunchAt = -20
 let cameraFlight: CameraFlight | null = null
 let overviewSnapshot: CameraSnapshot | null = null
 let activeSelectionId = ''
+let focusedDiscoveryId: DiscoveryId | '' = ''
 const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2(2, 2)
 const nodeObjects = new Map<string, THREE.Object3D>()
 const nodePositions = new Map<string, THREE.Vector3>()
 const nodeLookup = new Map<string, MemoryNode>()
 const interactive: THREE.Object3D[] = []
+const discoveryInteractive: THREE.Object3D[] = []
+const discoveryObjects = new Map<DiscoveryId, THREE.Group>()
 const starLayers: THREE.Points[] = []
 const cosmicBodies: THREE.Group[] = []
 const disposables = new Set<{ dispose: () => void }>()
+const INTRO_DURATION = 3600
+const INTRO_START_PHASE = .2
+const INTRO_END_PHASE = -.18
+const CRUISE_ANGULAR_SPEED = Math.PI * 2 / 60 * .18
 const planetProfiles: PlanetProfile[] = [
   { surface: 0x4679a8, atmosphere: 0x6fc8f0, glow: 0x56c5f1, accent: 0x91c5a6, surfaceCss: '#4679a8', accentCss: '#91c5a6' },
   { surface: 0xb75d49, atmosphere: 0xf18d67, glow: 0xeb8060, accent: 0xd2a06e, surfaceCss: '#b75d49', accentCss: '#d2a06e' },
@@ -630,6 +650,18 @@ function addCore() {
   scene.add(core)
 }
 
+function registerDiscovery(id: DiscoveryId, label: string, object: THREE.Group, hitRadius: number) {
+  const hitTarget = new THREE.Mesh(
+    track(new THREE.SphereGeometry(hitRadius, lowQuality ? 10 : 16, lowQuality ? 8 : 12)),
+    track(new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })),
+  )
+  hitTarget.userData.discoveryId = id
+  hitTarget.userData.discoveryLabel = label
+  object.add(hitTarget)
+  discoveryInteractive.push(hitTarget)
+  discoveryObjects.set(id, object)
+}
+
 function addSun() {
   if (!scene) return
   const mobile = window.innerWidth < 720
@@ -658,6 +690,7 @@ function addSun() {
   sun.add(outerHalo)
   const sunlight = new THREE.PointLight(0xffe6c8, 1500, 720, 1.32)
   sun.add(sunlight)
+  registerDiscovery('sun', '日冕观测站', sun, 16)
   scene.add(sun)
 }
 
@@ -709,6 +742,7 @@ function addBlackHole() {
     jet.rotation.x = -.2
     blackHole.add(jet)
   }
+  registerDiscovery('black-hole', '事件视界', blackHole, 45)
   scene.add(blackHole)
 }
 
@@ -768,7 +802,75 @@ function addSpaceStation() {
     beacon.scale.set(2.2, 2.2, 1)
     spaceStation.add(beacon)
   }
+  registerDiscovery('station', '记忆空间站', spaceStation, 23)
   scene.add(spaceStation)
+}
+
+function addSatellite() {
+  if (!scene) return
+  satellite = new THREE.Group()
+  satellite.name = 'signal-satellite'
+  satellite.position.set(-72, -38, -86)
+  satellite.rotation.set(.18, .42, -.12)
+  satellite.userData.orbitPhase = -2.28
+
+  const hull = track(new THREE.MeshStandardMaterial({ color: 0xb7c7d2, roughness: .35, metalness: .76, emissive: 0x102235, emissiveIntensity: .28 }))
+  const panel = track(new THREE.MeshStandardMaterial({ color: 0x285b9a, roughness: .42, metalness: .42, emissive: 0x0d3765, emissiveIntensity: .58, side: THREE.DoubleSide }))
+  const signal = track(new THREE.MeshBasicMaterial({ color: 0x76e6ff, transparent: true, opacity: .42, blending: THREE.AdditiveBlending, depthWrite: false }))
+  const body = new THREE.Mesh(track(new THREE.BoxGeometry(5.8, 4.2, 4.2)), hull)
+  satellite.add(body)
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(track(new THREE.BoxGeometry(8.5, .12, 3.8)), panel)
+    wing.position.x = side * 7.3
+    satellite.add(wing)
+  }
+  const mast = new THREE.Mesh(track(new THREE.CylinderGeometry(.12, .12, 5.5, 7)), hull)
+  mast.position.y = 4.2
+  satellite.add(mast)
+  const dish = new THREE.Mesh(track(new THREE.SphereGeometry(1.7, lowQuality ? 10 : 18, 6, 0, Math.PI * 2, 0, Math.PI / 2)), hull)
+  dish.position.y = 7.1
+  dish.rotation.x = Math.PI
+  satellite.add(dish)
+  for (const radius of [7.2, 10.5]) {
+    const ring = new THREE.Mesh(track(new THREE.TorusGeometry(radius, .08, 4, lowQuality ? 36 : 72)), signal)
+    ring.name = 'satellite-signal-ring'
+    ring.rotation.x = Math.PI / 2
+    satellite.add(ring)
+  }
+  const beacon = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture('#7ceaff'), transparent: true, opacity: .78, blending: THREE.AdditiveBlending, depthWrite: false })))
+  beacon.name = 'satellite-beacon'
+  beacon.scale.set(5, 5, 1)
+  satellite.add(beacon)
+  registerDiscovery('satellite', '深空信标卫星', satellite, 14)
+  scene.add(satellite)
+}
+
+function addSpacecraft() {
+  if (!scene) return
+  spacecraft = new THREE.Group()
+  spacecraft.name = 'memory-courier'
+  spacecraft.position.set(92, 18, -42)
+  const hull = track(new THREE.MeshStandardMaterial({ color: 0xd4dde3, roughness: .28, metalness: .72, emissive: 0x14273a, emissiveIntensity: .34 }))
+  const dark = track(new THREE.MeshStandardMaterial({ color: 0x263745, roughness: .42, metalness: .66 }))
+  const engine = track(new THREE.SpriteMaterial({ map: glowTexture('#75ddff'), color: 0x75ddff, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }))
+  const fuselage = new THREE.Mesh(track(new THREE.ConeGeometry(2.4, 10.5, lowQuality ? 8 : 14)), hull)
+  fuselage.rotation.z = -Math.PI / 2
+  spacecraft.add(fuselage)
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(track(new THREE.BoxGeometry(5.5, .28, 2.7)), dark)
+    wing.position.set(-1.2, 0, side * 2.7)
+    wing.rotation.y = side * .2
+    spacecraft.add(wing)
+  }
+  for (const z of [-1.2, 1.2]) {
+    const exhaust = new THREE.Sprite(engine)
+    exhaust.position.set(-6, 0, z)
+    exhaust.scale.set(7.5, 2.4, 1)
+    spacecraft.add(exhaust)
+  }
+  spacecraft.scale.setScalar(lowQuality ? .72 : .92)
+  registerDiscovery('spacecraft', '远航信使', spacecraft, 12)
+  scene.add(spacecraft)
 }
 
 function addOrbit(radius: number, year: number | null) {
@@ -1009,12 +1111,16 @@ function clearSceneContent() {
   nodePositions.clear()
   nodeLookup.clear()
   interactive.length = 0
+  discoveryInteractive.length = 0
+  discoveryObjects.clear()
   starLayers.length = 0
   cosmicBodies.length = 0
   core = null
   sun = null
   blackHole = null
   spaceStation = null
+  satellite = null
+  spacecraft = null
   meteor = null
   meteorTrail = null
   warpLines = null
@@ -1028,6 +1134,8 @@ function buildScene() {
   addSun()
   addBlackHole()
   addSpaceStation()
+  addSatellite()
+  addSpacecraft()
   addCore()
   const years = [...new Set(props.nodes.map(yearOf).filter((year): year is number => year != null))].sort((a, b) => b - a)
   if (years.length) {
@@ -1064,22 +1172,28 @@ function pointerPosition(event: PointerEvent) {
   pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 }
 
-function hitNode() {
+function hitScene() : SceneHit | null {
   if (!camera) return null
   raycaster.setFromCamera(pointer, camera)
-  const hit = raycaster.intersectObjects(interactive, false)[0]
-  const id = String(hit?.object.userData.nodeId || '')
-  return id ? nodeLookup.get(id) || null : null
+  const hit = raycaster.intersectObjects([...interactive, ...discoveryInteractive], false)[0]
+  const nodeId = String(hit?.object.userData.nodeId || '')
+  const node = nodeId ? nodeLookup.get(nodeId) : null
+  if (node) return { kind: 'memory', node, label: node.title }
+  const discoveryId = String(hit?.object.userData.discoveryId || '') as DiscoveryId
+  if (discoveryId && discoveryObjects.has(discoveryId)) {
+    return { kind: 'discovery', id: discoveryId, label: String(hit.object.userData.discoveryLabel || '') }
+  }
+  return null
 }
 
 function onPointerMove(event: PointerEvent) {
   pointerPosition(event)
-  const node = hitNode()
-  if (host.value) host.value.style.cursor = props.ambient ? 'default' : node ? 'pointer' : 'grab'
+  const hit = hitScene()
+  if (host.value) host.value.style.cursor = props.ambient ? 'default' : hit ? 'pointer' : 'grab'
   if (!tooltip.value || props.ambient) return
-  tooltip.value.textContent = node?.title || ''
-  tooltip.value.classList.toggle('visible', !!node)
-  if (node) {
+  tooltip.value.textContent = hit?.label || ''
+  tooltip.value.classList.toggle('visible', !!hit)
+  if (hit) {
     tooltip.value.style.left = `${event.clientX + 14}px`
     tooltip.value.style.top = `${event.clientY + 12}px`
   }
@@ -1087,28 +1201,92 @@ function onPointerMove(event: PointerEvent) {
 
 function onPointerDown() {
   if (props.ambient || cameraFlight) return
-  idleSince = performance.now()
   introInterrupted = true
+  introCompleted = true
+  if (camera) {
+    camera.fov = 48
+    camera.updateProjectionMatrix()
+  }
 }
 function onClick(event: PointerEvent) {
   if (props.ambient) return
   pointerPosition(event)
-  const node = hitNode()
-  if (node) emit('select', node)
-  else emit('clear')
+  const hit = hitScene()
+  if (hit?.kind === 'memory') emit('select', hit.node)
+  else if (hit?.kind === 'discovery') {
+    focusDiscovery(hit.id)
+    emit('discover', hit.id)
+  } else emit('clear')
+}
+
+function sceneTarget() {
+  const mobile = window.innerWidth < 720
+  return new THREE.Vector3(props.ambient && !mobile ? -44 : 0, mobile ? -42 : 0, 0)
+}
+
+function cruiseRadius() {
+  return window.innerWidth < 720 ? 238 : 218
 }
 
 function overviewPose(): CameraSnapshot {
   const mobile = window.innerWidth < 720
+  const target = sceneTarget()
+  const radius = cruiseRadius()
   return {
-    target: new THREE.Vector3(props.ambient && !mobile ? -44 : 0, mobile ? -42 : 0, 0),
-    position: new THREE.Vector3(0, mobile ? 62 : 68, mobile ? 238 : 218),
+    target,
+    position: new THREE.Vector3(
+      target.x + Math.sin(INTRO_END_PHASE) * radius,
+      mobile ? 62 : 68,
+      target.z + Math.cos(INTRO_END_PHASE) * radius,
+    ),
   }
+}
+
+function hermite(start: number, end: number, startTangent: number, endTangent: number, progress: number) {
+  const squared = progress * progress
+  const cubed = squared * progress
+  return (2 * cubed - 3 * squared + 1) * start
+    + (cubed - 2 * squared + progress) * startTangent
+    + (-2 * cubed + 3 * squared) * end
+    + (cubed - squared) * endTangent
+}
+
+function applyIntroCamera(now: number) {
+  if (!camera || !controls) return 0
+  const progress = Math.max(0, Math.min(1, (now - introStartedAt) / INTRO_DURATION))
+  const arrival = 1 - Math.pow(1 - progress, 4)
+  const mobile = window.innerWidth < 720
+  const target = sceneTarget()
+  const radius = THREE.MathUtils.lerp(mobile ? 620 : 720, cruiseRadius(), arrival)
+  const phase = hermite(
+    INTRO_START_PHASE,
+    INTRO_END_PHASE,
+    -.62,
+    -CRUISE_ANGULAR_SPEED * (INTRO_DURATION / 1000),
+    progress,
+  )
+  camera.position.set(
+    target.x + Math.sin(phase) * radius,
+    THREE.MathUtils.lerp(mobile ? 8 : 12, mobile ? 62 : 68, arrival),
+    target.z + Math.cos(phase) * radius,
+  )
+  controls.target.copy(target)
+  ambientOrbitPhase = phase
+  camera.fov = THREE.MathUtils.lerp(76, 48, arrival) - Math.sin(progress * Math.PI) * 4.5
+  camera.updateProjectionMatrix()
+  if (progress >= 1 && !introCompleted) {
+    introCompleted = true
+    controls.autoRotate = !props.ambient && !props.selectedId && !reducedMotion.value
+  }
+  return progress
 }
 
 function startCameraFlight(destination: CameraSnapshot, duration = 1250, arcHeight = 12) {
   if (!camera || !controls) return
   introInterrupted = true
+  introCompleted = true
+  camera.fov = 48
+  camera.updateProjectionMatrix()
   controls.autoRotate = false
   controls.enabled = false
   cameraFlight = {
@@ -1120,6 +1298,29 @@ function startCameraFlight(destination: CameraSnapshot, duration = 1250, arcHeig
     duration: reducedMotion.value ? 0 : duration,
     arcHeight,
   }
+}
+
+function focusDiscovery(id: DiscoveryId) {
+  if (!camera || !controls) return
+  const object = discoveryObjects.get(id)
+  if (!object) return
+  focusedDiscoveryId = id
+  if (id === 'sun') return
+  const target = object.getWorldPosition(new THREE.Vector3())
+  const direction = camera.position.clone().sub(controls.target).normalize()
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
+  const sideOffset = right.multiplyScalar(window.innerWidth < 700 ? 0 : 10)
+  const distance = id === 'black-hole' ? 118 : id === 'station' ? 72 : 58
+  startCameraFlight({
+    target: target.clone().add(sideOffset),
+    position: target.clone().add(direction.multiplyScalar(distance)).add(sideOffset.clone().multiplyScalar(.65)),
+  }, id === 'black-hole' ? 1750 : 1450, id === 'black-hole' ? 18 : 12)
+}
+
+function triggerDiscoveryEffect(id: DiscoveryId) {
+  discoveryEffect = id
+  discoveryEffectStartedAt = performance.now()
+  if (id === 'spacecraft') spacecraftLaunchAt = elapsed
 }
 
 function updateCameraFlight(now: number) {
@@ -1152,6 +1353,7 @@ function focusPose(target: THREE.Vector3): CameraSnapshot | null {
 
 function applySelection(animate = true) {
   const selected = props.selectedId
+  if (selected) focusedDiscoveryId = ''
   if (controls) controls.autoRotate = !selected && !props.ambient && !reducedMotion.value
   for (const [id, object] of nodeObjects) {
     const active = !selected || id === selected
@@ -1202,6 +1404,7 @@ function applySelection(animate = true) {
 function resetView() {
   if (!camera || !controls) return
   activeSelectionId = ''
+  focusedDiscoveryId = ''
   overviewSnapshot = null
   startCameraFlight(overviewPose(), 1400, 12)
 }
@@ -1212,27 +1415,60 @@ function animate(now = performance.now()) {
   const delta = lastFrame ? Math.min(.05, (now - lastFrame) / 1000) : 0
   elapsed += delta
   if (!reducedMotion.value) {
+    const effectAge = discoveryEffect ? (now - discoveryEffectStartedAt) / 1000 : Number.POSITIVE_INFINITY
+    const effectPulse = effectAge < 2.8 ? Math.sin(Math.min(1, effectAge / 2.8) * Math.PI) : 0
+    if (effectAge >= 2.8) discoveryEffect = ''
     if (core) {
       core.rotation.y += delta * .18
       core.rotation.z = Math.sin(elapsed * .3) * .08
     }
     if (sun) {
       sun.rotation.y += delta * .035
-      const pulse = 1 + Math.sin(elapsed * .55) * .025
+      const pulse = 1 + Math.sin(elapsed * .55) * .025 + (discoveryEffect === 'sun' ? effectPulse * .18 : 0)
       sun.scale.setScalar(pulse)
     }
     if (blackHole) {
       blackHole.rotation.y -= delta * .055
       blackHole.rotation.z = Math.sin(elapsed * .18) * .025
       const disk = blackHole.getObjectByName('black-hole-disk')
-      if (disk) disk.rotation.z += delta * .16
+      if (disk) disk.rotation.z += delta * (.16 + (discoveryEffect === 'black-hole' ? effectPulse * 1.2 : 0))
       const halo = blackHole.getObjectByName('black-hole-halo')
-      if (halo) halo.scale.setScalar(78 + Math.sin(elapsed * .7) * 3.5)
+      if (halo) halo.scale.setScalar(78 + Math.sin(elapsed * .7) * 3.5 + (discoveryEffect === 'black-hole' ? effectPulse * 18 : 0))
     }
     if (spaceStation) {
       spaceStation.rotation.y += delta * .045
       const habitatRing = spaceStation.getObjectByName('station-habitat-ring')
-      if (habitatRing) habitatRing.rotation.z += delta * .22
+      if (habitatRing) habitatRing.rotation.z += delta * (.22 + (discoveryEffect === 'station' ? effectPulse * 1.8 : 0))
+    }
+    if (satellite) {
+      if (focusedDiscoveryId !== 'satellite') {
+        const orbitPhase = Number(satellite.userData.orbitPhase || 0) - elapsed * .032
+        satellite.position.set(Math.cos(orbitPhase) * 92, -34 + Math.sin(elapsed * .42) * 4, Math.sin(orbitPhase) * 68)
+      }
+      satellite.rotation.y += delta * .12
+      satellite.traverse((child) => {
+        if (child.name !== 'satellite-signal-ring') return
+        const ringScale = 1 + Math.sin(elapsed * 1.4) * .06 + (discoveryEffect === 'satellite' ? effectPulse * .44 : 0)
+        child.scale.setScalar(ringScale)
+      })
+    }
+    if (spacecraft) {
+      const launchAge = elapsed - spacecraftLaunchAt
+      if (launchAge >= 0 && launchAge < 4.2) {
+        const progress = Math.min(1, launchAge / 4.2)
+        const eased = progress * progress * (3 - 2 * progress)
+        const start = new THREE.Vector3(-210, -58, 126)
+        const end = new THREE.Vector3(230, 74, -238)
+        const control = new THREE.Vector3(12, 110, 42)
+        spacecraft.position.copy(new THREE.QuadraticBezierCurve3(start, control, end).getPoint(eased))
+        spacecraft.rotation.set(.12, -1.02 + progress * .34, -.18)
+        spacecraft.scale.setScalar((lowQuality ? .72 : .92) * (1 + Math.sin(progress * Math.PI) * .34))
+      } else if (focusedDiscoveryId !== 'spacecraft') {
+        const cruise = (elapsed % 18) / 18 * Math.PI * 2
+        spacecraft.position.set(Math.cos(cruise) * 126, 18 + Math.sin(cruise * 2) * 22, Math.sin(cruise) * 92)
+        spacecraft.rotation.set(.08, -cruise - .25, Math.sin(cruise) * .12)
+        spacecraft.scale.setScalar(lowQuality ? .72 : .92)
+      }
     }
     starLayers.forEach((stars, index) => {
       stars.rotation.y += delta * (.004 + index * .006)
@@ -1271,33 +1507,28 @@ function animate(now = performance.now()) {
       meteorTrail.visible = visible
     }
 
-    const introProgress = Math.max(0, Math.min(1, (now - introStartedAt) / 3200))
-    if (!introInterrupted && introProgress < 1) {
-      const eased = 1 - Math.pow(1 - introProgress, 4)
-      const mobile = window.innerWidth < 720
+    let introProgress = 1
+    if (!introInterrupted && !introCompleted) introProgress = applyIntroCamera(now)
+    if (props.ambient && introCompleted && !cameraFlight) {
+      ambientOrbitPhase -= delta * CRUISE_ANGULAR_SPEED
+      const target = sceneTarget()
+      const radius = cruiseRadius()
       camera.position.set(
-        Math.sin(introProgress * Math.PI) * -26,
-        THREE.MathUtils.lerp(20, mobile ? 62 : 68, eased),
-        THREE.MathUtils.lerp(mobile ? 390 : 500, mobile ? 238 : 218, eased),
+        target.x + Math.sin(ambientOrbitPhase) * radius,
+        (window.innerWidth < 720 ? 62 : 68) + Math.sin(elapsed * .18) * 7,
+        target.z + Math.cos(ambientOrbitPhase) * radius,
       )
-      controls.target.set(props.ambient && !mobile ? -44 : 0, mobile ? -42 : 0, 0)
-      if (warpMaterial) warpMaterial.opacity = .52 * Math.pow(1 - introProgress, 1.6)
-    } else if (warpMaterial) {
-      warpMaterial.opacity = .035
+      controls.target.copy(target)
+      camera.lookAt(target)
     }
-
-    if (props.ambient && introProgress >= 1 && performance.now() - idleSince > 2500) {
-      const mobile = window.innerWidth < 720
-      const radius = mobile ? 225 : 205
-      camera.position.x = Math.sin(elapsed * .035) * radius
-      camera.position.z = Math.cos(elapsed * .035) * radius
-      camera.position.y = 72 + Math.sin(elapsed * .018) * 18
-      controls.target.set(!mobile ? -44 : 0, mobile ? -42 : 0, 0)
-      camera.lookAt(controls.target)
+    if (warpMaterial) {
+      const introWarp = introProgress < 1 ? .04 + .9 * Math.pow(1 - introProgress, 1.45) : .035
+      const effectWarp = discoveryEffect === 'spacecraft' ? effectPulse * .72 : discoveryEffect === 'black-hole' ? effectPulse * .18 : 0
+      warpMaterial.opacity = Math.min(.96, introWarp + effectWarp)
     }
   }
   updateCameraFlight(now)
-  controls.update()
+  controls.update(delta)
   if (sun && camera) {
     const viewOffset = (sun.userData.viewOffset as THREE.Vector3).clone()
       .multiplyScalar(320)
@@ -1325,19 +1556,37 @@ async function initialize() {
     host.value.appendChild(renderer.domElement)
     scene = new THREE.Scene()
     scene.fog = new THREE.FogExp2(spaceBackground(), .0016)
-    camera = new THREE.PerspectiveCamera(48, 1, .1, 1400)
-    camera.position.set(0, 20, window.innerWidth < 720 ? 390 : 500)
+    const skipIntro = reducedMotion.value || Boolean(props.selectedId)
+    camera = new THREE.PerspectiveCamera(skipIntro ? 48 : 76, 1, .1, 1400)
     controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.dampingFactor = .055
     controls.enablePan = false
     controls.minDistance = 38
     controls.maxDistance = 480
-    controls.autoRotate = !props.ambient && !reducedMotion.value
+    controls.autoRotate = false
     controls.autoRotateSpeed = .18
     controls.enableRotate = !props.ambient
     controls.enableZoom = !props.ambient
     controls.enabled = !props.ambient
+    introStartedAt = performance.now() + Math.max(0, props.introDelayMs)
+    introInterrupted = skipIntro
+    introCompleted = skipIntro
+    ambientOrbitPhase = skipIntro ? INTRO_END_PHASE : INTRO_START_PHASE
+    const initialPose = overviewPose()
+    if (skipIntro) {
+      camera.position.copy(initialPose.position)
+      controls.target.copy(initialPose.target)
+    } else {
+      const target = sceneTarget()
+      const radius = window.innerWidth < 720 ? 620 : 720
+      camera.position.set(
+        target.x + Math.sin(INTRO_START_PHASE) * radius,
+        window.innerWidth < 720 ? 8 : 12,
+        target.z + Math.cos(INTRO_START_PHASE) * radius,
+      )
+      controls.target.copy(target)
+    }
     const ambientLight = new THREE.AmbientLight(0x8caed2, .56); ambientLight.name = 'ambient-light'; scene.add(ambientLight)
     const keyLight = new THREE.PointLight(0xbad7f5, 620, 420); keyLight.name = 'key-light'; keyLight.position.set(0, 18, 28); scene.add(keyLight)
     buildScene()
@@ -1346,9 +1595,6 @@ async function initialize() {
     host.value.addEventListener('pointermove', onPointerMove)
     host.value.addEventListener('pointerdown', onPointerDown)
     host.value.addEventListener('click', onClick)
-    idleSince = performance.now()
-    introStartedAt = performance.now() + Math.max(0, props.introDelayMs)
-    introInterrupted = Boolean(props.selectedId)
     lastFrame = 0
     resize()
     renderer.render(scene, camera)
@@ -1396,6 +1642,8 @@ onBeforeUnmount(() => { disposed = true; destroy() })
 
 defineExpose({
   focusNode: (id: string) => { const node = nodeLookup.get(id); if (node) emit('select', node) },
+  focusDiscovery,
+  triggerDiscoveryEffect,
   resetView,
 })
 </script>
