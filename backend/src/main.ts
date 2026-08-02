@@ -1,24 +1,31 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
-import { RequestMethod, ValidationPipe } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
+import { createRequestValidationPipe } from './common/validation/request-validation.pipe';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
-  app.setGlobalPrefix('api', { exclude: [{ path: 'rss.xml', method: RequestMethod.GET }] });
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'rss.xml', method: RequestMethod.GET }],
+  });
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production'
-      ? ['https://corner.ink', 'https://www.corner.ink']
-      : ['http://localhost:3000'],
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? ['https://corner.ink', 'https://www.corner.ink']
+        : ['http://localhost:3000'],
     credentials: true,
   });
-  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
-  app.useGlobalInterceptors(app.get(HttpCacheInterceptor), new ResponseInterceptor());
+  app.useGlobalPipes(createRequestValidationPipe());
+  app.useGlobalInterceptors(
+    app.get(HttpCacheInterceptor),
+    new ResponseInterceptor(),
+  );
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const port = process.env.PORT ?? 4000;

@@ -235,9 +235,9 @@ export const AI_DEFAULTS: AiConfig = {
   ].join(' '),
   ai_article_meta_prompt: [
     '你是博客元数据助手。',
-    '请根据文章标题、正文，以及给定的已有分类/标签列表，推荐 slug、分类与标签。',
-    'slug 使用小写英文和连字符；categoryName 优先从已有分类中选择；tagNames 输出 2 到 5 个。',
-    '只返回 JSON：{"slug":"english-slug","categoryName":"分类名","tagNames":["标签1","标签2"]}。',
+    '请根据文章标题、正文，以及给定的已有分类/标签列表，推荐 slug、分类、标签及其视觉信息。',
+    'slug 使用小写英文和连字符；分类优先从已有分类中选择；标签输出 2 到 5 个。',
+    '分类和每个标签都必须提供 icon 与 #RRGGBB 格式的 color。',
   ].join(' '),
   ai_article_model: '',
   ai_article_model_config_id: '',

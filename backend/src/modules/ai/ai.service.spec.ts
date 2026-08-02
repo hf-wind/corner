@@ -1,4 +1,5 @@
 import { AiService } from './ai.service';
+import { AI_DEFAULTS } from './ai-defaults';
 
 describe('AiService model configuration compatibility', () => {
   const missingTableError = Object.assign(
@@ -11,6 +12,20 @@ describe('AiService model configuration compatibility', () => {
       aiModelConfig: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+      },
+      category: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      tag: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
       },
     };
     const settings = {
@@ -42,9 +57,143 @@ describe('AiService model configuration compatibility', () => {
 
   it('does not hide unrelated database failures', async () => {
     const { service, prisma } = createService();
-    const databaseError = Object.assign(new Error('database unavailable'), { code: 'P1001' });
+    const databaseError = Object.assign(new Error('database unavailable'), {
+      code: 'P1001',
+    });
     prisma.aiModelConfig.findMany.mockRejectedValue(databaseError);
 
     await expect(service.listModelConfigs()).rejects.toBe(databaseError);
+  });
+
+  it('creates AI taxonomy records with complete visual metadata', async () => {
+    const { service, prisma } = createService();
+    prisma.category.findFirst.mockResolvedValue(null);
+    prisma.category.findUnique.mockResolvedValue(null);
+    prisma.category.create.mockImplementation(({ data }: any) => ({
+      id: 'category-id',
+      ...data,
+    }));
+    prisma.tag.findFirst.mockResolvedValue(null);
+    prisma.tag.findUnique.mockResolvedValue(null);
+    prisma.tag.create.mockImplementation(({ data }: any) => ({
+      id: `tag-${data.slug}`,
+      ...data,
+    }));
+
+    const category = await (service as any).ensureCategoryByName({
+      name: '科幻电影',
+      icon: 'VideoCameraOutlined',
+      color: '#7C3AED',
+    });
+    const tags = await (service as any).ensureTagsByNames([
+      { name: '引力', icon: 'ExperimentOutlined', color: '#2563EB' },
+      { name: '时间', icon: 'invalid-icon', color: 'invalid-color' },
+    ]);
+
+    expect(category).toEqual(
+      expect.objectContaining({
+        icon: 'VideoCameraOutlined',
+        color: '#7c3aed',
+      }),
+    );
+    expect(tags).toHaveLength(2);
+    expect(tags[0]).toEqual(
+      expect.objectContaining({
+        icon: 'ExperimentOutlined',
+        color: '#2563eb',
+      }),
+    );
+    expect(tags[1].icon).toBe('TagOutlined');
+    expect(tags[1].color).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('fills missing visuals on existing taxonomy records', async () => {
+    const { service, prisma } = createService();
+    prisma.category.findFirst.mockResolvedValue({
+      id: 'category-id',
+      name: '技术',
+      slug: 'technology',
+      icon: null,
+      color: null,
+    });
+    prisma.category.update.mockImplementation(({ data }: any) => ({
+      id: 'category-id',
+      name: '技术',
+      slug: 'technology',
+      ...data,
+    }));
+
+    const category = await (service as any).ensureCategoryByName('技术');
+
+    expect(prisma.category.update).toHaveBeenCalledWith({
+      where: { id: 'category-id' },
+      data: {
+        icon: 'CodeOutlined',
+        color: expect.stringMatching(/^#[0-9a-f]{6}$/),
+      },
+    });
+    expect(category.icon).toBe('CodeOutlined');
+  });
+
+  it('accepts the complete AI metadata format in article generation', async () => {
+    const { service, prisma } = createService();
+    jest.spyOn(service, 'getConfig').mockResolvedValue({
+      ...AI_DEFAULTS,
+      ai_enabled: true,
+      ai_article_enabled: true,
+    });
+    jest.spyOn(service as any, 'canUseModel').mockResolvedValue(true);
+    jest
+      .spyOn(service, 'chat')
+      .mockResolvedValueOnce(
+        JSON.stringify({ title: '星际穿越', content: '一篇科幻电影文章' }),
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          slug: 'interstellar',
+          category: {
+            name: '科幻电影',
+            icon: 'VideoCameraOutlined',
+            color: '#7c3aed',
+          },
+          tags: [
+            { name: '电影', icon: 'VideoCameraOutlined', color: '#2563eb' },
+            { name: '科幻', icon: 'RocketOutlined', color: '#059669' },
+          ],
+        }),
+      );
+    jest.spyOn(service, 'summarize').mockResolvedValue({
+      excerpt: '摘要',
+      source: 'ai',
+    });
+    jest.spyOn(service, 'pickAndImportCover').mockResolvedValue('/cover.webp');
+    jest.spyOn(service as any, 'ensureCategoryByName').mockResolvedValue({
+      id: 'category-id',
+      name: '科幻电影',
+    });
+    jest.spyOn(service as any, 'ensureTagsByNames').mockResolvedValue([
+      { id: 'tag-1', name: '电影' },
+      { id: 'tag-2', name: '科幻' },
+    ]);
+    prisma.category.findMany.mockResolvedValue([]);
+    prisma.tag.findMany.mockResolvedValue([]);
+
+    const result = await service.generateArticle('写一篇星际穿越观后感');
+
+    expect((service as any).ensureCategoryByName).toHaveBeenCalledWith({
+      name: '科幻电影',
+      icon: 'VideoCameraOutlined',
+      color: '#7c3aed',
+    });
+    expect((service as any).ensureTagsByNames).toHaveBeenCalledWith([
+      { name: '电影', icon: 'VideoCameraOutlined', color: '#2563eb' },
+      { name: '科幻', icon: 'RocketOutlined', color: '#059669' },
+    ]);
+    expect(result).toEqual(
+      expect.objectContaining({
+        categoryId: 'category-id',
+        tagIds: ['tag-1', 'tag-2'],
+      }),
+    );
   });
 });
