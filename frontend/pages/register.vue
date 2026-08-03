@@ -34,8 +34,8 @@
           <label class="form-label">验证码</label>
           <div class="code-input-row">
             <input v-model="code" class="form-input code-input" type="text" placeholder="请输入6位验证码" required maxlength="6">
-            <button type="button" class="send-code-btn" @click="sendCode" :disabled="cooldown > 0">
-              {{ cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
+            <button type="button" class="send-code-btn" @click="sendCode" :disabled="cooldown > 0 || sendingCode">
+              {{ sendingCode ? '验证中…' : cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
             </button>
           </div>
         </div>
@@ -80,15 +80,21 @@ const confirmPassword = ref('')
 const error = ref('')
 const success = ref('')
 const submitting = ref(false)
+const sendingCode = ref(false)
 const cooldown = ref(0)
 const turnstileToken = ref('')
-const turnstileWidget = ref<{ reset: () => void } | null>(null)
+const turnstileWidget = ref<{ reset: () => void; waitForToken: (timeoutMs?: number) => Promise<string> } | null>(null)
 let cooldownTimer: NodeJS.Timeout | null = null
 
-function requireTurnstile() {
-  if (!import.meta.env.PROD || turnstileToken.value) return true
+async function resolveTurnstile() {
+  if (!import.meta.env.PROD) return turnstileToken.value
+  const token = turnstileToken.value || await turnstileWidget.value?.waitForToken(3500) || ''
+  if (token) {
+    turnstileToken.value = token
+    return token
+  }
   toast.warning('请先完成人机验证')
-  return false
+  return ''
 }
 
 async function sendCode() {
@@ -96,13 +102,15 @@ async function sendCode() {
     toast.warning('请先输入邮箱')
     return
   }
-  if (!requireTurnstile()) return
+  sendingCode.value = true
+  const token = await resolveTurnstile()
+  if (!token && import.meta.env.PROD) { sendingCode.value = false; return }
   
   error.value = ''
   success.value = ''
   
   try {
-    await api.post('/auth/send-code', { email: email.value, type: 'register', turnstileToken: turnstileToken.value })
+    await api.post('/auth/send-code', { email: email.value, type: 'register', turnstileToken: token })
     toast.success('验证码已发送，请查收邮箱')
     cooldown.value = 60
     cooldownTimer = setInterval(() => {
@@ -115,6 +123,7 @@ async function sendCode() {
   } catch (e: any) {
     toast.error(e?.message || '发送验证码失败')
   } finally {
+    sendingCode.value = false
     turnstileWidget.value?.reset()
   }
 }
@@ -132,15 +141,15 @@ async function handleRegister() {
     toast.warning('请输入6位验证码')
     return
   }
-  if (!requireTurnstile()) return
-  
   submitting.value = true
+  const token = await resolveTurnstile()
+  if (!token && import.meta.env.PROD) { submitting.value = false; return }
   try {
     const res = await api.post<any>('/auth/register', {
       email: email.value,
       password: password.value,
       code: code.value,
-      turnstileToken: turnstileToken.value,
+      turnstileToken: token,
     })
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})

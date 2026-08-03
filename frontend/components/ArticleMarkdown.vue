@@ -459,6 +459,7 @@ onUnmounted(() => observer?.disconnect())
   .article-md-wrap :deep(.md-editor-preview) {
     font-size: 0.9rem;
     line-height: 1.9;
+    text-wrap: wrap;
   }
 
   .article-md-wrap :deep(.md-editor-preview h1) {

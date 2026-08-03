@@ -74,6 +74,11 @@ const postAdminSelect = {
   _count: { select: { comments: true } },
 } satisfies Prisma.PostSelect;
 
+const postPublicSelect = {
+  ...postAdminSelect,
+  _count: { select: { comments: { where: { status: 'approved' } } } },
+} satisfies Prisma.PostSelect;
+
 @Injectable()
 export class PostService {
   constructor(private prisma: PrismaService, private memoryGraph?: MemoryGraphService) {}
@@ -152,7 +157,7 @@ export class PostService {
           status: 'published',
           publishedAt: { lt: post.publishedAt ?? undefined },
         },
-        select: postAdminSelect,
+        select: postPublicSelect,
         orderBy: { publishedAt: 'desc' },
       }),
       this.prisma.post.findFirst({
@@ -160,7 +165,7 @@ export class PostService {
           status: 'published',
           publishedAt: { gt: post.publishedAt ?? undefined },
         },
-        select: postAdminSelect,
+        select: postPublicSelect,
         orderBy: { publishedAt: 'asc' },
       }),
     ]);
@@ -184,7 +189,7 @@ export class PostService {
   async findFeatured() {
     const items = await this.prisma.post.findMany({
       where: { status: 'published' },
-      select: postAdminSelect,
+      select: postPublicSelect,
       orderBy: { publishedAt: 'desc' },
     });
 
@@ -322,9 +327,21 @@ export class PostService {
   }
 
   async remove(slug: string) {
-    const existing = await this.prisma.post.findUnique({ where: { slug } });
+    const existing = await this.prisma.post.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
     if (!existing) throw new NotFoundException('Post not found');
-    await this.prisma.post.delete({ where: { id: existing.id } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.commentLike.deleteMany({
+        where: { comment: { postId: existing.id } },
+      });
+      await tx.comment.deleteMany({ where: { postId: existing.id } });
+      await tx.postTag.deleteMany({ where: { postId: existing.id } });
+      await tx.visitStat.deleteMany({ where: { postId: existing.id } });
+      await tx.emailLog.deleteMany({ where: { postId: existing.id } });
+      await tx.post.delete({ where: { id: existing.id } });
+    });
     this.memoryGraph?.scheduleRebuild();
   }
 
@@ -413,7 +430,7 @@ export class PostService {
     const limit = query.limit ?? 10;
     const items = await this.prisma.post.findMany({
       where: { status: 'published' },
-      select: postAdminSelect,
+      select: postPublicSelect,
     });
 
     let posts = items.map((post) => this.formatPublic(post));
@@ -465,7 +482,7 @@ export class PostService {
   private async findPublishedByAnySlug(slug: string) {
     const byCurrentSlug = await this.prisma.post.findFirst({
       where: { slug, status: 'published' },
-      select: postAdminSelect,
+      select: postPublicSelect,
     });
     if (byCurrentSlug) {
       const snapshot = this.readSnapshot(byCurrentSlug.publishedSnapshot);
@@ -477,7 +494,7 @@ export class PostService {
         status: 'published',
         publishedSnapshot: { not: Prisma.DbNull },
       },
-      select: postAdminSelect,
+      select: postPublicSelect,
       take: 500,
     });
 

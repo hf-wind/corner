@@ -112,6 +112,7 @@
         <h3>{{ mySite.name }}</h3><p v-if="mySite.description">{{ mySite.description }}</p>
         <dl class="site-details">
           <div><dt><Icon name="ph:globe-simple-bold" />站点</dt><dd>{{ mySite.url }}</dd></div>
+          <div v-if="siteLogoUrl"><dt><Icon name="ph:image-square-bold" />Logo</dt><dd :title="siteLogoUrl">{{ siteLogoUrl }}</dd></div>
           <div v-if="mySite.rssUrl"><dt><Icon name="ph:rss-bold" />RSS</dt><dd>{{ mySite.rssUrl }}</dd></div>
           <div v-if="mySite.contactEmail"><dt><Icon name="ph:envelope-simple-bold" />邮箱</dt><dd>{{ mySite.contactEmail }}</dd></div>
         </dl>
@@ -139,6 +140,12 @@ const loading = ref(true)
 const showApplyForm = ref(false)
 const showRemoveForm = ref(false)
 const mySite = ref<{ name: string; url: string; avatar?: string; description?: string; rssUrl?: string; contactEmail?: string } | null>(null)
+const siteLogoUrl = computed(() => {
+  const avatar = String(mySite.value?.avatar || '').trim()
+  if (!avatar) return ''
+  try { return new URL(avatar, mySite.value?.url || window.location.origin).href }
+  catch { return avatar }
+})
 const applyForm = reactive({ siteName: '', siteUrl: '', siteAvatar: '', siteDescription: '', siteRssUrl: '', contactEmail: '', friendPageUrl: '' })
 const applySubmitting = ref(false)
 const siteInspecting = ref(false)

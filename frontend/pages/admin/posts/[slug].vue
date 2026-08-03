@@ -415,21 +415,26 @@ async function persistPost(confirmExactLocation: boolean) {
 .editor-layout {
   display: flex;
   flex: 1;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .editor-main {
   flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100%;
   gap: 12px;
   min-width: 0;
   padding-right: 16px;
+  overflow: hidden;
 }
 
 .editor-sidebar {
   width: 300px;
   flex-shrink: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -449,7 +454,14 @@ async function persistPost(confirmExactLocation: boolean) {
 .editor-field-grow :deep(.md-editor) {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100% !important;
+  max-height: 100%;
   overflow: hidden;
+}
+
+.editor-field-grow :deep(.md-editor-content) {
+  min-height: 0;
 }
 
 .title-input {

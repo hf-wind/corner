@@ -391,7 +391,7 @@ model VisitStat {
   ipHash    String?  @map("ip_hash") @db.VarChar(64)
   userAgent String?  @map("user_agent") @db.Text
   visitedAt DateTime @default(now()) @map("visited_at")
-  post      Post?    @relation(fields: [postId], references: [id])
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@map("visit_stats")
 }

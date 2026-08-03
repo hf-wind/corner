@@ -3,6 +3,7 @@ export type MusicPlaylistSource = {
   server: string;
   type: string;
   id: string;
+  sort: number;
 };
 
 export type MusicConfig = {
@@ -43,6 +44,7 @@ export const MUSIC_DEFAULTS: MusicConfig = {
       server: 'netease',
       type: 'playlist',
       id: '8043180114',
+      sort: 10,
     },
   ],
   music_cache_ttl: 21600,

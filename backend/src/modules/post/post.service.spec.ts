@@ -46,3 +46,49 @@ describe('PostService view counting', () => {
     expect(prisma.visitStat.create).not.toHaveBeenCalled();
   });
 });
+
+describe('PostService article cleanup', () => {
+  it('removes every post-owned record in one transaction before deleting the post', async () => {
+    const tx = {
+      commentLike: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      comment: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      postTag: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
+      visitStat: { deleteMany: jest.fn().mockResolvedValue({ count: 4 }) },
+      emailLog: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      post: { delete: jest.fn().mockResolvedValue({ id: 'post-id' }) },
+    };
+    const prisma = {
+      post: { findUnique: jest.fn().mockResolvedValue({ id: 'post-id' }) },
+      $transaction: jest.fn((callback: (client: any) => unknown) => callback(tx)),
+    } as any;
+    const memoryGraph = { scheduleRebuild: jest.fn() } as any;
+    const service = new PostService(prisma, memoryGraph);
+
+    await service.remove('post');
+
+    expect(tx.commentLike.deleteMany).toHaveBeenCalledWith({
+      where: { comment: { postId: 'post-id' } },
+    });
+    expect(tx.comment.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
+    expect(tx.postTag.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
+    expect(tx.visitStat.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
+    expect(tx.emailLog.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
+    expect(tx.post.delete).toHaveBeenCalledWith({ where: { id: 'post-id' } });
+    expect(memoryGraph.scheduleRebuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts only approved comments in public article queries', async () => {
+    const prisma = {
+      post: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn() },
+    } as any;
+    const service = new PostService(prisma);
+
+    await service.findAll({} as any);
+
+    expect(prisma.post.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        _count: { select: { comments: { where: { status: 'approved' } } } },
+      }),
+    }));
+  });
+});

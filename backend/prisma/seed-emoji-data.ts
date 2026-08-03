@@ -916,3 +916,30 @@ export const qqItems = [
   { label: '大展宏兔', imageUrl: 'https://koishi.js.org/QFace/static/s347.png', sort: 348 },
   { label: '福萝卜', imageUrl: 'https://koishi.js.org/QFace/static/s348.png', sort: 349 }
 ];
+
+export const kaomojiItems = [
+  { char: '(＾▽＾)', imageUrl: '', label: '开心', sort: 1 },
+  { char: '(≧▽≦)', imageUrl: '', label: '大笑', sort: 2 },
+  { char: '(⌒▽⌒)☆', imageUrl: '', label: '灿烂', sort: 3 },
+  { char: 'ヽ(・∀・)ﾉ', imageUrl: '', label: '欢呼', sort: 4 },
+  { char: '(｡•̀ᴗ-)✧', imageUrl: '', label: '眨眼', sort: 5 },
+  { char: '(๑•̀ㅂ•́)و✧', imageUrl: '', label: '加油', sort: 6 },
+  { char: '(づ｡◕‿‿◕｡)づ', imageUrl: '', label: '抱抱', sort: 7 },
+  { char: '(っ˘ω˘ς )', imageUrl: '', label: '满足', sort: 8 },
+  { char: '(￣▽￣)ノ', imageUrl: '', label: '招手', sort: 9 },
+  { char: '(´▽｀)', imageUrl: '', label: '轻松', sort: 10 },
+  { char: '(〃▽〃)', imageUrl: '', label: '害羞', sort: 11 },
+  { char: '(⁄ ⁄•⁄ω⁄•⁄ ⁄)', imageUrl: '', label: '脸红', sort: 12 },
+  { char: '(⊙_⊙)', imageUrl: '', label: '震惊', sort: 13 },
+  { char: '(・_・;)', imageUrl: '', label: '尴尬', sort: 14 },
+  { char: '(；￣Д￣)', imageUrl: '', label: '惊讶', sort: 15 },
+  { char: '(￣ヘ￣)', imageUrl: '', label: '不服', sort: 16 },
+  { char: '(¬_¬)', imageUrl: '', label: '斜眼', sort: 17 },
+  { char: '(╥﹏╥)', imageUrl: '', label: '流泪', sort: 18 },
+  { char: '(ノ_<。)', imageUrl: '', label: '难过', sort: 19 },
+  { char: '(｡•́︿•̀｡)', imageUrl: '', label: '委屈', sort: 20 },
+  { char: 'ᕦ(ò_óˇ)ᕤ', imageUrl: '', label: '力量', sort: 21 },
+  { char: '٩(◕‿◕｡)۶', imageUrl: '', label: '庆祝', sort: 22 },
+  { char: '┬─┬ノ( º _ ºノ)', imageUrl: '', label: '扶桌', sort: 23 },
+  { char: '(ノಠ益ಠ)ノ彡┻━┻', imageUrl: '', label: '掀桌', sort: 24 },
+];

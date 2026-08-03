@@ -108,7 +108,10 @@
             </a-form-item>
             <a-form-item label="歌单列表">
               <div class="playlist-editor">
-                <div v-for="(p, i) in music.music_playlists" :key="i" class="playlist-row">
+                <div v-for="(p, i) in music.music_playlists" :key="p.key" class="playlist-row"
+                  :class="{ dragging: draggedPlaylistIndex === i }" @dragover.prevent @drop="dropPlaylist(i)">
+                  <button class="playlist-drag" type="button" draggable="true" title="拖动排序" aria-label="拖动排序"
+                    @dragstart="startPlaylistDrag(i, $event)" @dragend="draggedPlaylistIndex = null"><Icon name="ph:dots-six-vertical-bold" /></button>
                   <a-input v-model:value="p.name" placeholder="名称" style="width:100px" />
                   <a-select v-model:value="p.server" style="width:100px">
                     <a-select-option value="netease">网易云</a-select-option>
@@ -122,7 +125,10 @@
                     <a-select-option value="song">单曲</a-select-option>
                   </a-select>
                   <a-input v-model:value="p.id" placeholder="ID" style="flex:1;min-width:100px" />
-                  <a-button type="text" danger size="small" @click="removePlaylist(i)">删</a-button>
+                  <a-input-number v-model:value="p.sort" class="playlist-sort" :precision="0" title="权重，数值越小越靠前" @blur="sortPlaylists" />
+                  <a-button type="text" size="small" :disabled="i === 0" title="上移" @click="movePlaylist(i, -1)"><Icon name="ph:arrow-up-bold" /></a-button>
+                  <a-button type="text" size="small" :disabled="i === music.music_playlists.length - 1" title="下移" @click="movePlaylist(i, 1)"><Icon name="ph:arrow-down-bold" /></a-button>
+                  <a-button type="text" danger size="small" title="删除" @click="removePlaylist(i)"><Icon name="ph:trash-bold" /></a-button>
                 </div>
                 <a-button size="small" @click="addPlaylist">+ 添加歌单</a-button>
               </div>
@@ -168,6 +174,10 @@ const email = reactive({
 const musicLoading = ref(true)
 const musicSaving = ref(false)
 const refreshing = ref(false)
+const draggedPlaylistIndex = ref<number | null>(null)
+let playlistKeySequence = 0
+type PlaylistForm = { key: string; name: string; server: string; type: string; id: string; sort: number }
+function playlistKey() { return `playlist-${Date.now().toString(36)}-${playlistKeySequence++}` }
 const music = reactive({
   music_enabled: true,
   music_autoplay: false,
@@ -177,7 +187,7 @@ const music = reactive({
   music_type: 'playlist',
   music_id: '8043180114',
   music_cache_ttl: 21600,
-  music_playlists: [] as { name: string; server: string; type: string; id: string }[],
+  music_playlists: [] as PlaylistForm[],
 })
 
 const volumePercent = computed({
@@ -316,8 +326,8 @@ async function loadMusic() {
       music_id: cfg.music_id || '8043180114',
       music_cache_ttl: cfg.music_cache_ttl ?? 21600,
       music_playlists: Array.isArray(cfg.music_playlists) && cfg.music_playlists.length
-        ? cfg.music_playlists.map((p: any) => ({ ...p }))
-        : [{ name: '默认歌单', server: 'netease', type: 'playlist', id: '8043180114' }],
+        ? cfg.music_playlists.map((p: any, index: number) => ({ ...p, key: playlistKey(), sort: Number.isFinite(Number(p.sort)) ? Number(p.sort) : (index + 1) * 10 }))
+        : [{ key: playlistKey(), name: '默认歌单', server: 'netease', type: 'playlist', id: '8043180114', sort: 10 }],
     })
   } catch {
     toast.error('加载音乐配置失败')
@@ -334,7 +344,39 @@ function addPlaylist() {
     server: music.music_server || 'netease',
     type: 'playlist',
     id: '',
+    sort: (music.music_playlists.at(-1)?.sort || 0) + 10,
+    key: playlistKey(),
   })
+}
+
+function normalizePlaylistSort() {
+  music.music_playlists.forEach((playlist, index) => { playlist.sort = (index + 1) * 10 })
+}
+
+function sortPlaylists() {
+  music.music_playlists.sort((a, b) => Number(a.sort || 0) - Number(b.sort || 0))
+}
+
+function movePlaylist(index: number, offset: number) {
+  const target = index + offset
+  if (target < 0 || target >= music.music_playlists.length) return
+  const [playlist] = music.music_playlists.splice(index, 1)
+  music.music_playlists.splice(target, 0, playlist)
+  normalizePlaylistSort()
+}
+
+function startPlaylistDrag(index: number, event: DragEvent) {
+  draggedPlaylistIndex.value = index
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+
+function dropPlaylist(index: number) {
+  const source = draggedPlaylistIndex.value
+  if (source === null || source === index) { draggedPlaylistIndex.value = null; return }
+  const [playlist] = music.music_playlists.splice(source, 1)
+  music.music_playlists.splice(index, 0, playlist)
+  normalizePlaylistSort()
+  draggedPlaylistIndex.value = null
 }
 
 function removePlaylist(i: number) {
@@ -352,6 +394,7 @@ async function saveMusic() {
   }
   musicSaving.value = true
   try {
+    sortPlaylists()
     if (music.music_playlists[0]?.id) {
       music.music_id = music.music_playlists[0].id
       music.music_server = music.music_playlists[0].server
@@ -367,7 +410,7 @@ async function saveMusic() {
         music_type: music.music_type,
         music_id: music.music_id,
         music_cache_ttl: music.music_cache_ttl,
-        music_playlists: music.music_playlists.filter((p) => p.id?.trim()),
+        music_playlists: music.music_playlists.filter((p) => p.id?.trim()).map(({ key: _key, ...playlist }) => playlist),
       },
     })
     toast.success('音乐配置已保存')
@@ -397,6 +440,10 @@ async function refreshCache() {
 .hint { font-size: 0.72rem; color: var(--c-text-3); margin-top: 4px; }
 .playlist-editor { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .playlist-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.playlist-row.dragging { opacity:.48; }
+.playlist-drag { display:grid; width:28px; height:28px; flex:0 0 28px; border:0; background:transparent; color:var(--c-text-3); cursor:grab; place-items:center; }
+.playlist-drag:active { cursor:grabbing; }
+.playlist-sort { width:76px; }
 .secret-field { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
 @media (max-width:520px) { .secret-field { grid-template-columns:1fr; } }
 </style>

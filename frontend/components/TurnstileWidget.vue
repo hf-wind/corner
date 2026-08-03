@@ -12,6 +12,8 @@ const props = defineProps<{ modelValue?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const container = ref<HTMLElement | null>(null)
 const unavailable = ref(false)
+const challengePending = ref(false)
+const rendering = ref(false)
 let widgetId: string | undefined
 const bypassToken = 'local-development-bypass'
 const enabled = computed(() => {
@@ -22,6 +24,7 @@ const enabled = computed(() => {
 
 type TurnstileApi = {
   render: (element: HTMLElement, options: Record<string, unknown>) => string
+  getResponse?: (widgetId?: string) => string
   reset: (widgetId?: string) => void
   remove: (widgetId?: string) => void
 }
@@ -35,12 +38,18 @@ function loadScript(): Promise<void> {
   if (window.__cornerTurnstileScript) return window.__cornerTurnstileScript
   window.__cornerTurnstileScript = new Promise((resolve, reject) => {
     const script = document.createElement('script')
+    script.dataset.cornerTurnstile = 'true'
     script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
     script.async = true
     script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Turnstile script failed to load'))
+    const timeout = window.setTimeout(() => reject(new Error('Turnstile script timed out')), 12_000)
+    script.onload = () => { window.clearTimeout(timeout); resolve() }
+    script.onerror = () => { window.clearTimeout(timeout); reject(new Error('Turnstile script failed to load')) }
     document.head.appendChild(script)
+  }).catch((error) => {
+    document.querySelector('script[data-corner-turnstile="true"]')?.remove()
+    window.__cornerTurnstileScript = undefined
+    throw error
   })
   return window.__cornerTurnstileScript
 }
@@ -55,6 +64,9 @@ async function renderWidget() {
     unavailable.value = true
     return
   }
+  if (rendering.value) return
+  rendering.value = true
+  unavailable.value = false
   try {
     await loadScript()
     if (!window.turnstile || !container.value) throw new Error('Turnstile API unavailable')
@@ -62,16 +74,43 @@ async function renderWidget() {
       sitekey,
       theme: 'auto',
       language: 'zh-CN',
-      callback: (token: string) => emit('update:modelValue', token),
-      'expired-callback': () => emit('update:modelValue', ''),
+      callback: (token: string) => {
+        challengePending.value = false
+        emit('update:modelValue', token)
+      },
+      'before-interactive-callback': () => { challengePending.value = true },
+      'after-interactive-callback': () => { challengePending.value = !props.modelValue },
+      'expired-callback': () => {
+        challengePending.value = false
+        emit('update:modelValue', '')
+      },
       'error-callback': () => {
+        challengePending.value = false
         emit('update:modelValue', '')
         unavailable.value = true
       },
     })
   } catch {
     unavailable.value = true
+  } finally {
+    rendering.value = false
   }
+}
+
+async function waitForToken(timeoutMs = 3500) {
+  if (!enabled.value) return bypassToken
+  const immediate = props.modelValue || (widgetId && window.turnstile?.getResponse?.(widgetId)) || ''
+  if (immediate) return immediate
+  if (!challengePending.value) return ''
+
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    await new Promise(resolve => window.setTimeout(resolve, 80))
+    const token = props.modelValue || (widgetId && window.turnstile?.getResponse?.(widgetId)) || ''
+    if (token) return token
+    if (unavailable.value) return ''
+  }
+  return ''
 }
 
 function reset() {
@@ -80,6 +119,7 @@ function reset() {
     return
   }
   emit('update:modelValue', '')
+  challengePending.value = false
   unavailable.value = false
   if (widgetId && window.turnstile) window.turnstile.reset(widgetId)
   else void renderWidget()
@@ -90,7 +130,7 @@ onBeforeUnmount(() => {
   if (widgetId && window.turnstile) window.turnstile.remove(widgetId)
 })
 
-defineExpose({ reset })
+defineExpose({ reset, waitForToken })
 </script>
 
 <style scoped>

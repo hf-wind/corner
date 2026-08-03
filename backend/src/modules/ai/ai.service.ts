@@ -91,6 +91,9 @@ const ARTICLE_META_VISUAL_INSTRUCTION = [
   'color 必须是 #RRGGBB 格式的十六进制颜色。',
   '严格只返回 JSON：{"slug":"english-slug","category":{"name":"分类名","icon":"FolderOutlined","color":"#2563eb"},"tags":[{"name":"标签1","icon":"TagOutlined","color":"#059669"}]}。',
   'tags 输出 2 到 5 个；已有分类或标签合适时优先复用其名称和视觉信息。',
+  '必须先在已有分类中选择语义最匹配的一项；只有确实没有合适分类时才能创建新分类。',
+  '“随笔”不是默认分类。除非正文核心明确是个人日常记录、感悟或散文，否则禁止选择“随笔”。',
+  '复用已有分类或标签时，name、icon、color 必须与清单中的记录完全一致。',
 ].join(' ');
 
 @Injectable()
@@ -1104,11 +1107,11 @@ export class AiService {
 
     const [categories, tags] = await Promise.all([
       this.prisma.category.findMany({
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, icon: true, color: true },
         take: 200,
       }),
       this.prisma.tag.findMany({
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, icon: true, color: true },
         take: 300,
       }),
     ]);
@@ -1131,8 +1134,8 @@ export class AiService {
             content: [
               `标题：${title}`,
               `正文：\n${content.slice(0, 6000)}`,
-              `已有分类：${categories.map((c) => c.name).join('、') || '无'}`,
-              `已有标签：${tags.map((t) => t.name).join('、') || '无'}`,
+              `已有分类（优先复用）：${JSON.stringify(categories)}`,
+              `已有标签（优先复用）：${JSON.stringify(tags)}`,
             ].join('\n'),
           },
         ],

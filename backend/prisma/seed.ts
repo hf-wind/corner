@@ -6,7 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import { copyFileSync, existsSync, mkdirSync, statSync } from 'fs';
 import { dirname, join } from 'path';
 import { AI_DEFAULTS } from '../src/modules/ai/ai-defaults';
-import { qqItems, twemojiItems } from './seed-emoji-data';
+import { kaomojiItems, qqItems, twemojiItems } from './seed-emoji-data';
 
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 if (!databaseUrl) throw new Error('DATABASE_URL 未配置，已拒绝执行初始化');
@@ -332,6 +332,7 @@ async function main() {
   for (const packData of [
     { name: 'Twemoji', type: 'static', sort: 1, items: twemojiItems },
     { name: 'QQ', type: 'animated', sort: 2, items: qqItems },
+    { name: '颜文字', type: 'static', sort: 3, items: kaomojiItems },
   ]) {
     let pack = await prisma.emojiPack.findFirst({ where: { name: packData.name } });
     pack = pack

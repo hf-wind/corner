@@ -1,6 +1,7 @@
 <template>
   <main class="portal">
     <TimeConstellationScene
+      v-if="graphLoaded"
       :nodes="graph.nodes"
       :relations="graph.relations"
       :graph-version="graph.graphVersion"
@@ -9,6 +10,12 @@
       @ready="sceneReady = true"
       @fallback="sceneFailed = true"
     />
+    <Transition name="portal-loader">
+      <div v-if="!graphLoaded || !sceneReady" class="portal-loading" aria-live="polite">
+        <span class="portal-loading-orbit"><i /><i /><i /></span>
+        <small>{{ graphLoaded ? '正在校准星图轨道' : '正在读取时间坐标' }}</small>
+      </div>
+    </Transition>
     <div class="cosmic-wash" aria-hidden="true" />
     <div class="portal-frame" aria-hidden="true" />
 
@@ -83,6 +90,16 @@ useHead({title:computed(()=>siteTitle.value)})
 .portal :deep(.constellation-scene) { z-index:-4; view-transition-name:cosmic-scene; }
 .cosmic-wash { position:absolute; z-index:-3; inset:0; background:radial-gradient(circle at 16% 44%,rgb(32 91 141 / .2),transparent 34%),linear-gradient(90deg,rgb(2 8 23 / .76),rgb(2 8 23 / .12) 58%,rgb(3 15 31 / .22)); pointer-events:none; }
 .portal-frame { position:absolute; z-index:8; inset:12px; border:1px solid rgb(104 191 235 / .15); pointer-events:none; }
+.portal-loading { position:absolute; z-index:12; inset:0; display:grid; align-content:center; justify-items:center; gap:18px; background:#020817; color:#80b9d8; transition:opacity .5s ease; }
+.portal-loading small { font-size:.62rem; letter-spacing:.12em; }
+.portal-loading-orbit { position:relative; display:block; width:62px; height:62px; border:1px solid rgb(104 200 255 / .28); border-radius:50%; animation:portal-loading-spin 5s linear infinite; }
+.portal-loading-orbit::before { position:absolute; inset:12px; border:1px solid rgb(121 169 255 / .34); border-radius:50%; content:''; }
+.portal-loading-orbit i { position:absolute; top:-4px; left:50%; width:7px; height:7px; border-radius:50%; background:#6ed8ff; box-shadow:0 0 16px #51c8ff; transform:translateX(-50%); }
+.portal-loading-orbit i:nth-child(2) { top:50%; right:-4px; left:auto; background:#9d8cff; }
+.portal-loading-orbit i:nth-child(3) { top:auto; bottom:-4px; left:22%; background:#74e0c6; }
+@keyframes portal-loading-spin { to { transform:rotate(360deg); } }
+.portal-loader-leave-active { transition:opacity .65s ease; }
+.portal-loader-leave-to { opacity:0; }
 .portal-frame::before,.portal-frame::after { position:absolute; width:42px; height:42px; border-color:#5bc9f1; content:''; }
 .portal-frame::before { top:-1px; left:-1px; border-top:1px solid; border-left:1px solid; }
 .portal-frame::after { right:-1px; bottom:-1px; border-right:1px solid; border-bottom:1px solid; }

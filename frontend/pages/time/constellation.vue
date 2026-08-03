@@ -1,5 +1,5 @@
 <template>
-  <main class="constellation-page" :class="{ ready: sceneReady }">
+  <main class="constellation-page" :class="{ ready: sceneReady, immersive: immersiveMode }">
     <section class="constellation-stage" aria-label="时光星图">
       <TimeConstellationScene
         v-if="!fallbackMode && graphReady"
@@ -14,6 +14,8 @@
         @select="handleSceneSelect"
         @discover="handleDiscovery"
         @clear="clearSelected"
+        @focus-cleared="handleFocusCleared"
+        @immersive-change="immersiveMode = $event"
         @fallback="fallbackMode = true"
       />
       <MemoryGraph2D
@@ -50,11 +52,6 @@
 
     <footer class="constellation-foot">
       <span><i />{{ latestLabel }}<b><em />点击太阳、黑洞、空间站、卫星与风隅号读取遥测</b></span>
-      <div aria-label="星图交互状态">
-        <Icon name="ph:cursor-click-bold" />
-        <Icon name="ph:arrows-out-cardinal-bold" />
-        <Icon name="ph:magnifying-glass-plus-bold" />
-      </div>
     </footer>
 
     <Transition name="popup">
@@ -82,7 +79,7 @@
       <aside
         v-if="activeDiscovery"
         class="discovery-popup"
-        :class="`discovery-${activeDiscovery.id}`"
+        :class="[`discovery-${activeDiscovery.id}`, { 'is-closing': discoveryClosing, 'is-immersive': immersiveMode }]"
         :style="{ '--discovery-accent': activeDiscovery.accent }"
         role="dialog"
         :aria-label="`${activeDiscovery.title}遥测档案`"
@@ -93,6 +90,11 @@
           <div><small>{{ activeDiscovery.kicker }}</small><b>{{ activeDiscovery.status }}</b></div>
           <em><i />科学模拟</em>
         </header>
+        <div v-if="immersiveMode && activeDiscovery.id === 'spacecraft'" class="immersive-actions" aria-label="风隅号追航指令">
+          <button type="button" :class="{ active: activeCommandId === 'warp' }" @click="runDiscoveryCommand('warp')">
+            <Icon name="ph:lightning-bold" /><span>曲率跃迁</span><small>WARP</small>
+          </button>
+        </div>
         <div class="discovery-title"><h2>{{ activeDiscovery.title }}</h2><span>{{ activeDiscovery.catalog }}</span></div>
         <p>{{ activeDiscovery.description }}</p>
         <div class="telemetry-grid">
@@ -192,6 +194,8 @@ const error = ref('')
 const sceneReady = ref(false)
 const fallbackMode = ref(false)
 const graphReady = ref(false)
+const discoveryClosing = ref(false)
+const immersiveMode = ref(false)
 let requestSequence = 0
 let telemetryTimer: ReturnType<typeof setInterval> | null = null
 
@@ -228,7 +232,7 @@ const discoveries: Discovery[] = [
   {
     id: 'satellite', title: '听风一号', catalog: 'TF-1 · 光学通信卫星', kicker: 'BEACON NETWORK · 04', status: '太阳同步轨道运行',
     description: '一颗兼具星间激光通信与光学遥感能力的试验卫星，在晨昏轨道上持续为离散记忆寻找同频信标。',
-    signalLabel: '星间链路状态', icon: 'ph:satellite-bold', accent: '#70e7cf',
+    signalLabel: '星间链路状态', icon: 'ph:broadcast-duotone', accent: '#70e7cf',
     commands: [{ id: 'signal', label: '发送窄带信号', icon: 'ph:broadcast-bold' }, { id: 'orbit', label: '重新锁定轨道', icon: 'ph:crosshair-simple-bold' }],
   },
   {
@@ -450,6 +454,8 @@ function handleDiscovery(id: DiscoveryId) {
   neighbors.value = []
   clearMemory()
   activeDiscoveryId.value = id
+  discoveryClosing.value = false
+  immersiveMode.value = false
   discoveryResult.value = ''
   activeCommandId.value = ''
   discoverySequence.value += 1
@@ -457,10 +463,19 @@ function handleDiscovery(id: DiscoveryId) {
 }
 
 function clearDiscovery() {
+  if (!activeDiscoveryId.value || discoveryClosing.value) return
+  discoveryClosing.value = true
+  activeCommandId.value = ''
+  if (sceneRef.value) sceneRef.value.resetView()
+  else handleFocusCleared()
+}
+
+function handleFocusCleared() {
   activeDiscoveryId.value = ''
   discoveryResult.value = ''
   activeCommandId.value = ''
-  sceneRef.value?.resetView()
+  discoveryClosing.value = false
+  immersiveMode.value = false
 }
 
 function runDiscoveryCommand(commandId: DiscoveryCommandId) {
@@ -487,6 +502,7 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
     sceneRef.value?.triggerDiscoveryEffect('satellite')
   } else if (commandId === 'warp') {
     discoveryResult.value = '曲率航路已展开：风隅号正在穿越星图，舰桥将持续追踪跃迁航迹。'
+    if (!immersiveMode.value) sceneRef.value?.startDiscoveryTour('spacecraft')
     sceneRef.value?.triggerDiscoveryEffect('spacecraft')
   } else {
     discoveryResult.value = ''
@@ -495,6 +511,10 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
 }
 
 function resetScene() {
+  if (activeDiscoveryId.value) {
+    clearDiscovery()
+    return
+  }
   if (selected.value) {
     selected.value = null
     neighbors.value = []
@@ -502,6 +522,8 @@ function resetScene() {
     void router.replace({ query: {} })
   }
   activeDiscoveryId.value = ''
+  discoveryClosing.value = false
+  immersiveMode.value = false
   discoveryResult.value = ''
   activeCommandId.value = ''
   sceneRef.value?.resetView()
@@ -513,10 +535,7 @@ function clearSelected() {
   clearMemory()
   void router.replace({ query: {} })
   if (activeDiscoveryId.value) {
-    activeDiscoveryId.value = ''
-    discoveryResult.value = ''
-    activeCommandId.value = ''
-    sceneRef.value?.resetView()
+    clearDiscovery()
   }
 }
 
@@ -568,6 +587,10 @@ useHead({ title: '时光星图' })
 .loading-orbit i:nth-child(2) { top:50%; left:auto; right:-4px; background:#9d8cff; box-shadow:0 0 16px #8c7cff; }
 .loading-orbit i:nth-child(3) { top:auto; right:auto; bottom:-4px; left:22%; background:#74e0c6; box-shadow:0 0 16px #57cfb1; }
 .constellation-nav { position:absolute; z-index:10; top:20px; right:22px; left:22px; display:flex; align-items:center; justify-content:space-between; pointer-events:none; }
+.constellation-nav,.constellation-intro,.constellation-foot { transition:opacity .45s ease,transform .55s cubic-bezier(.16,1,.3,1); }
+.constellation-page.immersive .constellation-nav,.constellation-page.immersive .constellation-intro,.constellation-page.immersive .constellation-foot { opacity:0; pointer-events:none; }
+.constellation-page.immersive .constellation-nav { transform:translateY(-18px); }
+.constellation-page.immersive .constellation-intro,.constellation-page.immersive .constellation-foot { transform:translateY(18px); }
 .brand,.signal { pointer-events:auto; }
 .brand { display:inline-flex; align-items:center; gap:11px; padding:0; border:0; background:none; color:#ecf7ff; cursor:pointer; font:inherit; text-align:left; }
 .brand img { width:42px; height:42px; border:1px solid rgb(116 207 255 / .18); border-radius:12px; box-shadow:0 0 26px rgb(73 157 232 / .24); }
@@ -617,6 +640,18 @@ useHead({ title: '时光星图' })
 .memory-popup section button>b { grid-column:1; overflow:hidden; font-size:.63rem; text-overflow:ellipsis; white-space:nowrap; }
 .memory-popup section button>small { grid-column:2; grid-row:1/3; align-self:center; color:#6f94b0; font-size:.48rem; }
 .discovery-popup { --discovery-accent:#72d9ff; position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(412px,calc(100vw - 40px)); max-height:calc(100dvh - 118px); padding:24px; overflow-x:hidden; overflow-y:auto; border:1px solid color-mix(in srgb,var(--discovery-accent) 30%,transparent); border-radius:8px; background:linear-gradient(155deg,rgb(7 21 38 / .94),rgb(2 8 19 / .97)); box-shadow:0 28px 90px rgb(0 0 0 / .52),inset 0 1px rgb(225 244 255 / .06); backdrop-filter:blur(24px) saturate(1.12); transform:translateY(-50%); }
+.discovery-popup.is-closing { opacity:0; pointer-events:none; transform:translate(42px,-50%) scale(.94); transition:opacity .42s ease,transform .7s cubic-bezier(.4,0,.2,1); }
+.discovery-popup.is-immersive { top:20px; right:22px; width:min(300px,calc(100vw - 44px)); max-height:none; padding:12px 14px; overflow:hidden; transform:none; transition:width .45s ease,padding .45s ease,transform .45s ease,opacity .3s ease; }
+.discovery-popup.is-immersive .discovery-title,.discovery-popup.is-immersive>p,.discovery-popup.is-immersive .telemetry-grid,.discovery-popup.is-immersive .discovery-signal,.discovery-popup.is-immersive .discovery-commands { display:none; }
+.discovery-popup.is-immersive .discovery-identity { grid-template-columns:32px minmax(0,1fr); padding-right:34px; }
+.discovery-popup.is-immersive .discovery-identity>span { width:32px; height:32px; }
+.discovery-popup.is-immersive .discovery-identity>em { display:none; }
+.immersive-actions { display:none; }
+.discovery-popup.is-immersive.discovery-spacecraft { width:min(330px,calc(100vw - 44px)); }
+.discovery-popup.is-immersive .immersive-actions { display:flex; margin-top:9px; padding-top:9px; border-top:1px solid color-mix(in srgb,var(--discovery-accent) 18%,transparent); }
+.immersive-actions button { display:flex; width:100%; height:32px; align-items:center; justify-content:center; gap:7px; border:1px solid color-mix(in srgb,var(--discovery-accent) 34%,transparent); border-radius:5px; background:linear-gradient(90deg,color-mix(in srgb,var(--discovery-accent) 8%,transparent),color-mix(in srgb,var(--discovery-accent) 16%,transparent),color-mix(in srgb,var(--discovery-accent) 8%,transparent)); color:#d9effa; cursor:pointer; font:inherit; font-size:.55rem; letter-spacing:.04em; transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease; }
+.immersive-actions button:hover,.immersive-actions button.active { border-color:color-mix(in srgb,var(--discovery-accent) 72%,transparent); box-shadow:0 0 22px color-mix(in srgb,var(--discovery-accent) 22%,transparent),inset 0 0 14px color-mix(in srgb,var(--discovery-accent) 10%,transparent); transform:translateY(-1px); }
+.immersive-actions small { color:color-mix(in srgb,var(--discovery-accent) 62%,#607588); font-size:.42rem; letter-spacing:.12em; }
 .discovery-popup::before { position:absolute; top:0; right:0; left:0; height:2px; background:linear-gradient(90deg,transparent,var(--discovery-accent),transparent); content:''; opacity:.7; pointer-events:none; }
 .discovery-black-hole { background:linear-gradient(150deg,rgb(24 13 15 / .96),rgb(3 6 12 / .98) 72%); box-shadow:0 30px 100px rgb(0 0 0 / .7),inset 0 0 70px rgb(128 37 12 / .08); }
 .discovery-identity { display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:10px; padding-right:30px; }
@@ -661,6 +696,8 @@ useHead({ title: '时光星图' })
   .constellation-foot>span b { display:none; }
   .memory-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(52dvh,440px); padding:18px 18px 18px 24px; border-radius:20px 20px 20px 8px; transform:none; }
   .discovery-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(67dvh,560px); padding:19px; transform:none; }
+  .discovery-popup.is-closing { transform:translateY(24px) scale(.96); }
+  .discovery-popup.is-immersive { top:14px; right:14px; bottom:auto; left:64px; width:auto; padding:10px 12px; }
   .discovery-title { align-items:flex-start; flex-direction:column; gap:4px; }
   .discovery-identity em { display:none; }
   .popup-rail { top:21px; bottom:19px; left:9px; }

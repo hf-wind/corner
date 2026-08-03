@@ -24,7 +24,7 @@
         <div ref="listRef" class="pet-chat-list">
           <div v-for="(m, i) in messages" :key="i" class="pet-msg" :class="m.role">
             <template v-if="m.role === 'assistant'">
-              <div v-if="m.streaming && m.content" class="pet-bubble pet-streaming">{{ m.content }}</div>
+              <div v-if="m.streaming && m.renderedHtml" class="pet-bubble pet-markdown pet-streaming" v-html="m.renderedHtml" />
               <div v-else-if="!m.streaming" class="pet-bubble pet-markdown" v-html="renderMarkdown(m.content)" />
             </template>
             <div v-else class="pet-bubble">{{ m.content }}</div>
@@ -98,7 +98,7 @@ function renderMarkdown(content: string) {
 }
 
 type Role = 'user' | 'assistant'
-interface Msg { role: Role; content: string; streaming?: boolean }
+interface Msg { role: Role; content: string; streaming?: boolean; renderedHtml?: string }
 type QuickAction = { label: string; icon: string; prompt: string; kind?: 'summary' }
 type ArticleContext = { title?: string; content?: string; slug?: string }
 
@@ -141,6 +141,9 @@ const suppressActions = ref(false)
 let streamController: AbortController | null = null
 let scrollFrame: number | null = null
 let typingBuffer = ''
+let typingHtml = ''
+let typingText = ''
+let typingVisibleCount = 0
 let typingTimer: ReturnType<typeof setTimeout> | null = null
 let typingMessageIndex = -1
 let typingDrainResolvers: Array<() => void> = []
@@ -307,6 +310,7 @@ async function sendMessage(text: string) {
   streamController = new AbortController()
 
   try {
+    let responseMarkdown = ''
     const article = isArticleMode.value ? {
       title: props.article?.title || '',
       content: String(props.article?.content || '').slice(0, 10000),
@@ -314,20 +318,15 @@ async function sendMessage(text: string) {
     } : undefined
     await api.postStream('/ai/chat/stream', { message: text, article }, ({ event, data }) => {
       if (event === 'token' && typeof data === 'string') {
-        enqueueTyping(data, assistantIndex)
+        responseMarkdown += data
       }
       if (event === 'error') throw new Error(data?.message || 'Stream failed')
     }, streamController.signal)
+    enqueueTyping(responseMarkdown || '……', assistantIndex)
     await waitForTypingDrain()
-    if (!messages.value[assistantIndex].content) {
-      enqueueTyping('……', assistantIndex)
-      await waitForTypingDrain()
-    }
   } catch (error: any) {
     if (error?.name !== 'AbortError') {
-      if (!messages.value[assistantIndex].content && !typingBuffer) {
-        enqueueTyping('呜，任意门开小差了。稍后再试，或者先逛逛文章吧～', assistantIndex)
-      }
+      enqueueTyping('呜，任意门开小差了。稍后再试，或者先逛逛文章吧～', assistantIndex)
       await waitForTypingDrain()
     }
   } finally {
@@ -395,6 +394,9 @@ function resetTypingBuffer(messageIndex: number) {
   if (typingTimer) clearTimeout(typingTimer)
   typingTimer = null
   typingBuffer = ''
+  typingHtml = ''
+  typingText = ''
+  typingVisibleCount = 0
   typingMessageIndex = messageIndex
   resolveTypingDrain()
 }
@@ -402,9 +404,53 @@ function resetTypingBuffer(messageIndex: number) {
 function enqueueTyping(text: string, messageIndex: number) {
   if (!text) return
   if (typingMessageIndex !== messageIndex) resetTypingBuffer(messageIndex)
-  typingBuffer += text
+  typingBuffer = text
+  typingHtml = renderMarkdown(text)
+  const container = document.createElement('div')
+  container.innerHTML = typingHtml
+  typingText = container.textContent || ''
+  typingVisibleCount = 0
+  const message = messages.value[messageIndex]
+  if (message) {
+    message.content = text
+    message.renderedHtml = ''
+  }
   streamStarted.value = true
   if (!typingTimer) typeNextCharacter()
+}
+
+function renderHtmlPrefix(html: string, visibleCount: number) {
+  const source = document.createElement('template')
+  source.innerHTML = html
+  let remaining = visibleCount
+
+  const clonePrefix = (node: Node): Node | null => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (remaining <= 0) return null
+      const characters = Array.from(node.textContent || '')
+      const value = characters.slice(0, remaining).join('')
+      remaining -= Math.min(remaining, characters.length)
+      return value ? document.createTextNode(value) : null
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return null
+    const element = node as HTMLElement
+    const clone = element.cloneNode(false) as HTMLElement
+    for (const child of Array.from(element.childNodes)) {
+      const childClone = clonePrefix(child)
+      if (childClone) clone.appendChild(childClone)
+      if (remaining <= 0) break
+    }
+    if (clone.childNodes.length || ['BR', 'HR'].includes(clone.tagName)) return clone
+    return null
+  }
+
+  const output = document.createElement('div')
+  for (const child of Array.from(source.content.childNodes)) {
+    const clone = clonePrefix(child)
+    if (clone) output.appendChild(clone)
+    if (remaining <= 0) break
+  }
+  return output.innerHTML
 }
 
 function typeNextCharacter() {
@@ -414,21 +460,25 @@ function typeNextCharacter() {
     return
   }
 
-  const codePoint = typingBuffer.codePointAt(0)
-  if (codePoint === undefined) return
-  const character = String.fromCodePoint(codePoint)
-  typingBuffer = typingBuffer.slice(character.length)
+  const characters = Array.from(typingText)
+  const character = characters[typingVisibleCount] || ''
+  typingVisibleCount += 1
   const message = messages.value[typingMessageIndex]
-  if (message) message.content += character
+  if (message) message.renderedHtml = renderHtmlPrefix(typingHtml, typingVisibleCount)
   queueScrollBottom()
 
+  if (typingVisibleCount >= characters.length) {
+    typingBuffer = ''
+    typingTimer = null
+    resolveTypingDrain()
+    return
+  }
+
   const delay = /[。！？.!?\n]/u.test(character)
-    ? 72
+    ? 96
     : /[，、；：,;:]/u.test(character)
-      ? 38
-      : typingBuffer.length > 120
-        ? 12
-        : 22
+      ? 58
+      : 34
   typingTimer = setTimeout(typeNextCharacter, delay)
 }
 
@@ -712,7 +762,7 @@ onUnmounted(() => {
 }
 
 .pet-streaming {
-  white-space: pre-wrap;
+  white-space: normal;
 }
 
 .pet-markdown :deep(> :first-child) {
@@ -1011,8 +1061,18 @@ onUnmounted(() => {
     bottom: max(64px, calc(env(safe-area-inset-bottom) + 56px));
   }
 
-  .pet-hint {
+  .pet-hint:not(.pet-hint-login) {
     display: none;
+  }
+
+  .pet-hint-login {
+    right: calc(100% + 6px);
+    display: block;
+    width: max-content;
+    max-width: min(210px, calc(100vw - 92px));
+    white-space: normal;
+    line-height: 1.45;
+    text-align: left;
   }
 
   .pet-fab {

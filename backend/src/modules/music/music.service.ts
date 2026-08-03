@@ -49,6 +49,7 @@ export class MusicService {
           server: cfg.music_server,
           type: cfg.music_type,
           id: cfg.music_id,
+          sort: 10,
         },
       ];
     }
@@ -83,6 +84,7 @@ export class MusicService {
         server: p.server,
         type: p.type,
         id: p.id,
+        sort: p.sort,
       })),
       active: {
         server: cfg.music_server,
@@ -111,6 +113,7 @@ export class MusicService {
       server: opts?.server || cfg.music_server,
       type: opts?.type || cfg.music_type,
       id: opts?.id || cfg.music_id,
+      sort: 0,
     };
 
     if (opts?.playlistIndex != null && cfg.music_playlists[opts.playlistIndex]) {
@@ -233,13 +236,17 @@ export class MusicService {
     if (Array.isArray(def)) {
       if (Array.isArray(value)) {
         return value
-          .map((v: any) => ({
+          .map((v: any, index: number) => ({
             name: String(v?.name || '歌单').slice(0, 40),
             server: String(v?.server || 'netease').slice(0, 20),
             type: String(v?.type || 'playlist').slice(0, 20),
             id: String(v?.id || '').slice(0, 64),
+            sort: Number.isFinite(Number(v?.sort)) ? Math.trunc(Number(v.sort)) : (index + 1) * 10,
+            originalIndex: index,
           }))
-          .filter((v) => v.id) as MusicPlaylistSource[];
+          .filter((v) => v.id)
+          .sort((a, b) => a.sort - b.sort || a.originalIndex - b.originalIndex)
+          .map(({ originalIndex: _originalIndex, ...playlist }) => playlist) as MusicPlaylistSource[];
       }
       if (typeof value === 'string') {
         try {

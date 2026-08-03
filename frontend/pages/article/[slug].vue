@@ -657,6 +657,14 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
+  .article-main {
+    width: 100%;
+    max-width: 100%;
+    padding-right: 20px;
+    padding-left: 20px;
+    scrollbar-gutter: auto;
+  }
+
   .back-btn {
     margin-bottom: 14px;
   }
@@ -698,6 +706,8 @@ onUnmounted(() => {
   }
 
   .article-shell {
+    width: 100%;
+    min-width: 0;
     padding-right: 0;
     padding-left: 0;
   }

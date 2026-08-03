@@ -196,4 +196,40 @@ describe('AiService model configuration compatibility', () => {
       }),
     );
   });
+
+  it('gives the model complete existing taxonomy records and rejects essay as a default', async () => {
+    const { service, prisma } = createService();
+    jest.spyOn(service, 'getConfig').mockResolvedValue({
+      ...AI_DEFAULTS,
+      ai_enabled: true,
+      ai_article_enabled: true,
+    });
+    jest.spyOn(service as any, 'canUseModel').mockResolvedValue(true);
+    const chat = jest
+      .spyOn(service, 'chat')
+      .mockResolvedValueOnce(JSON.stringify({ title: 'NestJS 事务实践', content: '事务与外键约束详解' }))
+      .mockResolvedValueOnce(JSON.stringify({
+        slug: 'nestjs-transactions',
+        category: { name: '技术', icon: 'CodeOutlined', color: '#2563eb' },
+        tags: [{ name: 'NestJS', icon: 'CodeOutlined', color: '#059669' }],
+      }));
+    jest.spyOn(service, 'summarize').mockResolvedValue({ excerpt: '摘要', source: 'ai' });
+    jest.spyOn(service, 'pickAndImportCover').mockResolvedValue('');
+    jest.spyOn(service as any, 'ensureCategoryByName').mockResolvedValue({ id: 'category-tech', name: '技术' });
+    jest.spyOn(service as any, 'ensureTagsByNames').mockResolvedValue([{ id: 'tag-nest', name: 'NestJS' }]);
+    prisma.category.findMany.mockResolvedValue([
+      { id: 'category-essay', name: '随笔', slug: 'essay' },
+      { id: 'category-tech', name: '技术', slug: 'technology' },
+    ]);
+    prisma.tag.findMany.mockResolvedValue([
+      { id: 'tag-nest', name: 'NestJS', slug: 'nestjs' },
+    ]);
+
+    await service.generateArticle('写一篇 NestJS 事务文章');
+
+    const metaMessages = chat.mock.calls[1][0] as Array<{ role: string; content: string }>;
+    expect(metaMessages[0].content).toContain('“随笔”不是默认分类');
+    expect(metaMessages[1].content).toContain('"id":"category-tech"');
+    expect(metaMessages[1].content).toContain('"slug":"nestjs"');
+  });
 });
