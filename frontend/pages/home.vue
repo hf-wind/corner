@@ -23,7 +23,7 @@
         </div>
       </div>
 
-      <FloatingPagination v-model="page" :total="totalPages" variant="articles" @change="loadArticles" />
+      <FloatingPagination v-model="page" :total="totalPages" variant="articles" @change="changePage" />
     </main>
 
     <aside class="sidebar-right">
@@ -82,6 +82,16 @@ async function loadArticles() {
   }
 }
 
+async function changePage() {
+  await loadArticles()
+  await nextTick()
+  const main = document.querySelector<HTMLElement>('.main-content')
+  const list = document.querySelector<HTMLElement>('.section-title')
+  if (!main || !list) return
+  const top = Math.max(0, list.offsetTop - 18)
+  main.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+}
+
 async function restoreScroll() {
   const saved = sessionStorage.getItem('home-scroll')
   if (!saved) return
@@ -120,7 +130,7 @@ onUnmounted(() => {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 28px;
+  padding: 24px 28px 112px;
   min-width: 0;
   min-height: 0;
   overscroll-behavior: contain;
@@ -146,7 +156,7 @@ onUnmounted(() => {
 .article-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   position: relative;
 }
 
@@ -219,6 +229,7 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
+  .main-content { padding: 18px 16px 104px; }
   .article-list { gap: 9px; }
 }
 </style>

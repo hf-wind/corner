@@ -82,6 +82,7 @@ let requestController: AbortController | null = null
 let requestTimer: number | undefined
 let requestSequence = 0
 let initialMemoryFocused = false
+let revealInitialResult = !selectedId.value && !route.query.lng && !route.query.lat
 
 const typeOptions = [
   { value: 'moment' as const, label: '瞬间', icon: 'ph:sparkle-bold' },
@@ -164,6 +165,13 @@ async function loadMap(boundsOverride?: MapBounds, zoomOverride?: number) {
     if (sequence !== requestSequence) return
     result.value = next
     map.setItems(next.items, selectedId.value)
+    if (revealInitialResult) {
+      const [onlyItem] = next.items
+      if (next.items.length === 1 && onlyItem) {
+        map.setCenter(onlyItem.longitude, onlyItem.latitude, onlyItem.kind === 'cluster' ? 9.6 : 13.5)
+      }
+      revealInitialResult = false
+    }
     if (!initialMemoryFocused && selectedId.value) {
       const selected = next.items.find((item): item is MemoryMapItem => item.kind === 'memory' && item.id === selectedId.value)
       if (selected) focusSelectedMemory(selected)
@@ -189,8 +197,7 @@ function selectMemory(item: MemoryMapItem, center = false, scroll = false) {
   }
 }
 function focusSelectedMemory(item: MemoryMapItem) {
-  const panelOffset = window.matchMedia('(min-width: 901px)').matches ? 154 : 0
-  adapter.value?.focusMemory(item.longitude, item.latitude, item.type, panelOffset)
+  adapter.value?.focusMemory(item.longitude, item.latitude, item.type)
 }
 function clearSelection() {
   selectedId.value = ''
@@ -255,7 +262,7 @@ useHead({ title: '风隅地图' })
 .memory-copy footer { margin-top:5px; font-size:.5rem; }
 :global(.corner-map-marker.has-image) { overflow: hidden; background: var(--c-bg); }
 :global(.corner-map-marker.has-image img) { width: 100%; height: 100%; object-fit: cover; }
-.map-legend { z-index:11; top:156px; bottom:auto; }
+.map-legend { z-index:210; bottom:0; left:0; gap:9px; min-height:48px; padding:8px 12px 10px; border-radius:0 11px 0 0; background:color-mix(in srgb,var(--ld-bg-card) 97%,transparent); box-shadow:0 9px 24px rgb(0 0 0/.14); }
 .map-legend .legend-marker { display:grid; width:20px; height:20px; border:2px solid #fff; color:#fff; font-size:.55rem; font-style:normal; line-height:1; place-items:center; box-shadow:0 3px 9px rgb(0 0 0/.18); }
 .map-legend .legend-marker.moment { border-radius:50%; background:#7564df; }
 .map-legend .legend-marker.album { border-radius:5px; background:#d58a4a; box-shadow:2px 2px 0 rgb(213 138 74/.28),0 3px 9px rgb(0 0 0/.18); }
@@ -266,6 +273,10 @@ useHead({ title: '风隅地图' })
 :global(.corner-map-marker.photo > *) { transform:rotate(45deg); }
 :global(.corner-map-marker.selected) { box-shadow:0 10px 26px rgb(0 0 0/.3); transform:scale(1.18); }
 :global(.corner-map-marker.photo.selected) { transform:rotate(-45deg) scale(1.18); }
+:global(.corner-map-marker:hover) { box-shadow:0 11px 28px rgb(0 0 0/.32); transform:translateY(-2px) scale(1.08); }
+:global(.corner-map-marker.photo:hover) { transform:rotate(-45deg) translate(1px,-1px) scale(1.08); }
+:global(.corner-map-marker.selected:hover) { transform:translateY(-2px) scale(1.18); }
+:global(.corner-map-marker.photo.selected:hover) { transform:rotate(-45deg) translate(1px,-1px) scale(1.18); }
 :global(.corner-map-cluster) { animation:marker-in .48s cubic-bezier(.16,1,.3,1) both; }
 :global(.amap-logo),:global(.amap-copyright) { opacity:.72; }
 .map-focus-card { position:absolute; z-index:18; left:calc(50% - 154px); bottom:52px; display:grid; width:min(430px,calc(100% - 390px)); min-width:340px; grid-template-columns:116px minmax(0,1fr); gap:14px; padding:11px; border:1px solid color-mix(in srgb,var(--border) 72%,transparent); border-radius:12px; background:color-mix(in srgb,var(--ld-bg-card) 94%,transparent); box-shadow:0 18px 48px rgb(0 0 0/.22); transform:translateX(-50%); backdrop-filter:blur(18px); }
@@ -290,7 +301,8 @@ useHead({ title: '风隅地图' })
   .memory-panel { inset: 0; width: 100%; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
   .map-brand { top:max(66px,calc(env(safe-area-inset-top) + 60px)); width:min(330px,calc(100% - 28px)); min-width:0; }
   .memory-list { max-height:none; }
-  .map-legend { top:max(228px,calc(env(safe-area-inset-top) + 222px)); bottom:auto; }
+  .map-legend { top:auto; bottom:0; left:0; }
+  .mobile-switch { right:10px; transform:none; }
   .map-focus-card { position:fixed; left:14px; right:14px; bottom:76px; width:auto; min-width:0; grid-template-columns:82px minmax(0,1fr); gap:10px; transform:none; }
   .focus-cover { width:82px; height:82px; }
   .focus-copy { padding-top:2px; }

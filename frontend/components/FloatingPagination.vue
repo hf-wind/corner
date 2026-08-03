@@ -1,98 +1,43 @@
 <template>
-  <!--
-    Strict port of Nuxt DevTools floating capsule
-    Source: packages/devtools/src/runtime/plugins/view/Main.vue (v1.7)
-  -->
-  <div
+  <nav
     v-if="total > 1"
-    id="fp-pagination-anchor"
-    ref="anchorEl"
-    :style="[anchorStyle, colorVars]"
-    :class="{ 'fp-hide': isMinimized }"
-    role="navigation"
+    class="floating-pagination"
+    :class="[`is-${variant}`, { 'is-collapsed': !isExpanded }]"
     aria-label="分页导航"
-    @mousemove="bringUp"
-    @mouseleave="onLeave"
+    @mouseenter="holdExpanded"
+    @mouseleave="scheduleCollapse"
+    @focusin="holdExpanded"
+    @focusout="scheduleCollapse"
   >
-    <div class="fp-glowing" />
-
-    <div
-      ref="panelEl"
-      class="fp-panel"
-      :style="panelStyle"
-    >
-      <!-- lead: click toggles collapse / expand -->
+    <div class="pagination-halo" aria-hidden="true" />
+    <div class="pagination-surface">
       <button
         type="button"
-        class="fp-icon-button fp-lead-button"
-        :title="leadLabel"
-        :aria-label="leadLabel"
-        @click.stop="toggleFold"
+        class="pagination-toggle"
+        :title="isExpanded ? '收起分页' : '展开分页'"
+        :aria-label="isExpanded ? '收起分页' : '展开分页'"
+        @click="toggle"
       >
         <Icon :name="leadIcon" />
       </button>
 
-      <!-- prev -->
-      <button
-        type="button"
-        class="fp-icon-button fp-panel-content"
-        title="上一页"
-        aria-label="上一页"
-        :disabled="modelValue <= 1"
-        @click.stop="goTo(modelValue - 1)"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 256 256"
-          style="height: 1.15em; width: 1.15em; opacity: 0.55"
-        >
-          <path
-            fill="currentColor"
-            d="M164.24 203.76a6 6 0 1 1-8.48 8.48l-80-80a6 6 0 0 1 0-8.48l80-80a6 6 0 0 1 8.48 8.48L88.49 128Z"
-          />
-        </svg>
-      </button>
-
-      <!-- page label — exact Nuxt label structure -->
-      <div
-        class="fp-panel-content fp-label"
-        :title="`第 ${modelValue} / ${total} 页`"
-      >
-        <div class="fp-label-main">
-          {{ modelValue }}
+      <div class="pagination-details" :aria-hidden="!isExpanded">
+        <span class="pagination-eyebrow">{{ variantLabel }}</span>
+        <div class="pagination-controls">
+          <button type="button" class="page-step" title="上一页" aria-label="上一页" :tabindex="isExpanded ? 0 : -1" :disabled="modelValue <= 1" @click="goTo(modelValue - 1)">
+            <Icon name="ph:caret-left-bold" />
+          </button>
+          <span class="page-counter"><b>{{ modelValue }}</b><i />{{ total }}</span>
+          <button type="button" class="page-step" title="下一页" aria-label="下一页" :tabindex="isExpanded ? 0 : -1" :disabled="modelValue >= total" @click="goTo(modelValue + 1)">
+            <Icon name="ph:caret-right-bold" />
+          </button>
         </div>
-        <span class="fp-label-secondary">
-          /{{ total }}
-        </span>
       </div>
-
-      <!-- next -->
-      <button
-        type="button"
-        class="fp-icon-button fp-panel-content"
-        title="下一页"
-        aria-label="下一页"
-        :disabled="modelValue >= total"
-        @click.stop="goTo(modelValue + 1)"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 256 256"
-          style="height: 1.15em; width: 1.15em; opacity: 0.55"
-        >
-          <path
-            fill="currentColor"
-            d="M180.24 132.24l-80 80a6 6 0 0 1-8.48-8.48L167.51 128 91.76 52.24a6 6 0 0 1 8.48-8.48l80 80a6 6 0 0 1 0 8.48"
-          />
-        </svg>
-      </button>
     </div>
-  </div>
+  </nav>
 </template>
 
 <script setup lang="ts">
-import type { CSSProperties } from 'vue'
-
 const props = withDefaults(defineProps<{
   modelValue: number
   total: number
@@ -106,328 +51,140 @@ const emit = defineEmits<{
   (e: 'change', value: number): void
 }>()
 
+const isExpanded = ref(true)
+let collapseTimer: ReturnType<typeof setTimeout> | undefined
+
 const leadIcon = computed(() => props.variant === 'comments'
   ? 'ph:chat-circle-text-bold'
   : props.variant === 'articles'
     ? 'ph:article-bold'
-    : 'ph:dots-three-bold')
-const leadLabel = computed(() => props.variant === 'comments' ? '评论分页' : props.variant === 'articles' ? '文章分页' : '分页')
+    : 'ph:compass-bold')
+const variantLabel = computed(() => props.variant === 'comments' ? '评论进度' : props.variant === 'articles' ? '文章索引' : '浏览进度')
 
-/* ── Nuxt Main.vue geometry ─────────────────────────────────────── */
-const PANEL_H = 30
-const PANEL_MARGIN_BOTTOM = 10
-const MINIMIZE_INACTIVE = 5000
-
-const panelEl = ref<HTMLDivElement>()
-const anchorEl = ref<HTMLDivElement>()
-
-const windowSize = reactive({ width: 0, height: 0 })
-const isHovering = ref(false)
-/** after click-collapse, ignore bringUp until pointer leaves */
-const pinnedClosed = ref(false)
-let _timer: ReturnType<typeof setTimeout> | null = null
-
-/** dark / light tokens — exact Nuxt vars() */
-const isDark = ref(false)
-
-const colorVars = computed(() => {
-  const dark = isDark.value
-  return {
-    '--fp-widget-bg': dark ? '#111' : '#ffffff',
-    '--fp-widget-fg': dark ? '#F5F5F5' : '#111',
-    '--fp-widget-border': dark ? '#3336' : '#efefef',
-    '--fp-widget-shadow': dark ? 'rgba(0,0,0,0.3)' : 'rgba(128,128,128,0.1)',
-  }
-})
-
-function syncDark() {
-  isDark.value = document.documentElement.classList.contains('dark')
+function scheduleCollapse() {
+  if (collapseTimer) clearTimeout(collapseTimer)
+  collapseTimer = setTimeout(() => { isExpanded.value = false }, 5000)
 }
 
-/**
- * Bottom-dock anchor — Nuxt anchorPos case 'bottom':
- *   top: windowHeight - panelMargins.bottom - halfHeight
- *   left: center
- */
-const anchorPos = computed(() => {
-  const halfHeight = PANEL_H / 2
-  return {
-    left: windowSize.width / 2,
-    top: windowSize.height - PANEL_MARGIN_BOTTOM - halfHeight,
-  }
-})
-
-const anchorStyle = computed(() => ({
-  left: `${anchorPos.value.left}px`,
-  top: `${anchorPos.value.top}px`,
-} as const))
-
-/**
- * Nuxt isMinimized:
- *   !open && !isHovering && minimizePanelInactive
- */
-const isMinimized = computed(() => !isHovering.value)
-
-/**
- * Nuxt panelStyle for position === 'bottom':
- *   expanded:  translate(-50%, -50%)
- *   minimized: translate(-50%, calc(-50% + 15px))
- *              + borderBottomLeft/RightRadius = 0
- */
-const panelStyle = computed(() => {
-  const style: CSSProperties = {
-    transform: isMinimized.value
-      ? 'translate(-50%, calc(-50% + 15px))'
-      : 'translate(-50%, -50%)',
-  }
-  if (isMinimized.value) {
-    style.borderBottomLeftRadius = '0'
-    style.borderBottomRightRadius = '0'
-  }
-  return style
-})
-
-/** Nuxt bringUp() — expand on activity, auto-minimize after idle */
-function bringUp() {
-  if (pinnedClosed.value)
-    return
-  isHovering.value = true
-  if (_timer)
-    clearTimeout(_timer)
-  _timer = setTimeout(() => {
-    isHovering.value = false
-  }, MINIMIZE_INACTIVE)
+function holdExpanded() {
+  if (collapseTimer) clearTimeout(collapseTimer)
+  isExpanded.value = true
 }
 
-function onLeave() {
-  pinnedClosed.value = false
+function expandFromInteraction() {
+  isExpanded.value = true
+  scheduleCollapse()
 }
 
-/** click lead: fold when open, unfold when collapsed */
-function toggleFold() {
-  if (isHovering.value) {
-    if (_timer)
-      clearTimeout(_timer)
-    _timer = null
-    isHovering.value = false
-    pinnedClosed.value = true
-  }
-  else {
-    pinnedClosed.value = false
-    bringUp()
-  }
+function toggle() {
+  isExpanded.value = !isExpanded.value
+  if (isExpanded.value) scheduleCollapse()
+  else if (collapseTimer) clearTimeout(collapseTimer)
 }
 
 function goTo(page: number) {
-  if (page < 1 || page > props.total || page === props.modelValue)
-    return
+  if (page < 1 || page > props.total || page === props.modelValue) return
   emit('update:modelValue', page)
   emit('change', page)
-  bringUp()
+  expandFromInteraction()
 }
 
-let resizeTimer: ReturnType<typeof setTimeout>
-function onResize() {
-  clearTimeout(resizeTimer)
-  resizeTimer = setTimeout(() => {
-    const scale = Number.parseFloat(getComputedStyle(document.body).getPropertyValue('zoom')) || 1
-    windowSize.width = window.innerWidth
-    windowSize.height = window.innerHeight / scale
-  }, 100)
-}
+onMounted(scheduleCollapse)
+onUnmounted(() => { if (collapseTimer) clearTimeout(collapseTimer) })
 
-onMounted(() => {
-  onResize()
-  syncDark()
-  window.addEventListener('resize', onResize)
-  // observe theme class flips
-  const mo = new MutationObserver(syncDark)
-  mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-  ;(anchorEl as any)._mo = mo
-  // first-paint reveal (Nuxt onMounted → bringUp)
-  bringUp()
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
-  if (_timer)
-    clearTimeout(_timer)
-  ;(anchorEl as any)._mo?.disconnect()
+watch(() => props.total, (total, previous) => {
+  if (total > 1 && previous <= 1) {
+    isExpanded.value = true
+    scheduleCollapse()
+  }
 })
 </script>
 
 <style scoped>
-/*
- * Exact CSS from Nuxt DevTools Main.vue
- * Only legacy devtool selectors → #fp-pagination-anchor / .fp-* renames
- */
-
-#fp-pagination-anchor {
-  width: 0;
-  z-index: 9999;
+.floating-pagination {
   position: fixed;
-  transform-origin: center center;
-  transform: translate(-50%, -50%) rotate(0);
-  font-family: var(--font-body);
-  font-size: 15px !important;
-  box-sizing: border-box;
+  z-index: 70;
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px));
+  left: 50%;
+  width: max-content;
+  color: var(--c-text);
+  transform: translateX(-50%);
 }
 
-#fp-pagination-anchor * {
-  box-sizing: border-box;
-}
-
-#fp-pagination-anchor button {
-  border: none;
-  background: none;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  outline: none;
-  color: inherit;
-}
-
-#fp-pagination-anchor button:disabled {
-  cursor: default;
-  opacity: 0.3;
-  pointer-events: none;
-}
-
-#fp-pagination-anchor .fp-label {
-  padding: 0 7px 0 8px;
-  font-size: 0.8em;
-  line-height: 1em;
-  display: flex;
-  gap: 3px;
-  justify-items: center;
-  align-items: center;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-#fp-pagination-anchor .fp-label .fp-label-main {
-  opacity: 0.8;
-}
-
-#fp-pagination-anchor .fp-label .fp-label-secondary {
-  font-size: 0.8em;
-  line-height: 0.6em;
-  opacity: 0.5;
-}
-
-/* lead always visible — click toggles fold */
-#fp-pagination-anchor .fp-lead-button {
-  flex: none;
-  color: var(--c-primary);
-  opacity: 1;
-}
-
-#fp-pagination-anchor .fp-lead-button :deep(.icon) {
-  width: 1.05em;
-  height: 1.05em;
-}
-
-#fp-pagination-anchor .fp-panel {
+.pagination-halo {
   position: absolute;
-  left: 0;
-  top: 0;
+  inset: 50% auto auto 50%;
+  width: 96px;
+  height: 46px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-primary) 28%, transparent);
+  filter: blur(17px);
+  opacity: .62;
+  pointer-events: none;
   transform: translate(-50%, -50%);
+  transition: opacity .38s ease, transform .42s cubic-bezier(.16, 1, .3, 1);
+}
+
+.pagination-surface {
+  position: relative;
   display: flex;
-  justify-content: flex-start;
+  height: 42px;
+  align-items: center;
   overflow: hidden;
-  align-items: center;
-  gap: 2px;
-  height: 30px;
-  padding: 2px 2px 2px 2.5px;
-  border: 1px solid var(--fp-widget-border);
-  border-radius: 100px;
-  background-color: var(--fp-widget-bg);
-  color: var(--fp-widget-fg);
-  box-shadow: 2px 2px 8px var(--fp-widget-shadow);
-  user-select: none;
-  touch-action: none;
-  max-width: 150px;
-  transition:
-    max-width 0.6s ease,
-    padding 0.5s ease,
-    transform 0.4s ease,
-    opacity 0.2s ease,
-    border-radius 0.4s ease;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ld-bg-card) 92%, transparent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ld-shadow) 74%, transparent), inset 0 1px rgb(255 255 255 / .28);
+  backdrop-filter: blur(16px) saturate(1.15);
+  transition: border-radius .35s ease, box-shadow .35s ease;
 }
 
-/* hide / minimized — exact Nuxt */
-#fp-pagination-anchor.fp-hide .fp-panel {
-  max-width: 32px;
-  padding: 2px 0;
+.pagination-toggle,
+.page-step {
+  display: grid;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  place-items: center;
 }
 
-#fp-pagination-anchor .fp-panel-content {
-  transition: opacity 0.4s ease;
+.pagination-toggle {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: var(--c-primary);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--c-primary) 32%, transparent);
+  color: #fff;
+  font-size: 1rem;
+  transition: transform .3s cubic-bezier(.16, 1, .3, 1), border-radius .35s ease, background-color .25s ease;
 }
 
-#fp-pagination-anchor.fp-hide .fp-panel-content {
-  opacity: 0;
-}
-
-#fp-pagination-anchor .fp-icon-button {
-  border-radius: 100%;
-  border-width: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0.8;
-  transition: opacity 0.2s ease-in-out;
-  flex: none;
-}
-
-#fp-pagination-anchor .fp-icon-button:hover:not(:disabled) {
-  opacity: 1;
-}
-
-#fp-pagination-anchor:hover .fp-glowing {
-  opacity: 0.6;
-}
-
-#fp-pagination-anchor .fp-glowing {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
-  width: 160px;
-  height: 160px;
-  opacity: 0;
-  transition: opacity 1s ease;
-  pointer-events: none;
-  z-index: -1;
-  border-radius: 9999px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 35%, transparent), transparent 65%);
-}
+.pagination-toggle:hover { transform: rotate(-7deg) scale(1.04); }
+.pagination-details { display:flex; width:146px; height:100%; min-width:146px; align-items:center; gap:11px; overflow:hidden; padding:0 10px 0 8px; opacity:1; transform:translateX(0); transition:width .42s cubic-bezier(.16, 1, .3, 1),min-width .42s cubic-bezier(.16, 1, .3, 1),padding .42s cubic-bezier(.16, 1, .3, 1),opacity .2s ease,transform .36s cubic-bezier(.16, 1, .3, 1); }
+.pagination-eyebrow { color:var(--c-text-3); font-size:.49rem; font-weight:750; letter-spacing:.1em; white-space:nowrap; }
+.pagination-controls { display:flex; align-items:center; gap:3px; }
+.page-step { width:24px; height:24px; border-radius:8px; background:transparent; color:var(--c-text-2); font-size:.72rem; transition:background-color .2s ease,color .2s ease,transform .2s ease; }
+.page-step:hover:not(:disabled) { background:var(--c-primary-soft); color:var(--c-primary); transform:scale(1.08); }
+.page-step:disabled { cursor:default; opacity:.28; }
+.page-counter { display:flex; min-width:39px; align-items:center; justify-content:center; gap:4px; color:var(--c-text-3); font-family:var(--font-mono, var(--font-body)); font-size:.62rem; font-variant-numeric:tabular-nums; }
+.page-counter b { color:var(--c-primary); font-size:.8rem; }
+.page-counter i { display:block; width:8px; height:1px; background:currentColor; opacity:.48; }
+.is-comments .pagination-toggle { background:#5b8bdc; }
+.is-collapsed .pagination-halo { opacity:.38; transform:translate(-50%, -50%) scale(.72); }
+.is-collapsed .pagination-surface { border-radius:50%; box-shadow:0 8px 22px color-mix(in srgb, var(--ld-shadow) 70%, transparent); }
+.is-collapsed .pagination-toggle { border-radius:50%; }
+.is-collapsed .pagination-details { width:0; min-width:0; padding:0; opacity:0; pointer-events:none; transform:translateX(-8px); }
 
 @media (prefers-reduced-motion: reduce) {
-  #fp-pagination-anchor .fp-panel,
-  #fp-pagination-anchor .fp-panel-content,
-  #fp-pagination-anchor .fp-icon-button,
-  #fp-pagination-anchor .fp-glowing {
-    transition: none;
-  }
+  .pagination-halo,.pagination-surface,.pagination-toggle,.pagination-details,.page-step { transition:none; }
 }
 
-@media (max-width: 640px) {
-  #fp-pagination-anchor {
-    font-size: 14px !important;
-    transform: translate(-50%, calc(-50% - env(safe-area-inset-bottom))) rotate(0);
-  }
-
-  #fp-pagination-anchor .fp-panel {
-    box-shadow: 0 6px 20px var(--fp-widget-shadow);
-  }
-}
-
-@media print {
-  #fp-pagination-anchor {
-    display: none;
-  }
+@media (max-width:640px) {
+  .floating-pagination { bottom:max(12px, calc(env(safe-area-inset-bottom) + 8px)); }
+  .pagination-surface,.pagination-toggle { height:40px; }
+  .pagination-toggle { width:40px; flex-basis:40px; }
+  .pagination-details { width:134px; min-width:134px; gap:8px; }
+  .is-collapsed .pagination-details { width:0; min-width:0; }
 }
 </style>

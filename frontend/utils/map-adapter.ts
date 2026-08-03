@@ -17,7 +17,7 @@ export interface MapAdapter {
   zoom(): number
   center(): { longitude: number; latitude: number }
   setCenter(longitude: number, latitude: number, zoom?: number): void
-  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type'], horizontalOffsetPx?: number): void
+  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type']): void
   fitBounds(bounds: MapBounds): void
   setItems(items: MapMarkerItem[], selectedId?: string): void
   setPath(points: Array<{ longitude: number; latitude: number }>): void
@@ -176,12 +176,10 @@ export class AmapAdapter implements MapAdapter {
     this.map.setZoomAndCenter(zoom || this.map.getZoom(), [longitude, latitude], false, 620)
   }
 
-  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type'], horizontalOffsetPx = 0) {
+  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type']) {
     const zoom = type === 'photo' ? 17.6 : 16.8
-    const longitudePerPixel = 360 / (256 * 2 ** zoom)
-    const visualCenterLongitude = normalizeLongitude(longitude + horizontalOffsetPx * longitudePerPixel)
     this.suppressViewEventsUntil = Date.now() + 1900
-    this.map.setZoomAndCenter(zoom, [visualCenterLongitude, latitude], false, 980)
+    this.map.setZoomAndCenter(zoom, [longitude, latitude], false, 980)
     this.map.setPitch?.(48, false, 980)
     this.map.setRotation?.(0, false, 980)
   }

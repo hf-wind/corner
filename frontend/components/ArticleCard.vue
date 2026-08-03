@@ -95,19 +95,20 @@ function saveScroll() {
   border-radius: 10px;
   overflow: hidden;
   background: var(--ld-bg-card);
-  border: 1px solid transparent;
-  box-shadow: 0 1px 3px var(--ld-shadow);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ld-shadow) 44%, transparent);
   cursor: pointer;
   text-decoration: none;
   color: inherit;
   contain: layout paint;
-  transition: border-color 0.18s ease, background-color 0.18s ease;
+  transform: translateZ(0);
+  transition: transform 0.32s cubic-bezier(.16, 1, .3, 1), background-color 0.28s ease, box-shadow 0.32s cubic-bezier(.16, 1, .3, 1);
   animation: article-card-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--article-index, 0) * 36ms);
 }
 .article-card:hover {
-  border-color: color-mix(in srgb, var(--c-primary) 28%, transparent);
-  background: color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft));
+  background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-primary-soft));
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--ld-shadow) 70%, transparent);
+  transform: translate3d(0, -3px, 0);
 }
 
 .card-cover {
@@ -132,7 +133,10 @@ function saveScroll() {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform .5s cubic-bezier(.16, 1, .3, 1), filter .32s ease;
 }
+
+.article-card:hover .card-cover img { transform: scale(1.045); filter: saturate(1.06); }
 
 .article-card:hover .card-title { color: var(--c-primary); }
 
