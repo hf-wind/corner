@@ -36,18 +36,21 @@ type MemoryRelation = {
 type CameraSnapshot = {
   position: THREE.Vector3
   target: THREE.Vector3
+  up?: THREE.Vector3
 }
 
 type CameraFlight = CameraSnapshot & {
   fromPosition: THREE.Vector3
   fromTarget: THREE.Vector3
+  fromUp: THREE.Vector3
+  up: THREE.Vector3
   startedAt: number
   duration: number
   arcHeight: number
   completion?: 'reset'
 }
 
-type DiscoveryId = 'sun' | 'black-hole' | 'station' | 'satellite' | 'spacecraft'
+type DiscoveryId = 'planet' | 'sun' | 'black-hole' | 'station' | 'satellite' | 'spacecraft'
 
 type SceneHit =
   | { kind: 'memory'; node: MemoryNode; label: string }
@@ -833,6 +836,7 @@ function addCore() {
   moon.position.set(20.5, 0, 0)
   moonOrbit.add(moon)
   core.add(moonOrbit)
+  registerDiscovery('planet', '风隅星 · 记忆母星', core, 12.5)
   scene.add(core)
 }
 
@@ -1771,8 +1775,10 @@ function startCameraFlight(
   cameraFlight = {
     fromPosition: camera.position.clone(),
     fromTarget: controls.target.clone(),
+    fromUp: camera.up.clone(),
     position: destination.position.clone(),
     target: destination.target.clone(),
+    up: destination.up?.clone() || new THREE.Vector3(0, 1, 0),
     startedAt: performance.now(),
     duration: reducedMotion.value ? 0 : duration,
     arcHeight,
@@ -1793,7 +1799,7 @@ function focusDiscovery(id: DiscoveryId) {
   const direction = camera.position.clone().sub(controls.target).normalize()
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
   const sideOffset = right.multiplyScalar(window.innerWidth < 700 ? 0 : 10)
-  const distance = id === 'black-hole' ? 118 : id === 'station' ? 78 : id === 'spacecraft' ? 82 : 58
+  const distance = id === 'black-hole' ? 118 : id === 'station' ? 78 : id === 'spacecraft' ? 82 : id === 'planet' ? 64 : 58
   const destination = {
     target: target.clone().add(sideOffset),
     position: target.clone().add(direction.multiplyScalar(distance)).add(sideOffset.clone().multiplyScalar(.65)),
@@ -1811,12 +1817,6 @@ function triggerDiscoveryEffect(id: DiscoveryId) {
 
 function startDiscoveryTour(id: DiscoveryId) {
   if (id !== 'station' && id !== 'spacecraft') return
-  focusDiscovery(id)
-  pendingDiscoveryTourId = id
-  if (!cameraFlight) activateDiscoveryTour(id)
-}
-
-function activateDiscoveryTour(id: DiscoveryId) {
   if (!camera || !controls) return
   const object = discoveryObjects.get(id)
   if (!object) return
@@ -1824,39 +1824,65 @@ function activateDiscoveryTour(id: DiscoveryId) {
   const offset = camera.position.clone().sub(target)
   discoveryTourPhase = Math.atan2(offset.z, offset.x)
   discoveryTourHeight = offset.y
+  focusedDiscoveryId = id
+  if (id === 'spacecraft') spacecraftLaunchActive = false
+  pendingDiscoveryTourId = id
+  const destination = discoveryTourPose(id)
+  if (!destination) return
+  startCameraFlight(destination, 1900, 6)
+}
+
+function activateDiscoveryTour(id: DiscoveryId) {
+  if (!camera || !controls) return
+  const object = discoveryObjects.get(id)
+  if (!object) return
   discoveryTourId = id
   pendingDiscoveryTourId = ''
   controls.enabled = false
-  camera.up.set(0, 1, 0)
   emit('immersiveChange', true)
+}
+
+function discoveryTourPose(id: DiscoveryId): CameraSnapshot | null {
+  const object = discoveryObjects.get(id)
+  if (!object) return null
+  const target = object.getWorldPosition(new THREE.Vector3())
+  if (id === 'station') {
+    const coreTarget = core?.getWorldPosition(new THREE.Vector3()) || new THREE.Vector3()
+    const radial = target.clone().sub(coreTarget).setY(0).normalize()
+    const tangent = new THREE.Vector3(-radial.z, 0, radial.x)
+    return {
+      position: target.clone()
+        .addScaledVector(radial, 72)
+        .addScaledVector(tangent, Math.sin(discoveryTourPhase) * 18)
+        .add(new THREE.Vector3(0, 24 + Math.sin(elapsed * .34) * 1.6, 0)),
+      target: target.clone().lerp(coreTarget, .46).add(new THREE.Vector3(0, 5, 0)),
+      up: new THREE.Vector3(0, 1, 0),
+    }
+  }
+  if (id === 'spacecraft' && spacecraft) {
+    return {
+      // 舰首沿本地 +X：相机位于尾焰之后并略微抬高、偏舷侧，稳定保留舰体和引擎尾流。
+      position: target.clone().add(new THREE.Vector3(-62, 26, 22).applyQuaternion(spacecraft.quaternion)),
+      target: target.clone().add(new THREE.Vector3(12, 2.5, 0).applyQuaternion(spacecraft.quaternion)),
+      up: new THREE.Vector3(0, 1, 0).applyQuaternion(spacecraft.quaternion).normalize(),
+    }
+  }
+  return null
 }
 
 function updateDiscoveryTour(delta: number) {
   if (!camera || !controls || !discoveryTourId || cameraFlight) return
-  const object = discoveryObjects.get(discoveryTourId)
-  if (!object) return
-  const target = object.getWorldPosition(new THREE.Vector3())
   if (discoveryTourId === 'station') {
     discoveryTourPhase -= delta * .085
-    const coreTarget = core?.getWorldPosition(new THREE.Vector3()) || new THREE.Vector3()
-    const radial = target.clone().sub(coreTarget).setY(0).normalize()
-    const tangent = new THREE.Vector3(-radial.z, 0, radial.x)
-    const desired = target.clone()
-      .addScaledVector(radial, 72)
-      .addScaledVector(tangent, Math.sin(discoveryTourPhase) * 18)
-      .add(new THREE.Vector3(0, 24 + Math.sin(elapsed * .34) * 1.6, 0))
-    const sharedTarget = target.clone().lerp(coreTarget, .46).add(new THREE.Vector3(0, 5, 0))
-    camera.position.lerp(desired, 1 - Math.exp(-delta * 1.9))
-    controls.target.lerp(sharedTarget, 1 - Math.exp(-delta * 2.5))
-  } else if (spacecraft) {
-    // Keep the camera just beyond the scaled nose geometry so banking never clips the hull.
-    const desired = target.clone().add(new THREE.Vector3(14.2, 2.35, 0).applyQuaternion(spacecraft.quaternion))
-    const lookAhead = target.clone().add(new THREE.Vector3(110, 1.25, 0).applyQuaternion(spacecraft.quaternion))
-    const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(spacecraft.quaternion).normalize()
-    camera.position.lerp(desired, 1 - Math.exp(-delta * 6.4))
-    controls.target.lerp(lookAhead, 1 - Math.exp(-delta * 7.8))
-    camera.up.lerp(shipUp, 1 - Math.exp(-delta * 4.2)).normalize()
   }
+  const pose = discoveryTourPose(discoveryTourId)
+  if (!pose) return
+  const positionDamping = discoveryTourId === 'spacecraft' ? 3.15 : 1.9
+  const targetDamping = discoveryTourId === 'spacecraft' ? 4.2 : 2.5
+  const upDamping = discoveryTourId === 'spacecraft' ? 2.4 : 3.2
+  camera.position.lerp(pose.position, 1 - Math.exp(-delta * positionDamping))
+  controls.target.lerp(pose.target, 1 - Math.exp(-delta * targetDamping))
+  camera.up.lerp(pose.up || new THREE.Vector3(0, 1, 0), 1 - Math.exp(-delta * upDamping)).normalize()
   camera.lookAt(controls.target)
 }
 
@@ -1875,7 +1901,14 @@ function updateFocusedDiscoveryCamera(delta: number) {
 
 function updateCameraFlight(now: number) {
   if (!cameraFlight || !camera || !controls) return
-  if (cameraFlightTrackingId) {
+  if (pendingDiscoveryTourId) {
+    const pose = discoveryTourPose(pendingDiscoveryTourId)
+    if (pose) {
+      cameraFlight.position.copy(pose.position)
+      cameraFlight.target.copy(pose.target)
+      cameraFlight.up.copy(pose.up || new THREE.Vector3(0, 1, 0))
+    }
+  } else if (cameraFlightTrackingId) {
     const object = discoveryObjects.get(cameraFlightTrackingId)
     if (object) {
       const target = object.getWorldPosition(new THREE.Vector3())
@@ -1888,10 +1921,13 @@ function updateCameraFlight(now: number) {
   camera.position.lerpVectors(cameraFlight.fromPosition, cameraFlight.position, eased)
   camera.position.y += Math.sin(progress * Math.PI) * cameraFlight.arcHeight
   controls.target.lerpVectors(cameraFlight.fromTarget, cameraFlight.target, eased)
+  camera.up.lerpVectors(cameraFlight.fromUp, cameraFlight.up, eased).normalize()
+  camera.lookAt(controls.target)
   if (progress < 1) return
   const completion = cameraFlight.completion
   camera.position.copy(cameraFlight.position)
   controls.target.copy(cameraFlight.target)
+  camera.up.copy(cameraFlight.up)
   cameraFlight = null
   cameraFlightTrackingId = ''
   if (pendingDiscoveryTourId) activateDiscoveryTour(pendingDiscoveryTourId)
@@ -1983,7 +2019,6 @@ function resetView() {
   pendingDiscoveryTourId = ''
   overviewSnapshot = null
   controls.enabled = !props.ambient
-  camera.up.set(0, 1, 0)
   emit('immersiveChange', false)
   startCameraFlight(overviewPose(), 1550, 12, 'reset')
 }
@@ -2019,6 +2054,7 @@ function animate(now = performance.now()) {
     if (core) {
       core.rotation.y += delta * .18
       core.rotation.z = Math.sin(elapsed * .3) * .08
+      core.scale.setScalar(1 + (discoveryEffect === 'planet' ? effectPulse * .09 : 0))
       const clouds = core.getObjectByName('core-clouds')
       if (clouds) clouds.rotation.y += delta * .055
       const moonOrbit = core.getObjectByName('core-moon-orbit')

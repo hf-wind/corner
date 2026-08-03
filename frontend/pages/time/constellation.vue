@@ -30,17 +30,6 @@
         <span class="loading-orbit"><i /><i /><i /></span>
         <small>正在展开你的时间轨道</small>
       </div>
-      <nav v-if="sceneReady && !fallbackMode" class="constellation-target-nav" aria-label="星图目标快速导航">
-        <button
-          v-for="discovery in discoveries"
-          :key="discovery.id"
-          type="button"
-          :title="`聚焦${discovery.title}`"
-          :aria-label="`聚焦${discovery.title}`"
-          :data-target="discovery.id"
-          @click="focusDiscoveryTarget(discovery.id)"
-        ><Icon :name="discovery.icon" /></button>
-      </nav>
     </section>
 
     <header class="constellation-nav">
@@ -63,7 +52,7 @@
     </section>
 
     <footer class="constellation-foot">
-      <span><i />{{ latestLabel }}<b><em />点击太阳、黑洞、空间站、卫星与风隅号读取遥测</b></span>
+      <span><i />{{ latestLabel }}<b><em />点击主星球、太阳、黑洞、空间站、卫星与风隅号读取档案</b></span>
     </footer>
 
     <div v-if="audioUrl" class="constellation-audio" :class="{ playing: audioPlaying }">
@@ -109,37 +98,43 @@
         :aria-label="`${activeDiscovery.title}遥测档案`"
       >
         <button class="popup-close" type="button" title="关闭" aria-label="关闭" @click="clearDiscovery"><Icon name="ph:x-bold" /></button>
-        <header class="discovery-identity">
-          <span><Icon :name="activeDiscovery.icon" /></span>
-          <div><small>{{ activeDiscovery.kicker }}</small><b>{{ activeDiscovery.status }}</b></div>
-          <em><i />科学模拟</em>
-        </header>
-        <div v-if="immersiveMode && activeDiscovery.id === 'spacecraft'" class="immersive-actions" aria-label="风隅号追航指令">
-          <button type="button" :class="{ active: activeCommandId === 'warp' }" @click="runDiscoveryCommand('warp')">
-            <Icon name="ph:lightning-bold" /><span>曲率跃迁</span><small>WARP</small>
-          </button>
-        </div>
-        <div class="discovery-title"><h2>{{ activeDiscovery.title }}</h2><span>{{ activeDiscovery.catalog }}</span></div>
-        <p>{{ activeDiscovery.description }}</p>
-        <div class="telemetry-grid">
-          <div v-for="metric in activeTelemetry.metrics" :key="metric.label">
-            <small>{{ metric.label }}</small><strong>{{ metric.value }}</strong>
+        <Transition name="discovery-content" mode="out-in">
+          <div :key="activeDiscovery.id" class="discovery-content">
+            <header class="discovery-identity">
+              <span><Icon :name="activeDiscovery.icon" /></span>
+              <div><small>{{ activeDiscovery.kicker }}</small><b>{{ activeDiscovery.status }}</b></div>
+              <em><i />{{ activeDiscovery.id === 'planet' ? '私人星球档案' : '科学模拟' }}</em>
+            </header>
+            <div v-if="activeDiscovery.id === 'spacecraft'" class="immersive-actions" aria-label="风隅号追航指令">
+              <button type="button" :class="{ active: activeCommandId === 'warp' }" @click="runDiscoveryCommand('warp')">
+                <Icon name="ph:lightning-bold" /><span>曲率跃迁</span><small>WARP</small>
+              </button>
+            </div>
+            <div class="discovery-details">
+              <div class="discovery-title"><h2>{{ activeDiscovery.title }}</h2><span>{{ activeDiscovery.catalog }}</span></div>
+              <p>{{ activeDiscovery.description }}</p>
+              <div class="telemetry-grid">
+                <div v-for="metric in activeTelemetry.metrics" :key="metric.label">
+                  <small>{{ metric.label }}</small><strong>{{ metric.value }}</strong>
+                </div>
+              </div>
+              <div class="discovery-signal" aria-live="polite">
+                <div><small>{{ activeDiscovery.signalLabel }}</small><time>{{ activeTelemetry.sampleTime }}</time></div>
+                <strong>{{ discoveryResult || activeTelemetry.report }}</strong>
+                <span>{{ activeTelemetry.basis }}</span>
+              </div>
+              <div class="discovery-commands" :aria-label="`${activeDiscovery.title}指令`">
+                <button
+                  v-for="command in activeDiscovery.commands"
+                  :key="command.id"
+                  type="button"
+                  :class="{ active: activeCommandId === command.id }"
+                  @click="runDiscoveryCommand(command.id)"
+                ><Icon :name="command.icon" /><span>{{ command.label }}</span></button>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="discovery-signal" aria-live="polite">
-          <div><small>{{ activeDiscovery.signalLabel }}</small><time>{{ activeTelemetry.sampleTime }}</time></div>
-          <strong>{{ discoveryResult || activeTelemetry.report }}</strong>
-          <span>{{ activeTelemetry.basis }}</span>
-        </div>
-        <div class="discovery-commands" :aria-label="`${activeDiscovery.title}指令`">
-          <button
-            v-for="command in activeDiscovery.commands"
-            :key="command.id"
-            type="button"
-            :class="{ active: activeCommandId === command.id }"
-            @click="runDiscoveryCommand(command.id)"
-          ><Icon :name="command.icon" /><span>{{ command.label }}</span></button>
-        </div>
+        </Transition>
       </aside>
     </Transition>
   </main>
@@ -171,8 +166,8 @@ type GraphRelation = {
   evidence?: Record<string, unknown>
 }
 
-type DiscoveryId = 'sun' | 'black-hole' | 'station' | 'satellite' | 'spacecraft'
-type DiscoveryCommandId = 'sample' | 'scan' | 'tour' | 'log' | 'signal' | 'orbit' | 'bridge' | 'warp'
+type DiscoveryId = 'planet' | 'sun' | 'black-hole' | 'station' | 'satellite' | 'spacecraft'
+type DiscoveryCommandId = 'pulse' | 'latest' | 'sample' | 'scan' | 'tour' | 'log' | 'signal' | 'orbit' | 'bridge' | 'warp'
 
 type Discovery = {
   id: DiscoveryId
@@ -241,6 +236,12 @@ const typeOptions = [
 
 const discoveries: Discovery[] = [
   {
+    id: 'planet', title: '风隅星', catalog: 'CORNER-INK · 记忆母星', kicker: 'PRIVATE HOMEWORLD · 00', status: '记忆生态持续生长',
+    description: '它不是一颗等待测绘的普通行星，而是风隅随笔的精神坐标：文章化作大陆，瞬间汇成云层，照片与旅途沿着晨昏线缓慢发光。',
+    signalLabel: '母星记忆回声', icon: 'ph:planet-bold', accent: '#69caff',
+    commands: [{ id: 'pulse', label: '唤醒星核', icon: 'ph:sparkle-bold' }, { id: 'latest', label: '定位最近记忆', icon: 'ph:crosshair-bold' }],
+  },
+  {
     id: 'sun', title: '太阳', catalog: 'G2V · 黄矮星', kicker: 'SOL HELIOPHYSICS · 01', status: '日球层遥测在线',
     description: '核心以质子－质子链持续把氢聚变为氦；能量穿过辐射区与对流区，最终以光和太阳风抵达星图。',
     signalLabel: '太阳活动简报', icon: 'ph:sun-bold', accent: '#ffb95e',
@@ -266,9 +267,9 @@ const discoveries: Discovery[] = [
   },
   {
     id: 'spacecraft', title: '风隅号', catalog: 'FY-01 · 深空巡航舰', kicker: 'WIND CORNER FLIGHT · 05', status: '三联离子驱动在线',
-    description: '以陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰。聚焦会持续跟随航迹，追航将进入驾驶舱第一人称。',
+    description: '以陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰。聚焦会持续跟随航迹，追航将在舰尾上方保持第三人称伴飞。',
     signalLabel: '舰桥航行简报', icon: 'ph:rocket-launch-bold', accent: '#7ca8ff',
-    commands: [{ id: 'bridge', label: '第一人称追航', icon: 'ph:steering-wheel-bold' }, { id: 'warp', label: '曲率跃迁', icon: 'ph:lightning-bold' }],
+    commands: [{ id: 'bridge', label: '第三人称追航', icon: 'ph:steering-wheel-bold' }, { id: 'warp', label: '曲率跃迁', icon: 'ph:lightning-bold' }],
   },
 ]
 
@@ -370,6 +371,23 @@ function buildDiscoveryTelemetry(id: DiscoveryId | '', now: Date, sequence: numb
   const hourAngle = (hours - 12) * 15
   const solarLongitude = ((now.getTime() / 86_400_000) % 27.2753) / 27.2753 * 360
   const empty = { report: '', sampleTime, basis: '', metrics: [] }
+  if (id === 'planet') {
+    const latest = latestNode.value
+    const journeyCount = routeNodeIds.value.length
+    return {
+      report: graph.nodes.length
+        ? `风隅星表面已有 ${graph.nodes.length} 枚真实记忆持续发光。${latest ? `最近一次地表回声来自「${latest.title}」，` : ''}${journeyCount ? `${journeyCount} 个记忆坐标正被旅行航线连接。` : '第一条旅行航线仍在等待足够的地点与时间坐标。'}`
+        : '这颗母星已经完成点火，正在等待第一篇文章、第一张照片或第一段旅途成为它的大陆。',
+      sampleTime,
+      basis: '直接读取风隅随笔的公开记忆图谱；这里的每一项变化，都来自真实发布的内容',
+      metrics: [
+        { label: '已点亮记忆', value: `${graph.nodes.length} 枚` },
+        { label: '记忆年代', value: timeRange.value },
+        { label: '旅行坐标', value: `${journeyCount} 个` },
+        { label: '最近回声', value: latest?.title || '等待首次点亮' },
+      ],
+    }
+  }
   if (id === 'sun') {
     return {
       report: `${sample(solarReports, minuteSeed)} 当前本地时角 ${hourAngle >= 0 ? '+' : ''}${hourAngle.toFixed(1)}°，可见日面模型已旋转至 ${solarLongitude.toFixed(1)}°。`,
@@ -538,11 +556,6 @@ function handleDiscovery(id: DiscoveryId) {
   void router.replace({ query: {} })
 }
 
-function focusDiscoveryTarget(id: DiscoveryId) {
-  sceneRef.value?.focusDiscovery(id)
-  handleDiscovery(id)
-}
-
 function clearDiscovery() {
   if (!activeDiscoveryId.value || discoveryClosing.value) return
   discoveryClosing.value = true
@@ -565,11 +578,18 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
   activeCommandId.value = commandId
   discoverySequence.value += 1
   telemetryNow.value = new Date()
-  if (commandId === 'tour') {
+  if (commandId === 'pulse') {
+    discoveryResult.value = `星核脉冲已穿过 ${graph.nodes.length} 枚记忆坐标，云层正在回应最近一次书写。`
+    sceneRef.value?.triggerDiscoveryEffect('planet')
+  } else if (commandId === 'latest') {
+    const latest = latestNode.value
+    if (latest) void selectNode(latest)
+    else discoveryResult.value = '母星还没有可定位的公开记忆，发布第一段内容后它会在这里点亮。'
+  } else if (commandId === 'tour') {
     discoveryResult.value = '环站巡航已接管视角：正沿桁架、实验舱与太阳翼外缘飞行。'
     sceneRef.value?.startDiscoveryTour('station')
   } else if (commandId === 'bridge') {
-    discoveryResult.value = '驾驶舱追航已启动：视角位于全景舰桥，沿风隅号实时姿态漫游完整轨道。'
+    discoveryResult.value = '第三人称追航已启动：镜头保持在舰尾上方，平滑跟随风隅号姿态与完整航线。'
     sceneRef.value?.startDiscoveryTour('spacecraft')
   } else if (commandId === 'log') {
     discoveryResult.value = sample(stationLogs, discoverySequence.value)
@@ -582,7 +602,7 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
     sceneRef.value?.focusDiscovery('satellite')
     sceneRef.value?.triggerDiscoveryEffect('satellite')
   } else if (commandId === 'warp') {
-    discoveryResult.value = '曲率航路已展开：风隅号正在穿越星图，舰桥将持续追踪跃迁航迹。'
+    discoveryResult.value = '曲率航路已展开：风隅号正在穿越星图，尾随镜头将持续追踪跃迁航迹。'
     if (!immersiveMode.value) sceneRef.value?.startDiscoveryTour('spacecraft')
     sceneRef.value?.triggerDiscoveryEffect('spacecraft')
   } else {
@@ -657,10 +677,6 @@ useHead({ title: '时光星图' })
 <style scoped>
 .constellation-page { position:fixed; z-index:40; inset:0; overflow:hidden; background:#030817; color:#ecf7ff; }
 .constellation-stage { position:absolute; inset:0; overflow:hidden; }
-.constellation-target-nav { position:absolute; z-index:30; top:14px; left:50%; display:flex; gap:6px; padding:6px; border:1px solid rgb(117 193 234 / .24); border-radius:7px; background:rgb(4 16 31 / .92); box-shadow:0 12px 34px rgb(0 0 0 / .34); opacity:.82; pointer-events:auto; transform:translate(-50%,0); transition:opacity .18s ease,transform .18s ease; }
-.constellation-target-nav:hover,.constellation-target-nav:focus-within { opacity:1; }
-.constellation-target-nav button { display:grid; width:34px; height:34px; padding:0; border:1px solid rgb(116 201 242 / .2); border-radius:5px; background:rgb(30 74 105 / .22); color:#a9dff5; cursor:pointer; place-items:center; }
-.constellation-target-nav button:focus-visible { border-color:#8bdcff; outline:2px solid rgb(112 218 255 / .5); outline-offset:2px; }
 .constellation-stage :deep(.constellation-scene) { position:absolute; inset:0; }
 .constellation-stage :deep(.graph-preview) { height:100%; min-height:100%; border:0; background:#030817; }
 .constellation-stage :deep(svg) { width:100%; height:100%; min-height:100%; }
@@ -734,16 +750,21 @@ useHead({ title: '时光星图' })
 .memory-popup section button>span { grid-column:1; color:#669fc4; font-size:.5rem; }
 .memory-popup section button>b { grid-column:1; overflow:hidden; font-size:.63rem; text-overflow:ellipsis; white-space:nowrap; }
 .memory-popup section button>small { grid-column:2; grid-row:1/3; align-self:center; color:#6f94b0; font-size:.48rem; }
-.discovery-popup { --discovery-accent:#72d9ff; position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(412px,calc(100vw - 40px)); max-height:calc(100dvh - 118px); padding:24px; overflow-x:hidden; overflow-y:auto; border:1px solid color-mix(in srgb,var(--discovery-accent) 30%,transparent); border-radius:8px; background:linear-gradient(155deg,rgb(7 21 38 / .94),rgb(2 8 19 / .97)); box-shadow:0 28px 90px rgb(0 0 0 / .52),inset 0 1px rgb(225 244 255 / .06); backdrop-filter:blur(24px) saturate(1.12); transform:translateY(-50%); }
+.discovery-popup { --discovery-accent:#72d9ff; position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(412px,calc(100vw - 40px)); height:min(500px,calc(100dvh - 118px)); max-height:calc(100dvh - 118px); box-sizing:border-box; padding:24px; overflow-x:hidden; overflow-y:auto; border:1px solid color-mix(in srgb,var(--discovery-accent) 30%,transparent); border-radius:8px; background:linear-gradient(155deg,rgb(7 21 38 / .94),rgb(2 8 19 / .97)); box-shadow:0 28px 90px rgb(0 0 0 / .52),inset 0 1px rgb(225 244 255 / .06); backdrop-filter:blur(24px) saturate(1.12); transform:translateY(-50%); transition:height .72s cubic-bezier(.16,1,.3,1),width .65s cubic-bezier(.16,1,.3,1),padding .65s cubic-bezier(.16,1,.3,1),top .65s cubic-bezier(.16,1,.3,1),right .65s cubic-bezier(.16,1,.3,1),transform .65s cubic-bezier(.16,1,.3,1),opacity .3s ease; }
 .discovery-popup.is-closing { opacity:0; pointer-events:none; transform:translate(42px,-50%) scale(.94); transition:opacity .42s ease,transform .7s cubic-bezier(.4,0,.2,1); }
-.discovery-popup.is-immersive { top:20px; right:22px; width:min(300px,calc(100vw - 44px)); max-height:none; padding:12px 14px; overflow:hidden; transform:none; transition:width .45s ease,padding .45s ease,transform .45s ease,opacity .3s ease; }
-.discovery-popup.is-immersive .discovery-title,.discovery-popup.is-immersive>p,.discovery-popup.is-immersive .telemetry-grid,.discovery-popup.is-immersive .discovery-signal,.discovery-popup.is-immersive .discovery-commands { display:none; }
+.discovery-popup.is-immersive { top:20px; right:22px; width:min(300px,calc(100vw - 44px)); height:58px; max-height:none; padding:12px 14px; overflow:hidden; transform:none; }
 .discovery-popup.is-immersive .discovery-identity { grid-template-columns:32px minmax(0,1fr); padding-right:34px; }
 .discovery-popup.is-immersive .discovery-identity>span { width:32px; height:32px; }
 .discovery-popup.is-immersive .discovery-identity>em { display:none; }
-.immersive-actions { display:none; }
-.discovery-popup.is-immersive.discovery-spacecraft { width:min(330px,calc(100vw - 44px)); }
-.discovery-popup.is-immersive .immersive-actions { display:flex; margin-top:9px; padding-top:9px; border-top:1px solid color-mix(in srgb,var(--discovery-accent) 18%,transparent); }
+.discovery-content { min-height:100%; }
+.discovery-content-enter-active,.discovery-content-leave-active { transition:opacity .22s ease,transform .36s cubic-bezier(.16,1,.3,1); }
+.discovery-content-enter-from { opacity:0; transform:translateX(12px); }
+.discovery-content-leave-to { opacity:0; transform:translateX(-8px); }
+.discovery-details { opacity:1; transform:none; transition:opacity .22s ease .14s,transform .48s cubic-bezier(.16,1,.3,1),visibility 0s linear; }
+.discovery-popup.is-immersive .discovery-details { visibility:hidden; opacity:0; pointer-events:none; transform:translateY(-9px); transition:opacity .16s ease,transform .32s ease,visibility 0s linear .32s; }
+.immersive-actions { display:flex; max-height:0; margin-top:0; padding-top:0; overflow:hidden; border-top:1px solid transparent; opacity:0; transform:translateY(-7px); transition:max-height .48s cubic-bezier(.16,1,.3,1),margin-top .48s cubic-bezier(.16,1,.3,1),padding-top .48s cubic-bezier(.16,1,.3,1),border-color .3s ease,opacity .24s ease,transform .42s cubic-bezier(.16,1,.3,1); }
+.discovery-popup.is-immersive.discovery-spacecraft { width:min(330px,calc(100vw - 44px)); height:114px; }
+.discovery-popup.is-immersive .immersive-actions { max-height:51px; margin-top:9px; padding-top:9px; border-top-color:color-mix(in srgb,var(--discovery-accent) 18%,transparent); opacity:1; transform:none; }
 .immersive-actions button { display:flex; width:100%; height:32px; align-items:center; justify-content:center; gap:7px; border:1px solid color-mix(in srgb,var(--discovery-accent) 34%,transparent); border-radius:5px; background:linear-gradient(90deg,color-mix(in srgb,var(--discovery-accent) 8%,transparent),color-mix(in srgb,var(--discovery-accent) 16%,transparent),color-mix(in srgb,var(--discovery-accent) 8%,transparent)); color:#d9effa; cursor:pointer; font:inherit; font-size:.55rem; letter-spacing:.04em; transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease; }
 .immersive-actions button:hover,.immersive-actions button.active { border-color:color-mix(in srgb,var(--discovery-accent) 72%,transparent); box-shadow:0 0 22px color-mix(in srgb,var(--discovery-accent) 22%,transparent),inset 0 0 14px color-mix(in srgb,var(--discovery-accent) 10%,transparent); transform:translateY(-1px); }
 .immersive-actions small { color:color-mix(in srgb,var(--discovery-accent) 62%,#607588); font-size:.42rem; letter-spacing:.12em; }
@@ -759,7 +780,7 @@ useHead({ title: '时光星图' })
 .discovery-title { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-top:19px; }
 .discovery-title h2 { min-width:0; margin:0; color:#f1f7fb; font-size:1.48rem; line-height:1.15; letter-spacing:0; }
 .discovery-title>span { flex:none; color:#667f94; font-size:.5rem; }
-.discovery-popup>p { margin:10px 0 0; color:#8fa5b5; font-size:.68rem; line-height:1.8; }
+.discovery-details>p { margin:10px 0 0; color:#8fa5b5; font-size:.68rem; line-height:1.8; }
 .telemetry-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:19px; border-top:1px solid rgb(133 172 199 / .13); border-bottom:1px solid rgb(133 172 199 / .13); }
 .telemetry-grid>div { display:flex; min-width:0; flex-direction:column; gap:4px; padding:10px 9px 10px 0; }
 .telemetry-grid>div:nth-child(even) { padding-left:12px; border-left:1px solid rgb(133 172 199 / .11); }
@@ -782,7 +803,6 @@ useHead({ title: '时光星图' })
 @keyframes audio-level { to { height:16px; background:#75d4f4; box-shadow:0 0 7px rgb(89 194 235/.62); } }
 @media (max-width:700px) {
   .constellation-nav { top:14px; right:14px; left:14px; }
-  .constellation-target-nav { top:60px; }
   .brand img { width:38px; height:38px; }
   .brand span { display:none; }
   .signal span { display:none; }
@@ -794,16 +814,17 @@ useHead({ title: '时光星图' })
   .constellation-audio { right:14px; bottom:12px; }
   .constellation-audio input { display:none; }
   .memory-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(52dvh,440px); padding:18px 18px 18px 24px; border-radius:20px 20px 20px 8px; transform:none; }
-  .discovery-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(67dvh,560px); padding:19px; transform:none; }
+  .discovery-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; height:min(560px,67dvh); max-height:min(67dvh,560px); padding:19px; transform:none; }
   .discovery-popup.is-closing { transform:translateY(24px) scale(.96); }
-  .discovery-popup.is-immersive { top:14px; right:14px; bottom:auto; left:64px; width:auto; padding:10px 12px; }
+  .discovery-popup.is-immersive { top:14px; right:14px; bottom:auto; left:64px; width:auto; height:54px; padding:10px 12px; }
+  .discovery-popup.is-immersive.discovery-spacecraft { height:110px; }
   .discovery-title { align-items:flex-start; flex-direction:column; gap:4px; }
   .discovery-identity em { display:none; }
   .popup-rail { top:21px; bottom:19px; left:9px; }
   .popup-enter-from,.popup-leave-to { opacity:0; transform:translateY(24px); }
 }
 @media (prefers-reduced-motion:reduce) {
-  .constellation-intro,.popup-enter-active,.popup-leave-active,.loading-orbit,.constellation-audio>span i { transition:none; animation:none; }
+  .constellation-intro,.popup-enter-active,.popup-leave-active,.discovery-popup,.discovery-content-enter-active,.discovery-content-leave-active,.discovery-details,.immersive-actions,.loading-orbit,.constellation-audio>span i { transition:none; animation:none; }
   .constellation-intro { opacity:1; transform:none; }
 }
 </style>
