@@ -154,7 +154,13 @@ const greetings = ref<string[]>([...(meta.greetings || [])])
 const selectedGreeting = ref('你好呀～')
 
 const isArticleMode = computed(() => props.mode === 'article')
-const hintText = computed(() => isArticleMode.value ? '要我帮你读懂这篇吗？' : selectedGreeting.value)
+function compactHint(value: string, maxLength = 26) {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  const characters = Array.from(normalized)
+  return characters.length > maxLength ? `${characters.slice(0, maxLength).join('')}…` : normalized
+}
+
+const hintText = computed(() => compactHint(isArticleMode.value ? '要我帮你读懂这篇吗？' : selectedGreeting.value))
 const inputPlaceholder = computed(() => isArticleMode.value ? '问问这篇文章…' : '问我文章推荐或本站内容…')
 const actionsVisible = computed(() => isLoggedIn.value && !chatOpen.value && !suppressActions.value && !showHint.value && !showLoginBubble.value)
 const quickActions = computed<QuickAction[]>(() => isArticleMode.value
@@ -593,13 +599,17 @@ onUnmounted(() => {
   right: calc(100% + 10px);
   top: 50%;
   transform: translateY(-50%);
-  white-space: nowrap;
-  max-width: 220px;
+  width: max-content;
+  max-width: min(240px, calc(100vw - 132px));
   padding: 8px 12px;
   border-radius: 12px;
   background: var(--ld-bg-card);
   color: var(--c-text-1);
   font-size: 0.75rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
   box-shadow: 0 8px 22px var(--ld-shadow);
   animation: hint-in 0.35s ease;
 }
@@ -643,6 +653,10 @@ onUnmounted(() => {
 .pet-chat-title {
   display: flex;
   gap: 10px;
+  min-width: 0;
+}
+
+.pet-chat-title > div {
   min-width: 0;
 }
 
@@ -697,6 +711,11 @@ onUnmounted(() => {
   font-size: 0.68rem;
   color: var(--c-text-3);
   line-height: 1.4;
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .pet-context-label {
@@ -908,7 +927,9 @@ onUnmounted(() => {
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 0.66rem;
-  white-space: nowrap;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
 }
 
 .pet-suggestions button:hover,

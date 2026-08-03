@@ -7,6 +7,7 @@
         :nodes="displayNodes"
         :relations="displayRelations"
         :graph-version="displayGraphVersion"
+        :route-node-ids="routeNodeIds"
         :selected-id="selected?.id"
         :resolve-image="mediaUrl"
         :intro-delay-ms="180"
@@ -29,6 +30,17 @@
         <span class="loading-orbit"><i /><i /><i /></span>
         <small>正在展开你的时间轨道</small>
       </div>
+      <nav v-if="sceneReady && !fallbackMode" class="constellation-target-nav" aria-label="星图目标快速导航">
+        <button
+          v-for="discovery in discoveries"
+          :key="discovery.id"
+          type="button"
+          :title="`聚焦${discovery.title}`"
+          :aria-label="`聚焦${discovery.title}`"
+          :data-target="discovery.id"
+          @click="focusDiscoveryTarget(discovery.id)"
+        ><Icon :name="discovery.icon" /></button>
+      </nav>
     </section>
 
     <header class="constellation-nav">
@@ -254,9 +266,9 @@ const discoveries: Discovery[] = [
   },
   {
     id: 'spacecraft', title: '风隅号', catalog: 'FY-01 · 深空巡航舰', kicker: 'WIND CORNER FLIGHT · 05', status: '三联离子驱动在线',
-    description: '以陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰，任务是把尚未说出口的话送往更远的恒星。',
+    description: '以陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰。聚焦会持续跟随航迹，追航将进入驾驶舱第一人称。',
     signalLabel: '舰桥航行简报', icon: 'ph:rocket-launch-bold', accent: '#7ca8ff',
-    commands: [{ id: 'bridge', label: '舰桥追航', icon: 'ph:steering-wheel-bold' }, { id: 'warp', label: '曲率跃迁', icon: 'ph:lightning-bold' }],
+    commands: [{ id: 'bridge', label: '第一人称追航', icon: 'ph:steering-wheel-bold' }, { id: 'warp', label: '曲率跃迁', icon: 'ph:lightning-bold' }],
   },
 ]
 
@@ -312,6 +324,16 @@ const displayNodes = computed(() => graph.nodes)
 const activeDiscovery = computed(() => discoveries.find(item => item.id === activeDiscoveryId.value) || null)
 const activeTelemetry = computed<DiscoveryTelemetry>(() => buildDiscoveryTelemetry(activeDiscoveryId.value, telemetryNow.value, discoverySequence.value))
 const displayRelations = computed(() => graph.relations)
+const routeNodeIds = computed(() => {
+  const ids = new Set<string>()
+  for (const relation of graph.relations) {
+    if (relation.type === 'journey_sequence' || relation.type === 'story_sequence') {
+      ids.add(relation.sourceId)
+      ids.add(relation.targetId)
+    }
+  }
+  return [...ids]
+})
 const displayGraphVersion = computed(() => graph.graphVersion || `empty-${graph.nodes.length}`)
 const nodeYears = computed(() => graph.nodes
   .map(node => node.occurredAt ? new Date(node.occurredAt).getFullYear() : NaN)
@@ -516,6 +538,11 @@ function handleDiscovery(id: DiscoveryId) {
   void router.replace({ query: {} })
 }
 
+function focusDiscoveryTarget(id: DiscoveryId) {
+  sceneRef.value?.focusDiscovery(id)
+  handleDiscovery(id)
+}
+
 function clearDiscovery() {
   if (!activeDiscoveryId.value || discoveryClosing.value) return
   discoveryClosing.value = true
@@ -542,7 +569,7 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
     discoveryResult.value = '环站巡航已接管视角：正沿桁架、实验舱与太阳翼外缘飞行。'
     sceneRef.value?.startDiscoveryTour('station')
   } else if (commandId === 'bridge') {
-    discoveryResult.value = '舰桥追航已启动：视角锁定风隅号尾部，航向由飞船实时姿态驱动。'
+    discoveryResult.value = '驾驶舱追航已启动：视角位于全景舰桥，沿风隅号实时姿态漫游完整轨道。'
     sceneRef.value?.startDiscoveryTour('spacecraft')
   } else if (commandId === 'log') {
     discoveryResult.value = sample(stationLogs, discoverySequence.value)
@@ -630,6 +657,10 @@ useHead({ title: '时光星图' })
 <style scoped>
 .constellation-page { position:fixed; z-index:40; inset:0; overflow:hidden; background:#030817; color:#ecf7ff; }
 .constellation-stage { position:absolute; inset:0; overflow:hidden; }
+.constellation-target-nav { position:absolute; z-index:30; top:14px; left:50%; display:flex; gap:6px; padding:6px; border:1px solid rgb(117 193 234 / .24); border-radius:7px; background:rgb(4 16 31 / .92); box-shadow:0 12px 34px rgb(0 0 0 / .34); opacity:.82; pointer-events:auto; transform:translate(-50%,0); transition:opacity .18s ease,transform .18s ease; }
+.constellation-target-nav:hover,.constellation-target-nav:focus-within { opacity:1; }
+.constellation-target-nav button { display:grid; width:34px; height:34px; padding:0; border:1px solid rgb(116 201 242 / .2); border-radius:5px; background:rgb(30 74 105 / .22); color:#a9dff5; cursor:pointer; place-items:center; }
+.constellation-target-nav button:focus-visible { border-color:#8bdcff; outline:2px solid rgb(112 218 255 / .5); outline-offset:2px; }
 .constellation-stage :deep(.constellation-scene) { position:absolute; inset:0; }
 .constellation-stage :deep(.graph-preview) { height:100%; min-height:100%; border:0; background:#030817; }
 .constellation-stage :deep(svg) { width:100%; height:100%; min-height:100%; }
@@ -751,6 +782,7 @@ useHead({ title: '时光星图' })
 @keyframes audio-level { to { height:16px; background:#75d4f4; box-shadow:0 0 7px rgb(89 194 235/.62); } }
 @media (max-width:700px) {
   .constellation-nav { top:14px; right:14px; left:14px; }
+  .constellation-target-nav { top:60px; }
   .brand img { width:38px; height:38px; }
   .brand span { display:none; }
   .signal span { display:none; }
