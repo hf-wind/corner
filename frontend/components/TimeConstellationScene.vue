@@ -133,6 +133,8 @@ let focusedDiscoveryId: DiscoveryId | '' = ''
 let resettingDiscoveryId: DiscoveryId | '' = ''
 const blackHoleResetFrom = new THREE.Vector3()
 let blackHoleResetActive = false
+const sunResetFrom = new THREE.Vector3()
+let sunResetActive = false
 let discoveryTourId: DiscoveryId | '' = ''
 let pendingDiscoveryTourId: DiscoveryId | '' = ''
 let cruisePausedUntil = 0
@@ -1794,12 +1796,11 @@ function focusDiscovery(id: DiscoveryId) {
   pendingDiscoveryTourId = ''
   focusedDiscoveryId = id
   if (id === 'spacecraft') spacecraftLaunchActive = false
-  if (id === 'sun') return
   const target = object.getWorldPosition(new THREE.Vector3())
   const direction = camera.position.clone().sub(controls.target).normalize()
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
   const sideOffset = right.multiplyScalar(window.innerWidth < 700 ? 0 : 10)
-  const distance = id === 'black-hole' ? 118 : id === 'station' ? 78 : id === 'spacecraft' ? 82 : id === 'planet' ? 64 : 58
+  const distance = id === 'black-hole' ? 118 : id === 'sun' ? 108 : id === 'station' ? 78 : id === 'spacecraft' ? 82 : id === 'planet' ? 64 : 58
   const destination = {
     target: target.clone().add(sideOffset),
     position: target.clone().add(direction.multiplyScalar(distance)).add(sideOffset.clone().multiplyScalar(.65)),
@@ -2011,6 +2012,8 @@ function resetView() {
   resettingDiscoveryId = focusedDiscoveryId
   blackHoleResetActive = resettingDiscoveryId === 'black-hole' && Boolean(blackHole)
   if (blackHoleResetActive && blackHole) blackHoleResetFrom.copy(blackHole.position)
+  sunResetActive = resettingDiscoveryId === 'sun' && Boolean(sun)
+  if (sunResetActive && sun) sunResetFrom.copy(sun.position)
   activeSelectionId = ''
   focusedDiscoveryId = ''
   cameraFlightTrackingId = ''
@@ -2220,11 +2223,19 @@ function animate(now = performance.now()) {
     updateFocusedDiscoveryCamera(delta)
   }
   controls.update(delta)
-  if (sun && camera) {
+  if (sun && camera && focusedDiscoveryId !== 'sun') {
     const viewOffset = (sun.userData.viewOffset as THREE.Vector3).clone()
       .multiplyScalar(320)
       .applyQuaternion(camera.quaternion)
-    sun.position.copy(camera.position).add(viewOffset)
+    const anchoredPosition = camera.position.clone().add(viewOffset)
+    if (resettingDiscoveryId === 'sun' && sunResetActive && cameraFlight) {
+      const progress = cameraFlight.duration ? Math.min(1, (now - cameraFlight.startedAt) / cameraFlight.duration) : 1
+      const eased = progress * progress * progress * (progress * (progress * 6 - 15) + 10)
+      sun.position.lerpVectors(sunResetFrom, anchoredPosition, eased)
+    } else {
+      sun.position.copy(anchoredPosition)
+      sunResetActive = false
+    }
   }
   if (blackHole && camera && focusedDiscoveryId !== 'black-hole') {
     const viewOffset = (blackHole.userData.viewOffset as THREE.Vector3).clone()
