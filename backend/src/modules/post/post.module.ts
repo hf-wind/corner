@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { PostController } from './post.controller';
 import { PostService } from './post.service';
 import { MemoryGraphModule } from '../memory-graph/memory-graph.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [MemoryGraphModule],
+  imports: [MemoryGraphModule, MediaModule],
   controllers: [PostController],
   providers: [PostService],
 })

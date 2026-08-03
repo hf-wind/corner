@@ -38,7 +38,7 @@
               <span>{{ article.comments }}</span> 评论
             </span>
             <span>
-              <Icon name="ph:folder-bold" />
+              <Icon :name="article.category?.icon || 'ph:folder-open-bold'" :style="{ color: article.category?.color || undefined }" />
               <a>{{ article.tag }}</a>
             </span>
             <span>
@@ -71,7 +71,7 @@
         <section class="tags-section">
           <div class="title text-creative">文章标签</div>
           <div class="content tags-list">
-            <a v-for="tag in article.tags" :key="tag" href="#" class="tag-item">#{{ tag }}</a>
+            <a v-for="tag in article.tags" :key="tag.id || tag.name" href="#" class="tag-item" :style="{ '--tag-color': tag.color || 'var(--c-primary)' }"><Icon :name="tag.icon || 'ph:tag-bold'" />{{ tag.name }}</a>
           </div>
         </section>
 
@@ -176,6 +176,7 @@ async function loadArticle() {
     article.value = {
       author: p.author?.username ?? '作者',
       tag: p.category?.name ?? '',
+      category: p.category || null,
       title: p.title,
       date: p.publishedAt?.slice(0, 10) ?? '',
       comments: p._count?.comments ?? 0,
@@ -183,7 +184,7 @@ async function loadArticle() {
       hero: p.coverImage,
       excerpt: p.excerpt ?? '',
       content: p.content,
-      tags: (p.tags ?? []).map((t: any) => t.name),
+      tags: p.tags ?? [],
       id: p.id,
     }
   } catch { /* keep empty */ }
@@ -562,20 +563,23 @@ onUnmounted(() => {
 }
 
 .tag-item {
-  display: inline-block;
+  --tag-color: var(--c-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 12px;
   border-radius: 999px;
   font-size: 0.7rem;
-  color: var(--c-text-2);
+  color: var(--tag-color);
   text-decoration: none;
   cursor: pointer;
-  background: var(--c-bg-2);
+  background: color-mix(in srgb, var(--tag-color) 10%, transparent);
   transition: all 0.2s;
 }
 
 .tag-item:hover {
-  color: var(--c-primary);
-  background: var(--c-primary-soft);
+  color: var(--tag-color);
+  background: color-mix(in srgb, var(--tag-color) 18%, transparent);
 }
 
 .license .content {

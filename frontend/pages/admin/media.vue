@@ -25,9 +25,10 @@
             <a-radio-button value="all">全部</a-radio-button>
             <a-radio-button value="image">图片</a-radio-button>
             <a-radio-button value="video">视频</a-radio-button>
+            <a-radio-button value="audio">音频</a-radio-button>
             <a-radio-button value="document">文档</a-radio-button>
           </a-radio-group>
-          <a-upload :showUploadList="false" accept="image/*,video/*,.pdf,.doc,.docx,.txt" :beforeUpload="beforeUpload">
+          <a-upload :showUploadList="false" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" :beforeUpload="beforeUpload">
             <a-button type="primary"><UploadOutlined /> 上传</a-button>
           </a-upload>
         </div>
@@ -53,6 +54,10 @@
                 </div>
                 <div v-if="isImage(item)" class="media-img-wrap">
                   <a-image :src="mediaUrl(item.path)" style="width:100%;height:120px;object-fit:cover" />
+                </div>
+                <div v-else-if="isAudio(item)" class="media-audio-wrap" @click.stop>
+                  <Icon name="ph:waveform-bold" />
+                  <audio :src="mediaUrl(item.path)" controls preload="metadata" />
                 </div>
                 <div v-else class="media-icon"><FileOutlined style="font-size:28px" /></div>
                 <div class="media-meta">
@@ -114,6 +119,7 @@ const moveDialog = reactive({
 })
 
 const isImage = (item: any) => item.mimeType?.startsWith('image/')
+const isAudio = (item: any) => item.mimeType?.startsWith('audio/')
 
 const uploadFolder = computed(() => {
   if (activeFolder.value === 'all' || activeFolder.value === '__none__') return 'general'
@@ -285,6 +291,8 @@ onMounted(() => { loadMedia(); loadFolders() })
 .media-item.selected { border-color:var(--c-primary); background:var(--c-primary-soft); }
 .media-check { position:absolute; top:6px; left:6px; z-index:2; }
 .media-img-wrap { display:flex; align-items:center; justify-content:center; width:100%; height:120px; overflow:hidden; background:var(--c-bg-1); }
+.media-audio-wrap { display:flex; width:100%; height:120px; box-sizing:border-box; align-items:center; justify-content:center; flex-direction:column; gap:10px; padding:18px 10px 10px; overflow:hidden; background:var(--c-bg-1); color:var(--c-primary); font-size:1.5rem; }
+.media-audio-wrap audio { display:block; width:100%; max-width:220px; height:32px; }
 .media-icon { width:100%; height:120px; display:flex; align-items:center; justify-content:center; color:var(--c-text-3); background:var(--c-bg-1); }
 .media-meta { display:flex; align-items:center; padding:4px 6px; gap:4px; }
 .media-name { font-size:0.7rem; color:var(--c-text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }

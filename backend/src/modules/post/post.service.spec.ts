@@ -61,8 +61,9 @@ describe('PostService article cleanup', () => {
       post: { findUnique: jest.fn().mockResolvedValue({ id: 'post-id' }) },
       $transaction: jest.fn((callback: (client: any) => unknown) => callback(tx)),
     } as any;
+    const media = { removeFolder: jest.fn().mockResolvedValue(undefined) } as any;
     const memoryGraph = { scheduleRebuild: jest.fn() } as any;
-    const service = new PostService(prisma, memoryGraph);
+    const service = new PostService(prisma, media, memoryGraph);
 
     await service.remove('post');
 
@@ -74,6 +75,7 @@ describe('PostService article cleanup', () => {
     expect(tx.visitStat.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
     expect(tx.emailLog.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
     expect(tx.post.delete).toHaveBeenCalledWith({ where: { id: 'post-id' } });
+    expect(media.removeFolder).toHaveBeenCalledWith('article/post-id');
     expect(memoryGraph.scheduleRebuild).toHaveBeenCalledTimes(1);
   });
 

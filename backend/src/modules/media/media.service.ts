@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
@@ -12,6 +12,14 @@ import type { Queue } from 'bull';
 const mimeTypeMap: Record<string, string[]> = {
   image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'],
   video: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
+  audio: [
+    'audio/mpeg',
+    'audio/mp4',
+    'audio/ogg',
+    'audio/wav',
+    'audio/webm',
+    'audio/flac',
+  ],
   document: [
     'application/pdf',
     'application/msword',
@@ -95,14 +103,43 @@ export class MediaService {
       ...fsKeys,
     ]);
 
+    const articleIds = Array.from(allKeys)
+      .filter((key) => key.startsWith('article/'))
+      .map((key) => key.slice('article/'.length));
+    const articleTitles = articleIds.length
+      ? await this.prisma.post.findMany({
+          where: { id: { in: articleIds } },
+          select: { id: true, title: true },
+        })
+      : [];
+    const titleById = new Map(articleTitles.map((post) => [post.id, post.title]));
+
     return Array.from(allKeys).map((key) => {
       const preset = PRESET_FOLDERS.find((f) => f.key === key);
+      const articleId = key.startsWith('article/') ? key.slice('article/'.length) : '';
       return {
         key,
-        label: preset?.label || key,
-        preset: !!preset,
+        label: preset?.label || (articleId
+          ? `文章 / ${titleById.get(articleId) || articleId.slice(0, 8)}`
+          : key),
+        preset: !!preset || Boolean(articleId),
       };
     });
+  }
+
+  async removeFolder(folderInput: string) {
+    const folder = sanitizeFolder(folderInput);
+    const items = await this.prisma.media.findMany({
+      where: { folder },
+      select: { id: true },
+    });
+    if (items.length) await this.batchRemove(items.map((item) => item.id));
+
+    const directory = join(UPLOAD_ROOT, folder);
+    if (existsSync(directory)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+    return { removed: items.length, folder };
   }
 
   private async getCustomFolders(): Promise<string[]> {
@@ -406,6 +443,12 @@ export class MediaService {
       'image/png': '.png',
       'image/webp': '.webp',
       'image/gif': '.gif',
+      'audio/mpeg': '.mp3',
+      'audio/mp4': '.m4a',
+      'audio/ogg': '.ogg',
+      'audio/wav': '.wav',
+      'audio/webm': '.webm',
+      'audio/flac': '.flac',
       'application/pdf': '.pdf',
     };
     return map[mime] || '';

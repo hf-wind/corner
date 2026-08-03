@@ -140,6 +140,7 @@ const seedMedia = [
   { relative: 'cover/768a470c-21da-46a5-ab7f-22eb33f84d8d.webp', path: '/uploads/cover/768a470c-21da-46a5-ab7f-22eb33f84d8d.webp', folder: 'cover', originalName: '穆斯林的葬礼.webp' },
   { relative: 'cover/a2366a1c-8f1f-4f20-8b61-cc537d7b3278.webp', path: '/uploads/cover/a2366a1c-8f1f-4f20-8b61-cc537d7b3278.webp', folder: 'cover', originalName: '漫长的季节.webp' },
   { relative: 'moment/8e9f92a2-0770-42c6-828c-989eebef2804.webp', path: '/uploads/moment/8e9f92a2-0770-42c6-828c-989eebef2804.webp', folder: 'moment', originalName: '鉴湖傍晚.webp' },
+  { relative: 'audio/constellation-ambient.wav', path: '/uploads/audio/constellation-ambient.wav', folder: 'audio', originalName: '时光星图·星海回声.wav', mimeType: 'audio/wav' },
 ];
 
 async function setSetting(key: string, value: unknown) {
@@ -159,7 +160,7 @@ async function installSeedMedia(adminId: string) {
     copyFileSync(source, target);
     const data = {
       filename: item.relative.split('/').pop()!, originalName: item.originalName,
-      mimeType: 'image/webp', size: statSync(source).size, path: item.path,
+      mimeType: item.mimeType || 'image/webp', size: statSync(source).size, path: item.path,
       originalPath: null, folder: item.folder, uploadedBy: adminId,
     };
     const existing = await prisma.media.findFirst({ where: { path: item.path } });
@@ -220,6 +221,7 @@ async function main() {
     music_enabled: true, music_autoplay: false, music_volume: 0.55,
     music_api: 'https://api.i-meto.com/meting/api', music_server: 'netease', music_type: 'playlist',
     music_id: '8043180114', music_cache_ttl: 21600,
+    constellation_music_url: '/uploads/audio/constellation-ambient.wav',
     music_playlists: [
       { id: '8043180114', name: '默认歌单', type: 'playlist', server: 'netease' },
       { id: '3778678', name: '热歌榜', type: 'playlist', server: 'netease' },
@@ -229,7 +231,7 @@ async function main() {
 
   const category = await prisma.category.upsert({
     where: { slug: 'essay' },
-    create: { name: '随笔', slug: 'essay', description: '生活感悟、随想', icon: 'FolderOutlined', color: '#f97316' },
+    create: { name: '随笔', slug: 'essay', description: '生活感悟、随想', icon: 'ph:coffee-bold', color: '#f97316' },
     update: { name: '随笔', description: '生活感悟、随想' },
   });
   const tagSeeds = [
@@ -241,7 +243,7 @@ async function main() {
   for (const tag of tagSeeds) {
     tags.push(await prisma.tag.upsert({
       where: { slug: tag.slug },
-      create: { ...tag, icon: 'TagOutlined' },
+      create: { ...tag, icon: 'ph:tag-bold' },
       update: { name: tag.name, color: tag.color },
     }));
   }

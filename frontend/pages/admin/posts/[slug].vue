@@ -16,7 +16,7 @@
 
           <div class="editor-field editor-field-grow">
             <client-only>
-              <MdEditor :key="editorKey" v-model="form.content" language="zh-CN" :toolbars="toolbars"
+              <MdEditor v-if="editorReady" :key="editorKey" v-model="form.content" language="zh-CN" :toolbars="toolbars"
                 :theme="editorTheme" @upload-img="onUploadImg" class="md-editor" />
             </client-only>
           </div>
@@ -110,6 +110,7 @@ import { Modal } from 'ant-design-vue'
 import { ThunderboltOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { ensureSlug } from '~/utils/postMeta'
 import type { Place } from '~/types/place'
+import { configureMarkdownEditor } from '~/utils/configureMarkdownEditor'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
@@ -119,10 +120,12 @@ const { mediaUrl } = useMediaUrl()
 const route = useRoute()
 const router = useRouter()
 const loading = ref(true)
+const editorReady = ref(false)
 const saving = ref(false)
 const generatingExcerpt = ref(false)
 const pickingCover = ref(false)
 const needsPublish = ref(false)
+const postId = ref('')
 const categories = ref<any[]>([])
 const tags = ref<any[]>([])
 const form = ref({
@@ -195,10 +198,12 @@ onMounted(async () => {
     api.get<any>(`/posts/${slug}/preview`).catch(() => null),
     api.get<any>('/categories').catch(() => []),
     api.get<any>('/tags').catch(() => []),
+    configureMarkdownEditor().then(() => { editorReady.value = true }),
   ])
   categories.value = Array.isArray(catRes) ? catRes : []
   tags.value = Array.isArray(tagRes) ? tagRes : []
   if (post) {
+    postId.value = post.id || ''
     form.value = {
       title: post.title || '',
       slug: post.slug || '',
@@ -292,12 +297,16 @@ async function pickWallpaper() {
 }
 
 async function onUploadImg(files: File[], callback: (urls: string[]) => void) {
+  if (!postId.value) {
+    toast.error('文章信息尚未加载，请稍后重试')
+    return
+  }
   try {
     const urls: string[] = []
     for (const file of files) {
       const fd = new FormData()
       fd.append('file', file)
-      fd.append('folder', 'article')
+      fd.append('folder', `article/${postId.value}`)
       const res = await api.upload<any>('/media/upload', fd)
       urls.push(res.path || '')
     }
@@ -424,9 +433,10 @@ async function persistPost(confirmExactLocation: boolean) {
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  align-self: stretch;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
   padding-right: 16px;
   overflow: hidden;
 }

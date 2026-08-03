@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { MediaService } from '../media/media.service';
+import { MusicService } from '../music/music.service';
 import {
   AI_DEFAULTS,
   AI_SETTING_KEYS,
@@ -45,31 +46,30 @@ type TaxonomySuggestion = {
 };
 
 const TAXONOMY_ICONS = [
-  'FolderOutlined',
-  'FolderOpenOutlined',
-  'BookOutlined',
-  'ReadOutlined',
-  'CodeOutlined',
-  'FileTextOutlined',
-  'PictureOutlined',
-  'CameraOutlined',
-  'VideoCameraOutlined',
-  'AudioOutlined',
-  'StarOutlined',
-  'HeartOutlined',
-  'TagOutlined',
-  'TagsOutlined',
-  'BulbOutlined',
-  'RocketOutlined',
-  'FireOutlined',
-  'EnvironmentOutlined',
-  'GlobalOutlined',
-  'CoffeeOutlined',
-  'ExperimentOutlined',
-  'CloudOutlined',
-  'HomeOutlined',
-  'CompassOutlined',
-  'ToolOutlined',
+  'ph:folder-open-bold',
+  'ph:book-open-text-bold',
+  'ph:books-bold',
+  'ph:code-bold',
+  'ph:file-text-bold',
+  'ph:image-bold',
+  'ph:camera-bold',
+  'ph:video-camera-bold',
+  'ph:music-notes-bold',
+  'ph:star-bold',
+  'ph:heart-bold',
+  'ph:tag-bold',
+  'ph:tags-bold',
+  'ph:lightbulb-filament-bold',
+  'ph:rocket-launch-bold',
+  'ph:fire-bold',
+  'ph:map-pin-bold',
+  'ph:globe-hemisphere-west-bold',
+  'ph:coffee-bold',
+  'ph:flask-bold',
+  'ph:cloud-sun-bold',
+  'ph:house-bold',
+  'ph:compass-bold',
+  'ph:wrench-bold',
 ] as const;
 
 const TAXONOMY_COLORS = [
@@ -89,7 +89,7 @@ const ARTICLE_META_VISUAL_INSTRUCTION = [
   '分类和标签必须包含视觉信息。',
   `icon 只能从以下值中选择：${TAXONOMY_ICONS.join('、')}。`,
   'color 必须是 #RRGGBB 格式的十六进制颜色。',
-  '严格只返回 JSON：{"slug":"english-slug","category":{"name":"分类名","icon":"FolderOutlined","color":"#2563eb"},"tags":[{"name":"标签1","icon":"TagOutlined","color":"#059669"}]}。',
+  '严格只返回 JSON：{"slug":"english-slug","category":{"name":"分类名","icon":"ph:folder-open-bold","color":"#2563eb"},"tags":[{"name":"标签1","icon":"ph:tag-bold","color":"#059669"}]}。',
   'tags 输出 2 到 5 个；已有分类或标签合适时优先复用其名称和视觉信息。',
   '必须先在已有分类中选择语义最匹配的一项；只有确实没有合适分类时才能创建新分类。',
   '“随笔”不是默认分类。除非正文核心明确是个人日常记录、感悟或散文，否则禁止选择“随笔”。',
@@ -105,6 +105,7 @@ export class AiService {
     private prisma: PrismaService,
     private settings: SettingsService,
     private media: MediaService,
+    private music: MusicService,
   ) {}
 
   private envApiKey(provider: string) {
@@ -896,17 +897,17 @@ export class AiService {
     kind: 'category' | 'tag',
   ) {
     const rules: Array<[RegExp, (typeof TAXONOMY_ICONS)[number]]> = [
-      [/电影|影视|观影|movie|film|科幻/i, 'VideoCameraOutlined'],
-      [/读书|阅读|书籍|文学|book/i, 'ReadOutlined'],
-      [/技术|编程|代码|开发|软件|人工智能|\bai\b/i, 'CodeOutlined'],
-      [/旅行|旅途|游记|出行|travel/i, 'CompassOutlined'],
-      [/摄影|照片|图片|photo|image/i, 'CameraOutlined'],
-      [/音乐|歌曲|声音|music|audio/i, 'AudioOutlined'],
-      [/科学|实验|研究|science/i, 'ExperimentOutlined'],
-      [/生活|日常|随笔|感悟|life/i, 'CoffeeOutlined'],
-      [/自然|天气|云|nature|weather/i, 'CloudOutlined'],
+      [/电影|影视|观影|movie|film|科幻/i, 'ph:video-camera-bold'],
+      [/读书|阅读|书籍|文学|book/i, 'ph:book-open-text-bold'],
+      [/技术|编程|代码|开发|软件|人工智能|\bai\b/i, 'ph:code-bold'],
+      [/旅行|旅途|游记|出行|travel/i, 'ph:compass-bold'],
+      [/摄影|照片|图片|photo|image/i, 'ph:camera-bold'],
+      [/音乐|歌曲|声音|music|audio/i, 'ph:music-notes-bold'],
+      [/科学|实验|研究|science/i, 'ph:flask-bold'],
+      [/生活|日常|随笔|感悟|life/i, 'ph:coffee-bold'],
+      [/自然|天气|云|nature|weather/i, 'ph:cloud-sun-bold'],
     ];
-    const fallbackIcon = kind === 'category' ? 'FolderOutlined' : 'TagOutlined';
+    const fallbackIcon = kind === 'category' ? 'ph:folder-open-bold' : 'ph:tag-bold';
     const icon =
       suggestion.icon ||
       rules.find(([pattern]) => pattern.test(suggestion.name))?.[1] ||
@@ -1742,6 +1743,7 @@ export class AiService {
       [message, article?.title || ''].filter(Boolean).join(' '),
       cfg,
     );
+    const musicContext = await this.buildMusicContext(message);
     const identity = [
       `当前对话对象：${username}`,
       isOwner
@@ -1763,7 +1765,7 @@ export class AiService {
 
     const system: ChatMessage = {
       role: 'system',
-      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${articleContext}\n\n【博客知识库】\n${knowledge}`,
+      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${articleContext}\n\n【博客知识库】\n${knowledge}${musicContext}`,
     };
 
     const historyLimit = Math.max(4, Math.min(60, cfg.ai_history_limit || 24));
@@ -1798,6 +1800,26 @@ export class AiService {
     ];
 
     return { cfg, messages };
+  }
+
+  private async buildMusicContext(message: string) {
+    const query = String(message || '');
+    if (!/(歌单|歌曲|音乐|听歌|想听|推荐.*歌|来一首|选.*歌)/i.test(query)) {
+      return '';
+    }
+    const candidates = await this.music
+      .getRecommendationCandidates(query, 10)
+      .catch(() => []);
+    if (!candidates.length) {
+      return '\n\n【本站歌单】\n暂时无法读取歌单，请不要编造歌曲。';
+    }
+    const compact = candidates
+      .map(
+        (track, index) =>
+          `${index + 1}. ${track.name} - ${track.artist}（${track.playlist}）`,
+      )
+      .join('\n');
+    return `\n\n【本站歌单的本地检索结果】\n只从以下少量候选中推荐，不要声称看过完整歌单；说明推荐理由即可。\n${compact}`;
   }
 
   async petChat(

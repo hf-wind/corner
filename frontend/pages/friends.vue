@@ -111,12 +111,9 @@
         <div class="site-avatar"><img v-if="mySite.avatar" :src="mediaUrl(mySite.avatar)" :alt="mySite.name"><Icon v-else name="ph:house-line-bold" /></div>
         <h3>{{ mySite.name }}</h3><p v-if="mySite.description">{{ mySite.description }}</p>
         <dl class="site-details">
-          <div><dt><Icon name="ph:globe-simple-bold" />站点</dt><dd>{{ mySite.url }}</dd></div>
-          <div v-if="siteLogoUrl"><dt><Icon name="ph:image-square-bold" />Logo</dt><dd :title="siteLogoUrl">{{ siteLogoUrl }}</dd></div>
-          <div v-if="mySite.rssUrl"><dt><Icon name="ph:rss-bold" />RSS</dt><dd>{{ mySite.rssUrl }}</dd></div>
-          <div v-if="mySite.contactEmail"><dt><Icon name="ph:envelope-simple-bold" />邮箱</dt><dd>{{ mySite.contactEmail }}</dd></div>
+          <div v-for="item in siteCopyItems" :key="item.label"><dt><Icon :name="item.icon" />{{ item.label }}</dt><dd><button type="button" :title="`复制${item.label}`" @click="copySiteField(item.label, item.value)"><span>{{ item.value }}</span><Icon name="ph:copy-bold" /></button></dd></div>
         </dl>
-        <button type="button" @click="copySiteUrl"><Icon name="ph:copy-bold" /> 复制本站地址</button>
+        <button type="button" @click="copySiteInfo"><Icon name="ph:copy-bold" /> 复制完整友链信息</button>
       </section>
       <section class="right-card stat-card">
         <div class="right-card-title"><span><Icon name="ph:users-three-bold" /> 邻居统计</span></div>
@@ -145,6 +142,17 @@ const siteLogoUrl = computed(() => {
   if (!avatar) return ''
   try { return new URL(avatar, mySite.value?.url || window.location.origin).href }
   catch { return avatar }
+})
+const siteCopyItems = computed(() => {
+  if (!mySite.value) return []
+  return [
+    { label: '站点名称', value: mySite.value.name, icon: 'ph:identification-card-bold' },
+    { label: '站点地址', value: mySite.value.url, icon: 'ph:globe-simple-bold' },
+    { label: 'Logo 地址', value: siteLogoUrl.value, icon: 'ph:image-square-bold' },
+    { label: 'RSS 地址', value: mySite.value.rssUrl || '', icon: 'ph:rss-bold' },
+    { label: '联系邮箱', value: mySite.value.contactEmail || '', icon: 'ph:envelope-simple-bold' },
+    { label: '站点描述', value: mySite.value.description || '', icon: 'ph:text-align-left-bold' },
+  ].filter(item => item.value)
 })
 const applyForm = reactive({ siteName: '', siteUrl: '', siteAvatar: '', siteDescription: '', siteRssUrl: '', contactEmail: '', friendPageUrl: '' })
 const applySubmitting = ref(false)
@@ -179,10 +187,14 @@ function validHttpUrl(value: string) {
 function validEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) }
 function openApply() { showApplyForm.value = true; showRemoveForm.value = false; nextTick(() => document.querySelector('#friend-apply-form')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })) }
 function openRemove() { showRemoveForm.value = true; showApplyForm.value = false; nextTick(() => document.querySelector('#friend-remove-form')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })) }
-async function copySiteUrl() {
-  if (!mySite.value?.url) return
-  try { await navigator.clipboard.writeText(mySite.value.url); toast.success('已复制站点地址') }
-  catch { toast.warning('复制失败，请手动复制本站地址') }
+async function copySiteField(label: string, value: string) {
+  try { await navigator.clipboard.writeText(value); toast.success(`${label}已复制`) }
+  catch { toast.warning(`复制${label}失败，请手动复制`) }
+}
+async function copySiteInfo() {
+  if (!siteCopyItems.value.length) return
+  const content = siteCopyItems.value.map(item => `${item.label}：${item.value}`).join('\n')
+  await copySiteField('完整友链信息', content)
 }
 
 async function inspectSite(forceRequest: boolean) {
@@ -287,6 +299,7 @@ useHead({ title: '友情链接' })
 .empty-state { display:flex; min-height:240px; flex-direction:column; align-items:center; justify-content:center; border:1px dashed var(--border); border-radius:16px; color:var(--c-text-3); }.empty-state>svg { margin-bottom:9px; color:var(--c-primary); font-size:2rem; }.empty-state strong { color:var(--c-text-2); font-size:.76rem; }.empty-state span { margin-top:4px; font-size:.6rem; }
 .right-card { padding:17px; border:1px solid color-mix(in srgb,var(--border) 70%,transparent); border-radius:14px; background:var(--ld-bg-card); box-shadow:0 5px 18px color-mix(in srgb,var(--ld-shadow) 25%,transparent); }.site-card { display:flex; flex-direction:column; align-items:center; background:linear-gradient(150deg,var(--c-primary-soft),var(--ld-bg-card) 66%); text-align:center; }.site-card>.aside-kicker { align-self:flex-start; }.site-avatar { display:grid; width:58px; height:58px; margin:13px 0 9px; overflow:hidden; border:4px solid var(--ld-bg-card); border-radius:50%; background:var(--c-primary-soft); box-shadow:0 5px 16px var(--ld-shadow); color:var(--c-primary); place-items:center; }.site-avatar img { width:100%; height:100%; object-fit:cover; }.site-card h3 { margin:0; color:var(--c-text); font-size:.8rem; }.site-card p { margin:6px 0 0; color:var(--c-text-2); font-size:.57rem; line-height:1.55; }.site-card button { display:flex; width:100%; height:32px; align-items:center; justify-content:center; gap:5px; margin-top:13px; border:1px solid color-mix(in srgb,var(--c-primary) 30%,var(--border)); border-radius:9px; background:var(--ld-bg-card); color:var(--c-primary); cursor:pointer; font:inherit; font-size:.59rem; }
 .site-details { display:grid; width:100%; gap:6px; margin:12px 0 0; text-align:left; }.site-details>div { display:grid; min-width:0; grid-template-columns:48px minmax(0,1fr); gap:7px; align-items:center; }.site-details dt { display:flex; align-items:center; gap:4px; color:var(--c-text-3); font-size:.55rem; }.site-details dd { min-width:0; margin:0; overflow:hidden; color:var(--c-text-2); font-size:.54rem; text-overflow:ellipsis; white-space:nowrap; }
+.site-details dd>button { display:flex; width:100%; height:auto; min-width:0; justify-content:space-between; gap:6px; margin:0; padding:5px 6px; border:0; border-radius:6px; background:transparent; color:var(--c-text-2); font:inherit; font-size:.54rem; text-align:left; }.site-details dd>button:hover { background:var(--c-primary-soft); color:var(--c-primary); }.site-details dd>button span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.site-details dd>button svg { flex:0 0 auto; }
 .right-card-title { margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border); }.right-card-title span { display:flex; align-items:center; gap:6px; color:var(--c-text); font-size:.7rem; font-weight:700; }.stat-card>div { position:relative; display:flex; align-items:baseline; gap:6px; overflow:hidden; }.stat-card strong { color:var(--c-primary); font-size:1.8rem; }.stat-card>div>span { color:var(--c-text-3); font-size:.57rem; }.stat-card i { position:absolute; right:-15px; bottom:-20px; width:72px; height:72px; border-radius:50%; background:var(--c-primary-soft); }.notice-card ol { display:grid; gap:9px; margin:0; padding:0; counter-reset:notice; list-style:none; }.notice-card li { position:relative; padding-left:22px; color:var(--c-text-2); font-size:.58rem; line-height:1.45; counter-increment:notice; }.notice-card li::before { position:absolute; top:-1px; left:0; display:grid; width:16px; height:16px; border-radius:5px; background:var(--c-primary-soft); color:var(--c-primary); content:counter(notice); font-size:.46rem; place-items:center; }.aside-actions { display:grid; gap:7px; }.aside-actions button { display:flex; height:36px; align-items:center; justify-content:center; gap:6px; border:1px solid var(--border); border-radius:10px; background:var(--ld-bg-card); color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.62rem; }.aside-actions button.primary { border-color:var(--c-primary); background:var(--c-primary); box-shadow:0 6px 16px color-mix(in srgb,var(--c-primary) 25%,transparent); color:#fff; }
 @media (max-width:1050px) { .friends-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.friend-welcome { grid-template-columns:88px minmax(0,1fr); }.welcome-orbit { width:76px; height:76px; font-size:1.9rem; }.welcome-actions { grid-column:1/-1; grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:640px) { .main-content { padding:max(68px,calc(env(safe-area-inset-top) + 60px)) 16px 24px!important; }.friend-welcome { grid-template-columns:1fr; margin-inline:0; padding:20px; }.welcome-orbit { display:none; }.welcome-steps { flex-wrap:wrap; }.welcome-actions { grid-column:auto; }.friends-grid { gap:10px; }.friend-card { min-height:208px; padding-inline:12px; }.form-card { padding:19px 16px; border-radius:12px; scroll-margin-top:68px; }.apply-form { grid-template-columns:1fr; }.span-two { grid-column:auto; }.form-actions { align-items:stretch; flex-direction:column; }.form-actions :deep(.ant-btn) { width:100%; }.form-intro { margin-left:0; }.content-heading { align-items:flex-start; flex-direction:column; gap:4px; } }

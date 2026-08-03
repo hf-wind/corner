@@ -10,6 +10,7 @@
           <a-menu-divider />
           <a-menu-item key="type:image"><PictureOutlined /> 图片</a-menu-item>
           <a-menu-item key="type:video"><PlaySquareOutlined /> 视频</a-menu-item>
+          <a-menu-item key="type:audio"><Icon name="ph:music-notes-bold" /> 音频</a-menu-item>
           <a-menu-item key="type:document"><FileTextOutlined /> 文档</a-menu-item>
         </a-menu>
       </div>
@@ -17,7 +18,7 @@
         <div class="media-toolbar">
           <a-upload
             :showUploadList="false"
-            accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
             :beforeUpload="handleUpload"
           >
             <a-button size="small" type="primary"><UploadOutlined /> 上传</a-button>
@@ -41,6 +42,10 @@
             >
               <div class="media-card-preview">
                 <img v-if="isImage(item)" :src="mediaUrl(item.path)" class="media-card-img" />
+                <div v-else-if="isAudio(item)" class="media-card-audio" @click.stop>
+                  <Icon name="ph:waveform-bold" />
+                  <audio :src="mediaUrl(item.path)" controls preload="metadata" />
+                </div>
                 <div v-else class="media-card-icon"><FileOutlined /></div>
                 <div class="media-card-selected" v-if="selectedIds.has(item.id)">
                   <CheckOutlined />
@@ -104,6 +109,7 @@ watch(() => props.folder, (f) => {
 })
 
 const isImage = (item: any) => item.mimeType?.startsWith('image/')
+const isAudio = (item: any) => item.mimeType?.startsWith('audio/')
 
 function toggleSelect(item: any) {
   if (!props.multiple) {
@@ -217,6 +223,8 @@ watch(visible, (v) => {
 .media-card.selected { border-color:var(--c-primary); }
 .media-card-preview { position:relative; width:100%; height:110px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:var(--c-bg-1); }
 .media-card-img { width:100%; height:100%; object-fit:cover; display:block; }
+.media-card-audio { display:flex; width:100%; min-width:0; align-items:center; justify-content:center; flex-direction:column; gap:9px; padding:12px 8px 8px; overflow:hidden; color:var(--c-primary); font-size:1.35rem; }
+.media-card-audio audio { display:block; width:100%; min-width:0; height:30px; }
 .media-card-icon { font-size:32px; color:var(--c-text-3); }
 .media-card-selected { position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; background:var(--c-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; }
 .media-card-footer { padding:6px 8px; }

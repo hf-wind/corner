@@ -37,7 +37,7 @@ describe('AiService model configuration compatibility', () => {
         ai_model: 'deepseek-chat',
       }),
     };
-    const service = new AiService(prisma as any, settings as any, {} as any);
+    const service = new AiService(prisma as any, settings as any, {} as any, {} as any);
     return { service, prisma };
   }
 
@@ -82,28 +82,28 @@ describe('AiService model configuration compatibility', () => {
 
     const category = await (service as any).ensureCategoryByName({
       name: '科幻电影',
-      icon: 'VideoCameraOutlined',
+      icon: 'ph:video-camera-bold',
       color: '#7C3AED',
     });
     const tags = await (service as any).ensureTagsByNames([
-      { name: '引力', icon: 'ExperimentOutlined', color: '#2563EB' },
+      { name: '引力', icon: 'ph:flask-bold', color: '#2563EB' },
       { name: '时间', icon: 'invalid-icon', color: 'invalid-color' },
     ]);
 
     expect(category).toEqual(
       expect.objectContaining({
-        icon: 'VideoCameraOutlined',
+        icon: 'ph:video-camera-bold',
         color: '#7c3aed',
       }),
     );
     expect(tags).toHaveLength(2);
     expect(tags[0]).toEqual(
       expect.objectContaining({
-        icon: 'ExperimentOutlined',
+        icon: 'ph:flask-bold',
         color: '#2563eb',
       }),
     );
-    expect(tags[1].icon).toBe('TagOutlined');
+    expect(tags[1].icon).toBe('ph:tag-bold');
     expect(tags[1].color).toMatch(/^#[0-9a-f]{6}$/);
   });
 
@@ -128,11 +128,11 @@ describe('AiService model configuration compatibility', () => {
     expect(prisma.category.update).toHaveBeenCalledWith({
       where: { id: 'category-id' },
       data: {
-        icon: 'CodeOutlined',
+        icon: 'ph:code-bold',
         color: expect.stringMatching(/^#[0-9a-f]{6}$/),
       },
     });
-    expect(category.icon).toBe('CodeOutlined');
+    expect(category.icon).toBe('ph:code-bold');
   });
 
   it('accepts the complete AI metadata format in article generation', async () => {
@@ -153,12 +153,12 @@ describe('AiService model configuration compatibility', () => {
           slug: 'interstellar',
           category: {
             name: '科幻电影',
-            icon: 'VideoCameraOutlined',
+            icon: 'ph:video-camera-bold',
             color: '#7c3aed',
           },
           tags: [
-            { name: '电影', icon: 'VideoCameraOutlined', color: '#2563eb' },
-            { name: '科幻', icon: 'RocketOutlined', color: '#059669' },
+            { name: '电影', icon: 'ph:video-camera-bold', color: '#2563eb' },
+            { name: '科幻', icon: 'ph:rocket-launch-bold', color: '#059669' },
           ],
         }),
       );
@@ -182,12 +182,12 @@ describe('AiService model configuration compatibility', () => {
 
     expect((service as any).ensureCategoryByName).toHaveBeenCalledWith({
       name: '科幻电影',
-      icon: 'VideoCameraOutlined',
+      icon: 'ph:video-camera-bold',
       color: '#7c3aed',
     });
     expect((service as any).ensureTagsByNames).toHaveBeenCalledWith([
-      { name: '电影', icon: 'VideoCameraOutlined', color: '#2563eb' },
-      { name: '科幻', icon: 'RocketOutlined', color: '#059669' },
+      { name: '电影', icon: 'ph:video-camera-bold', color: '#2563eb' },
+      { name: '科幻', icon: 'ph:rocket-launch-bold', color: '#059669' },
     ]);
     expect(result).toEqual(
       expect.objectContaining({
@@ -210,8 +210,8 @@ describe('AiService model configuration compatibility', () => {
       .mockResolvedValueOnce(JSON.stringify({ title: 'NestJS 事务实践', content: '事务与外键约束详解' }))
       .mockResolvedValueOnce(JSON.stringify({
         slug: 'nestjs-transactions',
-        category: { name: '技术', icon: 'CodeOutlined', color: '#2563eb' },
-        tags: [{ name: 'NestJS', icon: 'CodeOutlined', color: '#059669' }],
+        category: { name: '技术', icon: 'ph:code-bold', color: '#2563eb' },
+        tags: [{ name: 'NestJS', icon: 'ph:code-bold', color: '#059669' }],
       }));
     jest.spyOn(service, 'summarize').mockResolvedValue({ excerpt: '摘要', source: 'ai' });
     jest.spyOn(service, 'pickAndImportCover').mockResolvedValue('');

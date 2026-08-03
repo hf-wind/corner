@@ -1,5 +1,5 @@
 <template>
-  <section class="weather-card" :class="weatherTone" aria-labelledby="weather-card-title">
+  <section class="weather-card" :class="[weatherTone, { 'is-loading': loading }]" aria-labelledby="weather-card-title">
     <span class="weather-orb" aria-hidden="true" />
     <div class="weather-sky" aria-hidden="true"><i /><i /><i /></div>
     <header>
@@ -42,6 +42,10 @@ const api = useApi()
 const now = ref(new Date())
 const weather = ref<WeatherData>({ temperature: 0, feelsLike: 0, condition: '天气加载中', icon: '999', city: '绍兴', humidity: 0, windDirection: '微风', windScale: '0' })
 let timer: ReturnType<typeof setInterval>
+let refreshTimer: ReturnType<typeof setInterval>
+let idleHandle: number | null = null
+const loading = ref(true)
+let fetchedAt = 0
 
 const iconMap: Record<string, string> = {
   sunny: 'ph:sun-bold', cloudy: 'ph:cloud-sun-bold', overcast: 'ph:cloud-bold', rain: 'ph:cloud-rain-bold',
@@ -64,11 +68,40 @@ const weatherTone = computed(() => `weather-${weatherKind.value}`)
 const timeStr = computed(() => new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now.value))
 const dateStr = computed(() => new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(now.value))
 
-onMounted(async () => {
+async function loadWeather() {
+  try {
+    weather.value = await api.get<WeatherData>('/weather')
+    fetchedAt = Date.now()
+  } catch {
+    weather.value.condition = '风来得有些慢'
+  } finally {
+    loading.value = false
+  }
+}
+
+function onVisibilityChange() {
+  if (!document.hidden && Date.now() - fetchedAt > 10 * 60_000) void loadWeather()
+}
+
+onMounted(() => {
   timer = setInterval(() => { now.value = new Date() }, 30_000)
-  try { weather.value = await api.get<WeatherData>('/weather') } catch { weather.value.condition = '风来得有些慢' }
+  refreshTimer = setInterval(() => void loadWeather(), 15 * 60_000)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  if ('requestIdleCallback' in window) {
+    idleHandle = window.requestIdleCallback(() => void loadWeather(), { timeout: 1200 })
+  } else {
+    idleHandle = window.setTimeout(() => void loadWeather(), 180)
+  }
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  clearInterval(timer)
+  clearInterval(refreshTimer)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  if (idleHandle !== null) {
+    if ('cancelIdleCallback' in window) window.cancelIdleCallback(idleHandle)
+    else window.clearTimeout(idleHandle)
+  }
+})
 </script>
 
 <style scoped>
@@ -76,9 +109,13 @@ onUnmounted(() => clearInterval(timer))
 .weather-sunny { --weather-a:#e9a33d; --weather-b:#ffe5a8; }.weather-cloudy { --weather-a:#719bc5; --weather-b:#cbd9e7; }.weather-overcast { --weather-a:#708093; --weather-b:#c1c9d1; }.weather-rain,.weather-storm { --weather-a:#496f9c; --weather-b:#95abc2; }.weather-snow { --weather-a:#7aadd0; --weather-b:#e6f5ff; }.weather-fog { --weather-a:#82928f; --weather-b:#d3dcda; }
 .weather-orb { position:absolute; z-index:-1; top:-45px; right:-28px; width:145px; height:145px; border-radius:50%; background:radial-gradient(circle,color-mix(in srgb,var(--weather-b) 78%,transparent),transparent 68%); }
 .weather-sky { position:absolute; z-index:-1; inset:0; opacity:.24; }.weather-sky i { position:absolute; height:1px; border-radius:99px; background:linear-gradient(90deg,transparent,var(--weather-a),transparent); animation:weather-drift 7s ease-in-out infinite; }.weather-sky i:nth-child(1){top:32px;right:-8px;width:100px}.weather-sky i:nth-child(2){top:60px;right:22px;width:68px;animation-delay:-2s}.weather-sky i:nth-child(3){bottom:28px;left:-16px;width:85px;animation-delay:-4s}
+.weather-rain .weather-sky i,.weather-storm .weather-sky i { width:1px; height:46px; background:linear-gradient(transparent,var(--weather-b)); transform:rotate(18deg); animation:weather-rain 1.4s linear infinite; }.weather-rain .weather-sky i:nth-child(1),.weather-storm .weather-sky i:nth-child(1){top:-8px;right:28px}.weather-rain .weather-sky i:nth-child(2),.weather-storm .weather-sky i:nth-child(2){top:38px;right:82px}.weather-rain .weather-sky i:nth-child(3),.weather-storm .weather-sky i:nth-child(3){bottom:-6px;left:35px}.weather-snow .condition-icon{animation:weather-float 3s ease-in-out infinite}.weather-sunny .condition-icon{animation:weather-sun 8s linear infinite}.weather-card.is-loading .temperature,.weather-card.is-loading footer{opacity:.42}
 header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; } header>div { display:flex; flex-direction:column; gap:3px; } header span { display:flex; align-items:center; gap:4px; color:var(--c-text); font-size:.68rem; font-weight:720; } header span :deep(svg){color:var(--weather-a)} header small { color:var(--c-text-3); font-size:.53rem; } header time { color:var(--c-text-2); font-family:var(--font-accent); font-size:.68rem; font-weight:720; font-variant-numeric:tabular-nums; }
 .weather-main { display:flex; align-items:center; gap:10px; margin-top:21px; }.condition-icon { display:grid; width:44px; height:44px; border:1px solid color-mix(in srgb,var(--weather-a) 25%,transparent); border-radius:15px; background:color-mix(in srgb,var(--ld-bg-card) 54%,transparent); color:var(--weather-a); font-size:1.65rem; place-items:center; }.temperature { display:flex; align-items:flex-start; color:var(--c-text); line-height:1; }.temperature strong { font-family:var(--font-accent); font-size:2.7rem; font-variant-numeric:tabular-nums; }.temperature sup { margin:2px 0 0 2px; color:var(--weather-a); font-size:.9rem; }.condition-copy { display:flex; min-width:0; flex-direction:column; gap:3px; }.condition-copy b { overflow:hidden; color:var(--c-text); font-size:.76rem; text-overflow:ellipsis; white-space:nowrap; }.condition-copy span { color:var(--c-text-3); font-size:.52rem; }
 footer { position:relative; display:flex; align-items:center; gap:11px; margin-top:19px; padding-top:12px; border-top:1px solid color-mix(in srgb,var(--weather-a) 18%,var(--border)); } footer>span { display:grid; min-width:0; grid-template-columns:15px auto; align-items:center; column-gap:4px; color:var(--weather-a); } footer>span b { overflow:hidden; color:var(--c-text-2); font-size:.57rem; text-overflow:ellipsis; white-space:nowrap; } footer>span small { grid-column:2; color:var(--c-text-3); font-size:.47rem; } footer>i { width:1px; height:23px; background:var(--border); } footer em { margin-left:auto; padding:2px 5px; border-radius:99px; background:var(--c-bg-2); color:var(--c-text-3); font-size:.43rem; font-style:normal; }
 @keyframes weather-drift { 50% { opacity:.35; transform:translateX(-16px); } }
-@media(prefers-reduced-motion:reduce){.weather-sky i{animation:none}}
+@keyframes weather-rain { to { transform:translate3d(-14px,55px,0) rotate(18deg); opacity:0; } }
+@keyframes weather-float { 50% { transform:translateY(-4px) rotate(6deg); } }
+@keyframes weather-sun { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce){.weather-sky i,.condition-icon{animation:none!important}}
 </style>

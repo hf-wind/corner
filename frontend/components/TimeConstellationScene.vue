@@ -1530,7 +1530,7 @@ function focusDiscovery(id: DiscoveryId) {
   const direction = camera.position.clone().sub(controls.target).normalize()
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
   const sideOffset = right.multiplyScalar(window.innerWidth < 700 ? 0 : 10)
-  const distance = id === 'black-hole' ? 118 : id === 'station' ? 72 : 58
+  const distance = id === 'black-hole' ? 118 : id === 'station' ? 78 : id === 'spacecraft' ? 82 : 58
   startCameraFlight({
     target: target.clone().add(sideOffset),
     position: target.clone().add(direction.multiplyScalar(distance)).add(sideOffset.clone().multiplyScalar(.65)),
@@ -1570,23 +1570,23 @@ function updateDiscoveryTour(delta: number) {
   if (!object) return
   const target = object.getWorldPosition(new THREE.Vector3())
   if (discoveryTourId === 'station') {
-    discoveryTourPhase -= delta * .12
+    discoveryTourPhase -= delta * .085
     const coreTarget = core?.getWorldPosition(new THREE.Vector3()) || new THREE.Vector3()
     const radial = target.clone().sub(coreTarget).setY(0).normalize()
     const tangent = new THREE.Vector3(-radial.z, 0, radial.x)
     const desired = target.clone()
       .addScaledVector(radial, 72)
-      .addScaledVector(tangent, Math.sin(discoveryTourPhase) * 24)
-      .add(new THREE.Vector3(0, 24 + Math.sin(elapsed * .42) * 3, 0))
+      .addScaledVector(tangent, Math.sin(discoveryTourPhase) * 18)
+      .add(new THREE.Vector3(0, 24 + Math.sin(elapsed * .34) * 1.6, 0))
     const sharedTarget = target.clone().lerp(coreTarget, .46).add(new THREE.Vector3(0, 5, 0))
-    camera.position.lerp(desired, 1 - Math.exp(-delta * 2.5))
-    controls.target.lerp(sharedTarget, 1 - Math.exp(-delta * 3.4))
+    camera.position.lerp(desired, 1 - Math.exp(-delta * 1.9))
+    controls.target.lerp(sharedTarget, 1 - Math.exp(-delta * 2.5))
   } else if (spacecraft) {
     const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(spacecraft.quaternion).normalize()
-    const desired = target.clone().addScaledVector(forward, -28).add(new THREE.Vector3(0, 8.5, 0))
-    const lookAhead = target.clone().addScaledVector(forward, 26)
-    camera.position.lerp(desired, 1 - Math.exp(-delta * 3.6))
-    controls.target.lerp(lookAhead, 1 - Math.exp(-delta * 5))
+    const desired = target.clone().addScaledVector(forward, -46).add(new THREE.Vector3(0, 12.5, 0))
+    const lookAhead = target.clone().addScaledVector(forward, 34).add(new THREE.Vector3(0, 2, 0))
+    camera.position.lerp(desired, 1 - Math.exp(-delta * 2.05))
+    controls.target.lerp(lookAhead, 1 - Math.exp(-delta * 2.8))
   }
   camera.lookAt(controls.target)
 }
@@ -1766,10 +1766,7 @@ function animate(now = performance.now()) {
         const tangent = new THREE.QuadraticBezierCurve3(spacecraftLaunchFrom, spacecraftLaunchControl, spacecraftLaunchTo).getTangent(eased)
         spacecraft.rotation.set(.08, -Math.atan2(tangent.z, tangent.x), -.12)
         spacecraft.scale.setScalar((lowQuality ? .62 : .8) * (1 + Math.sin(progress * Math.PI) * .22))
-      } else if (spacecraftLaunchActive && launchAge >= 4.2 && focusedDiscoveryId === 'spacecraft') {
-        spacecraft.position.copy(spacecraftLaunchTo)
-        spacecraft.scale.setScalar(lowQuality ? .62 : .8)
-      } else if (focusedDiscoveryId !== 'spacecraft' || discoveryTourId === 'spacecraft') {
+      } else {
         spacecraftCruisePhase += delta * Math.PI * 2 / 42
         const pathProgress = ((spacecraftCruisePhase / (Math.PI * 2)) % 1 + 1) % 1
         const pathPosition = spacecraftFlightPath.getPointAt(pathProgress)

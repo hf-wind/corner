@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
+import { MediaService } from '../media/media.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostQueryDto } from './dto/post-query.dto';
@@ -28,8 +29,8 @@ type PublishedPostSnapshot = {
   locationPrecision: LocationPrecision;
   locationSource: LocationSource | null;
   locationExactConfirmedAt: string | null;
-  category: { id: string; name: string; slug: string } | null;
-  tags: Array<{ id: string; name: string; slug: string }>;
+  category: { id: string; name: string; slug: string; icon?: string | null; color?: string | null } | null;
+  tags: Array<{ id: string; name: string; slug: string; icon?: string | null; color?: string | null }>;
 };
 
 type VisitContext = {
@@ -39,8 +40,8 @@ type VisitContext = {
 
 const postInclude = {
   author: { select: { id: true, username: true, avatar: true } },
-  category: { select: { id: true, name: true, slug: true } },
-  tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
+  category: { select: { id: true, name: true, slug: true, icon: true, color: true } },
+  tags: { include: { tag: { select: { id: true, name: true, slug: true, icon: true, color: true } } } },
 } satisfies Prisma.PostInclude;
 
 const postAdminSelect = {
@@ -81,7 +82,11 @@ const postPublicSelect = {
 
 @Injectable()
 export class PostService {
-  constructor(private prisma: PrismaService, private memoryGraph?: MemoryGraphService) {}
+  constructor(
+    private prisma: PrismaService,
+    private media: MediaService,
+    private memoryGraph?: MemoryGraphService,
+  ) {}
 
   private isAdminListQuery(query: PostQueryDto) {
     return (
@@ -342,6 +347,7 @@ export class PostService {
       await tx.emailLog.deleteMany({ where: { postId: existing.id } });
       await tx.post.delete({ where: { id: existing.id } });
     });
+    await this.media.removeFolder(`article/${existing.id}`);
     this.memoryGraph?.scheduleRebuild();
   }
 
@@ -542,6 +548,8 @@ export class PostService {
         id: String(tag.id),
         name: String(tag.name),
         slug: String(tag.slug),
+        icon: tag.icon == null ? null : String(tag.icon),
+        color: tag.color == null ? null : String(tag.color),
       }))
       .sort((a: any, b: any) => a.slug.localeCompare(b.slug));
 
@@ -565,6 +573,8 @@ export class PostService {
             id: String(post.category.id),
             name: String(post.category.name),
             slug: String(post.category.slug),
+            icon: post.category.icon == null ? null : String(post.category.icon),
+            color: post.category.color == null ? null : String(post.category.color),
           }
         : null,
       tags,
@@ -586,6 +596,8 @@ export class PostService {
               id: String(tag.id),
               name: String(tag.name),
               slug: String(tag.slug),
+              icon: tag.icon == null ? null : String(tag.icon),
+              color: tag.color == null ? null : String(tag.color),
             };
           })
           .filter(Boolean) as PublishedPostSnapshot['tags']
@@ -597,6 +609,12 @@ export class PostService {
             id: String((snapshot.category as Record<string, unknown>).id || ''),
             name: String((snapshot.category as Record<string, unknown>).name || ''),
             slug: String((snapshot.category as Record<string, unknown>).slug || ''),
+            icon: (snapshot.category as Record<string, unknown>).icon == null
+              ? null
+              : String((snapshot.category as Record<string, unknown>).icon),
+            color: (snapshot.category as Record<string, unknown>).color == null
+              ? null
+              : String((snapshot.category as Record<string, unknown>).color),
           }
         : null;
 
@@ -643,6 +661,27 @@ export class PostService {
       locationSource: _source, locationExactConfirmedAt: _confirmed, ...rest
     } = base;
 
+    const liveCategory = base.category;
+    const category = active.category
+      ? {
+          ...active.category,
+          icon: liveCategory?.id === active.category.id
+            ? liveCategory.icon || active.category.icon || null
+            : active.category.icon || null,
+          color: liveCategory?.id === active.category.id
+            ? liveCategory.color || active.category.color || null
+            : active.category.color || null,
+        }
+      : null;
+    const tags = active.tags.map((tag) => {
+      const live = base.tags?.find((item: any) => item.id === tag.id);
+      return {
+        ...tag,
+        icon: live?.icon || tag.icon || null,
+        color: live?.color || tag.color || null,
+      };
+    });
+
     return {
       ...rest,
       title: active.title,
@@ -651,9 +690,9 @@ export class PostService {
       excerpt: active.excerpt,
       coverImage: active.coverImage,
       featured: active.featured,
-      category: active.category,
-      tags: active.tags,
-      tagIds: active.tags.map((tag) => tag.id),
+      category,
+      tags,
+      tagIds: tags.map((tag) => tag.id),
       occurredAt: active.occurredAt,
       publicLocation: buildPublicLocation({
         place: active.place,

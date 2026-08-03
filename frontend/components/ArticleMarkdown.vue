@@ -1,8 +1,11 @@
 <template>
   <div ref="wrapperRef" class="article-md-wrap" :class="{ dark: isDark }" @click.capture="onContentClick">
     <ClientOnly>
-      <MdPreview :id="editorId" :model-value="content || ''" :theme="mdTheme" language="zh-CN" preview-theme="vuepress"
+      <MdPreview v-if="editorReady" :id="editorId" :model-value="content || ''" :theme="mdTheme" language="zh-CN" preview-theme="vuepress"
         class="article-md-preview" />
+      <div v-else class="article-md-loading" aria-label="正文渲染中">
+        <i /><i /><i />
+      </div>
     </ClientOnly>
     <ImageLightbox v-model="previewOpen" v-model:index="previewIndex" :images="previewImages" label="文章图片预览" />
   </div>
@@ -12,6 +15,7 @@
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
 import ImageLightbox from '~/components/ImageLightbox.vue'
+import { configureMarkdownEditor } from '~/utils/configureMarkdownEditor'
 
 withDefaults(defineProps<{
   content?: string
@@ -22,6 +26,7 @@ withDefaults(defineProps<{
 })
 
 const isDark = ref(false)
+const editorReady = ref(false)
 const mdTheme = computed(() => (isDark.value ? 'dark' : 'light'))
 const wrapperRef = ref<HTMLElement | null>(null)
 const previewOpen = ref(false)
@@ -52,13 +57,15 @@ function onContentClick(event: MouseEvent) {
   previewOpen.value = true
 }
 
-onMounted(() => {
+onMounted(async () => {
   const sync = () => {
     isDark.value = document.documentElement.classList.contains('dark')
   }
   sync()
   observer = new MutationObserver(sync)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  await configureMarkdownEditor()
+  editorReady.value = true
 })
 
 onUnmounted(() => observer?.disconnect())
@@ -70,6 +77,23 @@ onUnmounted(() => observer?.disconnect())
   background: transparent !important;
   background-color: transparent !important;
 }
+
+.article-md-loading {
+  display: grid;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.article-md-loading i {
+  display: block;
+  width: 100%;
+  height: 14px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--c-text) 8%, transparent);
+}
+
+.article-md-loading i:nth-child(2) { width: 88%; }
+.article-md-loading i:nth-child(3) { width: 72%; }
 
 .article-md-wrap :deep(.article-md-preview) {
   --md-bk-color: transparent;

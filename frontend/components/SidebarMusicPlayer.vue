@@ -166,7 +166,8 @@ const index = ref(0)
 const progress = ref(0)
 const duration = ref(0)
 const mode = ref<PlayMode>('order')
-const userInteracted = ref(false)
+const playbackRequested = ref(false)
+const errorRecoveryAvailable = ref(false)
 const trackPage = ref(1)
 const hasMoreTracks = ref(false)
 const loadingMore = ref(false)
@@ -336,33 +337,37 @@ async function tryAutoplay() {
 }
 
 function onMiniPlay() {
-  userInteracted.value = true
   barOpen.value = true
   togglePlay()
   scheduleBarCollapse()
 }
 
 function togglePlay() {
-  userInteracted.value = true
   if (!current.value) return
   if (!barOpen.value) barOpen.value = true
   if (playing.value) pause()
-  else play()
+  else {
+    errorRecoveryAvailable.value = true
+    play()
+  }
   scheduleBarCollapse()
 }
 
 async function play() {
   const a = audioRef.value
   if (!a || !current.value) return
+  playbackRequested.value = true
   try {
     await a.play()
     playing.value = true
   } catch {
     playing.value = false
+    playbackRequested.value = false
   }
 }
 
 function pause() {
+  playbackRequested.value = false
   audioRef.value?.pause()
   playing.value = false
 }
@@ -374,10 +379,11 @@ function prev() {
   } else {
     index.value = (index.value - 1 + tracks.value.length) % tracks.value.length
   }
+  errorRecoveryAvailable.value = true
   reloadAndPlay()
 }
 
-async function next() {
+async function next(resetErrorRecovery: boolean | Event = true) {
   if (!tracks.value.length) return
   if (mode.value === 'shuffle') {
     let n = index.value
@@ -391,12 +397,14 @@ async function next() {
     }
     index.value = (index.value + 1) % tracks.value.length
   }
+  if (resetErrorRecovery !== false) errorRecoveryAvailable.value = true
   reloadAndPlay()
 }
 
 function playAt(i: number) {
   index.value = i
   barOpen.value = true
+  errorRecoveryAvailable.value = true
   reloadAndPlay()
 }
 
@@ -410,6 +418,7 @@ async function reloadAndPlay() {
 }
 
 function onEnded() {
+  playbackRequested.value = false
   if (mode.value === 'loop') {
     const a = audioRef.value
     if (a) {
@@ -433,9 +442,13 @@ function onMeta() {
 }
 
 function onAudioError() {
-  // skip broken track
-  if (tracks.value.length > 1) next()
-  else playing.value = false
+  playing.value = false
+  if (playbackRequested.value && errorRecoveryAvailable.value && tracks.value.length > 1) {
+    errorRecoveryAvailable.value = false
+    void next(false)
+    return
+  }
+  playbackRequested.value = false
 }
 
 function seek(e: MouseEvent) {

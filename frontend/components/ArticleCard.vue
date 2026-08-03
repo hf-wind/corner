@@ -14,7 +14,7 @@
     </div>
     <div class="card-body">
       <div class="card-top">
-        <span class="card-tag">{{ tag }}</span>
+        <span class="card-tag" :style="{ color: categoryColor || undefined }"><Icon :name="categoryIcon || 'ph:folder-open-bold'" />{{ tag }}</span>
         <span class="card-date">{{ date }}</span>
       </div>
       <h3 class="card-title">{{ title }}</h3>
@@ -39,8 +39,8 @@
           <span v-if="readingTime">{{ readingTime }} min</span>
         </div>
       </div>
-      <div v-if="tags?.length" class="card-tags">
-        <span v-for="t in tags" :key="t">{{ t }}</span>
+      <div v-if="resolvedTags.length" class="card-tags">
+        <span v-for="t in resolvedTags" :key="t.name" :style="{ '--tag-color': t.color || 'var(--c-primary)' }"><Icon :name="t.icon || 'ph:tag-bold'" />{{ t.name }}</span>
       </div>
     </div>
   </NuxtLink>
@@ -61,7 +61,10 @@ const props = withDefaults(defineProps<{
   title: string
   desc: string
   tag: string
+  categoryIcon?: string
+  categoryColor?: string
   tags?: string[]
+  tagItems?: Array<{ name: string; icon?: string; color?: string }>
   date: string
   author?: Author
   views?: number
@@ -76,6 +79,9 @@ const props = withDefaults(defineProps<{
 
 const coverUrl = computed(() => getDisplayImageUrl(props.cover, 280, 220))
 const avatarUrl = computed(() => getDisplayImageUrl(props.author?.avatar || avatarFallback, 48, 48))
+const resolvedTags = computed(() => props.tagItems?.length
+  ? props.tagItems
+  : (props.tags || []).map(name => ({ name })))
 
 function saveScroll() {
   const el = document.querySelector('.main-content')
@@ -151,6 +157,9 @@ function saveScroll() {
   gap: 8px;
 }
 .card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.6rem;
   font-weight: 600;
   padding: 1px 8px;
@@ -227,11 +236,15 @@ function saveScroll() {
   flex-wrap: wrap;
 }
 .card-tags span {
+  --tag-color: var(--c-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 0.58rem;
   padding: 1px 6px;
   border-radius: 8px;
-  background: var(--c-bg-2);
-  color: var(--c-text-3);
+  background: color-mix(in srgb, var(--tag-color) 10%, transparent);
+  color: var(--tag-color);
 }
 
 @media (prefers-reduced-motion: reduce) {

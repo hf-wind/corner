@@ -1,5 +1,11 @@
-import { createHash } from 'node:crypto';
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { SettingsService } from '../settings/settings.service';
 import { RedisService } from '../../common/redis/redis.service';
 import {
@@ -125,7 +131,9 @@ export class MusicService {
     const limit = Math.max(10, Math.min(100, Number.isFinite(opts?.limit) ? Math.floor(opts!.limit!) : 50));
     const total = allTracks.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
-    const tracks = allTracks.slice((page - 1) * limit, page * limit);
+    const tracks = allTracks
+      .slice((page - 1) * limit, page * limit)
+      .map((track) => this.presentTrack(track));
     return {
       enabled: true,
       source,
@@ -145,8 +153,161 @@ export class MusicService {
     return this.getPlaylist({ refresh: true });
   }
 
+  async getRecommendationCandidates(query: string, limit = 10) {
+    const cfg = await this.getConfig();
+    if (!cfg.music_enabled) return [];
+
+    const sources = cfg.music_playlists.slice(0, 8);
+    const lists = await Promise.allSettled(
+      sources.map((source) =>
+        this.fetchTracks(source, cfg.music_api, cfg.music_cache_ttl, false),
+      ),
+    );
+    const unique = new Map<string, MusicTrack & { playlist: string }>();
+    lists.forEach((result, sourceIndex) => {
+      if (result.status !== 'fulfilled') return;
+      for (const track of result.value) {
+        const key = `${track.name}\u0000${track.artist}`.toLowerCase();
+        if (!unique.has(key)) {
+          unique.set(key, { ...track, playlist: sources[sourceIndex].name });
+        }
+      }
+    });
+
+    const terms = this.musicSearchTerms(query);
+    const seed = createHash('sha256').update(query || 'music').digest().readUInt32BE(0);
+    return [...unique.values()]
+      .map((track, index) => ({
+        track,
+        score: this.scoreTrack(track, terms),
+        tie: (index * 2654435761 + seed) >>> 0,
+      }))
+      .sort((a, b) => b.score - a.score || a.tie - b.tie)
+      .slice(0, Math.max(1, Math.min(12, limit)))
+      .map(({ track }) => ({
+        name: track.name.slice(0, 80),
+        artist: track.artist.slice(0, 80),
+        playlist: track.playlist.slice(0, 40),
+      }));
+  }
+
+  async proxyMedia(input: {
+    url: string;
+    expires: string;
+    signature: string;
+    range?: string;
+  }) {
+    const expires = Number(input.expires);
+    if (
+      !Number.isSafeInteger(expires) ||
+      expires < Math.floor(Date.now() / 1000) ||
+      expires > Math.floor(Date.now() / 1000) + 172800
+    ) {
+      throw new UnauthorizedException('媒体链接已失效');
+    }
+    let target: URL;
+    try {
+      target = new URL(input.url);
+    } catch {
+      throw new BadRequestException('媒体地址无效');
+    }
+    if (!['http:', 'https:'].includes(target.protocol)) {
+      throw new BadRequestException('媒体地址无效');
+    }
+    const expected = this.signMediaUrl(target.toString(), expires);
+    const actual = Buffer.from(String(input.signature || ''));
+    const wanted = Buffer.from(expected);
+    if (actual.length !== wanted.length || !timingSafeEqual(actual, wanted)) {
+      throw new UnauthorizedException('媒体签名无效');
+    }
+
+    const headers: Record<string, string> = {
+      Accept: '*/*',
+      'User-Agent': 'corner-blog-music-proxy/1.0',
+    };
+    if (input.range) headers.Range = input.range;
+    const response = await fetch(target, {
+      headers,
+      redirect: 'follow',
+      signal: AbortSignal.timeout(20000),
+    }).catch((error) => {
+      throw new ServiceUnavailableException(`媒体加载失败: ${error}`);
+    });
+    if (!response.ok && response.status !== 206) {
+      throw new ServiceUnavailableException(`媒体源返回 ${response.status}`);
+    }
+    return response;
+  }
+
   private cacheKey(source: MusicPlaylistSource, api: string) {
     return `${api}|${source.server}|${source.type}|${source.id}`;
+  }
+
+  private presentTrack(track: MusicTrack): MusicTrack {
+    return {
+      ...track,
+      url: this.createMediaProxyUrl(track.url),
+      pic: track.pic ? this.createMediaProxyUrl(track.pic) : '',
+    };
+  }
+
+  private createMediaProxyUrl(url: string) {
+    const expires = Math.floor(Date.now() / 1000) + 86400;
+    const params = new URLSearchParams({
+      url,
+      expires: String(expires),
+      signature: this.signMediaUrl(url, expires),
+    });
+    return `/api/music/proxy?${params.toString()}`;
+  }
+
+  private signMediaUrl(url: string, expires: number) {
+    const secret =
+      process.env.MUSIC_PROXY_SECRET ||
+      process.env.JWT_SECRET ||
+      'corner-dev-music-proxy';
+    return createHmac('sha256', secret)
+      .update(`${url}|${expires}`)
+      .digest('base64url');
+  }
+
+  private musicSearchTerms(query: string) {
+    const normalized = String(query || '').toLowerCase();
+    const terms = normalized
+      .split(/[\s,，。！？!?、：:;；/]+/)
+      .map((term) => term.trim())
+      .filter((term) => term.length >= 2)
+      .filter(
+        (term) =>
+          !/^(推荐|一首|歌曲|音乐|歌单|听听|想听|给我|帮我|适合|现在)$/.test(term),
+      );
+    const moods: Array<[RegExp, string[]]> = [
+      [/开心|快乐|元气|通勤/, ['快乐', '阳光', '青春', '夏天']],
+      [/安静|放松|睡前|阅读|学习/, ['安静', '轻音乐', '纯音乐', '夜', '钢琴']],
+      [/难过|伤心|失落|emo/, ['雨', '遗憾', '孤独', '想念']],
+      [/浪漫|约会|甜/, ['爱', '浪漫', '心动', '温柔']],
+      [/热血|运动|跑步/, ['热血', '燃', '摇滚', '奔跑']],
+    ];
+    for (const [pattern, additions] of moods) {
+      if (pattern.test(normalized)) terms.push(...additions);
+    }
+    return [...new Set(terms)].slice(0, 12);
+  }
+
+  private scoreTrack(
+    track: MusicTrack & { playlist: string },
+    terms: string[],
+  ) {
+    if (!terms.length) return 0;
+    const name = track.name.toLowerCase();
+    const artist = track.artist.toLowerCase();
+    const playlist = track.playlist.toLowerCase();
+    return terms.reduce((score, term) => {
+      if (name.includes(term)) score += 8;
+      if (artist.includes(term)) score += 5;
+      if (playlist.includes(term)) score += 3;
+      return score;
+    }, 0);
   }
 
   private async fetchTracks(

@@ -8,8 +8,9 @@
       </div>
       <div class="overview-grid">
         <div v-for="item in overviewItems" :key="item.label" class="overview-item">
-          <strong>{{ compactNumber(item.value) }}</strong>
-          <span>{{ item.label }}</span>
+          <span class="overview-icon"><Icon :name="item.icon" /></span>
+          <span class="overview-copy"><small>{{ item.label }}</small><strong>{{ compactNumber(item.value) }}</strong></span>
+          <i aria-hidden="true" />
         </div>
       </div>
     </section>
@@ -56,10 +57,10 @@ const tags = ref<any[]>([])
 let idleHandle: number | null = null
 
 const overviewItems = computed(() => [
-  { label: '文章', value: stats.value.posts },
-  { label: '阅读', value: stats.value.views },
-  { label: '评论', value: stats.value.comments },
-  { label: '读者', value: stats.value.users },
+  { label: '文章', value: stats.value.posts, icon: 'ph:article-bold' },
+  { label: '阅读', value: stats.value.views, icon: 'ph:eye-bold' },
+  { label: '评论', value: stats.value.comments, icon: 'ph:chat-circle-dots-bold' },
+  { label: '读者', value: stats.value.users, icon: 'ph:users-three-bold' },
 ])
 
 function compactNumber(value: number) {
@@ -157,21 +158,25 @@ onUnmounted(() => {
 
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
 }
 
 .overview-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 9px 10px;
-  border-radius: 9px;
-  background: var(--c-bg-1);
+  position: relative;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  gap: 5px;
+  padding: 4px 2px;
 }
 
-.overview-item strong { color: var(--c-text); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
-.overview-item span { color: var(--c-text-3); font-size: 0.58rem; }
+.overview-icon { display:grid; width:27px; height:27px; border-radius:8px; background:var(--c-primary-soft); color:var(--c-primary); place-items:center; font-size:.78rem; }
+.overview-copy { display:flex; min-width:0; flex-direction:column; align-items:center; gap:1px; }
+.overview-copy strong { color:var(--c-text); font-size:.72rem; font-variant-numeric:tabular-nums; }
+.overview-copy small { color:var(--c-text-3); font-size:.48rem; }
+.overview-item>i { position:absolute; top:7px; right:0; bottom:7px; width:1px; background:color-mix(in srgb,var(--border) 72%,transparent); }
+.overview-item:last-child>i { display:none; }
 
 .popular-list { display: flex; flex-direction: column; }
 .popular-item {

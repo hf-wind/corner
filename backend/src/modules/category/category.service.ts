@@ -7,8 +7,8 @@ const postSelect = {
   id: true, title: true, slug: true, excerpt: true,
   coverImage: true, status: true, featured: true,
   publishedAt: true, createdAt: true, viewCount: true,
-  category: { select: { id: true, name: true, slug: true } },
-  tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
+  category: { select: { id: true, name: true, slug: true, icon: true, color: true } },
+  tags: { include: { tag: { select: { id: true, name: true, slug: true, icon: true, color: true } } } },
 };
 
 @Injectable()

@@ -26,9 +26,9 @@
             type="button"
             class="tag-chip"
             :class="[tag.size, { active: activeTag === tag.name }]"
-            :style="{ '--tag-delay': `${index * 28}ms` }"
+            :style="{ '--tag-delay': `${index * 28}ms`, '--tag-color': tag.color || 'var(--c-primary)' }"
             @click="selectTag(tag)"
-          ><Icon name="ph:hash" /><span>{{ tag.name }}</span><small>{{ tag.count }}</small></button>
+          ><Icon :name="tag.icon || 'ph:tag-bold'" /><span>{{ tag.name }}</span><small>{{ tag.count }}</small></button>
           <div v-if="!tagCloud.length" class="empty-tags">还没有标签，新的灵感会在这里生长。</div>
         </section>
 
@@ -82,7 +82,7 @@ const tagCloud = computed(() => {
   const max = Math.max(...counts, 1)
   return allTags.value.map(tag => {
     const ratio = Number(tag._count?.posts || 0) / max
-    return { name: tag.name, slug: tag.slug, count: Number(tag._count?.posts || 0), size: ratio > .66 ? 'size-lg' : ratio > .32 ? 'size-md' : 'size-sm' }
+    return { name: tag.name, slug: tag.slug, icon: tag.icon, color: tag.color, count: Number(tag._count?.posts || 0), size: ratio > .66 ? 'size-lg' : ratio > .32 ? 'size-md' : 'size-sm' }
   })
 })
 const hotTagsList = computed(() => [...tagCloud.value].sort((a, b) => b.count - a.count).slice(0, 6))
@@ -114,6 +114,8 @@ async function selectTag(tag: { name: string; slug: string }) {
     tagPosts.value = (res.items ?? []).map((post: any) => ({
       slug: post.slug, title: post.title, date: post.publishedAt, cover: post.coverImage,
       excerpt: post.excerpt, tag: activeTag.value,
+      tagIcon: post.tags?.find((tag: any) => tag.slug === activeTagSlug.value)?.icon || 'ph:tag-bold',
+      tagColor: post.tags?.find((tag: any) => tag.slug === activeTagSlug.value)?.color || '',
     }))
   } catch { tagPosts.value = [] }
   finally { postsLoading.value = false }
@@ -142,4 +144,8 @@ useHead({ title: '文章标签' })
 .right-card-title { margin-bottom:13px; padding-bottom:10px; border-bottom:1px solid var(--border); }.right-card-title span { display:flex; align-items:center; gap:6px; color:var(--c-text); font-size:.72rem; font-weight:700; }.distribution { display:grid; gap:12px; }.distribution>div>div { display:flex; justify-content:space-between; margin-bottom:5px; color:var(--c-text-2); font-size:.58rem; }.distribution small { color:var(--c-text-3); }.distribution i { display:block; height:5px; overflow:hidden; border-radius:999px; background:var(--c-bg-2); }.distribution i span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--c-primary),color-mix(in srgb,var(--c-primary) 50%,#9bd)); }.note-card { display:flex; align-items:flex-start; gap:9px; }.note-card>svg { flex:0 0 auto; color:var(--c-primary); font-size:1.1rem; }.note-card p { color:var(--c-text-2); font-size:.59rem; line-height:1.7; }
 @keyframes tag-in { from { opacity:0; transform:translateY(8px) scale(.96); } }
 @media (max-width:640px) { .main-content { padding:max(68px,calc(env(safe-area-inset-top) + 60px)) 16px 24px!important; }.insight-strip { grid-template-columns:1fr 1fr 1fr; padding:12px 8px; }.insight-strip>i { display:none; }.insight-strip>div { gap:6px; }.insight-strip>div>span { width:28px; height:28px; }.insight-strip strong { max-width:64px; font-size:.74rem; }.content-heading { align-items:flex-start; flex-direction:column; gap:4px; }.tag-stage { min-height:200px; padding:25px 12px; }.orbit-two { width:350px; }.tag-chip,.tag-chip.size-lg,.tag-chip.size-md { padding:7px 11px; font-size:.69rem; } }
+
+.tag-chip { --tag-color:var(--c-primary); border-color:color-mix(in srgb,var(--tag-color) 24%,var(--border)); background:color-mix(in srgb,var(--ld-bg-card) 92%,var(--tag-color) 8%); color:var(--tag-color); }
+.tag-chip:hover { border-color:var(--tag-color); color:var(--tag-color); }
+.tag-chip.active { border-color:var(--tag-color); background:var(--tag-color); box-shadow:0 7px 18px color-mix(in srgb,var(--tag-color) 28%,transparent); color:#fff; }
 </style>

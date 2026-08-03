@@ -2,7 +2,7 @@
   <a-modal v-model:open="visible" title="选择图标" width="600px" @ok="handleConfirm" @cancel="handleCancel" destroyOnClose>
     <a-input v-model:value="search" placeholder="搜索图标…" size="small" style="margin-bottom:12px" allow-clear />
     <div class="icon-preview" v-if="selected">
-      <component :is="selected" style="font-size:24px" />
+      <Icon :name="selected" style="font-size:24px" />
       <span class="icon-preview-name">{{ selected }}</span>
     </div>
     <div class="icon-grid">
@@ -11,7 +11,7 @@
         class="icon-item" :class="{ active: selected === name }"
         @click="selected = name"
       >
-        <component :is="name" style="font-size:20px" />
+        <Icon :name="name" style="font-size:20px" />
       </div>
       <div v-if="!filteredIcons.length" style="grid-column:1/-1;text-align:center;padding:24px;color:var(--c-text-3)">无匹配图标</div>
     </div>
@@ -38,23 +38,18 @@ const search = ref('')
 const selected = ref(props.icon || '')
 
 const icons = [
-  'FolderOutlined', 'FolderOpenOutlined', 'BookOutlined', 'ReadOutlined',
-  'CodeOutlined', 'FileTextOutlined', 'FileUnknownOutlined',
-  'PictureOutlined', 'CameraOutlined', 'VideoCameraOutlined',
-  'AudioOutlined', 'StarOutlined', 'HeartOutlined',
-  'TagOutlined', 'TagsOutlined', 'BulbOutlined', 'RocketOutlined',
-  'FireOutlined', 'SmileOutlined', 'MehOutlined', 'FrownOutlined',
-  'EnvironmentOutlined', 'GlobalOutlined', 'CoffeeOutlined',
-  'CrownOutlined', 'GiftOutlined', 'KeyOutlined',
-  'PushpinOutlined', 'SafetyOutlined', 'ShoppingOutlined',
-  'SoundOutlined', 'ThunderboltOutlined', 'ToolOutlined',
-  'TrophyOutlined', 'UserOutlined', 'TeamOutlined', 'WalletOutlined',
-  'PhoneOutlined', 'MailOutlined', 'LinkOutlined', 'CopyrightOutlined',
-  'ExperimentOutlined', 'CloudOutlined', 'HomeOutlined',
-  'AppstoreOutlined', 'BankOutlined', 'CompassOutlined',
-  'FlagOutlined', 'NotificationOutlined', 'PaperClipOutlined',
-  'RiseOutlined', 'ScanOutlined', 'SendOutlined', 'SkinOutlined',
-  'SwapOutlined', 'SyncOutlined', 'WifiOutlined',
+  'ph:folder-open-bold', 'ph:folder-simple-bold', 'ph:book-open-text-bold', 'ph:books-bold',
+  'ph:code-bold', 'ph:file-text-bold', 'ph:article-bold', 'ph:terminal-window-bold',
+  'ph:image-bold', 'ph:camera-bold', 'ph:video-camera-bold', 'ph:film-strip-bold',
+  'ph:music-notes-bold', 'ph:headphones-bold', 'ph:microphone-stage-bold',
+  'ph:star-bold', 'ph:heart-bold', 'ph:tag-bold', 'ph:tags-bold',
+  'ph:lightbulb-filament-bold', 'ph:rocket-launch-bold', 'ph:fire-bold', 'ph:sparkle-bold',
+  'ph:smiley-bold', 'ph:map-pin-bold', 'ph:globe-hemisphere-west-bold', 'ph:compass-bold',
+  'ph:coffee-bold', 'ph:bicycle-bold', 'ph:mountains-bold', 'ph:cloud-sun-bold',
+  'ph:flask-bold', 'ph:atom-bold', 'ph:brain-bold', 'ph:robot-bold',
+  'ph:house-bold', 'ph:briefcase-bold', 'ph:wrench-bold', 'ph:palette-bold',
+  'ph:game-controller-bold', 'ph:plant-bold', 'ph:fork-knife-bold', 'ph:airplane-tilt-bold',
+  'ph:chat-circle-text-bold', 'ph:users-three-bold', 'ph:graduation-cap-bold', 'ph:bookmark-simple-bold',
 ]
 
 const filteredIcons = computed(() => {

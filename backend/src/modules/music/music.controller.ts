@@ -2,11 +2,15 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import { Readable } from 'node:stream';
 import { AuthGuard } from '@nestjs/passport';
 import { MusicService } from './music.service';
 import { RolesGuard } from '../auth/roles.guard';
@@ -41,6 +45,37 @@ export class MusicController {
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
+  }
+
+  @Get('proxy')
+  async proxy(
+    @Query('url') url: string,
+    @Query('expires') expires: string,
+    @Query('signature') signature: string,
+    @Headers('range') range: string | undefined,
+    @Res() res: Response,
+  ) {
+    const upstream = await this.music.proxyMedia({
+      url,
+      expires,
+      signature,
+      range,
+    });
+    res.status(upstream.status);
+    for (const name of [
+      'accept-ranges',
+      'content-length',
+      'content-range',
+      'content-type',
+      'etag',
+      'last-modified',
+    ]) {
+      const value = upstream.headers.get(name);
+      if (value) res.setHeader(name, value);
+    }
+    res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
+    if (!upstream.body) return res.end();
+    Readable.fromWeb(upstream.body as any).pipe(res);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

@@ -19,12 +19,11 @@
             <span>{{ inspiration.trim().length }} 字</span>
           </header>
 
-          <textarea
+          <MomentRichEditor
             ref="editorRef"
             v-model="inspiration"
             class="quick-input"
-            rows="8"
-            autofocus
+            :autofocus="true"
             placeholder="此刻在想什么？一句话、一张图，或一个还没想明白的念头都可以。"
           />
 
@@ -85,12 +84,11 @@
             <a-input id="moment-title" v-model:value="form.title" class="title-input" placeholder="给这条记录一个标题" :bordered="false" />
 
             <label class="field-label" for="moment-content">正文</label>
-            <textarea
+            <MomentRichEditor
               id="moment-content"
               ref="editorRef"
               v-model="form.content"
               class="moment-input edit-input"
-              rows="18"
               placeholder="写下这一刻。"
             />
             <div class="composer-tools">
@@ -142,7 +140,11 @@ const api = useApi()
 const toast = useToast()
 const router = useRouter()
 const { open } = useMediaLibrary()
-const editorRef = ref<HTMLTextAreaElement | null>(null)
+const editorRef = ref<{
+  focus: () => void
+  insertText: (text: string) => void
+  insertToken: (token: string) => void
+} | null>(null)
 const loading = ref(Boolean(props.slug))
 const creating = ref(false)
 const saving = ref(false)
@@ -189,19 +191,8 @@ function setCurrentText(value: string) {
 }
 
 function insertAtCursor(token: string) {
-  const textarea = editorRef.value
-  const text = currentText()
-  if (!textarea) {
-    setCurrentText(`${text}${token}`)
-    return
-  }
-  const start = textarea.selectionStart ?? text.length
-  const end = textarea.selectionEnd ?? text.length
-  setCurrentText(`${text.slice(0, start)}${token}${text.slice(end)}`)
-  nextTick(() => {
-    textarea.focus()
-    textarea.setSelectionRange(start + token.length, start + token.length)
-  })
+  if (editorRef.value) editorRef.value.insertToken(token)
+  else setCurrentText(`${currentText()}${token}`)
 }
 
 function insertEmoji(payload: { char?: string; imageUrl?: string; label?: string }) {
@@ -376,8 +367,7 @@ onMounted(() => { void loadExisting() })
 .quick-head i { width:7px; height:7px; border-radius:50%; background:var(--c-primary); box-shadow:0 0 0 4px var(--c-primary-soft); }
 .quick-head strong { font-weight:650; }
 .quick-head > span { color:var(--c-text-3); font-size:.72rem; font-variant-numeric:tabular-nums; }
-.quick-input { display:block; width:100%; min-height:210px; padding:22px 2px; border:0; outline:0; resize:vertical; background:transparent; color:var(--c-text); font:inherit; font-size:1rem; line-height:1.9; }
-.quick-input::placeholder { color:var(--c-text-3); }
+.quick-input { display:block; width:100%; min-height:210px; max-height:52vh; overflow-y:auto; padding:22px 2px; border:0; outline:0; background:transparent; color:var(--c-text); font:inherit; font-size:1rem; line-height:1.9; }
 .starter-row { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:12px 0 15px; border-top:1px dashed color-mix(in srgb,var(--border) 78%,transparent); }
 .starter-row > span { margin-right:3px; color:var(--c-text-3); font-size:.7rem; }
 .starter-row button { display:inline-flex; align-items:center; gap:5px; padding:5px 9px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.7rem; transition:background-color .18s ease,color .18s ease; }
@@ -392,7 +382,7 @@ onMounted(() => { void loadExisting() })
 .surface-head { display:flex; align-items:start; justify-content:space-between; gap:12px; margin-bottom:18px; }
 .surface-head h2, .prompt-rail h2 { margin:5px 0 0; color:var(--c-text); font-size:1.1rem; }
 .surface-head > span { color:var(--c-text-3); font-size:.78rem; }
-.moment-input { display:block; width:100%; padding:16px; border:1px solid var(--border); border-radius:6px; outline:0; resize:vertical; background:var(--c-bg); color:var(--c-text); font:inherit; line-height:1.85; }
+.moment-input { display:block; width:100%; padding:16px; border:1px solid var(--border); border-radius:6px; outline:0; overflow-y:auto; background:var(--c-bg); color:var(--c-text); font:inherit; line-height:1.85; }
 .moment-input:focus { border-color:var(--c-primary); box-shadow:0 0 0 3px var(--c-primary-soft); }
 .composer-tools { position:relative; display:flex; gap:8px; margin-top:12px; }
 .icon-action { display:grid; width:34px; height:34px; place-items:center; border:1px solid var(--border); border-radius:6px; background:var(--c-bg); color:var(--c-text-2); cursor:pointer; font-size:1.05rem; }

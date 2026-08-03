@@ -10,7 +10,26 @@
       </section>
       <div v-if="mapError" class="map-state error"><Icon name="ph:warning-circle-bold" /><span>{{ mapError }}</span></div>
       <div v-else-if="loading" class="map-state"><Icon name="ph:spinner-gap-bold" class="spinning" /><span>正在寻找视野里的记忆</span></div>
-      <div class="map-legend"><span><i class="moment" />瞬间</span><span><i class="album" />相册</span><span><i class="photo" />照片</span></div>
+      <div class="map-legend" aria-label="点位图例">
+        <span><i class="legend-marker moment">✦</i>瞬间</span>
+        <span><i class="legend-marker album">▣</i>相册</span>
+        <span><i class="legend-marker photo">●</i>照片</span>
+      </div>
+      <Transition name="memory-focus">
+        <article v-if="selectedMemory" class="map-focus-card">
+          <button type="button" class="focus-close" title="关闭详情" aria-label="关闭详情" @click="clearSelection"><Icon name="ph:x-bold" /></button>
+          <div class="focus-cover" :class="selectedMemory.type">
+            <img v-if="selectedMemory.thumbnail" :src="mediaUrl(selectedMemory.thumbnail)" :alt="selectedMemory.title">
+            <Icon v-else :name="typeIcon(selectedMemory.type)" />
+          </div>
+          <div class="focus-copy">
+            <div class="focus-meta"><span><Icon :name="typeIcon(selectedMemory.type)" />{{ typeLabel(selectedMemory.type) }}</span><time>{{ formatDate(selectedMemory.occurredAt) }}</time></div>
+            <h2>{{ selectedMemory.title }}</h2>
+            <p>{{ selectedMemory.excerpt || `${selectedMemory.placeName}的一段记忆。` }}</p>
+            <footer><span><Icon name="ph:map-pin-fill" />{{ selectedMemory.placeName }} · {{ precisionLabel(selectedMemory.precision) }}</span><NuxtLink :to="selectedMemory.href">查看详情 <Icon name="ph:arrow-up-right-bold" /></NuxtLink></footer>
+          </div>
+        </article>
+      </Transition>
     </section>
 
     <aside class="memory-panel" :class="{ hidden: mobileMode === 'map' }">
@@ -78,6 +97,9 @@ const mapPlaceOptions = computed(() => [
   { value: '', label: '全部地点', icon: 'ph:globe-hemisphere-east-bold', count: result.value.totalMemories },
   ...result.value.places.map(item => ({ value: item.slug, label: item.name, icon: 'ph:map-pin-fill' })),
 ])
+const selectedMemory = computed(() => result.value.items.find(
+  (item): item is MemoryMapItem => item.kind === 'memory' && item.id === selectedId.value,
+) || null)
 
 onMounted(async () => {
   if (!mapEl.value) return
@@ -90,7 +112,9 @@ onMounted(async () => {
       : null
     const initialView: MapInitialView | undefined = initialPoint
       ? { ...initialPoint, zoom: selectedId.value ? 17 : 13 }
-      : undefined
+      : window.matchMedia('(max-width: 900px)').matches
+        ? { longitude: 112.8, latitude: 34.5, zoom: 4.25 }
+        : undefined
     const map = new AmapAdapter()
     await map.mount(mapEl.value, initialView)
     adapter.value = map
@@ -142,7 +166,7 @@ async function loadMap(boundsOverride?: MapBounds, zoomOverride?: number) {
     map.setItems(next.items, selectedId.value)
     if (!initialMemoryFocused && selectedId.value) {
       const selected = next.items.find((item): item is MemoryMapItem => item.kind === 'memory' && item.id === selectedId.value)
-      if (selected) map.focusMemory(selected.longitude, selected.latitude, selected.type)
+      if (selected) focusSelectedMemory(selected)
       initialMemoryFocused = true
     }
   } catch (error: any) {
@@ -157,12 +181,20 @@ function selectMemory(item: MemoryMapItem, center = false, scroll = false) {
   selectSharedMemory({ id: item.id, type: item.type, href: item.href })
   adapter.value?.setItems(result.value.items, item.id)
   if (center) {
-    adapter.value?.focusMemory(item.longitude, item.latitude, item.type)
+    focusSelectedMemory(item)
   }
   if (scroll) {
     mobileMode.value = 'list'
     nextTick(() => document.getElementById(`map-memory-${safeId(item.id)}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
   }
+}
+function focusSelectedMemory(item: MemoryMapItem) {
+  const panelOffset = window.matchMedia('(min-width: 901px)').matches ? 154 : 0
+  adapter.value?.focusMemory(item.longitude, item.latitude, item.type, panelOffset)
+}
+function clearSelection() {
+  selectedId.value = ''
+  adapter.value?.setItems(result.value.items)
 }
 async function expandCluster(item: MemoryMapCluster) {
   adapter.value?.setCenter(item.longitude, item.latitude, 15)
@@ -223,10 +255,47 @@ useHead({ title: '风隅地图' })
 .memory-copy footer { margin-top:5px; font-size:.5rem; }
 :global(.corner-map-marker.has-image) { overflow: hidden; background: var(--c-bg); }
 :global(.corner-map-marker.has-image img) { width: 100%; height: 100%; object-fit: cover; }
+.map-legend { z-index:11; top:156px; bottom:auto; }
+.map-legend .legend-marker { display:grid; width:20px; height:20px; border:2px solid #fff; color:#fff; font-size:.55rem; font-style:normal; line-height:1; place-items:center; box-shadow:0 3px 9px rgb(0 0 0/.18); }
+.map-legend .legend-marker.moment { border-radius:50%; background:#7564df; }
+.map-legend .legend-marker.album { border-radius:5px; background:#d58a4a; box-shadow:2px 2px 0 rgb(213 138 74/.28),0 3px 9px rgb(0 0 0/.18); }
+.map-legend .legend-marker.photo { border-radius:50% 50% 50% 4px; background:#2b9c84; transform:rotate(-45deg); }
+:global(.corner-map-marker) { width:36px; height:36px; border-radius:50%; animation:marker-in .48s cubic-bezier(.16,1,.3,1) both; transition:transform .28s cubic-bezier(.16,1,.3,1),box-shadow .28s; }
+:global(.corner-map-marker.album) { border-radius:8px; box-shadow:4px 4px 0 rgb(213 138 74/.28),0 7px 18px rgb(0 0 0/.22); }
+:global(.corner-map-marker.photo) { width:34px; height:34px; border-radius:50% 50% 50% 8px; transform:rotate(-45deg); }
+:global(.corner-map-marker.photo > *) { transform:rotate(45deg); }
+:global(.corner-map-marker.selected) { box-shadow:0 10px 26px rgb(0 0 0/.3); transform:scale(1.18); }
+:global(.corner-map-marker.photo.selected) { transform:rotate(-45deg) scale(1.18); }
+:global(.corner-map-cluster) { animation:marker-in .48s cubic-bezier(.16,1,.3,1) both; }
+:global(.amap-logo),:global(.amap-copyright) { opacity:.72; }
+.map-focus-card { position:absolute; z-index:18; left:calc(50% - 154px); bottom:52px; display:grid; width:min(430px,calc(100% - 390px)); min-width:340px; grid-template-columns:116px minmax(0,1fr); gap:14px; padding:11px; border:1px solid color-mix(in srgb,var(--border) 72%,transparent); border-radius:12px; background:color-mix(in srgb,var(--ld-bg-card) 94%,transparent); box-shadow:0 18px 48px rgb(0 0 0/.22); transform:translateX(-50%); backdrop-filter:blur(18px); }
+.focus-close { position:absolute; z-index:2; top:7px; right:7px; display:grid; width:27px; height:27px; padding:0; border:1px solid var(--border); border-radius:50%; background:color-mix(in srgb,var(--ld-bg-card) 90%,transparent); color:var(--c-text-3); cursor:pointer; place-items:center; }
+.focus-close:hover { color:var(--c-primary); }
+.focus-cover { display:grid; width:116px; height:116px; overflow:hidden; border-radius:9px; background:var(--c-primary-soft); color:var(--c-primary); font-size:2rem; place-items:center; }
+.focus-cover img { width:100%; height:100%; object-fit:cover; }
+.focus-copy { min-width:0; padding:5px 27px 3px 0; }
+.focus-meta,.focus-meta span,.focus-copy footer,.focus-copy footer>span,.focus-copy footer>a { display:flex; align-items:center; }
+.focus-meta { justify-content:space-between; gap:10px; color:var(--c-text-3); font-size:.54rem; }
+.focus-meta span { gap:4px; color:var(--c-primary); font-weight:700; letter-spacing:.06em; }
+.focus-copy h2 { margin:8px 0 0; overflow:hidden; color:var(--c-text); font-family:var(--font-serif); font-size:1rem; text-overflow:ellipsis; white-space:nowrap; }
+.focus-copy p { display:-webkit-box; margin:6px 0 0; overflow:hidden; color:var(--c-text-3); font-size:.58rem; line-height:1.65; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.focus-copy footer { justify-content:space-between; gap:10px; margin-top:11px; font-size:.53rem; }
+.focus-copy footer>span { min-width:0; gap:3px; overflow:hidden; color:var(--c-text-3); text-overflow:ellipsis; white-space:nowrap; }
+.focus-copy footer>a { flex:none; gap:3px; color:var(--c-primary); text-decoration:none; }
+.memory-focus-enter-active,.memory-focus-leave-active { transition:opacity .3s ease,transform .42s cubic-bezier(.16,1,.3,1); }
+.memory-focus-enter-from,.memory-focus-leave-to { opacity:0; transform:translate(-50%,18px) scale(.97); }
+@keyframes marker-in { from { opacity:0; translate:0 12px; scale:.72; } to { opacity:1; translate:0 0; scale:1; } }
 @media (max-width: 900px) {
   .map-canvas-shell { inset: 0; }
   .memory-panel { inset: 0; width: 100%; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
   .map-brand { top:max(66px,calc(env(safe-area-inset-top) + 60px)); width:min(330px,calc(100% - 28px)); min-width:0; }
   .memory-list { max-height:none; }
+  .map-legend { top:max(228px,calc(env(safe-area-inset-top) + 222px)); bottom:auto; }
+  .map-focus-card { position:fixed; left:14px; right:14px; bottom:76px; width:auto; min-width:0; grid-template-columns:82px minmax(0,1fr); gap:10px; transform:none; }
+  .focus-cover { width:82px; height:82px; }
+  .focus-copy { padding-top:2px; }
+  .focus-copy p { -webkit-line-clamp:1; }
+  .focus-copy footer { margin-top:7px; }
+  .memory-focus-enter-from,.memory-focus-leave-to { transform:translateY(18px) scale(.97); }
 }
 </style>

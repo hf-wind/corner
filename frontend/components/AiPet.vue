@@ -151,9 +151,10 @@ let typingDrainResolvers: Array<() => void> = []
 const displayName = ref(meta.displayName || '哆啦A梦')
 const description = ref(meta.description || '阿风的伙伴 · 蓝色机器猫')
 const greetings = ref<string[]>([...(meta.greetings || [])])
+const selectedGreeting = ref('你好呀～')
 
 const isArticleMode = computed(() => props.mode === 'article')
-const hintText = computed(() => isArticleMode.value ? '要我帮你读懂这篇吗？' : (greetings.value[0] || '你好呀～'))
+const hintText = computed(() => isArticleMode.value ? '要我帮你读懂这篇吗？' : selectedGreeting.value)
 const inputPlaceholder = computed(() => isArticleMode.value ? '问问这篇文章…' : '问我文章推荐或本站内容…')
 const actionsVisible = computed(() => isLoggedIn.value && !chatOpen.value && !suppressActions.value && !showHint.value && !showLoginBubble.value)
 const quickActions = computed<QuickAction[]>(() => isArticleMode.value
@@ -165,9 +166,22 @@ const quickActions = computed<QuickAction[]>(() => isArticleMode.value
     ]
   : [
       { label: '推荐一篇文章', icon: 'ph:sparkle-bold', prompt: '请根据本站最近发布的内容，推荐一篇值得先读的文章，并简要说明理由。' },
+      { label: '从歌单选一首', icon: 'ph:music-notes-plus-bold', prompt: '请从本站歌单中推荐一首歌，告诉我歌名、歌手和推荐理由。' },
+      { label: '按心情选歌', icon: 'ph:headphones-bold', prompt: '先用一个简短问题问问我现在的心情，再从本站歌单里为我选一首适合的歌。' },
       { label: '本站有什么内容', icon: 'ph:books-bold', prompt: '请简洁介绍这个博客主要有哪些内容方向，并各推荐一篇文章。' },
       { label: '帮我发现内容', icon: 'ph:compass-bold', prompt: '我还没想好读什么，请用三个简短问题了解兴趣，再为我推荐本站文章。' },
+      { label: '看看最近更新', icon: 'ph:clock-counter-clockwise-bold', prompt: '请从本站最近发布的内容中挑出三篇，用一句话分别介绍。' },
+      { label: '随机探索', icon: 'ph:dice-five-bold', prompt: '请从本站文章或歌单里随机挑一个值得探索的内容，并简短说明为什么选它。' },
     ])
+
+function chooseGreeting() {
+  const list = greetings.value.length ? greetings.value : ['你好，我是哆啦A梦！']
+  const previous = sessionStorage.getItem('corner:pet:last-greeting') || ''
+  const candidates = list.length > 1 ? list.filter(item => item !== previous) : list
+  const next = candidates[Math.floor(Math.random() * candidates.length)] || list[0]
+  selectedGreeting.value = next
+  sessionStorage.setItem('corner:pet:last-greeting', next)
+}
 
 async function loadPetMeta() {
   try {
@@ -179,7 +193,8 @@ async function loadPetMeta() {
     if (res?.displayName) displayName.value = res.displayName
     if (res?.description) description.value = res.description
     if (Array.isArray(res?.greetings) && res.greetings.length) {
-      greetings.value = res.greetings
+      greetings.value = [...new Set([...(meta.greetings || []), ...res.greetings])]
+      chooseGreeting()
     }
   } catch {
     // keep local pet.json defaults
@@ -270,8 +285,7 @@ async function prepareChat() {
     historyLoaded.value = true
   }
   if (messages.value.length === 0) {
-    const list = greetings.value.length ? greetings.value : ['你好，我是哆啦A梦！']
-    const fallback = isArticleMode.value ? '我已经准备好陪你读这篇文章啦！' : list[Math.floor(Math.random() * list.length)]
+    const fallback = isArticleMode.value ? '我已经准备好陪你读这篇文章啦！' : selectedGreeting.value
     messages.value.push({ role: 'assistant', content: fallback })
   }
   await nextTick(scrollBottom)
@@ -488,6 +502,7 @@ function waitForTypingDrain() {
 }
 
 onMounted(() => {
+  chooseGreeting()
   loadPetMeta()
   hintTimer = setTimeout(() => { showHint.value = false }, isArticleMode.value ? 4200 : 6000)
 })

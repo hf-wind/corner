@@ -77,7 +77,7 @@
           <Icon name="ph:monitor-bold" />
         </button>
       </div>
-      <button v-if="isPanel && isUserAdmin" class="admin-collapse-button" type="button" :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'" @click="emit('toggle-collapse')">
+      <button v-if="isPanel && isUserAdmin && allowCollapse" class="admin-collapse-button" type="button" :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'" @click="emit('toggle-collapse')">
         <Icon :name="collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-simple-bold'" />
         <span>{{ collapsed ? '展开侧栏' : '收起侧栏' }}</span>
         <Icon :name="collapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'" />
@@ -107,9 +107,11 @@ import { useFeatureFlags } from '~/composables/useFeatureFlags'
 const props = withDefaults(defineProps<{
   variant?: 'site' | 'admin'
   collapsed?: boolean
+  allowCollapse?: boolean
 }>(), {
   variant: 'site',
   collapsed: false,
+  allowCollapse: true,
 })
 
 const emit = defineEmits<{ openSearch: []; 'toggle-collapse': [] }>()
@@ -132,6 +134,7 @@ const router = useRouter()
 
 const isPanel = computed(() => props.variant === 'admin')
 const collapsed = computed(() => props.collapsed && isPanel.value)
+const allowCollapse = computed(() => props.allowCollapse)
 const { albumsEnabled, mapEnabled, constellationEnabled, storiesEnabled } = useFeatureFlags()
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar))
 const playerSlotRef = ref<HTMLElement | null>(null)

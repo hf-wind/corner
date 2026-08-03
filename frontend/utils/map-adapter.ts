@@ -17,7 +17,7 @@ export interface MapAdapter {
   zoom(): number
   center(): { longitude: number; latitude: number }
   setCenter(longitude: number, latitude: number, zoom?: number): void
-  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type']): void
+  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type'], horizontalOffsetPx?: number): void
   fitBounds(bounds: MapBounds): void
   setItems(items: MapMarkerItem[], selectedId?: string): void
   setPath(points: Array<{ longitude: number; latitude: number }>): void
@@ -79,13 +79,14 @@ function loadAmap() {
 
 function markerHtml(item: MapMarkerItem, selected: boolean) {
   if (item.kind === 'cluster') {
-    return `<button class="corner-map-cluster${selected ? ' selected' : ''}" type="button"><strong>${item.count}</strong><span>处记忆</span></button>`
+    return `<button class="corner-map-cluster${selected ? ' selected' : ''}" type="button" aria-label="展开 ${item.count} 处记忆"><strong>${item.count}</strong><span>处记忆</span></button>`
   }
   const icon = item.type === 'moment' ? '✦' : item.type === 'album' ? '▣' : '●'
   const image = item.thumbnail
     ? `<img src="${escapeHtml(item.thumbnail)}" alt="" loading="lazy">`
-    : `<span>${icon}</span>`
-  return `<button class="corner-map-marker ${item.type}${item.thumbnail ? ' has-image' : ''}${selected ? ' selected' : ''}" type="button">${image}</button>`
+    : `<span aria-hidden="true">${icon}</span>`
+  const label = escapeHtml(`${item.type === 'moment' ? '瞬间' : item.type === 'album' ? '相册' : '照片'}：${item.title}`)
+  return `<button class="corner-map-marker ${item.type}${item.thumbnail ? ' has-image' : ''}${selected ? ' selected' : ''}" type="button" aria-label="${label}" title="${label}">${image}</button>`
 }
 
 function escapeHtml(value: string) {
@@ -175,13 +176,14 @@ export class AmapAdapter implements MapAdapter {
     this.map.setZoomAndCenter(zoom || this.map.getZoom(), [longitude, latitude], false, 620)
   }
 
-  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type']) {
-    const zoom = type === 'photo' ? 18 : 17
-    const rotation = Math.round(((longitude * 13 + latitude * 7) % 34) - 17)
-    this.suppressViewEventsUntil = Date.now() + 1800
-    this.map.setZoomAndCenter(zoom, [longitude, latitude], false, 760)
-    this.map.setPitch?.(62, false, 760)
-    this.map.setRotation?.(rotation, false, 760)
+  focusMemory(longitude: number, latitude: number, type: MemoryMapItem['type'], horizontalOffsetPx = 0) {
+    const zoom = type === 'photo' ? 17.6 : 16.8
+    const longitudePerPixel = 360 / (256 * 2 ** zoom)
+    const visualCenterLongitude = normalizeLongitude(longitude + horizontalOffsetPx * longitudePerPixel)
+    this.suppressViewEventsUntil = Date.now() + 1900
+    this.map.setZoomAndCenter(zoom, [visualCenterLongitude, latitude], false, 980)
+    this.map.setPitch?.(48, false, 980)
+    this.map.setRotation?.(0, false, 980)
   }
 
   fitBounds(bounds: MapBounds) {

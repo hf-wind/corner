@@ -1,6 +1,6 @@
 <template>
   <a-config-provider :theme="themeConfig">
-    <div class="admin-root" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <div class="admin-root" :class="{ 'sidebar-collapsed': effectiveCollapsed }">
       <button
         class="admin-menu-trigger"
         type="button"
@@ -15,7 +15,7 @@
           @click="mobileNavOpen = false" />
       </Transition>
       <div class="sidebar-shell" :class="{ open: mobileNavOpen }">
-        <LeftSidebar variant="admin" :collapsed="sidebarCollapsed" @toggle-collapse="toggleSidebar" />
+        <LeftSidebar variant="admin" :collapsed="effectiveCollapsed" :allow-collapse="!isMobile" @toggle-collapse="toggleSidebar" />
       </div>
       <div class="admin-main">
         <slot />
@@ -35,6 +35,11 @@ const { resolvedTheme } = useTheme()
 const { readStorage, refreshProfile, isLoggedIn, isAdmin, canAccessAdminPath } = useAuth()
 const mobileNavOpen = ref(false)
 const sidebarCollapsed = ref(false)
+const isMobile = ref(false)
+const effectiveCollapsed = computed(() => !isMobile.value && sidebarCollapsed.value)
+let mobileQuery: MediaQueryList | null = null
+let syncMobile: (() => void) | null = null
+let previousBodyOverflow = ''
 
 const isDark = computed(() => resolvedTheme.value === 'dark')
 
@@ -61,19 +66,46 @@ async function guardPanel() {
 }
 
 onMounted(async () => {
+  mobileQuery = window.matchMedia('(max-width: 900px)')
+  syncMobile = () => {
+    isMobile.value = Boolean(mobileQuery?.matches)
+    if (!isMobile.value) mobileNavOpen.value = false
+  }
+  syncMobile()
+  mobileQuery.addEventListener('change', syncMobile)
+  window.addEventListener('keydown', onKeydown)
   await guardPanel()
   sidebarCollapsed.value = isAdmin.value && localStorage.getItem('corner-admin-sidebar-collapsed') === '1'
 })
 
 function toggleSidebar() {
-  if (!isAdmin.value) return
+  if (!isAdmin.value || isMobile.value) return
   sidebarCollapsed.value = !sidebarCollapsed.value
   localStorage.setItem('corner-admin-sidebar-collapsed', sidebarCollapsed.value ? '1' : '0')
 }
 
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') mobileNavOpen.value = false
+}
+
+watch(mobileNavOpen, (open) => {
+  if (open && isMobile.value) {
+    previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = previousBodyOverflow
+  }
+})
+
 watch(() => route.path, () => {
   mobileNavOpen.value = false
   void guardPanel()
+})
+
+onUnmounted(() => {
+  if (syncMobile) mobileQuery?.removeEventListener('change', syncMobile)
+  window.removeEventListener('keydown', onKeydown)
+  document.body.style.overflow = previousBodyOverflow
 })
 </script>
 
@@ -156,13 +188,6 @@ watch(() => route.path, () => {
     visibility: hidden;
     transition: transform 0.24s ease, visibility 0.24s;
   }
-  .admin-root.sidebar-collapsed .sidebar-shell { width:min(82vw,300px); flex-basis:var(--left-w); }
-  .sidebar-shell :deep(.sidebar-left.is-collapsed) { width:100%; padding-right:16px; padding-left:16px; }
-  .sidebar-shell :deep(.is-collapsed .hero-text),.sidebar-shell :deep(.is-collapsed .hero-status),.sidebar-shell :deep(.is-collapsed .nav-label),.sidebar-shell :deep(.is-collapsed .user-name),.sidebar-shell :deep(.is-collapsed .user-badge),.sidebar-shell :deep(.is-collapsed .user-logout),.sidebar-shell :deep(.is-collapsed .user-back span),.sidebar-shell :deep(.is-collapsed .admin-collapse-button span),.sidebar-shell :deep(.is-collapsed .admin-collapse-button svg:last-child) { display:revert; }
-  .sidebar-shell :deep(.is-collapsed .search-box) { display:flex; }
-  .sidebar-shell :deep(.is-collapsed .nav-item) { justify-content:flex-start; padding:7px 10px; }
-  .sidebar-shell :deep(.is-collapsed .theme-pill) { width:fit-content; flex-direction:row; border-radius:1.2rem; }
-  .sidebar-shell :deep(.is-collapsed .admin-collapse-button) { width:100%; padding:7px 10px; }
 
   .sidebar-shell.open {
     transform: translate3d(0, 0, 0);

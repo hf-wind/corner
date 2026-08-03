@@ -29,10 +29,11 @@
             type="button"
             class="category-card"
             :class="{ active: activeCategory === category.slug }"
+            :style="{ '--category-color': category.color || 'var(--c-primary)' }"
             @click="selectCategory(category.slug)"
           >
             <span class="category-index">{{ String(index + 1).padStart(2, '0') }}</span>
-            <span class="category-icon"><Icon name="ph:folder-open-duotone" /></span>
+            <span class="category-icon"><Icon :name="category.icon || 'ph:folder-open-bold'" /></span>
             <span class="category-copy">
               <strong>{{ category.name }}</strong>
               <small>{{ category.description || '这个分类正在慢慢积累内容。' }}</small>
@@ -125,6 +126,7 @@ async function loadCategoryPosts(slug: string) {
     categoryPosts.value = (res.items ?? []).map((post: any) => ({
       slug: post.slug, title: post.title, cover: post.coverImage, excerpt: post.excerpt,
       publishedAt: post.publishedAt, tag: post.category?.name || activeCategoryName.value || '随笔',
+      tagIcon: post.category?.icon || 'ph:folder-open-bold', tagColor: post.category?.color || '',
     }))
   } catch { categoryPosts.value = [] }
   finally { postsLoading.value = false }
@@ -159,4 +161,12 @@ useHead({ title: '文章分类' })
 .cat-stats-list { display:grid; gap:10px; }.cat-stats-list button { display:grid; grid-template-columns:42px 1fr; align-items:center; gap:8px; padding:0; border:0; background:transparent; color:inherit; cursor:pointer; font:inherit; text-align:left; }.cat-stats-list button>span { height:4px; overflow:hidden; border-radius:999px; background:var(--c-bg-2); }.cat-stats-list i { display:block; height:100%; border-radius:inherit; background:var(--c-primary); }.cat-stats-list button>div { display:flex; justify-content:space-between; gap:8px; }.cat-stats-list strong { overflow:hidden; color:var(--c-text-2); font-size:.64rem; text-overflow:ellipsis; white-space:nowrap; }.cat-stats-list small { color:var(--c-text-3); font-size:.55rem; }.cat-stats-list button.active strong { color:var(--c-primary); }.tag-cloud { display:flex; flex-wrap:wrap; gap:6px; }.tag-cloud a { padding:4px 8px; border-radius:999px; background:var(--c-bg-2); color:var(--c-text-2); font-size:.57rem; text-decoration:none; transition:.2s; }.tag-cloud a:hover { background:var(--c-primary-soft); color:var(--c-primary); }
 @media (max-width:900px) { .category-grid { grid-template-columns:1fr; }.category-insights { grid-template-columns:repeat(3,minmax(0,1fr)); margin-inline:0; }.category-insights>i { display:none; } }
 @media (max-width:640px) { .main-content { padding:max(68px,calc(env(safe-area-inset-top) + 60px)) 16px 24px!important; }.category-insights { grid-template-columns:1fr; gap:9px; padding:13px; }.category-insights>div { padding:4px; }.category-card { min-height:122px; padding:16px; }.content-heading { align-items:stretch; flex-direction:column; gap:10px; }.category-search { width:100%; }.category-copy small { -webkit-line-clamp:1; }.result-heading { align-items:flex-start; }.result-count { padding-top:6px; } }
+
+.category-card { --category-color:var(--c-primary); }
+.category-card::before { background:color-mix(in srgb,var(--category-color) 15%,transparent); }
+.category-card::after { background:var(--category-color); }
+.category-card:hover,.category-card.active { border-color:color-mix(in srgb,var(--category-color) 48%,var(--border)); }
+.category-card.active { background:linear-gradient(135deg,color-mix(in srgb,var(--category-color) 10%,var(--ld-bg-card)),var(--ld-bg-card)); }
+.category-icon { color:var(--category-color); background:color-mix(in srgb,var(--category-color) 13%,transparent); }
+.category-count strong,.category-arrow { color:var(--category-color); }
 </style>

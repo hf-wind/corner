@@ -9,8 +9,7 @@
         <a-table :dataSource="categories" :columns="columns" rowKey="slug" size="small" :pagination="false" :locale="{ emptyText: '暂无分类' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'icon'">
-              <component v-if="record.icon" :is="record.icon" :style="{ color: record.color || 'var(--c-text-3)', fontSize: '16px' }" />
-              <FolderOutlined v-else style="color:var(--c-text-3);font-size:16px" />
+              <Icon :name="record.icon || 'ph:folder-open-bold'" :style="{ color: record.color || 'var(--c-text-3)', fontSize: '16px' }" />
             </template>
             <template v-if="column.key === 'color'">
               <span v-if="record.color" class="table-color-pill"><span class="table-color-dot" :style="{ background: record.color }" />{{ record.color }}</span>
@@ -39,7 +38,7 @@
       <div class="add-field">
         <label class="add-label">图标</label>
         <a-button @click="openIconPickerAdd" class="icon-pick-btn">
-          <component :is="addDialog.icon" :style="{ color: addDialog.color || '#1677ff', fontSize: '18px' }" />
+          <Icon :name="addDialog.icon" :style="{ color: addDialog.color || '#1677ff', fontSize: '18px' }" />
         </a-button>
       </div>
       <div class="add-field">
@@ -94,7 +93,7 @@ const api = useApi()
 const toast = useToast()
 const loading = ref(true)
 const categories = ref<any[]>([])
-const addDialog = reactive({ open: false, name: '', slug: '', icon: 'FolderOutlined', color: '', editing: false, editingSlug: '' })
+const addDialog = reactive({ open: false, name: '', slug: '', icon: 'ph:folder-open-bold', color: '', editing: false, editingSlug: '' })
 
 const columns = [
   { title: '', key: 'icon', width: 36, align: 'center' as const },
@@ -138,14 +137,14 @@ async function load() {
 }
 
 function openAdd() {
-  addDialog.name = ''; addDialog.slug = ''; addDialog.icon = 'FolderOutlined'; addDialog.color = ''
+  addDialog.name = ''; addDialog.slug = ''; addDialog.icon = 'ph:folder-open-bold'; addDialog.color = ''
   addDialog.editing = false; addDialog.editingSlug = ''
   addDialog.open = true
 }
 
 function openEdit(record: any) {
   addDialog.name = record.name; addDialog.slug = record.slug
-  addDialog.icon = record.icon || 'FolderOutlined'; addDialog.color = record.color || ''
+  addDialog.icon = record.icon || 'ph:folder-open-bold'; addDialog.color = record.color || ''
   addDialog.editing = true; addDialog.editingSlug = record.slug
   addDialog.open = true
 }
