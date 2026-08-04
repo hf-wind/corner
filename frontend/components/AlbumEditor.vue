@@ -6,9 +6,7 @@
         <div><h1>{{ form.title || '新建相册' }}</h1><span>{{ items.length }} 张照片 · 原图保留，公开位置由你确认</span></div>
       </div>
       <div class="heading-actions">
-        <a-button v-if="props.id" @click="setPrivate">设为私密</a-button>
-        <a-button :loading="saving" @click="save">保存草稿</a-button>
-        <a-button type="primary" :loading="publishing" @click="publish">保存并发布</a-button>
+        <a-button type="primary" :loading="saving" @click="save">保存</a-button>
       </div>
     </header>
 
@@ -119,7 +117,6 @@ const router = useRouter()
 const { mediaUrl } = useMediaUrl()
 const { openItems } = useMediaLibrary()
 const saving = ref(false)
-const publishing = ref(false)
 const dragIndex = ref(-1)
 const previewOpen = ref(false)
 const previewIndex = ref(0)
@@ -197,9 +194,6 @@ async function persist() {
   return saved
 }
 async function save() { saving.value = true; try { await persist(); toast.success('相册已保存') } catch (error: any) { toast.error(error?.message || '保存失败') } finally { saving.value = false } }
-async function publish() { publishing.value = true; try { const saved = await persist(); await api.post(`/albums/${saved.id}/publish`); toast.success('相册已发布'); router.push('/admin/albums') } catch (error: any) { toast.error(error?.message || '发布失败') } finally { publishing.value = false } }
-async function setPrivate() { if (!props.id) return; try { await persist(); await api.post(`/albums/${props.id}/private`); toast.success('相册已设为私密'); router.push('/admin/albums') } catch (error: any) { toast.error(error?.message || '设置失败') } }
-
 async function openMetadata(item: any) {
   metadataDialog.open = true; metadataDialog.loading = true; metadataDialog.item = item
   try { const result = await api.get<any>(`/media/${item.mediaId}/metadata`); metadataDialog.media = result; metadataDialog.metadata = result.metadata; metadataDialog.dateValue = result.metadata?.confirmedCapturedAt ? dayjs(result.metadata.confirmedCapturedAt) : result.metadata?.capturedAt ? dayjs(result.metadata.capturedAt) : null; metadataDialog.place = result.metadata?.confirmedPlace || item.place || null }

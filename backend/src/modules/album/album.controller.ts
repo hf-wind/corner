@@ -30,8 +30,9 @@ export class AlbumController {
     @Query('limit') limit?: string,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('needsPublish') needsPublish?: string,
   ) {
-    return this.album.findAdmin({ page, limit, status, search });
+    return this.album.findAdmin({ page, limit, status, search, needsPublish: needsPublish === 'true' });
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

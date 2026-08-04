@@ -32,6 +32,13 @@ export class MomentController {
     return this.moment.publish(slug);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post(':slug/private')
+  makePrivate(@Param('slug') slug: string) {
+    return this.moment.makePrivate(slug);
+  }
+
   @UseGuards(AuthGuard('jwt'))
   @Post(':slug/like')
   toggleLike(@Param('slug') slug: string, @Req() req: any) {

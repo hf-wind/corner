@@ -23,7 +23,7 @@
         </div>
 
         <div class="editor-sidebar">
-          <a-card :bordered="false" class="meta-card" size="small" title="草稿设置">
+          <a-card :bordered="false" class="meta-card" size="small" title="内容设置">
             <div class="meta-row">
               <label>Slug</label>
               <a-input v-model:value="form.slug" placeholder="URL 标识" size="small" />

@@ -1,5 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res, UseGuards } from '@nestjs/common';
-import type { Response } from 'express';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { EmojiService } from './emoji.service';
 import { CreateEmojiPackDto } from './dto/create-emoji-pack.dto';
@@ -16,14 +15,6 @@ export class EmojiController {
   @Get()
   getPacks() {
     return this.emoji.getPacks(false, 48);
-  }
-
-  @Get('asset')
-  async getAsset(@Query('url') url: string, @Res() response: Response) {
-    const asset = await this.emoji.cacheRemoteAsset(url);
-    response.setHeader('Content-Type', asset.mimeType);
-    response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    return response.sendFile(asset.path);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

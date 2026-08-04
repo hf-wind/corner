@@ -139,7 +139,7 @@
         <footer class="about-footer reveal-block">
           <div>
             <p>{{ profile.motto }}</p>
-            <span>{{ currentYear }} · 风隅随笔</span>
+            <span>{{ siteYearLabel }} · 风隅随笔</span>
           </div>
           <strong>{{ profile.name }}</strong>
         </footer>
@@ -157,6 +157,7 @@ const { mediaUrl } = useMediaUrl()
 const profile = ref(normalizeAboutProfile(null))
 const aboutPage = ref<HTMLElement | null>(null)
 const currentYear = new Date().getFullYear()
+const siteYearLabel = currentYear === 2026 ? '2026' : `2026 - ${currentYear}`
 const now = ref(new Date())
 const activeToolIndex = ref(0)
 const skillIcons = ['ph:devices-bold', 'ph:chart-line-up-bold', 'ph:cube-focus-bold', 'ph:code-bold']

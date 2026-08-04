@@ -7,6 +7,12 @@ import { UpdateAlbumDto } from './dto/update-album.dto';
 import type { PublicMapMemory } from '../memory-map/memory-map.types';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
 
+type PublishedAlbumSnapshot = Record<string, any> & {
+  title: string;
+  slug: string;
+  items: any[];
+};
+
 const albumInclude = {
   coverMedia: true,
   place: true,
@@ -42,21 +48,27 @@ export class AlbumService {
 
   async findPublic(query: { page?: string; limit?: string; place?: string; year?: string }) {
     const { page, limit } = this.pagination(query.page, query.limit);
-    const where: Prisma.AlbumWhereInput = { status: 'published' };
-    if (query.place) where.place = { slug: query.place };
+    const rows = await this.prisma.album.findMany({
+      where: { status: 'published' }, include: albumListInclude,
+      orderBy: [{ happenedAt: 'desc' }, { publishedAt: 'desc' }],
+    });
     const year = Number(query.year);
-    if (year >= 1900 && year <= 3000) {
-      where.happenedAt = { gte: new Date(`${year}-01-01T00:00:00.000Z`), lt: new Date(`${year + 1}-01-01T00:00:00.000Z`) };
-    }
-    const [rows, total] = await Promise.all([
-      this.prisma.album.findMany({ where, include: albumListInclude, orderBy: [{ happenedAt: 'desc' }, { publishedAt: 'desc' }], skip: (page - 1) * limit, take: limit }),
-      this.prisma.album.count({ where }),
-    ]);
-    return { items: rows.map((row) => this.formatPublic(row, false)), total, page, limit, totalPages: Math.ceil(total / limit) };
+    let visible = rows.map((row) => this.formatPublic(row, false));
+    if (query.place) visible = visible.filter((album) => album.publicLocation?.slug === query.place);
+    if (year >= 1900 && year <= 3000) visible = visible.filter((album) => album.happenedAt && new Date(album.happenedAt).getUTCFullYear() === year);
+    visible.sort((left, right) => new Date(right.happenedAt || right.publishedAt || 0).getTime() - new Date(left.happenedAt || left.publishedAt || 0).getTime());
+    const total = visible.length;
+    return { items: visible.slice((page - 1) * limit, page * limit), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findPublishedBySlug(slug: string) {
-    const album = await this.prisma.album.findFirst({ where: { slug, status: 'published' }, include: albumInclude });
+    const direct = await this.prisma.album.findFirst({ where: { slug, status: 'published' }, include: albumInclude });
+    const candidates = direct ? [direct] : await this.prisma.album.findMany({
+      where: { status: 'published', publishedSnapshot: { not: Prisma.DbNull } },
+      include: albumInclude,
+      take: 500,
+    });
+    const album = candidates.find((candidate) => (this.readSnapshot(candidate.publishedSnapshot)?.slug || candidate.slug) === slug);
     if (!album) throw new NotFoundException('Album not found');
     return this.formatPublic(album, true);
   }
@@ -100,10 +112,11 @@ export class AlbumService {
     return memories;
   }
 
-  async findAdmin(query: { page?: string; limit?: string; status?: string; search?: string }) {
+  async findAdmin(query: { page?: string; limit?: string; status?: string; search?: string; needsPublish?: boolean }) {
     const { page, limit } = this.pagination(query.page, query.limit);
     const where: Prisma.AlbumWhereInput = {};
     if (query.status && query.status !== 'all') where.status = query.status;
+    if (query.needsPublish) where.needsPublish = true;
     if (query.search) where.OR = [{ title: { contains: query.search, mode: 'insensitive' } }, { description: { contains: query.search, mode: 'insensitive' } }];
     const [items, total] = await Promise.all([
       this.prisma.album.findMany({ where, include: { coverMedia: true, place: true, _count: { select: { items: true } } }, orderBy: { updatedAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
@@ -127,6 +140,9 @@ export class AlbumService {
         description: dto.description?.trim() || null,
         coverMediaId: dto.coverMediaId || null,
         authorId,
+        status: 'draft',
+        needsPublish: true,
+        publishedSnapshot: Prisma.DbNull,
         happenedAt: dto.happenedAt ? new Date(dto.happenedAt) : null,
         placeId: dto.placeId || null,
         locationVisibility: dto.locationVisibility || 'private',
@@ -136,19 +152,20 @@ export class AlbumService {
       },
       include: albumInclude,
     });
-    this.memoryGraph?.scheduleRebuild();
     return album;
   }
 
   async update(id: string, dto: UpdateAlbumDto) {
-    const existing = await this.prisma.album.findUnique({ where: { id } });
+    const existing = await this.prisma.album.findUnique({ where: { id }, include: albumInclude });
     if (!existing) throw new NotFoundException('Album not found');
     await this.validate(dto, id);
+    const currentSnapshot = this.readSnapshot(existing.publishedSnapshot)
+      || (existing.status === 'published' ? this.buildSnapshot(existing) : null);
     const album = await this.prisma.$transaction(async (tx) => {
       if (dto.items) {
         await tx.albumItem.deleteMany({ where: { albumId: id } });
       }
-      return tx.album.update({
+      const updated = await tx.album.update({
         where: { id },
         data: {
           ...this.albumData(dto),
@@ -156,16 +173,33 @@ export class AlbumService {
         },
         include: albumInclude,
       });
+      const needsPublish = !currentSnapshot || JSON.stringify(currentSnapshot) !== JSON.stringify(this.buildSnapshot(updated));
+      return tx.album.update({
+        where: { id },
+        data: {
+          needsPublish,
+          publishedSnapshot: currentSnapshot ? currentSnapshot as Prisma.InputJsonValue : Prisma.DbNull,
+        },
+        include: albumInclude,
+      });
     });
-    this.memoryGraph?.scheduleRebuild();
     return album;
   }
 
   async publish(id: string) {
-    const album = await this.prisma.album.findUnique({ where: { id }, include: { _count: { select: { items: true } } } });
+    const album = await this.prisma.album.findUnique({ where: { id }, include: albumInclude });
     if (!album) throw new NotFoundException('Album not found');
-    if (!album._count.items) throw new BadRequestException('相册至少需要一张照片');
-    const updated = await this.prisma.album.update({ where: { id }, data: { status: 'published', publishedAt: album.publishedAt || new Date() }, include: albumInclude });
+    if (!album.items.length) throw new BadRequestException('相册至少需要一张照片');
+    const snapshot = this.buildSnapshot(album);
+    const updated = await this.prisma.album.update({
+      where: { id },
+      data: {
+        status: 'published', needsPublish: false,
+        publishedSnapshot: snapshot as Prisma.InputJsonValue,
+        publishedAt: album.publishedAt || new Date(),
+      },
+      include: albumInclude,
+    });
     this.memoryGraph?.scheduleRebuild();
     return updated;
   }
@@ -237,6 +271,29 @@ export class AlbumService {
   }
 
   private formatPublic(album: any, includeItems: boolean) {
+    const snapshot = this.readSnapshot(album.publishedSnapshot);
+    if (snapshot) {
+      return {
+        id: album.id,
+        title: snapshot.title,
+        slug: snapshot.slug,
+        description: snapshot.description,
+        happenedAt: snapshot.happenedAt,
+        publishedAt: album.publishedAt,
+        cover: snapshot.cover,
+        publicLocation: buildPublicLocation({
+          place: snapshot.place,
+          visibility: snapshot.locationVisibility,
+          precision: snapshot.locationPrecision,
+          exactConfirmedAt: snapshot.locationExactConfirmedAt,
+        }),
+        itemCount: snapshot.items.length,
+        author: album.author,
+        ...(includeItems ? {
+          items: snapshot.items.map(({ place: _place, locationVisibility: _visibility, locationPrecision: _precision, locationExactConfirmedAt: _confirmed, momentId: _momentId, ...item }: any) => item),
+        } : {}),
+      };
+    }
     const publicLocation = buildPublicLocation({
       place: album.place,
       visibility: album.locationVisibility,
@@ -273,6 +330,72 @@ export class AlbumService {
       itemCount: album._count?.items ?? album.items.length,
       author: album.author,
       ...(includeItems ? { items } : {}),
+    };
+  }
+
+  private buildSnapshot(album: any): PublishedAlbumSnapshot {
+    const items = (album.items || []).map((item: any) => {
+      const place = item.place || item.media.metadata?.confirmedPlace || null;
+      const happenedAt = item.happenedAt || item.media.metadata?.confirmedCapturedAt || null;
+      return {
+        id: item.id,
+        sort: item.sort,
+        caption: item.caption,
+        happenedAt: happenedAt ? new Date(happenedAt).toISOString() : null,
+        media: {
+          id: item.media.id,
+          path: item.media.path,
+          filename: item.media.filename,
+          width: item.media.metadata?.width ?? null,
+          height: item.media.metadata?.height ?? null,
+        },
+        place: this.placeSnapshot(place),
+        locationVisibility: item.locationVisibility,
+        locationPrecision: item.locationPrecision,
+        locationExactConfirmedAt: item.locationExactConfirmedAt ? new Date(item.locationExactConfirmedAt).toISOString() : null,
+        publicLocation: buildPublicLocation({
+          place: this.placeSnapshot(place),
+          visibility: item.locationVisibility,
+          precision: item.locationPrecision,
+          exactConfirmedAt: item.locationExactConfirmedAt,
+        }),
+        moment: item.moment?.status === 'published' ? { slug: item.moment.slug, title: item.moment.title } : null,
+        momentId: item.moment?.status === 'published' ? item.momentId : null,
+      };
+    });
+    const coverMedia = album.coverMedia || items.find((item: any) => item.media.id === album.coverMediaId)?.media || items[0]?.media;
+    return {
+      title: album.title,
+      slug: album.slug,
+      description: album.description ?? null,
+      happenedAt: album.happenedAt ? new Date(album.happenedAt).toISOString() : null,
+      cover: coverMedia ? { id: coverMedia.id, path: coverMedia.path } : null,
+      place: this.placeSnapshot(album.place),
+      locationVisibility: album.locationVisibility,
+      locationPrecision: album.locationPrecision,
+      locationExactConfirmedAt: album.locationExactConfirmedAt ? new Date(album.locationExactConfirmedAt).toISOString() : null,
+      items,
+    } as PublishedAlbumSnapshot;
+  }
+
+  private readSnapshot(raw: unknown): PublishedAlbumSnapshot | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const snapshot = raw as Record<string, any>;
+    if (!snapshot.title || !snapshot.slug || !Array.isArray(snapshot.items)) return null;
+    return snapshot as PublishedAlbumSnapshot;
+  }
+
+  private placeSnapshot(raw: unknown) {
+    if (!raw || typeof raw !== 'object') return null;
+    const place = raw as Record<string, unknown>;
+    const latitude = Number(place.latitude);
+    const longitude = Number(place.longitude);
+    if (!place.id || !place.name || !place.slug || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return {
+      id: String(place.id), name: String(place.name), slug: String(place.slug),
+      address: place.address == null ? null : String(place.address), city: place.city == null ? null : String(place.city),
+      province: place.province == null ? null : String(place.province), country: place.country == null ? null : String(place.country),
+      latitude, longitude, type: String(place.type || 'poi'),
     };
   }
 

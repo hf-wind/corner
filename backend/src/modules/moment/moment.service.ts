@@ -285,6 +285,18 @@ export class MomentService {
     return this.format(moment);
   }
 
+  async makePrivate(slug: string) {
+    const existing = await this.prisma.moment.findUnique({ where: { slug }, select: { id: true } });
+    if (!existing) throw new NotFoundException('Moment not found');
+    const moment = await this.prisma.moment.update({
+      where: { id: existing.id },
+      data: { status: 'private' },
+      include: this.buildInclude(),
+    });
+    this.memoryGraph?.scheduleRebuild();
+    return this.format(moment);
+  }
+
   async toggleLike(slug: string, userId: string) {
     const moment = await this.findPublishedByAnySlug(slug);
     if (!moment) throw new NotFoundException('Moment not found');

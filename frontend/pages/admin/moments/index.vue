@@ -35,15 +35,15 @@
             <div class="moment-row-content">
               <i v-if="record.needsPublish" class="change-dot" aria-label="有未发布修改" />
               <div class="moment-row-title">
-                <strong>{{ record.title }}</strong>
+                <div><strong>{{ record.title }}</strong><a-tag v-if="record.needsPublish" color="orange">{{ record.published ? '已更新' : '有新内容' }}</a-tag></div>
                 <span>{{ record.excerpt || '这条瞬间还没写摘要。' }}</span>
               </div>
             </div>
           </template>
 
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.published ? 'green' : 'default'">
-              {{ record.published ? '已发布' : '草稿' }}
+            <a-tag :color="statusColor(record.status)">
+              {{ statusText(record.status) }}
             </a-tag>
           </template>
 
@@ -64,6 +64,7 @@
               <a-button type="link" size="small" @click="$router.push(`/admin/moments/preview?slug=${encodeURIComponent(record.slug)}`)">
                 预览
               </a-button>
+              <a-button type="link" size="small" @click="openSettings(record)">设置</a-button>
               <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
             </div>
           </template>
@@ -107,6 +108,7 @@ const statusOptions = [
   { label: '全部', value: 'all' },
   { label: '已发布', value: 'published' },
   { label: '草稿', value: 'draft' },
+  { label: '私密', value: 'private' },
   { label: '有修改', value: 'pending' },
 ]
 
@@ -116,8 +118,10 @@ const columns = [
   { title: '点赞', dataIndex: 'likes', key: 'likes', width: 90, align: 'center' as const },
   { title: '评论', dataIndex: 'comments', key: 'comments', width: 90, align: 'center' as const },
   { title: '日期', dataIndex: 'date', key: 'date', width: 110 },
-  { title: '操作', key: 'actions', width: 240, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 350, fixed: 'right' as const },
 ]
+function statusText(status: string) { return status === 'published' ? '已发布' : status === 'private' ? '私密' : '草稿' }
+function statusColor(status: string) { return status === 'published' ? 'green' : status === 'private' ? 'purple' : 'default' }
 
 function onFilterChange() {
   page.value = 1
@@ -141,6 +145,7 @@ async function loadMoments() {
       title: item.title,
       excerpt: item.excerpt || '',
       published: item.status === 'published',
+      status: item.status,
       needsPublish: !!item.needsPublish,
       likes: item.likeCount ?? 0,
       comments: item.commentCount ?? item._count?.comments ?? 0,
@@ -155,6 +160,23 @@ async function loadMoments() {
   } finally {
     loading.value = false
   }
+}
+
+function openSettings(record: any) {
+  const restoring = record.status === 'private'
+  Modal.confirm({
+    title: restoring ? '恢复公开这条瞬间？' : '将这条瞬间设为私密？',
+    content: restoring ? '将发布当前已保存版本。' : '前台会立即隐藏，保存内容不会删除。',
+    okText: restoring ? '恢复公开' : '设为私密',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await api.post(`/moments/${record.slug}/${restoring ? 'publish' : 'private'}`)
+        toast.success(restoring ? '瞬间已恢复公开' : '瞬间已设为私密')
+        await loadMoments()
+      } catch (error: any) { toast.error(error?.message || '设置失败') }
+    },
+  })
 }
 
 function publish(record: any) {
@@ -247,6 +269,7 @@ onMounted(() => {
 .moment-row-title strong {
   color: var(--c-text);
 }
+.moment-row-title > div { display:flex; align-items:center; gap:8px; }
 
 .change-dot {
   width: 8px;
@@ -266,7 +289,8 @@ onMounted(() => {
 .table-actions {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .pagination-wrap {

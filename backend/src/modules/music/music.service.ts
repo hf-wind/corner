@@ -196,6 +196,7 @@ export class MusicService {
     expires: string;
     signature: string;
     range?: string;
+    signal?: AbortSignal;
   }) {
     const expires = Number(input.expires);
     if (
@@ -229,7 +230,9 @@ export class MusicService {
     const response = await fetch(target, {
       headers,
       redirect: 'follow',
-      signal: AbortSignal.timeout(20000),
+      signal: input.signal
+        ? AbortSignal.any([input.signal, AbortSignal.timeout(20_000)])
+        : AbortSignal.timeout(20_000),
     }).catch((error) => {
       throw new ServiceUnavailableException(`媒体加载失败: ${error}`);
     });

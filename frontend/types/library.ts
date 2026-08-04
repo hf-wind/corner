@@ -1,7 +1,7 @@
 import type { Place, PublicLocation } from './place'
 
 export type LibraryType = 'book' | 'film'
-export type LibraryPublishStatus = 'draft' | 'published'
+export type LibraryPublishStatus = 'draft' | 'published' | 'private'
 
 export interface LibraryItem {
   id: string
@@ -18,6 +18,7 @@ export interface LibraryItem {
   genres: string[]
   cast: string[]
   publishStatus: LibraryPublishStatus
+  needsPublish?: boolean
   progressStatus?: string | null
   rating?: number | null
   rank?: number | null

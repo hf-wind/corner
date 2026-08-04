@@ -37,11 +37,20 @@
         </header>
 
         <textarea
-          ref="editorRef"
+          v-if="mode === 'article'"
+          ref="articleEditorRef"
+          class="prompt-editor"
           v-model="prompt"
-          :rows="mode === 'article' ? 13 : 9"
+          :rows="13"
           :placeholder="modeConfig.placeholder"
           :disabled="generating"
+        />
+        <MomentRichEditor
+          v-else
+          ref="momentEditorRef"
+          v-model="prompt"
+          class="prompt-editor moment-prompt-editor"
+          :placeholder="modeConfig.placeholder"
         />
 
         <div class="preset-row">
@@ -96,7 +105,8 @@ const mode = ref<CreatorMode>(props.initialMode)
 const drafts = reactive<Record<CreatorMode,string>>({ article:'', moment:'' })
 const generating = ref(false)
 const pickerOpen = ref(false)
-const editorRef = ref<HTMLTextAreaElement|null>(null)
+const articleEditorRef = ref<HTMLTextAreaElement|null>(null)
+const momentEditorRef = ref<{ focus: () => void; insertToken: (token: string) => void } | null>(null)
 const prompt = computed({ get:() => drafts[mode.value], set:(value:string) => { drafts[mode.value] = value } })
 
 const configs = {
@@ -129,10 +139,19 @@ const presets = computed(() => mode.value === 'article' ? [
   { label:'此刻心情',icon:'ph:heart-straight-bold',text:'我现在最想说的是：' },
 ])
 
-watch(mode, () => { pickerOpen.value=false; nextTick(() => editorRef.value?.focus()) })
+function focusEditor() { mode.value === 'moment' ? momentEditorRef.value?.focus() : articleEditorRef.value?.focus() }
+watch(mode, () => { pickerOpen.value=false; nextTick(focusEditor) })
 
-function applyPreset(text:string) { prompt.value = prompt.value.trim() ? `${prompt.value}\n\n${text}` : text; nextTick(() => editorRef.value?.focus()) }
-function insertAtCursor(token:string) { const area=editorRef.value; const text=prompt.value; const start=area?.selectionStart ?? text.length; const end=area?.selectionEnd ?? text.length; prompt.value=`${text.slice(0,start)}${token}${text.slice(end)}`; nextTick(()=>{ area?.focus(); area?.setSelectionRange(start+token.length,start+token.length) }) }
+function applyPreset(text:string) { prompt.value = prompt.value.trim() ? `${prompt.value}\n\n${text}` : text; nextTick(focusEditor) }
+function insertAtCursor(token:string) {
+  if (mode.value === 'moment' && momentEditorRef.value) {
+    momentEditorRef.value.insertToken(token)
+    return
+  }
+  const area=articleEditorRef.value; const text=prompt.value; const start=area?.selectionStart ?? text.length; const end=area?.selectionEnd ?? text.length
+  prompt.value=`${text.slice(0,start)}${token}${text.slice(end)}`
+  nextTick(()=>{ area?.focus(); area?.setSelectionRange(start+token.length,start+token.length) })
+}
 function insertEmoji(payload:{char?:string;imageUrl?:string;label?:string}) { insertAtCursor(payload.imageUrl ? `[[emoji:${payload.imageUrl}|${payload.label || '表情'}]]` : payload.char || ''); pickerOpen.value=false }
 async function pickImages() { const urls=await open({multiple:true,folder:'moment'}); if (!urls.length) return; insertAtCursor(`${prompt.value.trim()?'\n\n':''}${urls.map((url,index)=>`![瞬间图片 ${index+1}](${url})`).join('\n')}\n`) }
 
@@ -166,13 +185,13 @@ async function generateMoment(text:string) {
 .mode-hero { position:relative; display:flex; min-height:160px; align-items:center; justify-content:space-between; gap:34px; padding:27px 30px; overflow:hidden; border:1px solid color-mix(in srgb,var(--border) 74%,transparent); border-radius:17px; background:radial-gradient(circle at 12% 0,color-mix(in srgb,var(--c-primary) 8%,transparent),transparent 34%),var(--ld-bg-card); box-shadow:0 9px 28px color-mix(in srgb,var(--ld-shadow) 34%,transparent); }.mode-hero::before { position:absolute; top:27px; bottom:27px; left:0; width:3px; background:linear-gradient(var(--c-primary),transparent); content:''; }.mode-intro { max-width:610px; }.mode-intro>span { display:flex; align-items:center; gap:7px; color:var(--c-primary); font-size:.6rem; font-weight:700; letter-spacing:.13em; }.mode-intro h2 { margin:10px 0 0; color:var(--c-text); font-size:1.4rem; }.mode-intro p { margin:8px 0 0; color:var(--c-text-2); font-size:.74rem; line-height:1.75; }
 .mode-switch { display:flex; flex:0 0 auto; gap:6px; padding:5px; border-radius:14px; background:var(--c-bg-2); }.mode-switch button { display:grid; min-width:116px; grid-template-columns:24px 1fr; align-items:center; gap:7px; padding:11px 12px; border:0; border-radius:10px; background:transparent; color:var(--c-text-3); cursor:pointer; text-align:left; font:inherit; transition:background-color .2s ease,color .2s ease,box-shadow .2s ease; }.mode-switch button.active { background:var(--ld-bg-card); color:var(--c-primary); box-shadow:0 5px 15px var(--ld-shadow); }.mode-switch button> :deep(svg) { font-size:1.1rem; }.mode-switch button span { display:flex; flex-direction:column; }.mode-switch strong { color:var(--c-text); font-size:.76rem; }.mode-switch small { margin-top:2px; color:var(--c-text-3); font-size:.56rem; }
 .studio-grid { display:grid; grid-template-columns:minmax(0,1fr) 275px; gap:18px; align-items:start; margin-top:18px; }.prompt-card,.rail-card { border:1px solid color-mix(in srgb,var(--border) 76%,transparent); border-radius:16px; background:var(--ld-bg-card); }.prompt-card { padding:23px 25px 19px; box-shadow:0 10px 30px color-mix(in srgb,var(--ld-shadow) 34%,transparent); }.prompt-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }.prompt-head span,.rail-card header span { color:var(--c-text-3); font-size:.58rem; letter-spacing:.15em; }.prompt-head h2 { margin:5px 0 0; color:var(--c-text); font-size:1rem; }.prompt-head small { color:var(--c-text-3); font-size:.66rem; font-variant-numeric:tabular-nums; }
-.prompt-card textarea { display:block; width:100%; min-height:250px; margin-top:15px; padding:17px 18px; border:1px solid var(--border); border-radius:11px; outline:0; resize:vertical; background:var(--c-bg-1); color:var(--c-text); font:inherit; font-size:.85rem; line-height:1.9; transition:border-color .18s ease,box-shadow .18s ease; }.prompt-card textarea:focus { border-color:var(--c-primary); box-shadow:0 0 0 3px var(--c-primary-soft); }.prompt-card textarea::placeholder { color:var(--c-text-3); }
+.prompt-editor { display:block; width:100%; min-height:250px; margin-top:15px; padding:17px 18px; border:1px solid var(--border); border-radius:8px; outline:0; resize:vertical; overflow-y:auto; background:var(--c-bg-1); color:var(--c-text); font:inherit; font-size:.85rem; line-height:1.9; transition:border-color .18s ease,box-shadow .18s ease; }.prompt-editor:focus { border-color:var(--c-primary); box-shadow:0 0 0 3px var(--c-primary-soft); }.prompt-editor::placeholder { color:var(--c-text-3); }.moment-prompt-editor { max-height:52vh; resize:none; }
 .preset-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:12px; }.preset-row>span { margin-right:3px; color:var(--c-text-3); font-size:.62rem; }.preset-row button { display:flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid var(--border); border-radius:999px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.63rem; }.preset-row button:hover { background:var(--c-primary-soft); color:var(--c-primary); }
 .prompt-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:17px; padding-top:15px; border-top:1px solid color-mix(in srgb,var(--border) 70%,transparent); }.prompt-tools { position:relative; display:flex; align-items:center; gap:6px; }.prompt-tools>span { display:flex; align-items:center; gap:5px; margin-left:3px; color:var(--c-text-3); font-size:.61rem; }.tool-button { display:grid; width:32px; height:32px; place-items:center; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--c-text-3); cursor:pointer; }.tool-button:hover,.tool-button.active { background:var(--c-primary-soft); color:var(--c-primary); }.picker-wrap { position:relative; }
 .generate-button { display:flex; min-height:38px; align-items:center; gap:7px; padding:8px 15px; border:0; border-radius:10px; background:var(--c-primary); color:#fff; box-shadow:0 8px 18px color-mix(in srgb,var(--c-primary) 20%,transparent); cursor:pointer; font:inherit; font-size:.72rem; font-weight:650; }.generate-button:disabled { background:var(--c-bg-2); box-shadow:none; color:var(--c-text-3); cursor:not-allowed; }
 .studio-rail { display:grid; gap:12px; }.rail-card { padding:18px; }.rail-card header h3 { margin:5px 0 0; color:var(--c-text); font-size:.88rem; }.flow-card ol { display:grid; gap:0; margin:16px 0 0; padding:0; list-style:none; }.flow-card li { position:relative; display:grid; grid-template-columns:25px 1fr; gap:9px; padding-bottom:16px; }.flow-card li:last-child { padding-bottom:0; }.flow-card li:not(:last-child)::before { position:absolute; top:24px; bottom:0; left:12px; width:1px; background:var(--border); content:''; }.flow-card i { z-index:1; display:grid; width:25px; height:25px; place-items:center; border-radius:50%; background:var(--c-primary-soft); color:var(--c-primary); font-size:.6rem; font-style:normal; }.flow-card li div { display:flex; flex-direction:column; }.flow-card strong { color:var(--c-text-2); font-size:.69rem; }.flow-card li span { margin-top:3px; color:var(--c-text-3); font-size:.58rem; line-height:1.55; }.tone-card { background:linear-gradient(145deg,var(--c-primary-soft),var(--ld-bg-card)); }.tone-card> :deep(svg) { color:var(--c-primary); font-size:1.15rem; }.tone-card p { margin:10px 0 0; color:var(--c-text-2); font-size:.66rem; line-height:1.75; }.tone-card>span { display:block; margin-top:8px; color:var(--c-text-3); font-size:.56rem; }
 .mode-fade-enter-active,.mode-fade-leave-active { transition:opacity .15s ease,transform .15s ease; }.mode-fade-enter-from { opacity:0; transform:translateY(4px); }.mode-fade-leave-to { opacity:0; transform:translateY(-4px); }.spinning { animation:spin .8s linear infinite; }@keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:900px) { .mode-hero { align-items:flex-start; flex-direction:column; }.mode-switch { width:100%; }.mode-switch button { min-width:0; flex:1; }.studio-grid { grid-template-columns:1fr; }.studio-rail { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media (max-width:640px) { .page-header { align-items:stretch; flex-direction:column; }.page-header> :last-child { align-self:flex-end; }.mode-hero { padding:23px 20px; border-radius:14px; }.mode-intro h2 { font-size:1.16rem; }.mode-switch { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }.mode-switch button { grid-template-columns:20px 1fr; padding:9px; }.prompt-card { padding:18px 15px 15px; }.prompt-card textarea { min-height:220px; padding:14px; }.prompt-footer { align-items:stretch; flex-direction:column; }.prompt-tools>span { display:none; }.generate-button { justify-content:center; }.studio-rail { grid-template-columns:1fr; } }
+@media (max-width:640px) { .page-header { align-items:stretch; flex-direction:column; }.page-header> :last-child { align-self:flex-end; }.mode-hero { padding:23px 20px; border-radius:14px; }.mode-intro h2 { font-size:1.16rem; }.mode-switch { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }.mode-switch button { grid-template-columns:20px 1fr; padding:9px; }.prompt-card { padding:18px 15px 15px; }.prompt-editor { min-height:220px; padding:14px; }.prompt-footer { align-items:stretch; flex-direction:column; }.prompt-tools>span { display:none; }.generate-button { justify-content:center; }.studio-rail { grid-template-columns:1fr; } }
 @media (prefers-reduced-motion:reduce) { .mode-fade-enter-active,.mode-fade-leave-active,.spinning { transition:none; animation:none; } }
 </style>

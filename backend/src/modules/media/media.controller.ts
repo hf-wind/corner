@@ -82,22 +82,24 @@ export class MediaController {
     @Body() dto: UploadMediaDto,
   ) {
     const isAdmin = req.user?.role === 'admin';
-    if (!isAdmin && dto?.folder !== 'avatar') {
+    const folder = isAdmin ? dto?.folder : 'avatar';
+    const isAvatar = folder === 'avatar';
+    if (!isAdmin && !isAvatar) {
       throw new ForbiddenException('普通用户只能上传头像');
     }
     if (
-      !isAdmin &&
+      isAvatar &&
       !['image/jpeg', 'image/png', 'image/webp'].includes(file?.mimetype)
     ) {
       throw new BadRequestException('头像仅支持 JPG、PNG 或 WebP');
     }
-    if (!isAdmin && file?.size > 8 * 1024 * 1024) {
+    if (isAvatar && file?.size > 8 * 1024 * 1024) {
       throw new BadRequestException('头像文件不能超过 8MB');
     }
     return this.media.create(
       file,
       req.user?.id,
-      isAdmin ? dto?.folder : 'avatar',
+      folder,
       isAdmin && dto?.compressAnimated === 'true',
     );
   }

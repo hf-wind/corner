@@ -6,6 +6,7 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { PostQueryDto } from './dto/post-query.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { SchedulePostDto } from './dto/schedule-post.dto';
 
 @Controller('posts')
 export class PostController {
@@ -38,6 +39,27 @@ export class PostController {
   @Post(':slug/publish')
   publish(@Param('slug') slug: string) {
     return this.post.publish(slug);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post(':slug/schedule')
+  schedule(@Param('slug') slug: string, @Body() dto: SchedulePostDto) {
+    return this.post.schedule(slug, dto.scheduledAt);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Delete(':slug/schedule')
+  cancelSchedule(@Param('slug') slug: string) {
+    return this.post.cancelSchedule(slug);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post(':slug/private')
+  makePrivate(@Param('slug') slug: string) {
+    return this.post.makePrivate(slug);
   }
 
   @Get(':slug')

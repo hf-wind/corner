@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
@@ -59,6 +59,7 @@ const postAdminSelect = {
   featured: true,
   needsPublish: true,
   publishedSnapshot: true,
+  scheduledAt: true,
   occurredAt: true,
   placeId: true,
   locationVisibility: true,
@@ -81,12 +82,24 @@ const postPublicSelect = {
 } satisfies Prisma.PostSelect;
 
 @Injectable()
-export class PostService {
+export class PostService implements OnModuleInit, OnModuleDestroy {
+  private scheduleTimer?: ReturnType<typeof setInterval>;
+
   constructor(
     private prisma: PrismaService,
     private media: MediaService,
     private memoryGraph?: MemoryGraphService,
   ) {}
+
+  onModuleInit() {
+    void this.publishScheduledPosts();
+    this.scheduleTimer = setInterval(() => void this.publishScheduledPosts(), 30_000);
+    this.scheduleTimer.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.scheduleTimer) clearInterval(this.scheduleTimer);
+  }
 
   private isAdminListQuery(query: PostQueryDto) {
     return (
@@ -206,12 +219,11 @@ export class PostService {
 
   async create(dto: CreatePostDto, authorId: string) {
     const {
-      tagIds, status, placeId: _placeId, occurredAt: _occurredAt,
+      tagIds, status: _status, placeId: _placeId, occurredAt: _occurredAt,
       locationVisibility: _visibility, locationPrecision: _precision,
       locationSource: _source, confirmExactLocation: _confirmExact, ...data
     } = dto;
     const slug = await this.uniqueSlug(data.slug);
-    const publishNow = status === 'published';
     const spacetime = await this.prepareContentSpacetime(dto);
 
     const created = await this.prisma.post.create({
@@ -220,29 +232,15 @@ export class PostService {
         ...spacetime,
         slug,
         authorId,
-        status: publishNow ? 'published' : 'draft',
-        publishedAt: publishNow ? new Date() : undefined,
-        needsPublish: !publishNow,
-        publishedSnapshot: publishNow ? undefined : Prisma.DbNull,
+        status: 'draft',
+        needsPublish: true,
+        publishedSnapshot: Prisma.DbNull,
         tags: tagIds?.length ? { create: tagIds.map((tagId) => ({ tagId })) } : undefined,
       },
       select: postAdminSelect,
     });
 
-    if (!publishNow) return this.format(created);
-
-    const snapshot = this.buildSnapshotFromPost(created);
-    const published = await this.prisma.post.update({
-      where: { id: created.id },
-      data: {
-        needsPublish: false,
-        publishedSnapshot: snapshot as unknown as Prisma.InputJsonValue,
-      },
-      select: postAdminSelect,
-    });
-
-    this.memoryGraph?.scheduleRebuild();
-    return this.format(published);
+    return this.format(created);
   }
 
   async update(slug: string, dto: UpdatePostDto) {
@@ -253,7 +251,7 @@ export class PostService {
     if (!existing) throw new NotFoundException('Post not found');
 
     const {
-      tagIds, status, placeId: _placeId, occurredAt: _occurredAt,
+      tagIds, status: _status, placeId: _placeId, occurredAt: _occurredAt,
       locationVisibility: _visibility, locationPrecision: _precision,
       locationSource: _source, confirmExactLocation: _confirmExact, ...data
     } = dto;
@@ -262,7 +260,6 @@ export class PostService {
     const currentSnapshot =
       this.readSnapshot(existing.publishedSnapshot) ||
       (existing.status === 'published' ? this.buildSnapshotFromPost(existing) : null);
-    const publishNow = status === 'published';
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (tagIds) {
@@ -275,22 +272,16 @@ export class PostService {
           ...data,
           ...spacetime,
           ...(nextSlug ? { slug: nextSlug } : {}),
-          ...(status ? { status } : {}),
-          ...(publishNow && !existing.publishedAt ? { publishedAt: new Date() } : {}),
           tags: tagIds ? { create: tagIds.map((tagId) => ({ tagId })) } : undefined,
         },
         select: postAdminSelect,
       });
 
       const nextSnapshot = this.buildSnapshotFromPost(record);
-      const needsPublish = publishNow
-        ? false
-        : record.status === 'published'
-          ? !currentSnapshot || !this.snapshotEquals(currentSnapshot, nextSnapshot)
-          : true;
-      const publishedSnapshot = publishNow
-        ? nextSnapshot
-        : currentSnapshot;
+      const needsPublish = currentSnapshot
+        ? !this.snapshotEquals(currentSnapshot, nextSnapshot)
+        : true;
+      const publishedSnapshot = currentSnapshot;
 
       return tx.post.update({
         where: { id: existing.id },
@@ -323,12 +314,62 @@ export class PostService {
         needsPublish: false,
         publishedSnapshot: snapshot as unknown as Prisma.InputJsonValue,
         publishedAt: existing.publishedAt ?? new Date(),
+        scheduledAt: null,
       },
       select: postAdminSelect,
     });
 
     this.memoryGraph?.scheduleRebuild();
     return this.format(post);
+  }
+
+  async schedule(slug: string, scheduledAt: string) {
+    const date = new Date(scheduledAt);
+    if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) {
+      throw new BadRequestException('定时发布时间必须晚于当前时间');
+    }
+    const existing = await this.prisma.post.findUnique({ where: { slug }, select: { id: true } });
+    if (!existing) throw new NotFoundException('Post not found');
+    const post = await this.prisma.post.update({
+      where: { id: existing.id },
+      data: { scheduledAt: date },
+      select: postAdminSelect,
+    });
+    return this.format(post);
+  }
+
+  async cancelSchedule(slug: string) {
+    const existing = await this.prisma.post.findUnique({ where: { slug }, select: { id: true } });
+    if (!existing) throw new NotFoundException('Post not found');
+    const post = await this.prisma.post.update({
+      where: { id: existing.id },
+      data: { scheduledAt: null },
+      select: postAdminSelect,
+    });
+    return this.format(post);
+  }
+
+  async makePrivate(slug: string) {
+    const existing = await this.prisma.post.findUnique({ where: { slug }, select: { id: true } });
+    if (!existing) throw new NotFoundException('Post not found');
+    const post = await this.prisma.post.update({
+      where: { id: existing.id },
+      data: { status: 'private', scheduledAt: null },
+      select: postAdminSelect,
+    });
+    this.memoryGraph?.scheduleRebuild();
+    return this.format(post);
+  }
+
+  private async publishScheduledPosts() {
+    const due = await this.prisma.post.findMany({
+      where: { scheduledAt: { lte: new Date() } },
+      select: { slug: true },
+      take: 50,
+    }).catch(() => []);
+    for (const post of due) {
+      await this.publish(post.slug).catch(() => undefined);
+    }
   }
 
   async remove(slug: string) {

@@ -430,54 +430,63 @@ export class MemoryGraphService implements OnModuleInit {
     }
 
     for (const album of albums) {
+      const snapshot = this.record(album.publishedSnapshot);
+      const snapshotSlug = this.stringValue(snapshot?.slug);
+      const snapshotPlace = this.snapshotPlace(snapshot?.place);
+      const albumPlace = snapshotPlace || album.place;
+      const albumVisibility = this.stringValue(snapshot?.locationVisibility) || album.locationVisibility;
+      const snapshotItems = Array.isArray(snapshot?.items) ? snapshot.items.map((item) => this.record(item)).filter(Boolean) as Record<string, any>[] : null;
       const albumId = `album:${album.id}`;
-      const albumVisible = album.locationVisibility !== 'private';
+      const albumVisible = albumVisibility !== 'private';
       addNode(
         this.node({
           id: albumId,
           type: 'album',
           sourceId: album.id,
-          title: album.title,
-          slug: album.slug,
-          excerpt: this.cleanText(album.description),
-          href: `/albums/${album.slug}`,
-          image: album.coverMedia?.path,
-          occurredAt: album.happenedAt || album.publishedAt,
-          placeId: albumVisible ? album.placeId : null,
+          title: this.stringValue(snapshot?.title) || album.title,
+          slug: snapshotSlug || album.slug,
+          excerpt: this.cleanText(snapshot?.description || album.description),
+          href: `/albums/${snapshotSlug || album.slug}`,
+          image: this.stringValue(this.record(snapshot?.cover)?.path) || album.coverMedia?.path,
+          occurredAt: this.dateValue(snapshot?.happenedAt) || album.happenedAt || album.publishedAt,
+          placeId: albumVisible ? albumPlace?.id || null : null,
           metadata: {
-            photoCount: album.items.length,
-            hasLocation: !!album.place,
-            locationVisibility: album.locationVisibility,
+            photoCount: snapshotItems?.length ?? album.items.length,
+            hasLocation: !!albumPlace,
+            locationVisibility: albumVisibility,
           },
         }),
       );
-      rememberPlace(album.place, albumId, albumVisible);
+      rememberPlace(albumPlace, albumId, albumVisible);
 
-      for (const item of album.items) {
-        const photoId = `photo:${item.id}`;
-        const itemVisible = item.locationVisibility !== 'private';
-        const itemPlace = item.place || item.media.metadata?.confirmedPlace;
+      const activeItems: any[] = snapshotItems || album.items;
+      for (const item of activeItems) {
+        const media = this.record(item.media) || item.media;
+        const photoId = `photo:${this.stringValue(item.id)}`;
+        const itemVisibility = this.stringValue(item.locationVisibility) || 'private';
+        const itemVisible = itemVisibility !== 'private';
+        const itemPlace = this.snapshotPlace(item.place) || item.place || media?.metadata?.confirmedPlace;
+        const caption = this.stringValue(item.caption);
         addNode(
           this.node({
             id: photoId,
             type: 'photo',
-            sourceId: item.id,
-            title:
-              item.caption || item.media.originalName || item.media.filename,
-            excerpt: this.cleanText(item.caption),
-            href: `/albums/${album.slug}?photo=${item.id}`,
-            image: item.media.path,
+            sourceId: this.stringValue(item.id),
+            title: caption || this.stringValue(media?.filename) || '相册照片',
+            excerpt: this.cleanText(caption),
+            href: `/albums/${snapshotSlug || album.slug}?photo=${this.stringValue(item.id)}`,
+            image: this.stringValue(media?.path),
             occurredAt:
-              item.happenedAt ||
-              item.media.metadata?.confirmedCapturedAt ||
-              item.media.metadata?.capturedAt,
+              this.dateValue(item.happenedAt) ||
+              media?.metadata?.confirmedCapturedAt ||
+              media?.metadata?.capturedAt,
             placeId: itemVisible ? itemPlace?.id || null : null,
             metadata: {
               albumId: album.id,
-              albumTitle: album.title,
+              albumTitle: this.stringValue(snapshot?.title) || album.title,
               hasLocation: !!itemPlace,
-              width: item.media.metadata?.width,
-              height: item.media.metadata?.height,
+              width: media?.width ?? media?.metadata?.width,
+              height: media?.height ?? media?.metadata?.height,
             },
           }),
         );
@@ -486,7 +495,7 @@ export class MemoryGraphService implements OnModuleInit {
             albumId,
             photoId,
             'same_album',
-            { albumId: album.id, albumTitle: album.title },
+            { albumId: album.id, albumTitle: this.stringValue(snapshot?.title) || album.title },
             1,
           ),
         );
@@ -505,37 +514,42 @@ export class MemoryGraphService implements OnModuleInit {
     }
 
     for (const item of libraryItems) {
+      const snapshot = this.record(item.publishedSnapshot);
+      const activePlace = this.snapshotPlace(snapshot?.place) || item.place;
+      const activeVisibility = this.stringValue(snapshot?.locationVisibility) || item.locationVisibility;
+      const activeSlug = this.stringValue(snapshot?.slug) || item.slug;
       const id = `library:${item.id}`;
-      const visible = item.locationVisibility !== 'private';
+      const visible = activeVisibility !== 'private';
       addNode(
         this.node({
           id,
           type: 'library',
           sourceId: item.id,
-          title: item.title,
-          slug: item.slug,
-          excerpt: this.cleanText(item.reflection || item.summary),
-          href: `/library/${item.slug}`,
-          image: item.coverImage,
+          title: this.stringValue(snapshot?.title) || item.title,
+          slug: activeSlug,
+          excerpt: this.cleanText(snapshot?.reflection || snapshot?.summary || item.reflection || item.summary),
+          href: `/library/${activeSlug}`,
+          image: this.stringValue(snapshot?.coverImage) || item.coverImage,
           occurredAt:
-            item.finishDate ||
-            item.startDate ||
+            this.dateValue(snapshot?.finishDate) ||
+            this.dateValue(snapshot?.startDate) ||
+            item.finishDate || item.startDate ||
             item.publishedAt ||
             item.createdAt,
-          placeId: visible ? item.placeId : null,
+          placeId: visible ? activePlace?.id || null : null,
           metadata: {
-            libraryType: item.type,
-            hasLocation: !!item.place,
-            creator: item.creator,
-            rating: item.rating,
-            genres: item.genres,
-            featured: item.recommended,
-            locationVisibility: item.locationVisibility,
-            locationPrecision: item.locationPrecision,
+            libraryType: this.stringValue(snapshot?.type) || item.type,
+            hasLocation: !!activePlace,
+            creator: this.stringValue(snapshot?.creator) || item.creator,
+            rating: snapshot?.rating ?? item.rating,
+            genres: snapshot?.genres ?? item.genres,
+            featured: snapshot?.recommended ?? item.recommended,
+            locationVisibility: activeVisibility,
+            locationPrecision: this.stringValue(snapshot?.locationPrecision) || item.locationPrecision,
           },
         }),
       );
-      rememberPlace(item.place, id, visible);
+      rememberPlace(activePlace, id, visible);
     }
 
     for (const journey of journeys) {

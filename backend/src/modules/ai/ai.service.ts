@@ -8,7 +8,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { MediaService } from '../media/media.service';
-import { MusicService } from '../music/music.service';
 import {
   AI_DEFAULTS,
   AI_SETTING_KEYS,
@@ -105,7 +104,6 @@ export class AiService {
     private prisma: PrismaService,
     private settings: SettingsService,
     private media: MediaService,
-    private music: MusicService,
   ) {}
 
   private envApiKey(provider: string) {
@@ -1743,7 +1741,6 @@ export class AiService {
       [message, article?.title || ''].filter(Boolean).join(' '),
       cfg,
     );
-    const musicContext = await this.buildMusicContext(message);
     const identity = [
       `当前对话对象：${username}`,
       isOwner
@@ -1765,7 +1762,7 @@ export class AiService {
 
     const system: ChatMessage = {
       role: 'system',
-      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${articleContext}\n\n【博客知识库】\n${knowledge}${musicContext}`,
+      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${articleContext}\n\n【博客知识库】\n${knowledge}`,
     };
 
     const historyLimit = Math.max(4, Math.min(60, cfg.ai_history_limit || 24));
@@ -1800,26 +1797,6 @@ export class AiService {
     ];
 
     return { cfg, messages };
-  }
-
-  private async buildMusicContext(message: string) {
-    const query = String(message || '');
-    if (!/(歌单|歌曲|音乐|听歌|想听|推荐.*歌|来一首|选.*歌)/i.test(query)) {
-      return '';
-    }
-    const candidates = await this.music
-      .getRecommendationCandidates(query, 10)
-      .catch(() => []);
-    if (!candidates.length) {
-      return '\n\n【本站歌单】\n暂时无法读取歌单，请不要编造歌曲。';
-    }
-    const compact = candidates
-      .map(
-        (track, index) =>
-          `${index + 1}. ${track.name} - ${track.artist}（${track.playlist}）`,
-      )
-      .join('\n');
-    return `\n\n【本站歌单的本地检索结果】\n只从以下少量候选中推荐，不要声称看过完整歌单；说明推荐理由即可。\n${compact}`;
   }
 
   async petChat(

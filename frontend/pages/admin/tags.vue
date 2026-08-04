@@ -101,7 +101,7 @@ const columns = [
   { title: '名称', dataIndex: 'name', key: 'name' },
   { title: 'Slug', dataIndex: 'slug', key: 'slug' },
   { title: '文章', dataIndex: 'postCount', key: 'postCount', width: 60, align: 'center' as const },
-  { title: '操作', key: 'actions', width: 320, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 390, fixed: 'right' as const },
 ]
 
 const viewColumns = [
@@ -229,6 +229,7 @@ async function confirmAssign() {
 <style scoped>
 .table-toolbar { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
 .list-card { border-radius:8px; }
+.list-card :deep(td:last-child) { white-space:nowrap; }
 .assign-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
 .assign-count { font-size:0.78rem; color:var(--c-text-3); white-space:nowrap; }
 .assign-list { max-height:400px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:4px; }

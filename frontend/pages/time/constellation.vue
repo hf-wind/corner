@@ -726,7 +726,7 @@ useHead({ title: '时光星图' })
 .constellation-audio.playing>span i:nth-child(3) { animation-delay:-.22s; }
 .constellation-audio.playing>span i:nth-child(4) { animation-delay:-.68s; }
 .constellation-audio input { width:70px; height:3px; accent-color:#69c8ee; cursor:pointer; }
-.memory-popup { position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(342px,calc(100vw - 40px)); max-height:min(620px,calc(100dvh - 138px)); overflow-x:hidden; overflow-y:auto; padding:25px 25px 23px 30px; border:1px solid rgb(125 204 246 / .18); border-radius:24px 24px 24px 10px; background:linear-gradient(145deg,rgb(7 25 48 / .76),rgb(2 10 25 / .88)); box-shadow:0 24px 70px rgb(0 0 0 / .42),inset 0 1px rgb(191 226 255 / .08); backdrop-filter:blur(24px) saturate(1.2); transform:translateY(-50%); }
+.memory-popup { position:absolute; z-index:20; top:50%; right:clamp(20px,4.5vw,72px); width:min(342px,calc(100vw - 40px)); height:min(620px,calc(100dvh - 138px)); box-sizing:border-box; contain:layout paint; overflow-anchor:none; overflow-x:hidden; overflow-y:auto; padding:25px 25px 23px 30px; border:1px solid rgb(125 204 246 / .18); border-radius:24px 24px 24px 10px; background:linear-gradient(145deg,rgb(7 25 48 / .76),rgb(2 10 25 / .88)); box-shadow:0 24px 70px rgb(0 0 0 / .42),inset 0 1px rgb(191 226 255 / .08); backdrop-filter:blur(24px) saturate(1.2); transform:translateY(-50%); }
 .popup-rail { position:absolute; top:27px; bottom:24px; left:12px; display:flex; width:2px; flex-direction:column; align-items:center; justify-content:space-between; }
 .popup-rail::before { position:absolute; top:0; bottom:0; width:1px; background:linear-gradient(transparent,rgb(104 203 246 / .46),transparent); content:''; }
 .popup-rail span,.popup-rail i { position:relative; width:6px; height:6px; border:1px solid #79d7f7; border-radius:50%; background:#0b2842; box-shadow:0 0 12px #63c8ef; }
@@ -813,7 +813,7 @@ useHead({ title: '时光星图' })
   .constellation-foot>span b { display:none; }
   .constellation-audio { right:14px; bottom:12px; }
   .constellation-audio input { display:none; }
-  .memory-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; max-height:min(52dvh,440px); padding:18px 18px 18px 24px; border-radius:20px 20px 20px 8px; transform:none; }
+  .memory-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; height:min(52dvh,440px); padding:18px 18px 18px 24px; border-radius:20px 20px 20px 8px; transform:none; }
   .discovery-popup { top:auto; right:14px; bottom:58px; left:14px; width:auto; height:min(560px,67dvh); max-height:min(67dvh,560px); padding:19px; transform:none; }
   .discovery-popup.is-closing { transform:translateY(24px) scale(.96); }
   .discovery-popup.is-immersive { top:14px; right:14px; bottom:auto; left:64px; width:auto; height:54px; padding:10px 12px; }

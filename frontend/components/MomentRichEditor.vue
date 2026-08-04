@@ -94,7 +94,9 @@ function contentNodes(content: string) {
   for (const match of content.matchAll(TOKEN_RE)) {
     const index = match.index || 0
     if (index > cursor) appendText(fragment, content.slice(cursor, index))
+    fragment.append(document.createTextNode(CURSOR_MARKER))
     fragment.append(createTokenNode(match[0], match[1], match[2], match[3], match[4]))
+    fragment.append(document.createTextNode(CURSOR_MARKER))
     cursor = index + match[0].length
   }
   if (cursor < content.length) appendText(fragment, content.slice(cursor))
@@ -194,9 +196,50 @@ function onPaste(event: ClipboardEvent) {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if ((event.key === 'Backspace' || event.key === 'Delete') && removeAdjacentToken(event.key === 'Backspace' ? -1 : 1)) {
+    event.preventDefault()
+    syncModel()
+    return
+  }
   if (event.key !== 'Enter') return
   event.preventDefault()
   insertPlainText('\n')
+}
+
+function removeAdjacentToken(direction: -1 | 1) {
+  const root = rootRef.value
+  const selection = window.getSelection()
+  if (!root || !selection?.rangeCount || !selection.isCollapsed) return false
+  const range = selection.getRangeAt(0)
+  let node: Node | null = range.startContainer
+  let offset = range.startOffset
+  if (!root.contains(node)) return false
+
+  if (node.nodeType === Node.TEXT_NODE) {
+    const length = node.textContent?.length || 0
+    if ((direction < 0 && offset > 0) || (direction > 0 && offset < length)) return false
+  }
+
+  let candidate: Node | null
+  if (node === root) candidate = root.childNodes[offset + (direction < 0 ? -1 : 0)] || null
+  else candidate = direction < 0 ? node.previousSibling : node.nextSibling
+  while (candidate?.nodeType === Node.TEXT_NODE && !(candidate.textContent || '').replaceAll(CURSOR_MARKER, '')) {
+    candidate = direction < 0 ? candidate.previousSibling : candidate.nextSibling
+  }
+  if (!(candidate instanceof HTMLElement) || !candidate.dataset.token) return false
+  const anchor = direction < 0 ? candidate.previousSibling : candidate.nextSibling
+  candidate.remove()
+  const nextRange = document.createRange()
+  if (anchor?.nodeType === Node.TEXT_NODE) nextRange.setStart(anchor, anchor.textContent?.length || 0)
+  else {
+    nextRange.selectNodeContents(root)
+    nextRange.collapse(direction < 0 ? false : true)
+  }
+  nextRange.collapse(true)
+  selection.removeAllRanges()
+  selection.addRange(nextRange)
+  savedRange = nextRange.cloneRange()
+  return true
 }
 
 function onBeforeInput(event: InputEvent) {

@@ -9,10 +9,6 @@
         <p>把故事资料与自己的阅读、观影感受一起留下。</p>
       </div>
       <div class="header-actions">
-        <a-select v-model:value="form.publishStatus" style="width: 112px">
-          <a-select-option value="draft">草稿</a-select-option>
-          <a-select-option value="published">发布</a-select-option>
-        </a-select>
         <a-button type="primary" :loading="saving" :disabled="aiLoading" @click="save">
           <Icon name="ph:floppy-disk-bold" /> 保存记录
         </a-button>
@@ -155,7 +151,7 @@
             <a-switch v-model:checked="form.recommended" />
           </div>
           <div class="preview-link" v-if="item?.slug && item.publishStatus === 'published'">
-            <NuxtLink :to="`/library/${item.slug}`" target="_blank"><Icon name="ph:arrow-square-out-bold" /> 查看前台详情</NuxtLink>
+            <NuxtLink :to="`/library/${item.slug}`" target="_blank"><Icon name="ph:arrow-square-out-bold" /> 预览前台详情</NuxtLink>
           </div>
         </a-card>
       </aside>
@@ -179,7 +175,7 @@ const aiLoading = ref(false)
 
 const emptyForm = () => ({
   type: 'book' as LibraryType, title: '', originalTitle: '', slug: '', coverImage: '', creator: '', director: '',
-  summary: '', reflection: '', publishStatus: 'draft' as 'draft' | 'published', progressStatus: undefined as string | undefined,
+  summary: '', reflection: '', progressStatus: undefined as string | undefined,
   rating: undefined as number | undefined, rank: undefined as number | undefined, recommended: false,
   experienceDate: '', releaseYear: undefined as number | undefined, country: '', language: '',
   runtimeMinutes: undefined as number | undefined, episodeCount: undefined as number | undefined, platform: '',
@@ -310,7 +306,6 @@ async function performSave(confirmExactLocation: boolean) {
     director: form.director,
     summary: form.summary,
     reflection: form.reflection,
-    publishStatus: form.publishStatus,
     progressStatus: form.progressStatus,
     rating: form.rating,
     rank: form.rank,

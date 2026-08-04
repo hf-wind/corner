@@ -22,6 +22,7 @@
           <div class="head-meta">
             <div class="head-name">{{ form.username || '用户' }}</div>
             <div v-if="isAdmin" class="head-role admin">管理员</div>
+            <div class="avatar-hint">JPG、PNG 或 WebP，最大 8MB；上传后自动压缩并归入头像文件夹。</div>
             <div class="head-email">{{ form.email }}</div>
             <div class="head-hint">支持 JPG / PNG，上传后自动压缩为 WebP</div>
           </div>
@@ -295,6 +296,7 @@ async function save() {
 .avatar-upload.busy {
   background: rgb(0 0 0 / 42%);
 }
+.avatar-hint { margin-top:7px; color:var(--c-text-3); font-size:.7rem; line-height:1.55; }
 .avatar-upload.busy {
   animation: spin 0.9s linear infinite;
 }

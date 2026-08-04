@@ -31,7 +31,8 @@ export type Album = {
   title: string
   slug: string
   description?: string | null
-  status?: 'draft' | 'published'
+  status?: 'draft' | 'published' | 'private'
+  needsPublish?: boolean
   coverMediaId?: string | null
   cover?: AlbumMedia | null
   coverMedia?: AlbumMedia | null

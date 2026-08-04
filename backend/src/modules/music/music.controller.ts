@@ -6,11 +6,14 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import type { Request } from 'express';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { AuthGuard } from '@nestjs/passport';
 import { MusicService } from './music.service';
 import { RolesGuard } from '../auth/roles.guard';
@@ -53,13 +56,19 @@ export class MusicController {
     @Query('expires') expires: string,
     @Query('signature') signature: string,
     @Headers('range') range: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
+    const controller = new AbortController();
+    const abortUpstream = () => controller.abort();
+    req.once('aborted', abortUpstream);
+    res.once('close', abortUpstream);
     const upstream = await this.music.proxyMedia({
       url,
       expires,
       signature,
       range,
+      signal: controller.signal,
     });
     res.status(upstream.status);
     for (const name of [
@@ -74,8 +83,21 @@ export class MusicController {
       if (value) res.setHeader(name, value);
     }
     res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
-    if (!upstream.body) return res.end();
-    Readable.fromWeb(upstream.body as any).pipe(res);
+    if (!upstream.body) {
+      req.off('aborted', abortUpstream);
+      res.off('close', abortUpstream);
+      controller.abort();
+      return res.end();
+    }
+    try {
+      await pipeline(Readable.fromWeb(upstream.body as any), res);
+    } catch {
+      if (!res.writableEnded && !res.destroyed) res.end();
+    } finally {
+      req.off('aborted', abortUpstream);
+      res.off('close', abortUpstream);
+      controller.abort();
+    }
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

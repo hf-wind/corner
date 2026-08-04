@@ -86,7 +86,7 @@ const radar = reactive({ posts: 0, views: 0, comments: 0, likes: 0, categories: 
 const pending = reactive({ article: 0, moment: 0 })
 const recentPosts = ref<any[]>([])
 const system = reactive({ uptime: '', cpuCores: 0, memoryUsage: '', nodeVersion: '' })
-const siteDays = Math.max(1, Math.floor((Date.now() - new Date('2025-01-01').getTime()) / 86400000))
+const siteDays = Math.max(1, Math.floor((Date.now() - new Date('2026-01-14T00:00:00+08:00').getTime()) / 86400000))
 const pendingTotal = computed(() => pending.article + pending.moment)
 const hour = new Date().getHours()
 const greeting = computed(() => `${hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好'}，${user.value?.username || '管理员'}`)

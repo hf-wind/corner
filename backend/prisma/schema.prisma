@@ -76,6 +76,7 @@ model Post {
   featured    Boolean   @default(false)
   needsPublish Boolean  @default(true) @map("needs_publish")
   publishedSnapshot Json? @map("published_snapshot")
+  scheduledAt DateTime? @map("scheduled_at")
   occurredAt  DateTime? @map("occurred_at")
   placeId     String?   @map("place_id") @db.Uuid
   locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
@@ -94,6 +95,7 @@ model Post {
 
   @@index([status, publishedAt])
   @@index([publishedAt])
+  @@index([scheduledAt])
   @@index([placeId, occurredAt])
   @@index([occurredAt])
   @@map("posts")
@@ -284,6 +286,8 @@ model Album {
   slug                     String      @unique @db.VarChar(255)
   description              String?     @db.Text
   status                   String      @default("draft") @db.VarChar(20)
+  needsPublish             Boolean     @default(true) @map("needs_publish")
+  publishedSnapshot        Json?       @map("published_snapshot")
   coverMediaId             String?     @map("cover_media_id") @db.Uuid
   authorId                 String      @map("author_id") @db.Uuid
   happenedAt               DateTime?   @map("happened_at")
@@ -527,6 +531,8 @@ model LibraryItem {
   genres          Json      @default("[]")
   cast            Json      @default("[]")
   publishStatus   String    @default("draft") @map("publish_status") @db.VarChar(20)
+  needsPublish    Boolean   @default(true) @map("needs_publish")
+  publishedSnapshot Json?   @map("published_snapshot")
   progressStatus  String?   @map("progress_status") @db.VarChar(30)
   rating          Float?
   rank            Int?

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs';
@@ -30,15 +30,21 @@ const mimeTypeMap: Record<string, string[]> = {
 
 const UPLOAD_ROOT = join(process.cwd(), 'uploads');
 const CUSTOM_FOLDERS_KEY = 'media_custom_folders';
+const HIDDEN_LEGACY_FOLDERS = new Set(['emoji-cache', '相册', 'video', 'document', 'story', 'place']);
 
 @Injectable()
-export class MediaService {
+export class MediaService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private settings: SettingsService,
     @InjectQueue('media-metadata') private metadataQueue: Queue,
   ) {
     this.ensurePresetDirs();
+  }
+
+  async onModuleInit() {
+    await this.mergeLegacyAlbumFolder();
+    this.removeLegacyCache();
   }
 
   private ensurePresetDirs() {
@@ -92,7 +98,7 @@ export class MediaService {
     let fsKeys: string[] = [];
     if (existsSync(UPLOAD_ROOT)) {
       fsKeys = readdirSync(UPLOAD_ROOT, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && d.name !== 'original')
+        .filter((d) => d.isDirectory() && d.name !== 'original' && !HIDDEN_LEGACY_FOLDERS.has(d.name))
         .map((d) => d.name);
     }
 
@@ -102,6 +108,7 @@ export class MediaService {
       ...dbKeys,
       ...fsKeys,
     ]);
+    for (const key of HIDDEN_LEGACY_FOLDERS) allKeys.delete(key);
 
     const articleIds = Array.from(allKeys)
       .filter((key) => key.startsWith('article/'))
@@ -145,8 +152,27 @@ export class MediaService {
   private async getCustomFolders(): Promise<string[]> {
     const row = await this.prisma.setting.findUnique({ where: { key: CUSTOM_FOLDERS_KEY } });
     if (!row?.value) return [];
-    if (Array.isArray(row.value)) return row.value.map(String);
+    if (Array.isArray(row.value)) return [...new Set(row.value.map(String).filter((value) => !HIDDEN_LEGACY_FOLDERS.has(value)))];
     return [];
+  }
+
+  private async mergeLegacyAlbumFolder() {
+    const legacy = await this.prisma.media.findMany({ where: { folder: '相册' }, select: { id: true } });
+    if (legacy.length) await this.batchMove(legacy.map((item) => item.id), 'album');
+
+    const custom = await this.getCustomFolders();
+    const row = await this.prisma.setting.findUnique({ where: { key: CUSTOM_FOLDERS_KEY } });
+    if (row && JSON.stringify(row.value) !== JSON.stringify(custom)) {
+      await this.prisma.setting.update({ where: { key: CUSTOM_FOLDERS_KEY }, data: { value: custom } });
+    }
+
+    const legacyDirectory = join(UPLOAD_ROOT, '相册');
+    if (existsSync(legacyDirectory)) rmSync(legacyDirectory, { recursive: true, force: true });
+  }
+
+  private removeLegacyCache() {
+    const cacheDirectory = join(UPLOAD_ROOT, 'emoji-cache');
+    if (existsSync(cacheDirectory)) rmSync(cacheDirectory, { recursive: true, force: true });
   }
 
   async createFolder(name: string) {

@@ -117,7 +117,7 @@ const libraryItems = [
     highlights: ['玉是君子之德，也是匠人之魂，韩子奇用一生诠释了这份执着。', '梁冰玉的出走，是对传统女性命运的无声反抗，却也是另一种囚笼。', '韩新月与楚雁潮的对话，充满了对文学与理想的纯粹向往。', '葬礼仪式中，生者的哀悼与死者的安宁，构成一种庄严的平衡。', '玉器行的兴衰，暗喻着传统手艺在时代变革中的挣扎与坚守。'],
     quotes: ['人，最可怕的不是疾病，而是丧失了意志和信念。', '爱情，是生命中的一道光，但有时也会灼伤自己。', '玉，是活的，它有生命，有灵魂。', '死亡，不是生命的终结，而是另一种开始。', '我们每个人，都在自己的葬礼上，扮演着主角。'],
     genres: ['小说', '当代文学', '家族史诗'], cast: [], publishStatus: 'published', progressStatus: 'finished',
-    rating: 9, recommended: true, startDate: new Date('2018-08-01'), country: '中国', language: '中文',
+    rating: 9, recommended: true, startDate: new Date('2026-01-14'), country: '中国', language: '中文',
     publishedAt,
   },
   {
@@ -129,7 +129,7 @@ const libraryItems = [
     quotes: ['这个季节怎么这么长啊，像过不完似的。', '往前看，别回头。', '人这一辈子，有些事是绕不过去的。', '我这一辈子，就活在这几个秋天里了。'],
     genres: ['悬疑', '剧情', '犯罪', '家庭'], cast: ['范伟', '秦昊', '陈明昊', '李庚希', '刘奕铁', '刘琳', '史彭元', '王佳佳'],
     publishStatus: 'published', progressStatus: 'watched', rating: 10, rank: 1, recommended: true,
-    startDate: new Date('2025-12-01'), releaseYear: 2023, country: '中国大陆', language: '汉语普通话',
+    startDate: new Date('2026-01-14'), releaseYear: 2023, country: '中国大陆', language: '汉语普通话',
     director: '辛爽', runtimeMinutes: 60, episodeCount: 12, platform: '优酷', publishedAt,
   },
 ] satisfies Prisma.LibraryItemCreateInput[];

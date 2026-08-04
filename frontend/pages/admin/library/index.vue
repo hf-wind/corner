@@ -11,6 +11,8 @@
         <a-select-option value="all">全部状态</a-select-option>
         <a-select-option value="published">已发布</a-select-option>
         <a-select-option value="draft">草稿</a-select-option>
+        <a-select-option value="private">私密</a-select-option>
+        <a-select-option value="pending">有新内容</a-select-option>
       </a-select>
       <a-input v-model:value="filter.search" allow-clear placeholder="搜索名称、作者、导演..." class="search-input" @pressEnter="resetAndLoad">
         <template #prefix><Icon name="ph:magnifying-glass" /></template>
@@ -28,7 +30,8 @@
                   <img v-if="record.coverImage" :src="mediaUrl(record.coverImage)" alt="">
                   <Icon v-else :name="record.type === 'book' ? 'ph:book-open-text' : 'ph:film-strip'" />
                 </div>
-                <div><strong>{{ record.title }}</strong><span>{{ record.originalTitle || creatorLabel(record) }}</span></div>
+                <i v-if="record.needsPublish" class="change-dot" />
+                <div><div class="work-title"><strong>{{ record.title }}</strong><a-tag v-if="record.needsPublish" color="orange">{{ record.publishStatus === 'published' ? '已更新' : '有新内容' }}</a-tag></div><span>{{ record.originalTitle || creatorLabel(record) }}</span></div>
               </div>
             </template>
             <template v-else-if="column.key === 'type'">
@@ -42,11 +45,13 @@
               <span v-if="record.type === 'film' && record.rank">#{{ record.rank }}</span><span v-else class="muted">—</span>
             </template>
             <template v-else-if="column.key === 'status'">
-              <a-badge :status="record.publishStatus === 'published' ? 'success' : 'default'" :text="record.publishStatus === 'published' ? '已发布' : '草稿'" />
+              <a-tag :color="statusColor(record.publishStatus)">{{ statusText(record.publishStatus) }}</a-tag>
             </template>
             <template v-else-if="column.key === 'actions'">
               <a-button type="link" size="small" @click="router.push(`/admin/library/${record.id}`)"><Icon name="ph:pencil-simple-bold" /> 编辑</a-button>
-              <a-button v-if="record.publishStatus === 'published'" type="link" size="small" @click="router.push(`/library/${record.slug}`)"><Icon name="ph:arrow-square-out-bold" /> 查看</a-button>
+              <a-button v-if="record.needsPublish" type="link" size="small" @click="publish(record)"><Icon name="ph:paper-plane-tilt-bold" /> 发布</a-button>
+              <a-button v-if="record.publishStatus === 'published'" type="link" size="small" @click="router.push(`/library/${record.slug}`)"><Icon name="ph:eye-bold" /> 预览</a-button>
+              <a-button type="link" size="small" @click="openSettings(record)"><Icon name="ph:gear-six-bold" /> 设置</a-button>
               <a-button type="link" size="small" danger @click="remove(record)"><Icon name="ph:trash-bold" /> 删除</a-button>
             </template>
           </template>
@@ -79,19 +84,41 @@ const columns = [
   { title: '评分', key: 'rating', width: 76 }, { title: '排名', key: 'rank', width: 68 },
   { title: '状态', key: 'status', width: 92 }, { title: '浏览', dataIndex: 'viewCount', key: 'views', width: 65 },
   { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 120, customRender: ({ text }: any) => text?.slice(0, 10) || '—' },
-  { title: '操作', key: 'actions', width: 220, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 380, fixed: 'right' as const },
 ]
 
 function creatorLabel(item: LibraryItem) { return item.type === 'book' ? item.creator || '未知作者' : item.director || '未知导演' }
 function resetAndLoad() { page.value = 1; load() }
+function statusText(status: string) { return status === 'published' ? '已发布' : status === 'private' ? '私密' : '草稿' }
+function statusColor(status: string) { return status === 'published' ? 'green' : status === 'private' ? 'purple' : 'default' }
 
 async function load() {
   loading.value = true
   try {
-    const res = await api.get<any>('/library/admin', { page: page.value, limit, ...filter })
+    const res = await api.get<any>('/library/admin', {
+      page: page.value, limit, type: filter.type,
+      status: filter.status === 'pending' ? 'all' : filter.status,
+      needsPublish: filter.status === 'pending' ? true : undefined,
+      search: filter.search,
+    })
     items.value = res.items || []; total.value = res.total || 0; totalPages.value = res.totalPages || 1
   } catch { items.value = []; total.value = 0 }
   finally { loading.value = false }
+}
+
+function publish(item: LibraryItem) {
+  Modal.confirm({ title: '确认发布', content: `将「${item.title}」的当前保存版本发布到前台？`, okText: '发布', cancelText: '取消', onOk: async () => {
+    try { await api.post(`/library/${item.id}/publish`); toast.success('书影记录已发布'); await load() }
+    catch (error: any) { toast.error(error?.message || '发布失败') }
+  } })
+}
+
+function openSettings(item: LibraryItem) {
+  const restoring = item.publishStatus === 'private'
+  Modal.confirm({ title: restoring ? '恢复公开这条记录？' : '将这条记录设为私密？', content: restoring ? '将发布当前已保存版本。' : '前台会立即隐藏，保存内容不会删除。', okText: restoring ? '恢复公开' : '设为私密', cancelText: '取消', onOk: async () => {
+    try { await api.post(`/library/${item.id}/${restoring ? 'publish' : 'private'}`); toast.success(restoring ? '记录已恢复公开' : '记录已设为私密'); await load() }
+    catch (error: any) { toast.error(error?.message || '设置失败') }
+  } })
 }
 
 function remove(item: LibraryItem) {
@@ -117,6 +144,8 @@ useHead({ title: '书影管理' })
 .search-input { width:240px; }
 .list-card { overflow:hidden; border:1px solid color-mix(in srgb,var(--border) 72%,transparent); border-radius:13px; background:var(--ld-bg-card); }
 .work-cell { display:flex; align-items:center; gap:11px; min-width:0; }
+.change-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 18%,transparent); }
+.work-title { display:flex; align-items:center; gap:7px; }
 .work-cell > div:last-child { display:flex; min-width:0; flex-direction:column; gap:3px; }
 .work-cell strong,.work-cell span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .work-cell strong { color:var(--c-text); font-size:.82rem; }

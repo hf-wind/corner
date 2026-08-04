@@ -31,15 +31,23 @@ export class NotificationController {
     return new Observable((observer) => {
       const subscription = subject.subscribe({
         next: (event) => observer.next({ data: event }),
-        error: (err) => observer.error(err),
+        error: (err) => {
+          this.logger.warn(`SSE event stream failed for user ${userId}: ${String(err)}`);
+          observer.complete();
+        },
       });
 
-      this.notificationService.getUnreadCount(userId).then(({ count }) => {
-        observer.next({ data: { type: 'unread-count', data: { count } } });
-      });
+      void this.notificationService.getUnreadCount(userId)
+        .then(({ count }) => observer.next({ data: { type: 'unread-count', data: { count } } }))
+        .catch((error) => this.logger.warn(`SSE unread count failed for user ${userId}: ${String(error)}`));
+      const heartbeat = setInterval(() => {
+        observer.next({ data: { type: 'heartbeat', data: { at: new Date().toISOString() } } });
+      }, 25_000);
 
       return () => {
+        clearInterval(heartbeat);
         subscription.unsubscribe();
+        this.logger.log(`SSE client disconnected: ${userId}`);
       };
     });
   }

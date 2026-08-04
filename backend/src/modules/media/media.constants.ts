@@ -14,11 +14,9 @@ export const PRESET_FOLDERS: MediaFolderDef[] = [
   { key: 'emoji', label: '表情', preset: true },
   { key: 'moment', label: '瞬间', preset: true },
   { key: 'album', label: '相册', preset: true },
+  { key: 'library', label: '书影', preset: true },
+  { key: 'about', label: '关于', preset: true },
   { key: 'audio', label: '音频', preset: true },
-  { key: 'video', label: '视频', preset: true },
-  { key: 'document', label: '文档', preset: true },
-  { key: 'story', label: '航线故事', preset: true },
-  { key: 'place', label: '地点', preset: true },
   { key: 'general', label: '通用', preset: true },
 ]
 

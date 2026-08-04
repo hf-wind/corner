@@ -36,8 +36,9 @@ export class LibraryController {
     @Query('type') type?: string,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('needsPublish') needsPublish?: string,
   ) {
-    return this.library.findAll({ page, limit, type, status, search, admin: true });
+    return this.library.findAll({ page, limit, type, status, search, needsPublish: needsPublish === 'true', admin: true });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,6 +72,20 @@ export class LibraryController {
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateLibraryItemDto) {
     return this.library.update(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post(':id/publish')
+  publish(@Param('id') id: string) {
+    return this.library.publish(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post(':id/private')
+  makePrivate(@Param('id') id: string) {
+    return this.library.makePrivate(id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

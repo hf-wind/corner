@@ -4,8 +4,9 @@ import { CreateLibraryItemDto } from './dto/create-library-item.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
 import { AiService } from '../ai/ai.service';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
-import { buildPublicLocation, type PlaceSnapshot } from '../../common/location/public-location';
+import { buildPublicLocation, type LocationPrecision, type LocationVisibility, type PlaceSnapshot } from '../../common/location/public-location';
 import { prepareSpacetime } from '../../common/location/spacetime';
+import { Prisma } from '@prisma/client';
 
 type LibraryQuery = {
   page?: string;
@@ -14,6 +15,7 @@ type LibraryQuery = {
   status?: string;
   search?: string;
   sort?: string;
+  needsPublish?: boolean;
   admin: boolean;
 };
 
@@ -24,6 +26,14 @@ type PublicLibrarySource = {
   genres?: string[];
   language?: string;
   coverImage?: string;
+};
+
+type PublishedLibrarySnapshot = Record<string, any> & {
+  title: string;
+  slug: string;
+  place: PlaceSnapshot | null;
+  locationVisibility: LocationVisibility;
+  locationPrecision: LocationPrecision;
 };
 
 @Injectable()
@@ -139,6 +149,7 @@ export class LibraryService {
     const where: Record<string, any> = {};
     if (!query.admin) where.publishStatus = 'published';
     else if (query.status && query.status !== 'all') where.publishStatus = query.status;
+    if (query.admin && query.needsPublish) where.needsPublish = true;
     if (query.type && ['book', 'film'].includes(query.type)) where.type = query.type;
     if (query.search?.trim()) {
       const search = query.search.trim();
@@ -153,6 +164,38 @@ export class LibraryService {
     const orderBy = query.sort === 'rank'
       ? [{ rank: { sort: 'asc', nulls: 'last' } }, { publishedAt: 'desc' }]
       : [{ recommended: 'desc' }, { publishedAt: 'desc' }, { createdAt: 'desc' }];
+    if (!query.admin) {
+      const rows = await this.prisma.libraryItem.findMany({
+        where: { publishStatus: 'published' },
+        include: { place: true },
+        orderBy: orderBy as any,
+      });
+      let visible = rows.map((item) => this.presentItem(item));
+      if (query.type && ['book', 'film'].includes(query.type)) visible = visible.filter((item) => item.type === query.type);
+      if (query.search?.trim()) {
+        const search = query.search.trim().toLocaleLowerCase();
+        visible = visible.filter((item) => `${item.title || ''} ${item.originalTitle || ''} ${item.creator || ''} ${item.director || ''}`.toLocaleLowerCase().includes(search));
+      }
+      visible.sort((left, right) => {
+        if (query.sort === 'rank') {
+          const leftRank = Number(left.rank);
+          const rightRank = Number(right.rank);
+          if (Number.isFinite(leftRank) || Number.isFinite(rightRank)) {
+            if (!Number.isFinite(leftRank)) return 1;
+            if (!Number.isFinite(rightRank)) return -1;
+            if (leftRank !== rightRank) return leftRank - rightRank;
+          }
+        } else if (!!left.recommended !== !!right.recommended) {
+          return left.recommended ? -1 : 1;
+        }
+        return new Date(right.publishedAt || right.createdAt || 0).getTime() - new Date(left.publishedAt || left.createdAt || 0).getTime();
+      });
+      const total = visible.length;
+      return {
+        items: visible.slice((page - 1) * limit, page * limit),
+        total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)),
+      };
+    }
     const [items, total] = await Promise.all([
       this.prisma.libraryItem.findMany({ where, include: { place: true }, orderBy: orderBy as any, skip: (page - 1) * limit, take: limit }),
       this.prisma.libraryItem.count({ where }),
@@ -181,7 +224,13 @@ export class LibraryService {
   }
 
   async findPublishedBySlug(slug: string) {
-    const item = await this.prisma.libraryItem.findFirst({ where: { slug, publishStatus: 'published' }, include: { place: true } });
+    const direct = await this.prisma.libraryItem.findFirst({ where: { slug, publishStatus: 'published' }, include: { place: true } });
+    const candidates = direct ? [direct] : await this.prisma.libraryItem.findMany({
+      where: { publishStatus: 'published', publishedSnapshot: { not: Prisma.DbNull } },
+      include: { place: true },
+      take: 500,
+    });
+    const item = candidates.find((candidate) => (this.readSnapshot(candidate.publishedSnapshot)?.slug || candidate.slug) === slug);
     if (!item) throw new NotFoundException('书影记录不存在或尚未发布');
     void this.prisma.libraryItem.update({ where: { id: item.id }, data: { viewCount: { increment: 1 } } }).catch(() => undefined);
     return this.presentItem(item);
@@ -190,8 +239,10 @@ export class LibraryService {
   async create(dto: CreateLibraryItemDto) {
     const data = await this.toData(dto);
     try {
-      const item = await this.prisma.libraryItem.create({ data: data as any, include: { place: true } });
-      this.memoryGraph?.scheduleRebuild();
+      const item = await this.prisma.libraryItem.create({
+        data: { ...data, publishStatus: 'draft', needsPublish: true, publishedSnapshot: Prisma.DbNull } as any,
+        include: { place: true },
+      });
       return this.presentItem(item, true);
     } catch (error: any) {
       if (error?.code === 'P2002') throw new BadRequestException('Slug 已存在，请换一个');
@@ -200,16 +251,55 @@ export class LibraryService {
   }
 
   async update(id: string, dto: UpdateLibraryItemDto) {
-    const current = await this.findById(id);
-    const data = await this.toData(dto, current.publishStatus, current);
+    const current = await this.prisma.libraryItem.findUnique({ where: { id }, include: { place: true } });
+    if (!current) throw new NotFoundException('书影记录不存在');
+    const currentSnapshot = this.readSnapshot(current.publishedSnapshot)
+      || (current.publishStatus === 'published' ? this.buildSnapshot(current) : null);
+    const data = await this.toData(dto, current);
     try {
-      const item = await this.prisma.libraryItem.update({ where: { id }, data: data as any, include: { place: true } });
-      this.memoryGraph?.scheduleRebuild();
+      const item = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.libraryItem.update({ where: { id }, data: data as any, include: { place: true } });
+        const needsPublish = !currentSnapshot || JSON.stringify(currentSnapshot) !== JSON.stringify(this.buildSnapshot(updated));
+        return tx.libraryItem.update({
+          where: { id },
+          data: {
+            needsPublish,
+            publishedSnapshot: currentSnapshot ? currentSnapshot as Prisma.InputJsonValue : Prisma.DbNull,
+          },
+          include: { place: true },
+        });
+      });
       return this.presentItem(item, true);
     } catch (error: any) {
       if (error?.code === 'P2002') throw new BadRequestException('Slug 已存在，请换一个');
       throw error;
     }
+  }
+
+  async publish(id: string) {
+    const current = await this.prisma.libraryItem.findUnique({ where: { id }, include: { place: true } });
+    if (!current) throw new NotFoundException('书影记录不存在');
+    const snapshot = this.buildSnapshot(current);
+    const item = await this.prisma.libraryItem.update({
+      where: { id },
+      data: {
+        publishStatus: 'published', needsPublish: false,
+        publishedSnapshot: snapshot as Prisma.InputJsonValue,
+        publishedAt: current.publishedAt || new Date(),
+      },
+      include: { place: true },
+    });
+    this.memoryGraph?.scheduleRebuild();
+    return this.presentItem(item, true);
+  }
+
+  async makePrivate(id: string) {
+    const item = await this.prisma.libraryItem.update({
+      where: { id }, data: { publishStatus: 'private' }, include: { place: true },
+    }).catch(() => null);
+    if (!item) throw new NotFoundException('书影记录不存在');
+    this.memoryGraph?.scheduleRebuild();
+    return this.presentItem(item, true);
   }
 
   async remove(id: string) {
@@ -219,11 +309,11 @@ export class LibraryService {
     return { success: true };
   }
 
-  private async toData(dto: UpdateLibraryItemDto, previousStatus = 'draft', existing?: any) {
+  private async toData(dto: UpdateLibraryItemDto, existing?: any) {
     const {
       placeId: _placeId, occurredAt: _occurredAt, locationVisibility: _visibility,
       locationPrecision: _precision, locationSource: _source,
-      confirmExactLocation: _confirmExact, ...data
+      confirmExactLocation: _confirmExact, publishStatus: _publishStatus, ...data
     }: Record<string, any> = { ...dto };
     const spacetime = await prepareSpacetime({ ...dto, occurredAt: undefined }, existing, async (placeId) => {
       const place = await this.prisma.place.findUnique({ where: { id: placeId }, select: { id: true } });
@@ -244,12 +334,34 @@ export class LibraryService {
       data.finishDate = null;
       delete data.experienceDate;
     }
-    if (data.publishStatus === 'published' && previousStatus !== 'published') data.publishedAt = new Date();
-    if (data.publishStatus === 'draft') data.publishedAt = null;
     return data;
   }
 
-  private presentItem(item: Record<string, any>, admin = false) {
+  private presentItem(item: Record<string, any>, admin = false): any {
+    if (!admin) {
+      const active = this.readSnapshot(item.publishedSnapshot) || this.buildSnapshot(item);
+      const {
+        place: _activePlace, locationVisibility: _activeVisibility,
+        locationPrecision: _activePrecision, locationSource: _activeSource,
+        locationExactConfirmedAt: _activeConfirmed, ...visible
+      } = active;
+      return {
+        id: item.id,
+        ...visible,
+        publishStatus: 'published',
+        viewCount: item.viewCount,
+        publishedAt: item.publishedAt,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        publicLocation: buildPublicLocation({
+          place: active.place,
+          visibility: active.locationVisibility,
+          precision: active.locationPrecision,
+          exactConfirmedAt: active.locationExactConfirmedAt,
+        }),
+        experienceDate: active.finishDate || active.startDate || null,
+      };
+    }
     const {
       startDate,
       finishDate,
@@ -280,8 +392,34 @@ export class LibraryService {
       } : {}),
       publicLocation: location,
       publishStatus: item.publishStatus,
+      needsPublish: item.needsPublish ?? true,
       experienceDate: finishDate || startDate || null,
     };
+  }
+
+  private buildSnapshot(item: Record<string, any>): PublishedLibrarySnapshot {
+    const fields = [
+      'type', 'title', 'originalTitle', 'slug', 'coverImage', 'creator', 'summary', 'reflection',
+      'highlights', 'quotes', 'genres', 'cast', 'progressStatus', 'rating', 'rank', 'recommended',
+      'releaseYear', 'country', 'language', 'director', 'runtimeMinutes', 'episodeCount', 'platform',
+    ];
+    const snapshot: Record<string, any> = {};
+    for (const field of fields) snapshot[field] = item[field] ?? null;
+    snapshot.startDate = item.startDate ? new Date(item.startDate).toISOString() : null;
+    snapshot.finishDate = item.finishDate ? new Date(item.finishDate).toISOString() : null;
+    snapshot.place = this.placeSnapshot(item.place);
+    snapshot.locationVisibility = item.locationVisibility === 'public' || item.locationVisibility === 'blurred' ? item.locationVisibility : 'private';
+    snapshot.locationPrecision = ['exact', 'city', 'province'].includes(item.locationPrecision) ? item.locationPrecision : 'place';
+    snapshot.locationSource = item.locationSource || null;
+    snapshot.locationExactConfirmedAt = item.locationExactConfirmedAt ? new Date(item.locationExactConfirmedAt).toISOString() : null;
+    return snapshot as PublishedLibrarySnapshot;
+  }
+
+  private readSnapshot(raw: unknown): PublishedLibrarySnapshot | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const snapshot = raw as Record<string, any>;
+    if (!snapshot.title || !snapshot.slug) return null;
+    return { ...snapshot, title: String(snapshot.title), slug: String(snapshot.slug), place: this.placeSnapshot(snapshot.place) } as PublishedLibrarySnapshot;
   }
 
   private placeSnapshot(raw: unknown): PlaceSnapshot | null {

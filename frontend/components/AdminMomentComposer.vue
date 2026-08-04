@@ -52,7 +52,7 @@
                 <Icon name="ph:image-bold" />
               </button>
               <EmojiPalette :open="pickerOpen" @select="insertEmoji" @close="pickerOpen = false" />
-              <span>保存为草稿后可预览发布</span>
+              <span>保存后可在列表预览或发布</span>
             </div>
             <a-button type="primary" :loading="creating" :disabled="!inspiration.trim()" @click="createFromInspiration">
               <Icon :name="creating ? 'ph:spinner-gap-bold' : 'ph:magic-wand-bold'" :class="{ spinning: creating }" />
@@ -106,7 +106,10 @@
             <label class="field-label" for="moment-slug">Slug</label>
             <a-input id="moment-slug" v-model:value="form.slug" placeholder="自动生成" />
 
-            <label class="field-label" for="moment-excerpt">摘要</label>
+            <div class="field-label-row">
+              <label class="field-label" for="moment-excerpt">摘要</label>
+              <a-button type="link" size="small" :loading="generatingExcerpt" @click="generateExcerpt">重新生成摘要</a-button>
+            </div>
             <a-textarea id="moment-excerpt" v-model:value="form.excerpt" :rows="6" placeholder="可选。前台会以摘要样式展示，不会和正文混在一起。" />
 
             <MomentLocationEditor
@@ -116,11 +119,6 @@
               v-model:precision="form.locationPrecision"
               @source="form.locationSource = $event"
             />
-
-            <div class="publish-block">
-              <span>{{ published ? '已发布的修改需要再次发布才会同步到前台。' : '保存后是草稿，可在列表中发布。' }}</span>
-              <a-button v-if="needsPublish" block type="primary" :loading="publishing" @click="publish">发布更新</a-button>
-            </div>
           </aside>
         </div>
       </template>
@@ -148,11 +146,10 @@ const editorRef = ref<{
 const loading = ref(Boolean(props.slug))
 const creating = ref(false)
 const saving = ref(false)
-const publishing = ref(false)
+const generatingExcerpt = ref(false)
 const pickerOpen = ref(false)
 const inspiration = ref('')
 const currentSlug = ref(props.slug || '')
-const published = ref(false)
 const needsPublish = ref(false)
 
 const form = reactive<{
@@ -255,7 +252,6 @@ async function loadExisting() {
     form.locationVisibility = moment.locationVisibility || 'private'
     form.locationPrecision = moment.locationPrecision || 'place'
     form.locationSource = moment.locationSource === 'map' ? 'map' : 'manual'
-    published.value = moment.status === 'published'
     needsPublish.value = !!moment.needsPublish
   } catch (error: any) {
     toast.error(`读取瞬间失败：${error?.message || ''}`)
@@ -295,18 +291,27 @@ async function save() {
   }
 }
 
-async function publish() {
-  if (!currentSlug.value) return
-  publishing.value = true
-  try {
-    await api.post(`/moments/${currentSlug.value}/publish`)
-    published.value = true
-    needsPublish.value = false
-    toast.success('已发布到瞬间流')
-  } catch (error: any) {
-    toast.error(`发布失败：${error?.message || ''}`)
-  } finally {
-    publishing.value = false
+async function generateExcerpt() {
+  if (form.content.trim().length < 20) {
+    toast.warning('请先写一些正文再生成摘要')
+    return
+  }
+  const run = async () => {
+    generatingExcerpt.value = true
+    try {
+      const result = await api.post<{ excerpt: string }>('/ai/summarize', { title: form.title, content: form.content })
+      form.excerpt = result.excerpt || ''
+      toast.success('摘要已重新生成')
+    } catch (error: any) {
+      toast.error(`摘要生成失败：${error?.message || ''}`)
+    } finally {
+      generatingExcerpt.value = false
+    }
+  }
+  if (form.excerpt.trim()) {
+    Modal.confirm({ title: '覆盖现有摘要？', content: '重新生成后会覆盖当前摘要。', okText: '覆盖', cancelText: '取消', onOk: run })
+  } else {
+    await run()
   }
 }
 
@@ -394,10 +399,11 @@ onMounted(() => { void loadExisting() })
 .prompt-rail button:last-child { border-bottom:0; }
 .prompt-rail button:hover { color:var(--c-primary); }
 .field-label { display:block; margin:0 0 7px; color:var(--c-text-3); font-size:.76rem; }
+.field-label-row { display:flex; min-height:28px; align-items:center; justify-content:space-between; gap:8px; }
+.field-label-row .field-label { margin:0; }
 .title-input { margin-bottom:20px; padding:0; color:var(--c-text); font-size:1.35rem; font-weight:650; }
 .edit-input { min-height:420px; }
 .edit-rail { display:grid; gap:16px; }
-.publish-block { display:grid; gap:10px; padding-top:16px; border-top:1px solid var(--border); color:var(--c-text-3); font-size:.78rem; line-height:1.7; }
 .spinning { animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:900px) { .create-layout, .edit-layout { grid-template-columns:1fr; } .prompt-rail { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } .prompt-rail h2, .prompt-rail > .surface-kicker { grid-column:1 / -1; } .prompt-rail button { border:1px solid var(--border); border-radius:6px; padding:10px; } }
