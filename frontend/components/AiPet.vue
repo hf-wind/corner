@@ -21,7 +21,6 @@
               <span v-if="isContentMode" class="pet-context-label">{{
                 contextLabel
               }}</span>
-              <span class="pet-usage">{{ usageText }}</span>
             </div>
           </div>
           <button
@@ -61,24 +60,56 @@
                   :key="`${card.type}:${card.sourceId}`"
                   :to="card.href"
                   @click="trackCard(card)"
-                  ><small>{{ card.type }}</small
-                  ><strong>{{ card.title }}</strong
-                  ><span>{{ card.excerpt }}</span></NuxtLink
                 >
+                  <span class="pet-source-media">
+                    <img
+                      v-if="sourceImage(card)"
+                      :src="sourceImage(card)"
+                      :alt="card.title"
+                      loading="lazy"
+                    />
+                    <Icon v-else :name="sourceIcon(card.type)" />
+                  </span>
+                  <span class="pet-source-copy">
+                    <small>{{ sourceLabel(card.type) }}</small>
+                    <strong>{{ card.title }}</strong>
+                    <span v-if="sourceExcerpt(card)">{{
+                      sourceExcerpt(card)
+                    }}</span>
+                  </span>
+                  <Icon
+                    name="ph:arrow-up-right-bold"
+                    class="pet-source-arrow"
+                  />
+                </NuxtLink>
               </div>
-              <div v-if="!m.streaming && m.content" class="pet-feedback">
-                <span>这次回答有帮助吗？</span
-                ><button
-                  :class="{ active: m.feedback === true }"
-                  @click="feedback(m, true)"
-                >
-                  有帮助</button
-                ><button
-                  :class="{ active: m.feedback === false }"
-                  @click="feedback(m, false)"
-                >
-                  没帮助
-                </button>
+              <div v-if="shouldAskFeedback(m, i)" class="pet-feedback">
+                <span>这次有帮到你吗？</span>
+                <div>
+                  <button
+                    type="button"
+                    title="有帮助"
+                    :disabled="m.feedbackPending"
+                    @click="feedback(m, true)"
+                  >
+                    <Icon name="ph:thumbs-up-bold" /><span>有</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="没帮助"
+                    :disabled="m.feedbackPending"
+                    @click="feedback(m, false)"
+                  >
+                    <Icon name="ph:thumbs-down-bold" /><span>没有</span>
+                  </button>
+                </div>
+              </div>
+              <div
+                v-else-if="m.feedbackRecorded && i === latestFeedbackIndex"
+                class="pet-feedback-confirmed"
+              >
+                <Icon name="ph:check-circle-fill" />
+                <span>谢谢，我记下了</span>
               </div>
             </template>
             <div v-else class="pet-bubble">{{ m.content }}</div>
@@ -102,13 +133,17 @@
         </div>
 
         <form class="pet-chat-form" @submit.prevent="send">
-          <input
+          <Icon name="ph:sparkle-bold" class="pet-input-mark" />
+          <textarea
+            ref="inputRef"
             v-model="input"
             class="pet-input"
-            type="text"
+            rows="1"
             :maxlength="inputMaxChars"
             :placeholder="inputPlaceholder"
             :disabled="sending"
+            @input="resizeInput"
+            @keydown.enter.exact.prevent="send"
           />
           <button
             type="submit"
@@ -153,6 +188,7 @@
 <script setup lang="ts">
 import MarkdownIt from "markdown-it";
 import petMeta from "~/assets/dram/pet.json";
+import { aiCardImage, cleanAiExcerpt } from "~/utils/aiContent";
 const spriteUrl = "/dram/spritesheet.webp";
 
 const markdown = new MarkdownIt({
@@ -182,6 +218,7 @@ type SourceCard = {
   title: string;
   href: string;
   excerpt: string;
+  image?: string | null;
 };
 interface Msg {
   role: Role;
@@ -189,14 +226,12 @@ interface Msg {
   streaming?: boolean;
   renderedHtml?: string;
   cards?: SourceCard[];
-  feedback?: boolean;
+  feedbackEligible?: boolean;
+  feedbackPending?: boolean;
+  feedbackRecorded?: boolean;
 }
 type ChatUsage = {
-  audience: "user" | "guest";
-  limit: number;
-  remaining: number;
   inputMaxChars: number;
-  outputMaxTokens: number;
 };
 type QuickAction = {
   label: string;
@@ -210,6 +245,14 @@ type ArticleContext = {
   slug?: string;
   type?: string;
   sourceId?: string;
+  scene?: string;
+};
+
+type ContextProfile = {
+  label: string;
+  hint: string;
+  placeholder: string;
+  actions: QuickAction[];
 };
 
 const props = withDefaults(
@@ -240,12 +283,15 @@ const meta = petMeta as {
 
 const api = useApi();
 const { isLoggedIn } = useAuth();
+const { mediaUrl } = useMediaUrl();
+const toast = useToast();
 const chatOpen = ref(false);
 const sending = ref(false);
 const streamStarted = ref(false);
 const input = ref("");
 const messages = ref<Msg[]>([]);
 const listRef = ref<HTMLElement | null>(null);
+const inputRef = ref<HTMLTextAreaElement | null>(null);
 const showHint = ref(true);
 const historyLoaded = ref(false);
 const suppressActions = ref(false);
@@ -264,17 +310,261 @@ const description = ref(meta.description || "阿风的伙伴 · 蓝色机器猫"
 const greetings = ref<string[]>([...(meta.greetings || [])]);
 const selectedGreeting = ref("你好呀～");
 const inputMaxChars = ref(500);
-const userDailyLimit = ref(40);
-const guestDailyLimit = ref(12);
-const remainingQuota = ref<number | null>(null);
 
 const isArticleMode = computed(() => props.mode === "article");
 const isContentMode = computed(
   () => props.mode === "article" || props.mode === "context",
 );
-const contextLabel = computed(() =>
-  props.mode === "article" ? "正在陪你读这篇文章" : "正在结合当前页面陪你探索",
+const contentType = computed(
+  () => props.article?.type || (isArticleMode.value ? "post" : "home"),
 );
+
+const contextProfiles: Record<string, ContextProfile> = {
+  post: {
+    label: "正在陪你读这篇文章",
+    hint: "这篇文章，要一起读读吗？",
+    placeholder: "聊聊这篇文章…",
+    actions: [
+      {
+        label: "三句话总结",
+        icon: "ph:magic-wand-bold",
+        prompt: "请用三句话总结当前文章。",
+        kind: "summary",
+      },
+      {
+        label: "提炼核心要点",
+        icon: "ph:list-checks-bold",
+        prompt: "请结合当前文章，提炼 4 到 6 个核心要点，表达简洁。",
+      },
+      {
+        label: "这篇适合谁",
+        icon: "ph:users-three-bold",
+        prompt: "请说明这篇文章适合哪些读者，以及读完能获得什么。",
+      },
+      {
+        label: "解释难点",
+        icon: "ph:lightbulb-filament-bold",
+        prompt: "请找出当前文章里最难理解的部分，并用通俗方式解释。",
+      },
+    ],
+  },
+  moment: {
+    label: "正在陪你看这则瞬间",
+    hint: "想听听这则瞬间的余味吗？",
+    placeholder: "聊聊这则瞬间…",
+    actions: [
+      {
+        label: "读读此刻",
+        icon: "ph:sparkle-bold",
+        prompt: "请结合当前瞬间，说说它记录了怎样的时刻与情绪。",
+      },
+      {
+        label: "寻找相似记忆",
+        icon: "ph:circles-three-plus-bold",
+        prompt: "请从本站找出与当前瞬间气质或主题相近的内容。",
+      },
+      {
+        label: "从这里继续",
+        icon: "ph:path-bold",
+        prompt: "如果从这则瞬间继续探索，推荐下一条值得看的内容。",
+      },
+    ],
+  },
+  library: {
+    label: "正在陪你翻这份书影",
+    hint: "这本书或这部电影，聊聊吗？",
+    placeholder: "问问这份书影记录…",
+    actions: [
+      {
+        label: "为什么值得看",
+        icon: "ph:star-bold",
+        prompt: "结合当前书影记录，说说它为什么值得读或值得看。",
+      },
+      {
+        label: "读后感重点",
+        icon: "ph:quotes-bold",
+        prompt: "提炼这份书影记录中最重要的个人感受，不要写成文章摘要。",
+      },
+      {
+        label: "找相似作品",
+        icon: "ph:books-bold",
+        prompt: "从本站书影中推荐气质或主题相近的作品。",
+      },
+    ],
+  },
+  album: {
+    label: "正在陪你翻这册相簿",
+    hint: "要一起看看这册相簿吗？",
+    placeholder: "聊聊照片里的故事…",
+    actions: [
+      {
+        label: "读懂这册相簿",
+        icon: "ph:images-square-bold",
+        prompt: "结合当前相册资料，概括它记录的时间、地点与主题。",
+      },
+      {
+        label: "照片里的线索",
+        icon: "ph:magnifying-glass-bold",
+        prompt: "从当前相册信息中找出值得留意的细节与线索。",
+      },
+      {
+        label: "寻找相关记忆",
+        icon: "ph:clock-counter-clockwise-bold",
+        prompt: "推荐与当前相册相关的文章、瞬间或地点记忆。",
+      },
+    ],
+  },
+  photo: {
+    label: "正在陪你看这张照片",
+    hint: "照片里的故事，要一起找找吗？",
+    placeholder: "问问这张照片…",
+    actions: [
+      {
+        label: "照片讲了什么",
+        icon: "ph:image-bold",
+        prompt: "仅依据当前照片的公开资料，说说它记录了什么。",
+      },
+      {
+        label: "找到所属相册",
+        icon: "ph:images-square-bold",
+        prompt: "帮我找到这张照片所属的相册与相关记忆。",
+      },
+    ],
+  },
+  place: {
+    label: "正在陪你抵达这个地点",
+    hint: "想看看这里发生过什么吗？",
+    placeholder: "问问这个地点的记忆…",
+    actions: [
+      {
+        label: "这里发生过什么",
+        icon: "ph:map-pin-bold",
+        prompt: "结合本站公开内容，介绍当前地点发生过的记忆。",
+      },
+      {
+        label: "按时间逛一遍",
+        icon: "ph:clock-counter-clockwise-bold",
+        prompt: "按时间顺序整理与当前地点有关的内容。",
+      },
+      {
+        label: "推荐下一站",
+        icon: "ph:navigation-arrow-bold",
+        prompt: "根据当前地点的记忆，推荐下一处值得探索的地点。",
+      },
+    ],
+  },
+  journey: {
+    label: "正在陪你走这段旅程",
+    hint: "这段旅程，要从哪一站聊起？",
+    placeholder: "问问这段旅程…",
+    actions: [
+      {
+        label: "旅程速览",
+        icon: "ph:path-bold",
+        prompt: "概括当前旅程的路线、节点与最值得留意的记忆。",
+      },
+      {
+        label: "挑一站停留",
+        icon: "ph:map-pin-line-bold",
+        prompt: "从当前旅程中挑一站重点介绍，并说明选择理由。",
+      },
+      {
+        label: "沿线继续阅读",
+        icon: "ph:book-open-text-bold",
+        prompt: "推荐与当前旅程沿线相关的文章、瞬间或相册。",
+      },
+    ],
+  },
+  story: {
+    label: "正在陪你走进这条故事线",
+    hint: "要一起理清这段故事吗？",
+    placeholder: "聊聊这条故事线…",
+    actions: [
+      {
+        label: "故事线索",
+        icon: "ph:film-strip-bold",
+        prompt: "整理当前故事的公开线索与叙事顺序。",
+      },
+      {
+        label: "关键节点",
+        icon: "ph:git-branch-bold",
+        prompt: "指出当前故事中最关键的几个记忆节点。",
+      },
+      {
+        label: "继续探索",
+        icon: "ph:arrow-circle-right-bold",
+        prompt: "推荐与当前故事相关、适合继续探索的内容。",
+      },
+    ],
+  },
+  map: {
+    label: "正在陪你浏览时光地图",
+    hint: "想从哪座城市开始找记忆？",
+    placeholder: "问问地图上的地点与记忆…",
+    actions: [
+      {
+        label: "最近的地点记忆",
+        icon: "ph:map-trifold-bold",
+        prompt: "从本站最近的公开内容中，推荐几处有记忆的地点。",
+      },
+      {
+        label: "按城市探索",
+        icon: "ph:buildings-bold",
+        prompt: "先问我想去的城市，再推荐该城市相关的公开内容。",
+      },
+      {
+        label: "随机去一处",
+        icon: "ph:navigation-arrow-bold",
+        prompt: "从时光地图中随机挑一处值得探索的地点并说明理由。",
+      },
+    ],
+  },
+  constellation: {
+    label: "正在陪你观察时光星图",
+    hint: "想从哪颗记忆星开始？",
+    placeholder: "问问星图里的记忆关系…",
+    actions: [
+      {
+        label: "最近点亮的记忆",
+        icon: "ph:star-four-bold",
+        prompt: "介绍本站最近点亮的公开记忆，并推荐从哪一颗开始。",
+      },
+      {
+        label: "解释星图关系",
+        icon: "ph:graph-bold",
+        prompt: "简洁解释时光星图中的内容如何按时间、地点与主题相连。",
+      },
+      {
+        label: "随机定位一颗",
+        icon: "ph:crosshair-bold",
+        prompt: "随机推荐一段公开记忆，并说明它与其他内容的联系。",
+      },
+    ],
+  },
+};
+
+const activeProfile = computed(
+  () => contextProfiles[contentType.value] || contextProfiles.post,
+);
+const contextLabel = computed(() => activeProfile.value.label);
+const eventScene = computed(
+  () =>
+    props.article?.scene ||
+    (isArticleMode.value
+      ? "article"
+      : contentType.value || props.mode || "home"),
+);
+const latestFeedbackIndex = computed(() => {
+  for (let index = messages.value.length - 1; index >= 0; index -= 1) {
+    const message = messages.value[index];
+    if (
+      message.role === "assistant" &&
+      (message.feedbackEligible || message.feedbackRecorded)
+    )
+      return index;
+  }
+  return -1;
+});
 function compactHint(value: string, maxLength = 26) {
   const normalized = value.replace(/\s+/g, " ").trim();
   const characters = Array.from(normalized);
@@ -285,55 +575,24 @@ function compactHint(value: string, maxLength = 26) {
 
 const hintText = computed(() =>
   compactHint(
-    isContentMode.value ? "要我帮你理解当前内容吗？" : selectedGreeting.value,
+    isContentMode.value ? activeProfile.value.hint : selectedGreeting.value,
   ),
 );
 const inputPlaceholder = computed(() =>
-  isContentMode.value ? "问问当前内容…" : "问我文章推荐或本站内容…",
-);
-const dailyLimit = computed(() =>
-  isLoggedIn.value ? userDailyLimit.value : guestDailyLimit.value,
-);
-const usageText = computed(() =>
-  remainingQuota.value == null
-    ? `${isLoggedIn.value ? "登录用户" : "游客"}每日可聊 ${dailyLimit.value} 次 · 单次 ${inputMaxChars.value} 字`
-    : `今日剩余 ${remainingQuota.value}/${dailyLimit.value} 次`,
+  isContentMode.value ? activeProfile.value.placeholder : "想从这里发现什么？",
 );
 const actionsVisible = computed(
   () => !chatOpen.value && !suppressActions.value && !showHint.value,
 );
 
 watch(isLoggedIn, () => {
-  remainingQuota.value = null;
   historyLoaded.value = false;
   messages.value = [];
   if (chatOpen.value) void prepareChat();
 });
 const quickActions = computed<QuickAction[]>(() =>
   isContentMode.value
-    ? [
-        {
-          label: "三句话总结",
-          icon: "ph:magic-wand-bold",
-          prompt: "请用三句话总结当前文章。",
-          kind: "summary",
-        },
-        {
-          label: "提炼核心要点",
-          icon: "ph:list-checks-bold",
-          prompt: "请结合当前文章，提炼 4 到 6 个核心要点，表达简洁。",
-        },
-        {
-          label: "这篇适合谁",
-          icon: "ph:users-three-bold",
-          prompt: "请说明这篇文章适合哪些读者，以及读完能获得什么。",
-        },
-        {
-          label: "解释难点",
-          icon: "ph:lightbulb-filament-bold",
-          prompt: "请找出当前文章里最难理解的部分，并用通俗方式解释。",
-        },
-      ]
+    ? activeProfile.value.actions
     : [
         {
           label: "推荐一篇文章",
@@ -386,15 +645,11 @@ async function loadPetMeta() {
       description?: string;
       greetings?: string[];
       limits?: {
-        userDaily?: number;
-        guestDaily?: number;
         inputMaxChars?: number;
       };
     }>("/ai/pet/meta");
     if (res?.displayName) displayName.value = res.displayName;
     if (res?.description) description.value = res.description;
-    if (res?.limits?.userDaily) userDailyLimit.value = res.limits.userDaily;
-    if (res?.limits?.guestDaily) guestDailyLimit.value = res.limits.guestDaily;
     if (res?.limits?.inputMaxChars)
       inputMaxChars.value = res.limits.inputMaxChars;
     if (Array.isArray(res?.greetings) && res.greetings.length) {
@@ -451,9 +706,9 @@ let actionRevealTimer: ReturnType<typeof setTimeout> | null = null;
 function openChat() {
   void api
     .post("/ai/events", {
-      scene: isArticleMode.value ? "article" : props.mode || "home",
+      scene: eventScene.value,
       action: "open",
-      contentType: props.article?.type,
+      contentType: contentType.value,
       sourceId: props.article?.sourceId,
     })
     .catch(() => undefined);
@@ -487,7 +742,7 @@ async function prepareChat() {
   }
   if (messages.value.length === 0) {
     const fallback = isContentMode.value
-      ? "我已经准备好陪你探索当前内容啦！"
+      ? `${activeProfile.value.label}，想从哪里开始？`
       : selectedGreeting.value;
     messages.value.push({ role: "assistant", content: fallback });
   }
@@ -511,11 +766,15 @@ async function send() {
   const text = input.value.trim();
   if (!text || sending.value) return;
   input.value = "";
+  nextTick(resizeInput);
   await sendMessage(text);
 }
 
 async function sendMessage(text: string) {
   if (!text.trim() || sending.value) return;
+  messages.value.forEach((message) => {
+    message.feedbackEligible = false;
+  });
   messages.value.push({ role: "user", content: text });
   sending.value = true;
   streamStarted.value = false;
@@ -534,7 +793,7 @@ async function sendMessage(text: string) {
           title: props.article?.title || "",
           content: String(props.article?.content || "").slice(0, 10000),
           slug: props.article?.slug || "",
-          type: props.article?.type || (isArticleMode.value ? "post" : ""),
+          type: contentType.value === "home" ? "" : contentType.value,
           sourceId: props.article?.sourceId || "",
         }
       : undefined;
@@ -551,10 +810,7 @@ async function sendMessage(text: string) {
         }
         if (event === "done" && data?.usage) {
           const usage = data.usage as ChatUsage;
-          remainingQuota.value = usage.remaining;
           inputMaxChars.value = usage.inputMaxChars;
-          if (usage.audience === "user") userDailyLimit.value = usage.limit;
-          else guestDailyLimit.value = usage.limit;
         }
         if (event === "error")
           throw new Error(data?.message || "Stream failed");
@@ -572,8 +828,12 @@ async function sendMessage(text: string) {
       await waitForTypingDrain();
     }
   } finally {
-    if (messages.value[assistantIndex])
+    if (messages.value[assistantIndex]) {
       messages.value[assistantIndex].streaming = false;
+      messages.value[assistantIndex].feedbackEligible = Boolean(
+        messages.value[assistantIndex].content,
+      );
+    }
     sending.value = false;
     streamStarted.value = false;
     streamController = null;
@@ -588,23 +848,39 @@ async function runQuickAction(action: QuickAction) {
   await sendMessage(action.prompt);
 }
 
-function feedback(message: Msg, helpful: boolean) {
-  message.feedback = helpful;
-  void api
-    .post("/ai/events", {
-      scene: isArticleMode.value ? "article" : props.mode || "home",
+function shouldAskFeedback(message: Msg, index: number) {
+  return (
+    index === latestFeedbackIndex.value &&
+    Boolean(message.feedbackEligible) &&
+    !message.feedbackRecorded &&
+    !message.streaming
+  );
+}
+
+async function feedback(message: Msg, helpful: boolean) {
+  if (message.feedbackPending || message.feedbackRecorded) return;
+  message.feedbackPending = true;
+  try {
+    await api.post("/ai/events", {
+      scene: eventScene.value,
       action: "feedback",
-      contentType: props.article?.type,
+      contentType: contentType.value,
       sourceId: props.article?.sourceId,
       helpful,
-    })
-    .catch(() => undefined);
+    });
+    message.feedbackEligible = false;
+    message.feedbackRecorded = true;
+  } catch {
+    toast.error("这次反馈没有送达，请稍后再试");
+  } finally {
+    message.feedbackPending = false;
+  }
 }
 
 function trackCard(card: SourceCard) {
   void api
     .post("/ai/events", {
-      scene: isArticleMode.value ? "article" : props.mode || "home",
+      scene: eventScene.value,
       action: "recommend_click",
       contentType: card.type,
       sourceId: card.sourceId,
@@ -612,6 +888,51 @@ function trackCard(card: SourceCard) {
       sourceClicked: true,
     })
     .catch(() => undefined);
+}
+
+const sourceLabels: Record<string, string> = {
+  post: "文章",
+  moment: "瞬间",
+  library: "书影",
+  place: "地点",
+  album: "相册",
+  photo: "照片",
+  journey: "旅程",
+  story: "故事",
+};
+const sourceIcons: Record<string, string> = {
+  post: "ph:article-bold",
+  moment: "ph:sparkle-bold",
+  library: "ph:books-bold",
+  place: "ph:map-pin-bold",
+  album: "ph:images-square-bold",
+  photo: "ph:image-bold",
+  journey: "ph:path-bold",
+  story: "ph:film-strip-bold",
+};
+
+function sourceLabel(type: string) {
+  return sourceLabels[type] || type;
+}
+
+function sourceIcon(type: string) {
+  return sourceIcons[type] || "ph:star-four-bold";
+}
+
+function sourceImage(card: SourceCard) {
+  const source = aiCardImage(card);
+  return source ? mediaUrl(source) : "";
+}
+
+function sourceExcerpt(card: SourceCard) {
+  return cleanAiExcerpt(card.excerpt);
+}
+
+function resizeInput() {
+  const element = inputRef.value;
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${Math.min(88, Math.max(24, element.scrollHeight))}px`;
 }
 
 function scrollBottom() {
@@ -855,17 +1176,17 @@ onUnmounted(() => {
 }
 
 .pet-chat {
-  width: min(326px, calc(100vw - 32px));
-  height: min(430px, calc(100dvh - 150px));
+  width: min(368px, calc(100vw - 32px));
+  height: min(520px, calc(100dvh - 150px));
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-primary-soft));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ld-bg-card) 98%, var(--c-primary-soft));
   box-shadow:
     0 18px 46px color-mix(in srgb, #000 20%, var(--ld-shadow)),
     0 1px 0 color-mix(in srgb, #fff 60%, transparent) inset;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, var(--border));
 }
 
 .pet-chat-head {
@@ -873,15 +1194,11 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-  padding: 13px 14px 11px;
-  background:
-    radial-gradient(
-      circle at 12% 0%,
-      color-mix(in srgb, var(--c-primary) 16%, transparent),
-      transparent 48%
-    ),
-    linear-gradient(135deg, var(--c-primary-soft), transparent 72%);
+  padding: 14px;
+  background: color-mix(in srgb, var(--ld-bg-card) 80%, var(--c-primary-soft));
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  box-shadow: inset 0 2px 0
+    color-mix(in srgb, var(--c-primary) 48%, transparent);
 }
 
 .pet-chat-title {
@@ -899,7 +1216,7 @@ onUnmounted(() => {
   height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 8px;
   color: #fff;
   background: linear-gradient(
     145deg,
@@ -956,13 +1273,6 @@ onUnmounted(() => {
   -webkit-line-clamp: 2;
 }
 
-.pet-usage {
-  display: block;
-  margin-top: 2px;
-  color: var(--c-text-3);
-  font-size: 0.58rem;
-}
-
 .pet-context-label {
   display: inline-flex;
   align-items: center;
@@ -996,31 +1306,31 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px 13px;
+  padding: 15px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background:
-    radial-gradient(
-      circle at 100% 0%,
-      color-mix(in srgb, var(--c-primary) 7%, transparent),
-      transparent 35%
-    ),
-    color-mix(in srgb, var(--c-bg-1) 74%, transparent);
+  background: color-mix(in srgb, var(--c-bg-1) 80%, var(--ld-bg-card));
 }
 
 .pet-msg {
   display: flex;
+  min-width: 0;
 }
 
 .pet-msg.user {
   justify-content: flex-end;
 }
 
+.pet-msg.assistant {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
 .pet-bubble {
   max-width: 88%;
   padding: 10px 13px;
-  border-radius: 16px;
+  border-radius: 8px;
   font-size: 0.81rem;
   line-height: 1.65;
   word-break: break-word;
@@ -1030,14 +1340,14 @@ onUnmounted(() => {
   background: var(--ld-bg-card);
   color: var(--c-text-1);
   border: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
-  border-bottom-left-radius: 5px;
+  border-bottom-left-radius: 3px;
   box-shadow: 0 6px 18px color-mix(in srgb, var(--ld-shadow) 80%, transparent);
 }
 
 .pet-msg.user .pet-bubble {
   background: var(--c-primary);
   color: #fff;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 3px;
 }
 
 .pet-markdown {
@@ -1233,38 +1543,58 @@ onUnmounted(() => {
 }
 
 .pet-chat-form {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 40px;
+  align-items: end;
   gap: 8px;
-  padding: 12px;
+  margin: 10px;
+  padding: 8px 8px 8px 11px;
   border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: var(--ld-bg-card);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
+  border-radius: 8px;
+  background: var(--c-bg-1);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pet-chat-form:focus-within {
+  border-color: color-mix(in srgb, var(--c-primary) 58%, var(--border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 9%, transparent);
+}
+.pet-input-mark {
+  margin-bottom: 10px;
+  color: var(--c-primary);
+  font-size: 0.88rem;
 }
 
 .pet-input {
   flex: 1;
   min-width: 0;
-  height: 38px;
+  min-height: 40px;
+  max-height: 88px;
   border: none;
-  border-radius: 12px;
-  padding: 0 12px;
-  background: var(--c-bg-1);
+  border-radius: 0;
+  padding: 9px 2px 7px;
+  overflow-y: auto;
+  resize: none;
+  background: transparent;
   color: var(--c-text);
   font-family: inherit;
   font-size: 0.8rem;
   outline: none;
-  box-shadow: inset 0 0 0 1.5px transparent;
-  transition: box-shadow 0.15s;
+  line-height: 1.55;
 }
 
 .pet-input:focus {
-  box-shadow: inset 0 0 0 1.5px var(--c-primary);
+  box-shadow: none;
 }
 
 .pet-send {
   width: 38px;
   height: 38px;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--c-primary);
   color: #fff;
   cursor: pointer;
@@ -1321,14 +1651,14 @@ onUnmounted(() => {
 .pet-panel-enter-active,
 .pet-panel-leave-active {
   transition:
-    opacity 0.14s ease,
-    transform 0.14s ease;
+    opacity 0.3s ease,
+    transform 0.48s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .pet-panel-enter-from,
 .pet-panel-leave-to {
   opacity: 0;
-  transform: translateY(7px);
+  transform: translateY(16px) scale(0.975);
 }
 
 .pet-actions-enter-active {
@@ -1378,9 +1708,9 @@ onUnmounted(() => {
   }
 
   .pet-chat {
-    width: min(326px, calc(100vw - 20px));
-    height: min(420px, calc(62dvh - env(safe-area-inset-bottom)));
-    border-radius: 16px;
+    width: min(368px, calc(100vw - 20px));
+    height: min(500px, calc(68dvh - env(safe-area-inset-bottom)));
+    border-radius: 8px;
   }
 
   .pet-actions {
@@ -1416,51 +1746,119 @@ onUnmounted(() => {
 .pet-feedback {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 5px;
+  justify-content: space-between;
+  gap: 8px;
+  width: min(94%, 270px);
+  margin-top: 7px;
+  padding-left: 3px;
   color: var(--c-text-3);
-  font-size: 0.5rem;
+  font-size: 0.55rem;
+}
+.pet-feedback > div {
+  display: flex;
+  gap: 5px;
 }
 .pet-feedback button {
-  padding: 3px 6px;
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: transparent;
+  background: var(--ld-bg-card);
   color: var(--c-text-3);
   font-size: 0.5rem;
   cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
 }
-.pet-feedback button.active {
+.pet-feedback button:hover:not(:disabled) {
   border-color: var(--c-primary);
   color: var(--c-primary);
   background: var(--c-primary-soft);
+  transform: translateY(-1px);
+}
+.pet-feedback button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.pet-feedback-confirmed {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  padding-left: 3px;
+  color: #26936a;
+  font-size: 0.55rem;
+  animation: feedback-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pet-feedback-confirmed :deep(svg) {
+  font-size: 0.78rem;
 }
 .pet-source-cards {
   display: grid;
   gap: 6px;
+  width: 94%;
   margin-top: 7px;
 }
 .pet-source-cards a {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 8px 9px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 12px;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 5px 8px 5px 5px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 7px;
   background: var(--ld-bg-card);
   color: inherit;
   text-decoration: none;
+  transition:
+    border-color 0.18s ease,
+    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pet-source-cards a:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 45%, var(--border));
+  transform: translateY(-1px);
+}
+.pet-source-media {
+  display: grid;
+  width: 48px;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--c-bg-2);
+  color: var(--c-primary);
+  place-items: center;
+}
+.pet-source-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pet-source-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
 }
 .pet-source-cards small {
   color: var(--c-primary);
   font-size: 0.5rem;
-  text-transform: uppercase;
 }
 .pet-source-cards strong {
+  overflow: hidden;
   color: var(--c-text);
   font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.pet-source-cards span {
+.pet-source-copy > span {
   display: -webkit-box;
   overflow: hidden;
   color: var(--c-text-3);
@@ -1468,5 +1866,19 @@ onUnmounted(() => {
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+.pet-source-arrow {
+  color: var(--c-primary);
+  font-size: 0.65rem;
+}
+@keyframes feedback-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>

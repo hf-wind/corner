@@ -43,20 +43,34 @@ const showContextAi = computed(() =>
 );
 const pageContext = computed(() => {
   const parts = route.path.split("/").filter(Boolean);
-  const map: Record<string, string> = {
-    moments: "moment",
-    library: "library",
-    places: "place",
-    albums: "album",
-    stories: "story",
-    journeys: "journey",
-    time: parts[1] === "map" ? "place" : "journey",
+  const section = parts[0] || "";
+  const profiles: Record<
+    string,
+    { type: string; scene: string; title: string }
+  > = {
+    moments: { type: "moment", scene: "moment", title: "瞬间" },
+    library: { type: "library", scene: "library", title: "书影" },
+    places: { type: "place", scene: "place", title: "地点记忆" },
+    albums: { type: "album", scene: "album", title: "相册" },
+    stories: { type: "story", scene: "story", title: "故事航线" },
+    journeys: { type: "journey", scene: "journey", title: "旅程" },
   };
+  const profile =
+    section === "time"
+      ? parts[1] === "map"
+        ? { type: "map", scene: "map", title: "时光地图" }
+        : { type: "constellation", scene: "constellation", title: "时光星图" }
+      : profiles[section] || {
+          type: section,
+          scene: section,
+          title: "当前页面",
+        };
   return {
-    type: map[parts[0]] || parts[0],
+    type: profile.type,
+    scene: profile.scene,
     slug: parts.at(-1) || "",
     sourceId: "",
-    title: "",
+    title: profile.title,
     content: "",
   };
 });
@@ -164,6 +178,9 @@ watch(
     box-shadow: 18px 0 48px rgb(0 0 0 / 18%);
     transform: translate3d(-105%, 0, 0);
     visibility: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
     transition:
       transform 0.24s ease,
       visibility 0.24s;
@@ -176,9 +193,21 @@ watch(
 
   .sidebar-shell :deep(.sidebar-left) {
     width: 100%;
-    height: 100%;
+    height: auto;
+    min-height: 100%;
     padding-top: 4px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+
+  .sidebar-shell :deep(.sidebar-scroll) {
+    flex: 0 0 auto;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .sidebar-shell :deep(.sidebar-bottom) {
+    margin-top: auto;
   }
 
   .layout-page {

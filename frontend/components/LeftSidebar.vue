@@ -535,6 +535,8 @@ watch(
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
+  min-width: 0;
 }
 
 .search-suffix {
@@ -549,6 +551,8 @@ watch(
 
 .search-box input {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   padding: 7px 30px;
   border: 1.5px solid var(--border);
   border-radius: 8px;
@@ -971,6 +975,24 @@ watch(
   .wind-stroke,
   .hero-status i {
     animation: none;
+  }
+}
+
+@media (max-height: 720px) and (min-width: 901px) {
+  .sidebar-left {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .sidebar-scroll {
+    flex: 0 0 auto;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .sidebar-bottom {
+    margin-top: 12px;
   }
 }
 </style>

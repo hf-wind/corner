@@ -34,6 +34,10 @@ export class AiNativeService {
       .replace(/<[^>]+>/g, ' ')
       .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
       .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(
+        /(?:(?:https?:\/\/)|(?:https?%3a%2f%2f)|(?:\/uploads\/)|(?:%2fuploads%2f))[^\s<>()]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:(?:\?|%3f)[^\s<>()]*)?/gi,
+        ' ',
+      )
       .replace(/[#>*_~`\-]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
@@ -95,17 +99,29 @@ export class AiNativeService {
     },
     score?: number,
   ) {
+    const excerpt = item.excerpt || '';
     return {
       type: item.contentType,
       sourceId: item.sourceId,
       title: item.title,
       href: item.href,
-      excerpt: item.excerpt || '',
-      image: item.image,
+      excerpt: this.plain(excerpt, 280),
+      image: item.image || this.firstContentImage(excerpt),
       occurredAt: item.occurredAt?.toISOString() || null,
       metadata: this.metadata(item.metadata),
       score: score == null ? undefined : Number(score.toFixed(4)),
     };
+  }
+
+  private firstContentImage(value: unknown) {
+    const text = String(value || '');
+    return (
+      text.match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1]?.trim() ||
+      text.match(
+        /(?:(?:https?:\/\/)|(?:https?%3a%2f%2f)|(?:\/uploads\/)|(?:%2fuploads%2f))[^\s<>()]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:(?:\?|%3f)[^\s<>()]*)?/i,
+      )?.[0] ||
+      null
+    );
   }
 
   async syncIndex() {
@@ -628,20 +644,28 @@ export class AiNativeService {
   }
 
   async analytics() {
-    const [total, helpful, clicks, byAction] = await Promise.all([
-      this.prisma.aiInteraction.count(),
-      this.prisma.aiInteraction.count({ where: { helpful: true } }),
-      this.prisma.aiInteraction.count({ where: { sourceClicked: true } }),
-      this.prisma.aiInteraction.groupBy({
-        by: ['action'],
-        _count: { _all: true },
-        orderBy: { _count: { action: 'desc' } },
-        take: 20,
-      }),
-    ]);
+    const [total, chats, feedbackTotal, helpful, clicks, byAction] =
+      await Promise.all([
+        this.prisma.aiInteraction.count(),
+        this.prisma.aiInteraction.count({ where: { action: 'chat' } }),
+        this.prisma.aiInteraction.count({ where: { helpful: { not: null } } }),
+        this.prisma.aiInteraction.count({ where: { helpful: true } }),
+        this.prisma.aiInteraction.count({ where: { sourceClicked: true } }),
+        this.prisma.aiInteraction.groupBy({
+          by: ['action'],
+          _count: { _all: true },
+          orderBy: { _count: { action: 'desc' } },
+          take: 20,
+        }),
+      ]);
     return {
       total,
+      chats,
+      feedbackTotal,
       helpful,
+      helpfulRate: feedbackTotal
+        ? Number(((helpful / feedbackTotal) * 100).toFixed(1))
+        : 0,
       sourceClicks: clicks,
       byAction: byAction.map((item) => ({
         action: item.action,

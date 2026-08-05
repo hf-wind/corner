@@ -1,6 +1,9 @@
 <template>
   <a-config-provider :theme="themeConfig">
-    <div class="admin-root" :class="{ 'sidebar-collapsed': effectiveCollapsed }">
+    <div
+      class="admin-root"
+      :class="{ 'sidebar-collapsed': effectiveCollapsed }"
+    >
       <button
         class="admin-menu-trigger"
         type="button"
@@ -11,11 +14,21 @@
         <Icon :name="mobileNavOpen ? 'ph:x-bold' : 'ph:list-bold'" />
       </button>
       <Transition name="admin-overlay">
-        <button v-if="mobileNavOpen" class="admin-nav-overlay" type="button" aria-label="关闭管理菜单"
-          @click="mobileNavOpen = false" />
+        <button
+          v-if="mobileNavOpen"
+          class="admin-nav-overlay"
+          type="button"
+          aria-label="关闭管理菜单"
+          @click="mobileNavOpen = false"
+        />
       </Transition>
       <div class="sidebar-shell" :class="{ open: mobileNavOpen }">
-        <LeftSidebar variant="admin" :collapsed="effectiveCollapsed" :allow-collapse="!isMobile" @toggle-collapse="toggleSidebar" />
+        <LeftSidebar
+          variant="admin"
+          :collapsed="effectiveCollapsed"
+          :allow-collapse="!isMobile"
+          @toggle-collapse="toggleSidebar"
+        />
       </div>
       <div class="admin-main">
         <slot />
@@ -27,86 +40,99 @@
 </template>
 
 <script setup lang="ts">
-import { theme } from 'ant-design-vue'
+import { theme } from "ant-design-vue";
 
-const router = useRouter()
-const route = useRoute()
-const { resolvedTheme } = useTheme()
-const { readStorage, refreshProfile, isLoggedIn, isAdmin, canAccessAdminPath } = useAuth()
-const mobileNavOpen = ref(false)
-const sidebarCollapsed = ref(false)
-const isMobile = ref(false)
-const effectiveCollapsed = computed(() => !isMobile.value && sidebarCollapsed.value)
-let mobileQuery: MediaQueryList | null = null
-let syncMobile: (() => void) | null = null
-let previousBodyOverflow = ''
+const router = useRouter();
+const route = useRoute();
+const { resolvedTheme } = useTheme();
+const { readStorage, refreshProfile, isLoggedIn, isAdmin, canAccessAdminPath } =
+  useAuth();
+const mobileNavOpen = ref(false);
+const sidebarCollapsed = ref(false);
+const isMobile = ref(false);
+const effectiveCollapsed = computed(
+  () => !isMobile.value && sidebarCollapsed.value,
+);
+let mobileQuery: MediaQueryList | null = null;
+let syncMobile: (() => void) | null = null;
+let previousBodyOverflow = "";
 
-const isDark = computed(() => resolvedTheme.value === 'dark')
+const isDark = computed(() => resolvedTheme.value === "dark");
 
 const themeConfig = computed(() => ({
   algorithm: isDark.value ? theme.darkAlgorithm : theme.defaultAlgorithm,
   token: {
-    fontFamily: 'var(--font-body)',
-    fontFamilyCode: 'var(--font-mono)',
+    fontFamily: "var(--font-body)",
+    fontFamilyCode: "var(--font-mono)",
   },
-}))
+}));
 
 async function guardPanel() {
-  readStorage()
+  readStorage();
   if (!isLoggedIn.value) {
-    router.push('/login')
-    return
+    router.push("/login");
+    return;
   }
   try {
-    await refreshProfile()
-  } catch { /* keep local session */ }
+    await refreshProfile();
+  } catch {
+    /* keep local session */
+  }
   if (!canAccessAdminPath(route.path)) {
-    router.push('/admin/profile')
+    router.push("/admin/profile");
   }
 }
 
 onMounted(async () => {
-  mobileQuery = window.matchMedia('(max-width: 900px)')
+  mobileQuery = window.matchMedia("(max-width: 900px)");
   syncMobile = () => {
-    isMobile.value = Boolean(mobileQuery?.matches)
-    if (!isMobile.value) mobileNavOpen.value = false
-  }
-  syncMobile()
-  mobileQuery.addEventListener('change', syncMobile)
-  window.addEventListener('keydown', onKeydown)
-  await guardPanel()
-  sidebarCollapsed.value = isAdmin.value && localStorage.getItem('corner-admin-sidebar-collapsed') === '1'
-})
+    isMobile.value = Boolean(mobileQuery?.matches);
+    if (!isMobile.value) mobileNavOpen.value = false;
+  };
+  syncMobile();
+  mobileQuery.addEventListener("change", syncMobile);
+  window.addEventListener("keydown", onKeydown);
+  await guardPanel();
+  sidebarCollapsed.value =
+    isAdmin.value &&
+    localStorage.getItem("corner-admin-sidebar-collapsed") === "1";
+});
 
 function toggleSidebar() {
-  if (!isAdmin.value || isMobile.value) return
-  sidebarCollapsed.value = !sidebarCollapsed.value
-  localStorage.setItem('corner-admin-sidebar-collapsed', sidebarCollapsed.value ? '1' : '0')
+  if (!isAdmin.value || isMobile.value) return;
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  localStorage.setItem(
+    "corner-admin-sidebar-collapsed",
+    sidebarCollapsed.value ? "1" : "0",
+  );
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') mobileNavOpen.value = false
+  if (event.key === "Escape") mobileNavOpen.value = false;
 }
 
 watch(mobileNavOpen, (open) => {
   if (open && isMobile.value) {
-    previousBodyOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
   } else {
-    document.body.style.overflow = previousBodyOverflow
+    document.body.style.overflow = previousBodyOverflow;
   }
-})
+});
 
-watch(() => route.path, () => {
-  mobileNavOpen.value = false
-  void guardPanel()
-})
+watch(
+  () => route.path,
+  () => {
+    mobileNavOpen.value = false;
+    void guardPanel();
+  },
+);
 
 onUnmounted(() => {
-  if (syncMobile) mobileQuery?.removeEventListener('change', syncMobile)
-  window.removeEventListener('keydown', onKeydown)
-  document.body.style.overflow = previousBodyOverflow
-})
+  if (syncMobile) mobileQuery?.removeEventListener("change", syncMobile);
+  window.removeEventListener("keydown", onKeydown);
+  document.body.style.overflow = previousBodyOverflow;
+});
 </script>
 
 <style scoped>
@@ -125,9 +151,14 @@ onUnmounted(() => {
   z-index: 30;
   overflow: visible;
   border-right: 1px solid var(--border);
-  transition: flex-basis .32s cubic-bezier(.16,1,.3,1), width .32s cubic-bezier(.16,1,.3,1);
+  transition:
+    flex-basis 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.admin-root.sidebar-collapsed .sidebar-shell { flex-basis:72px; width:72px; }
+.admin-root.sidebar-collapsed .sidebar-shell {
+  flex-basis: 72px;
+  width: 72px;
+}
 
 .admin-main {
   background: var(--c-bg);
@@ -186,7 +217,12 @@ onUnmounted(() => {
     box-shadow: 18px 0 48px rgb(0 0 0 / 18%);
     transform: translate3d(-105%, 0, 0);
     visibility: hidden;
-    transition: transform 0.24s ease, visibility 0.24s;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    transition:
+      transform 0.24s ease,
+      visibility 0.24s;
   }
 
   .sidebar-shell.open {
@@ -196,15 +232,29 @@ onUnmounted(() => {
 
   .sidebar-shell :deep(.sidebar-left) {
     width: 100%;
-    height: 100%;
+    height: auto;
+    min-height: 100%;
     padding-top: 4px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+
+  .sidebar-shell :deep(.sidebar-scroll) {
+    flex: 0 0 auto;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .sidebar-shell :deep(.sidebar-bottom) {
+    margin-top: auto;
   }
 
   .admin-main {
     width: 100%;
-    padding: max(70px, calc(env(safe-area-inset-top) + 64px)) max(12px, env(safe-area-inset-right))
-      max(20px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    padding: max(70px, calc(env(safe-area-inset-top) + 64px))
+      max(12px, env(safe-area-inset-right))
+      max(20px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
     overflow-x: hidden;
   }
 }

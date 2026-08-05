@@ -85,8 +85,12 @@
           data-speed="30"
         >
           <Icon name="ph:highlighter-bold" />
-          <span id="excerpt-text" :data-text="article.excerpt"></span>
-          <span id="excerpt-caret" class="excerpt-caret">_</span>
+          <span class="excerpt-copy">
+            <span ref="excerptTextRef" :data-text="article.excerpt"></span>
+            <span ref="excerptCaretRef" class="excerpt-caret" aria-hidden="true"
+              >_</span
+            >
+          </span>
         </div>
 
         <div
@@ -220,6 +224,8 @@ const shareOpen = ref(false);
 const posterOpen = ref(false);
 
 const excerptRef = ref<HTMLElement | null>(null);
+const excerptTextRef = ref<HTMLElement | null>(null);
+const excerptCaretRef = ref<HTMLElement | null>(null);
 const noticeRef = ref<HTMLElement | null>(null);
 const articleMainRef = ref<HTMLElement | null>(null);
 const articleContentRef = ref<HTMLElement | null>(null);
@@ -233,6 +239,9 @@ const articleContext = computed(() => ({
   title: article.value?.title || "",
   content: article.value?.content || "",
   slug,
+  type: "post",
+  scene: "article",
+  sourceId: article.value?.id || "",
 }));
 
 async function loadArticle() {
@@ -299,6 +308,7 @@ function scrollToComment() {
 
 let scrollFrame: number | null = null;
 let articleResizeObserver: ResizeObserver | null = null;
+let excerptTimer: ReturnType<typeof setTimeout> | null = null;
 
 function updateArticleScrollState() {
   const container = articleMainRef.value;
@@ -335,20 +345,29 @@ function handleArticleScroll() {
 function typeExcerpt() {
   const container = excerptRef.value;
   if (!container || container.dataset.animation === "false") return;
-  const el = document.getElementById("excerpt-text");
-  const caret = document.getElementById("excerpt-caret");
+  const el = excerptTextRef.value;
+  const caret = excerptCaretRef.value;
   if (!el) return;
   const text = el.dataset.text || "";
   const speed = parseInt(container.dataset.speed || "30");
+  const characters = Array.from(text);
+  if (excerptTimer) clearTimeout(excerptTimer);
   el.textContent = "";
+  if (caret) caret.style.visibility = "visible";
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    el.textContent = text;
+    if (caret) caret.style.visibility = "hidden";
+    return;
+  }
   let index = 0;
   function type() {
-    if (index < text.length) {
-      el!.textContent += text[index];
+    if (index < characters.length) {
+      el!.textContent += characters[index];
       index++;
-      setTimeout(type, speed);
+      excerptTimer = setTimeout(type, speed);
     } else if (caret) {
-      caret.style.display = "none";
+      caret.style.visibility = "hidden";
+      excerptTimer = null;
     }
   }
   type();
@@ -392,6 +411,7 @@ onMounted(async () => {
 onUnmounted(() => {
   articleResizeObserver?.disconnect();
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+  if (excerptTimer) clearTimeout(excerptTimer);
 });
 </script>
 
@@ -551,7 +571,7 @@ onUnmounted(() => {
 }
 
 .md-excerpt :deep(.icon),
-#excerpt-text,
+.excerpt-copy,
 .excerpt-caret {
   position: relative;
   z-index: 0;
@@ -563,12 +583,14 @@ onUnmounted(() => {
   color: var(--c-primary);
 }
 
-#excerpt-text {
+.excerpt-copy {
   flex: 1;
   min-width: 0;
 }
 
 .excerpt-caret {
+  display: inline-block;
+  width: 0.65em;
   animation: blink 0.8s infinite;
 }
 

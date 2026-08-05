@@ -1810,6 +1810,17 @@ function focusDiscovery(id: DiscoveryId) {
   startCameraFlight(destination, id === 'black-hole' ? 1750 : 1450, id === 'black-hole' ? 18 : 12, undefined, id)
 }
 
+function resumeDiscoveryFocus(id: DiscoveryId) {
+  if (!camera || !controls) return
+  const object = discoveryObjects.get(id)
+  if (!object) return
+  focusedDiscoveryId = id
+  discoveryTourId = ''
+  pendingDiscoveryTourId = ''
+  cameraFlightTrackingId = cameraFlight ? id : ''
+  controls.enabled = !props.ambient && !cameraFlight
+}
+
 function triggerDiscoveryEffect(id: DiscoveryId) {
   discoveryEffect = id
   discoveryEffectStartedAt = performance.now()
@@ -2366,6 +2377,7 @@ onBeforeUnmount(() => { disposed = true; destroy() })
 defineExpose({
   focusNode: (id: string) => { const node = nodeLookup.get(id); if (node) emit('select', node) },
   focusDiscovery,
+  resumeDiscoveryFocus,
   triggerDiscoveryEffect,
   startDiscoveryTour,
   resetView,

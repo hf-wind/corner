@@ -3,8 +3,11 @@
     <header>
       <div>
         <span>AI NATIVE</span>
-        <h1>AI 原生能力台</h1>
-        <p>管理语义索引、作者风格、私有检索与记忆叙事。</p>
+        <h1>AI 体验与内容智能</h1>
+        <p>
+          汇总前台 AI
+          体验事件，并管理语义索引、作者风格与记忆叙事；事件总数并不等同于模型调用次数。
+        </p>
       </div>
       <a-button type="primary" :loading="busy === 'index'" @click="rebuildIndex"
         ><Icon name="ph:arrows-clockwise-bold" />重建索引</a-button
@@ -12,14 +15,22 @@
     </header>
     <section class="metrics">
       <article>
-        <small>交互总数</small><strong>{{ analytics.total || 0 }}</strong>
+        <small>AI 体验事件</small><strong>{{ analytics.total || 0 }}</strong>
       </article>
       <article>
-        <small>来源点击</small
+        <small>AI 对话</small><strong>{{ analytics.chats || 0 }}</strong>
+      </article>
+      <article>
+        <small>推荐来源点击</small
         ><strong>{{ analytics.sourceClicks || 0 }}</strong>
       </article>
       <article>
-        <small>有帮助</small><strong>{{ analytics.helpful || 0 }}</strong>
+        <small>回答好评率</small
+        ><strong>{{ analytics.helpfulRate || 0 }}<em>%</em></strong>
+        <span
+          >{{ analytics.helpful || 0 }} /
+          {{ analytics.feedbackTotal || 0 }} 次反馈</span
+        >
       </article>
     </section>
     <div class="grid">
@@ -74,7 +85,7 @@
           :key="item.action"
           class="action-row"
         >
-          <span>{{ item.action }}</span
+          <span>{{ actionLabel(item.action) }}</span
           ><strong>{{ item.count }}</strong>
         </div></a-card
       >
@@ -92,6 +103,18 @@ const privateQuery = ref("");
 const privateResult = ref<any>();
 const narrative = reactive({ kind: "weekly", theme: "" });
 const narrativeResult = ref<any>();
+const actionLabels: Record<string, string> = {
+  exposure: "组件曝光",
+  open: "打开 AI 面板",
+  chat: "发起对话",
+  feedback: "回答反馈",
+  recommend_click: "点击推荐来源",
+  related_click: "点击相关阅读",
+  reading_end: "结束阅读",
+};
+function actionLabel(action: string) {
+  return actionLabels[action] || action;
+}
 async function load() {
   try {
     analytics.value = await api.get("/ai/admin/analytics");
@@ -172,7 +195,7 @@ onMounted(load);
 }
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 .metrics article {
@@ -188,6 +211,19 @@ onMounted(load);
 }
 .metrics strong {
   font-size: 1.35rem;
+}
+.metrics strong em {
+  margin-left: 2px;
+  color: var(--c-text-3);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 600;
+}
+.metrics article > span {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-3);
+  font-size: 0.5rem;
 }
 .grid {
   display: grid;
@@ -223,6 +259,9 @@ onMounted(load);
   font-size: 0.65rem;
 }
 @media (max-width: 800px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .grid {
     grid-template-columns: 1fr;
   }

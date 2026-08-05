@@ -164,9 +164,27 @@ export class MemoryGraphService implements OnModuleInit {
     return (
       text
         .replace(/<[^>]+>/g, ' ')
+        .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(
+          /(?:(?:https?:\/\/)|(?:https?%3a%2f%2f)|(?:\/uploads\/)|(?:%2fuploads%2f))[^\s<>()]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:(?:\?|%3f)[^\s<>()]*)?/gi,
+          ' ',
+        )
+        .replace(/[*_`>#-]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, max) || null
+    );
+  }
+
+  private firstContentImage(value: unknown) {
+    const text = this.stringValue(value);
+    return (
+      text.match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1]?.trim() ||
+      text.match(
+        /(?:(?:https?:\/\/)|(?:https?%3a%2f%2f)|(?:\/uploads\/)|(?:%2fuploads%2f))[^\s<>()]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:(?:\?|%3f)[^\s<>()]*)?/i,
+      )?.[0] ||
+      null
     );
   }
 
@@ -394,6 +412,8 @@ export class MemoryGraphService implements OnModuleInit {
 
     for (const moment of moments) {
       const snapshot = this.record(moment.publishedSnapshot);
+      const momentContent =
+        this.stringValue(snapshot?.content) || moment.content || '';
       const visibility =
         this.stringValue(snapshot?.locationVisibility) ||
         moment.locationVisibility;
@@ -410,8 +430,9 @@ export class MemoryGraphService implements OnModuleInit {
           sourceId: moment.id,
           title: this.stringValue(snapshot?.title) || moment.title,
           slug: this.stringValue(snapshot?.slug) || moment.slug,
-          excerpt: this.cleanText(snapshot?.excerpt || snapshot?.content),
+          excerpt: this.cleanText(snapshot?.excerpt || momentContent),
           href: `/moments/${this.stringValue(snapshot?.slug) || moment.slug}`,
+          image: this.firstContentImage(momentContent),
           occurredAt:
             this.dateValue(snapshot?.happenedAt) ||
             moment.happenedAt ||
