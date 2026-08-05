@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isContentMode }">
+  <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isArticleMode }">
     <Transition name="pet-panel">
       <div
         v-if="chatOpen"
@@ -72,7 +72,7 @@
                   </span>
                   <span class="pet-source-copy">
                     <small>{{ sourceLabel(card.type) }}</small>
-                    <strong>{{ card.title }}</strong>
+                    <strong>{{ sourceTitle(card) }}</strong>
                     <span v-if="sourceExcerpt(card)">{{
                       sourceExcerpt(card)
                     }}</span>
@@ -82,6 +82,32 @@
                     class="pet-source-arrow"
                   />
                 </NuxtLink>
+              </div>
+              <div
+                v-if="!m.streaming && m.music?.length"
+                class="pet-music-cards"
+              >
+                <button
+                  v-for="track in m.music"
+                  :key="`${track.name}:${track.artist}`"
+                  type="button"
+                  @click="playTrack(track)"
+                >
+                  <span class="pet-music-cover">
+                    <img
+                      v-if="track.pic"
+                      :src="track.pic"
+                      :alt="track.name"
+                      loading="lazy"
+                    />
+                    <Icon v-else name="ph:music-notes-fill" />
+                  </span>
+                  <span
+                    ><strong>{{ track.name }}</strong
+                    ><small>{{ track.artist }}</small></span
+                  >
+                  <Icon name="ph:play-fill" />
+                </button>
               </div>
               <div v-if="shouldAskFeedback(m, i)" class="pet-feedback">
                 <span>这次有帮到你吗？</span>
@@ -180,7 +206,9 @@
       <span class="pet-sprite-wrap" :style="wrapStyle">
         <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
       </span>
-      <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
+      <Transition name="pet-hint" appear>
+        <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
+      </Transition>
     </button>
   </div>
 </template>
@@ -188,7 +216,7 @@
 <script setup lang="ts">
 import MarkdownIt from "markdown-it";
 import petMeta from "~/assets/dram/pet.json";
-import { aiCardImage, cleanAiExcerpt } from "~/utils/aiContent";
+import { aiCardImage, cleanAiExcerpt, cleanAiTitle } from "~/utils/aiContent";
 const spriteUrl = "/dram/spritesheet.webp";
 
 const markdown = new MarkdownIt({
@@ -229,9 +257,17 @@ interface Msg {
   feedbackEligible?: boolean;
   feedbackPending?: boolean;
   feedbackRecorded?: boolean;
+  music?: MusicTrack[];
 }
 type ChatUsage = {
   inputMaxChars: number;
+};
+type MusicTrack = {
+  name: string;
+  artist: string;
+  url: string;
+  pic?: string;
+  playlist?: string;
 };
 type QuickAction = {
   label: string;
@@ -285,6 +321,7 @@ const api = useApi();
 const { isLoggedIn } = useAuth();
 const { mediaUrl } = useMediaUrl();
 const toast = useToast();
+const { requestTrack } = useMusicPlayerState();
 const chatOpen = ref(false);
 const sending = ref(false);
 const streamStarted = ref(false);
@@ -590,6 +627,15 @@ watch(isLoggedIn, () => {
   messages.value = [];
   if (chatOpen.value) void prepareChat();
 });
+watch(
+  () =>
+    `${props.article?.type || "home"}:${props.article?.slug || ""}:${props.article?.sourceId || ""}`,
+  () => {
+    streamController?.abort();
+    historyLoaded.value = false;
+    messages.value = [];
+  },
+);
 const quickActions = computed<QuickAction[]>(() =>
   isContentMode.value
     ? activeProfile.value.actions
@@ -599,6 +645,21 @@ const quickActions = computed<QuickAction[]>(() =>
           icon: "ph:sparkle-bold",
           prompt:
             "请根据本站最近发布的内容，推荐一篇值得先读的文章，并简要说明理由。",
+        },
+        {
+          label: "推荐一册相册",
+          icon: "ph:images-square-bold",
+          prompt: "请从本站相册中推荐一册值得翻看的相册，并简短说明理由。",
+        },
+        {
+          label: "推荐一份书影",
+          icon: "ph:books-bold",
+          prompt: "请从本站书影记录中推荐一部作品，并简短说明理由。",
+        },
+        {
+          label: "推荐一首歌",
+          icon: "ph:music-notes-bold",
+          prompt: "先根据此刻的氛围推荐几首歌，我可以点击直接播放。",
         },
         {
           label: "本站有什么内容",
@@ -722,7 +783,7 @@ function closeChat() {
   if (actionRevealTimer) clearTimeout(actionRevealTimer);
   actionRevealTimer = setTimeout(() => {
     suppressActions.value = false;
-  }, 160);
+  }, 220);
 }
 
 async function toggleChat() {
@@ -736,7 +797,7 @@ async function toggleChat() {
 }
 
 async function prepareChat() {
-  if (!historyLoaded.value) {
+  if (!historyLoaded.value && !isContentMode.value) {
     await loadHistory();
     historyLoaded.value = true;
   }
@@ -795,6 +856,7 @@ async function sendMessage(text: string) {
           slug: props.article?.slug || "",
           type: contentType.value === "home" ? "" : contentType.value,
           sourceId: props.article?.sourceId || "",
+          scene: eventScene.value,
         }
       : undefined;
     await api.postStream(
@@ -807,6 +869,13 @@ async function sendMessage(text: string) {
         if (event === "done" && Array.isArray(data?.recommendations)) {
           const message = messages.value[assistantIndex];
           if (message) message.cards = data.recommendations;
+        }
+        if (event === "done" && Array.isArray(data?.music)) {
+          const message = messages.value[assistantIndex];
+          if (message) message.music = data.music.slice(0, 4);
+          if (/播放|来一首|听(?:一首|点|歌)/u.test(text) && data.music[0]) {
+            requestTrack(data.music[0]);
+          }
         }
         if (event === "done" && data?.usage) {
           const usage = data.usage as ChatUsage;
@@ -890,6 +959,22 @@ function trackCard(card: SourceCard) {
     .catch(() => undefined);
 }
 
+function playTrack(track: MusicTrack) {
+  requestTrack(track);
+  toast.success(`正在播放：${track.name}`);
+  void api
+    .post("/ai/events", {
+      scene: eventScene.value,
+      action: "music_play",
+      metadata: {
+        name: track.name,
+        artist: track.artist,
+        playlist: track.playlist,
+      },
+    })
+    .catch(() => undefined);
+}
+
 const sourceLabels: Record<string, string> = {
   post: "文章",
   moment: "瞬间",
@@ -926,6 +1011,10 @@ function sourceImage(card: SourceCard) {
 
 function sourceExcerpt(card: SourceCard) {
   return cleanAiExcerpt(card.excerpt);
+}
+
+function sourceTitle(card: SourceCard) {
+  return cleanAiTitle(card.title, card.type);
 }
 
 function resizeInput() {
@@ -1082,10 +1171,8 @@ onUnmounted(() => {
   right: 22px;
   bottom: 22px;
   z-index: 1100;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  width: 96px;
+  height: 104px;
   pointer-events: none;
 }
 
@@ -1098,7 +1185,9 @@ onUnmounted(() => {
 }
 
 .pet-fab {
-  position: relative;
+  position: absolute;
+  right: 0;
+  bottom: 0;
   border: none;
   background: transparent;
   padding: 0;
@@ -1161,7 +1250,6 @@ onUnmounted(() => {
   text-align: left;
   white-space: normal;
   box-shadow: 0 8px 22px var(--ld-shadow);
-  animation: hint-in 0.35s ease;
 }
 
 .pet-hint::after {
@@ -1176,6 +1264,9 @@ onUnmounted(() => {
 }
 
 .pet-chat {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
   width: min(368px, calc(100vw - 32px));
   height: min(520px, calc(100dvh - 150px));
   display: flex;
@@ -1624,15 +1715,17 @@ onUnmounted(() => {
   }
 }
 
-@keyframes hint-in {
-  from {
-    opacity: 0;
-    transform: translateY(-50%) translateX(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-  }
+.pet-hint-enter-active,
+.pet-hint-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pet-hint-enter-from,
+.pet-hint-leave-to {
+  opacity: 0;
+  transform: translateY(-50%) translateX(8px);
 }
 
 @keyframes typing {
@@ -1648,11 +1741,16 @@ onUnmounted(() => {
   }
 }
 
-.pet-panel-enter-active,
+.pet-panel-enter-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .pet-panel-leave-active {
   transition:
-    opacity 0.3s ease,
-    transform 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 0.18s ease,
+    transform 0.22s cubic-bezier(0.4, 0, 1, 1);
 }
 
 .pet-panel-enter-from,
@@ -1737,6 +1835,8 @@ onUnmounted(() => {
 
   .pet-panel-enter-active,
   .pet-panel-leave-active,
+  .pet-hint-enter-active,
+  .pet-hint-leave-active,
   .pet-actions-enter-active,
   .pet-actions-leave-active {
     transition: none;
@@ -1870,6 +1970,73 @@ onUnmounted(() => {
 .pet-source-arrow {
   color: var(--c-primary);
   font-size: 0.65rem;
+}
+
+.pet-music-cards {
+  display: grid;
+  width: 94%;
+  gap: 6px;
+  margin-top: 7px;
+}
+.pet-music-cards button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 34px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px 5px 5px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 15%, var(--border));
+  border-radius: 9px;
+  background: var(--ld-bg-card);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    transform 0.22s ease;
+}
+.pet-music-cards button:hover {
+  border-color: var(--c-primary);
+  transform: translateX(2px);
+}
+.pet-music-cover {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  place-items: center;
+}
+.pet-music-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pet-music-cards button > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.pet-music-cards strong,
+.pet-music-cards small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pet-music-cards strong {
+  color: var(--c-text);
+  font-size: 0.66rem;
+}
+.pet-music-cards small {
+  color: var(--c-text-3);
+  font-size: 0.54rem;
+}
+.pet-music-cards button > svg {
+  color: var(--c-primary);
 }
 @keyframes feedback-in {
   from {

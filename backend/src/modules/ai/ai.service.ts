@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { MediaService } from '../media/media.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { MusicService } from '../music/music.service';
 import {
   AI_DEFAULTS,
   AI_SETTING_KEYS,
@@ -143,6 +144,7 @@ export class AiService {
     private settings: SettingsService,
     private media: MediaService,
     private redis: RedisService,
+    private music: MusicService,
   ) {}
 
   private envApiKey(provider: string) {
@@ -688,6 +690,10 @@ export class AiService {
       .replace(/`[^`]*`/g, ' ')
       .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
       .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(
+        /(?:(?:https?:\/\/)|(?:https?%3a%2f%2f)|(?:\/uploads\/)|(?:%2fuploads%2f))[^\s<>()]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:(?:\?|%3f)[^\s<>()]*)?/gi,
+        ' ',
+      )
       .replace(/[#>*_~\-]+/g, ' ')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -1988,6 +1994,7 @@ export class AiService {
           slug?: string;
           type?: string;
           sourceId?: string;
+          scene?: string;
         }
       | undefined,
     cfg: AiConfig,
@@ -2015,6 +2022,11 @@ export class AiService {
         ? `对方是站长「${cfg.ai_owner_username}」，以亲密伙伴身份相处。`
         : '对方是访客，热情向导即可；不要把对方叫成大雄，也不要反复提大雄相关梗。',
     ].join('\n');
+    const musicSuggestions = /音乐|歌曲|歌单|听歌|播放|music|song/i.test(
+      message,
+    )
+      ? await this.music.getRecommendedTracks(message, 4).catch(() => [])
+      : [];
 
     let resolvedArticle = article;
     if (article?.type && article.slug && !article.content) {
@@ -2057,9 +2069,21 @@ export class AiService {
             .join('\n')
         : '';
 
+    const sceneGuard = resolvedArticle?.type
+      ? [
+          `【场景边界】当前场景是「${resolvedArticle.type}」，当前内容是「${String(resolvedArticle.title || resolvedArticle.slug || '未命名')}」。`,
+          '回答必须优先且明确依据当前内容；不得把博客知识库中的其他文章、相册或书影误称为当前内容。',
+          '只有用户明确要求推荐或寻找相似内容时，才可以引用其他内容，并清楚标注为推荐。',
+          '相册与照片场景不得在回复正文中展示图片 URL；图片只通过界面缩略图呈现。',
+        ].join('\n')
+      : '【场景边界】当前是首页探索场景，可以跨文章、相册和书影推荐，但必须清楚标注内容类型。';
+    const musicContext = musicSuggestions.length
+      ? `【可推荐歌曲（仅以下 ${musicSuggestions.length} 首，不得虚构）】\n${musicSuggestions.map((track, index) => `${index + 1}. ${track.name} - ${track.artist}（${track.playlist}）`).join('\n')}\n用户要求播放时，告诉用户已为其准备播放；不要输出音频 URL。`
+      : '';
+
     const system: ChatMessage = {
       role: 'system',
-      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${articleContext}\n\n【博客知识库】\n${knowledge}`,
+      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${sceneGuard}\n\n${articleContext}\n\n${musicContext}\n\n【博客知识库】\n${knowledge}`,
     };
 
     const configuredHistoryLimit = Math.max(
@@ -2069,7 +2093,9 @@ export class AiService {
     const historyLimit = actor.userId
       ? configuredHistoryLimit
       : Math.min(configuredHistoryLimit, 12);
-    const recent = await this.getHistory(actor, historyLimit);
+    const recent = resolvedArticle?.type
+      ? []
+      : await this.getHistory(actor, historyLimit);
     let budget = Math.max(500, cfg.ai_history_char_budget || 4096);
     if (!actor.userId) budget = Math.min(budget, 2400);
     let messageLength = 0;
@@ -2092,6 +2118,7 @@ export class AiService {
         ...history,
         { role: 'user' as const, content: message },
       ],
+      musicSuggestions,
     };
   }
 
@@ -2104,6 +2131,7 @@ export class AiService {
       slug?: string;
       type?: string;
       sourceId?: string;
+      scene?: string;
     },
   ) {
     const cfg = await this.getConfig();
@@ -2127,7 +2155,7 @@ export class AiService {
       return { reply: quotaMessage, source: 'quota' as const, usage };
     }
 
-    const { messages } = await this.preparePetChat(
+    const { messages, musicSuggestions } = await this.preparePetChat(
       actor,
       userText,
       article,
@@ -2143,7 +2171,12 @@ export class AiService {
       });
       const text = reply || '嗯……四次元口袋卡住了，再说一次好不好？';
       await this.saveMessage(actor, 'assistant', text);
-      return { reply: text, source: 'ai' as const, usage };
+      return {
+        reply: text,
+        source: 'ai' as const,
+        usage,
+        music: musicSuggestions,
+      };
     } catch {
       const fallback = cfg.ai_fallback_error;
       await this.saveMessage(actor, 'assistant', fallback);
@@ -2161,6 +2194,7 @@ export class AiService {
           slug?: string;
           type?: string;
           sourceId?: string;
+          scene?: string;
         }
       | undefined,
     onToken: (token: string) => void,
@@ -2188,7 +2222,7 @@ export class AiService {
       return { source: 'quota' as const, usage };
     }
 
-    const { messages } = await this.preparePetChat(
+    const { messages, musicSuggestions } = await this.preparePetChat(
       actor,
       userText,
       article,
@@ -2213,7 +2247,7 @@ export class AiService {
       const text = reply || '嗯……四次元口袋卡住了，再说一次好不好？';
       if (!reply) onToken(text);
       await this.saveMessage(actor, 'assistant', text);
-      return { source: 'ai' as const, usage };
+      return { source: 'ai' as const, usage, music: musicSuggestions };
     } catch (error) {
       if (partial.trim()) {
         this.logger.warn(`AI stream ended after partial response: ${error}`);

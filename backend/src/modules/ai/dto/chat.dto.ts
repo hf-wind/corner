@@ -31,6 +31,11 @@ export class ChatArticleDto {
   @IsString()
   @MaxLength(180)
   sourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  scene?: string;
 }
 
 export class ChatDto {

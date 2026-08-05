@@ -67,10 +67,15 @@ export class MusicService {
     const allowed = new Set<string>(MUSIC_SETTING_KEYS);
     for (const [key, value] of Object.entries(partial)) {
       if (!allowed.has(key)) continue;
-      await this.settings.set(key, this.coerce(key as keyof MusicConfig, value));
+      await this.settings.set(
+        key,
+        this.coerce(key as keyof MusicConfig, value),
+      );
     }
     this.cache.clear();
-    await this.redis.client.incr('corner:music:cache-version').catch(() => undefined);
+    await this.redis.client
+      .incr('corner:music:cache-version')
+      .catch(() => undefined);
     return this.getConfig();
   }
 
@@ -122,13 +127,30 @@ export class MusicService {
       sort: 0,
     };
 
-    if (opts?.playlistIndex != null && cfg.music_playlists[opts.playlistIndex]) {
+    if (
+      opts?.playlistIndex != null &&
+      cfg.music_playlists[opts.playlistIndex]
+    ) {
       source = { ...cfg.music_playlists[opts.playlistIndex] };
     }
 
-    const allTracks = await this.fetchTracks(source, cfg.music_api, cfg.music_cache_ttl, !!opts?.refresh);
-    const page = Math.max(1, Number.isFinite(opts?.page) ? Math.floor(opts!.page!) : 1);
-    const limit = Math.max(10, Math.min(100, Number.isFinite(opts?.limit) ? Math.floor(opts!.limit!) : 50));
+    const allTracks = await this.fetchTracks(
+      source,
+      cfg.music_api,
+      cfg.music_cache_ttl,
+      !!opts?.refresh,
+    );
+    const page = Math.max(
+      1,
+      Number.isFinite(opts?.page) ? Math.floor(opts!.page!) : 1,
+    );
+    const limit = Math.max(
+      10,
+      Math.min(
+        100,
+        Number.isFinite(opts?.limit) ? Math.floor(opts!.limit!) : 50,
+      ),
+    );
     const total = allTracks.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const tracks = allTracks
@@ -149,11 +171,22 @@ export class MusicService {
 
   async refreshCache() {
     this.cache.clear();
-    await this.redis.client.incr('corner:music:cache-version').catch(() => undefined);
+    await this.redis.client
+      .incr('corner:music:cache-version')
+      .catch(() => undefined);
     return this.getPlaylist({ refresh: true });
   }
 
   async getRecommendationCandidates(query: string, limit = 10) {
+    const tracks = await this.getRecommendedTracks(query, limit);
+    return tracks.map(({ name, artist, playlist }) => ({
+      name,
+      artist,
+      playlist,
+    }));
+  }
+
+  async getRecommendedTracks(query: string, limit = 4) {
     const cfg = await this.getConfig();
     if (!cfg.music_enabled) return [];
 
@@ -175,7 +208,10 @@ export class MusicService {
     });
 
     const terms = this.musicSearchTerms(query);
-    const seed = createHash('sha256').update(query || 'music').digest().readUInt32BE(0);
+    const seed = createHash('sha256')
+      .update(query || 'music')
+      .digest()
+      .readUInt32BE(0);
     return [...unique.values()]
       .map((track, index) => ({
         track,
@@ -183,12 +219,17 @@ export class MusicService {
         tie: (index * 2654435761 + seed) >>> 0,
       }))
       .sort((a, b) => b.score - a.score || a.tie - b.tie)
-      .slice(0, Math.max(1, Math.min(12, limit)))
-      .map(({ track }) => ({
-        name: track.name.slice(0, 80),
-        artist: track.artist.slice(0, 80),
-        playlist: track.playlist.slice(0, 40),
-      }));
+      .slice(0, Math.max(1, Math.min(6, limit)))
+      .map(({ track }) => {
+        const presented = this.presentTrack(track);
+        return {
+          name: track.name.slice(0, 80),
+          artist: track.artist.slice(0, 80),
+          playlist: track.playlist.slice(0, 40),
+          url: presented.url,
+          pic: presented.pic,
+        };
+      });
   }
 
   async proxyMedia(input: {
@@ -282,7 +323,9 @@ export class MusicService {
       .filter((term) => term.length >= 2)
       .filter(
         (term) =>
-          !/^(推荐|一首|歌曲|音乐|歌单|听听|想听|给我|帮我|适合|现在)$/.test(term),
+          !/^(推荐|一首|歌曲|音乐|歌单|听听|想听|给我|帮我|适合|现在)$/.test(
+            term,
+          ),
       );
     const moods: Array<[RegExp, string[]]> = [
       [/开心|快乐|元气|通勤/, ['快乐', '阳光', '青春', '夏天']],
@@ -325,10 +368,15 @@ export class MusicService {
     if (!force && hit && now - hit.fetchedAt < Math.max(60, ttlSec) * 1000) {
       return hit.tracks;
     }
-    const cacheVersion = await this.redis.client.get('corner:music:cache-version').catch(() => null) || '1';
+    const cacheVersion =
+      (await this.redis.client
+        .get('corner:music:cache-version')
+        .catch(() => null)) || '1';
     const redisKey = `corner:music:playlist:${cacheVersion}:${createHash('sha256').update(key).digest('hex')}`;
     if (!force) {
-      const persistent = await this.redis.getJson<CacheEntry>(redisKey).catch(() => null);
+      const persistent = await this.redis
+        .getJson<CacheEntry>(redisKey)
+        .catch(() => null);
       if (persistent?.tracks?.length) {
         this.cache.set(key, persistent);
         return persistent.tracks;
@@ -342,7 +390,10 @@ export class MusicService {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 20000);
       const res = await fetch(url, {
-        headers: { Accept: 'application/json', 'User-Agent': 'corner-blog-music/1.0' },
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'corner-blog-music/1.0',
+        },
         signal: controller.signal,
       }).finally(() => clearTimeout(timer));
       if (!res.ok) {
@@ -355,9 +406,11 @@ export class MusicService {
       }
       const entry = { tracks, fetchedAt: now, key };
       this.cache.set(key, entry);
-      await this.redis.setJson(redisKey, entry, Math.max(60, ttlSec)).catch((error: Error) => {
-        this.logger.warn(`cache playlist in redis failed: ${error.message}`);
-      });
+      await this.redis
+        .setJson(redisKey, entry, Math.max(60, ttlSec))
+        .catch((error: Error) => {
+          this.logger.warn(`cache playlist in redis failed: ${error.message}`);
+        });
       return tracks;
     } catch (e) {
       this.logger.warn(`fetch playlist failed: ${e}`);
@@ -374,10 +427,16 @@ export class MusicService {
       .map((item: any) => {
         const name = String(item.name || item.title || item.song || '').trim();
         const artist = String(
-          item.artist || item.author || item.ar || (Array.isArray(item.artists) ? item.artists.join(' / ') : '') || '未知歌手',
+          item.artist ||
+            item.author ||
+            item.ar ||
+            (Array.isArray(item.artists) ? item.artists.join(' / ') : '') ||
+            '未知歌手',
         ).trim();
         const url = String(item.url || item.src || item.mp3 || '').trim();
-        const pic = String(item.pic || item.cover || item.picture || item.album?.picUrl || '').trim();
+        const pic = String(
+          item.pic || item.cover || item.picture || item.album?.picUrl || '',
+        ).trim();
         const lrc = item.lrc != null ? String(item.lrc) : undefined;
         if (!name || !url) return null;
         return { name, artist, url, pic, lrc };
@@ -385,7 +444,10 @@ export class MusicService {
       .filter(Boolean) as MusicTrack[];
   }
 
-  private coerce(key: keyof MusicConfig, value: unknown): MusicConfig[keyof MusicConfig] {
+  private coerce(
+    key: keyof MusicConfig,
+    value: unknown,
+  ): MusicConfig[keyof MusicConfig] {
     const def = MUSIC_DEFAULTS[key];
     if (typeof def === 'boolean') {
       if (typeof value === 'boolean') return value;
@@ -405,12 +467,16 @@ export class MusicService {
             server: String(v?.server || 'netease').slice(0, 20),
             type: String(v?.type || 'playlist').slice(0, 20),
             id: String(v?.id || '').slice(0, 64),
-            sort: Number.isFinite(Number(v?.sort)) ? Math.trunc(Number(v.sort)) : (index + 1) * 10,
+            sort: Number.isFinite(Number(v?.sort))
+              ? Math.trunc(Number(v.sort))
+              : (index + 1) * 10,
             originalIndex: index,
           }))
           .filter((v) => v.id)
           .sort((a, b) => a.sort - b.sort || a.originalIndex - b.originalIndex)
-          .map(({ originalIndex: _originalIndex, ...playlist }) => playlist) as MusicPlaylistSource[];
+          .map(
+            ({ originalIndex: _originalIndex, ...playlist }) => playlist,
+          ) as MusicPlaylistSource[];
       }
       if (typeof value === 'string') {
         try {

@@ -25,7 +25,12 @@
       }"
     >
       <Transition name="smp-list">
-        <div v-if="listOpen" class="smp-list" role="listbox" aria-label="播放列表">
+        <div
+          v-if="listOpen"
+          class="smp-list"
+          role="listbox"
+          aria-label="播放列表"
+        >
           <div class="smp-list-head">
             <div class="smp-list-tabs">
               <button
@@ -39,7 +44,12 @@
                 {{ pl.name }}
               </button>
             </div>
-            <button type="button" class="smp-icon-btn" title="关闭" @click="listOpen = false">
+            <button
+              type="button"
+              class="smp-icon-btn"
+              title="关闭"
+              @click="listOpen = false"
+            >
               <Icon name="ph:caret-down-bold" />
             </button>
           </div>
@@ -57,12 +67,18 @@
                 <span class="smp-track-name">{{ t.name }}</span>
                 <span class="smp-track-artist">{{ t.artist }}</span>
               </span>
-              <Icon v-if="i === index && playing" name="ph:waveform-bold" class="smp-track-wave" />
+              <Icon
+                v-if="i === index && playing"
+                name="ph:waveform-bold"
+                class="smp-track-wave"
+              />
             </button>
             <div v-if="hasMoreTracks" class="smp-list-loading">
-              {{ loadingMore ? '正在加载更多歌曲…' : '继续滚动以加载更多歌曲' }}
+              {{ loadingMore ? "正在加载更多歌曲…" : "继续滚动以加载更多歌曲" }}
             </div>
-            <div v-if="!tracks.length" class="smp-empty">{{ loading ? '加载中…' : '暂无歌曲' }}</div>
+            <div v-if="!tracks.length" class="smp-empty">
+              {{ loading ? "加载中…" : "暂无歌曲" }}
+            </div>
           </div>
         </div>
       </Transition>
@@ -75,7 +91,11 @@
           @click="toggleList"
         >
           <span class="smp-cover" :style="coverStyle">
-            <Icon v-if="!current?.pic" name="ph:music-notes-fill" class="smp-cover-fallback" />
+            <Icon
+              v-if="!coverLoaded"
+              name="ph:music-notes-fill"
+              class="smp-cover-fallback"
+            />
           </span>
           <span v-if="playing" class="smp-eq" aria-hidden="true">
             <i /><i /><i />
@@ -84,15 +104,27 @@
 
         <div class="smp-bar">
           <div class="smp-info" @click="toggleList">
-            <div class="smp-title" :title="current?.name">{{ current?.name || '未选择歌曲' }}</div>
-            <div class="smp-artist">{{ current?.artist || '—' }}</div>
+            <div class="smp-title" :title="current?.name">
+              {{ current?.name || "未选择歌曲" }}
+            </div>
+            <div class="smp-artist">{{ current?.artist || "—" }}</div>
           </div>
 
           <div class="smp-controls">
-            <button type="button" class="smp-icon-btn" :title="modeTitle" @click="cycleMode">
+            <button
+              type="button"
+              class="smp-icon-btn"
+              :title="modeTitle"
+              @click="cycleMode"
+            >
               <Icon :name="modeIcon" />
             </button>
-            <button type="button" class="smp-icon-btn" title="上一首" @click="prev">
+            <button
+              type="button"
+              class="smp-icon-btn"
+              title="上一首"
+              @click="prev"
+            >
               <Icon name="ph:skip-back-fill" />
             </button>
             <button
@@ -103,13 +135,34 @@
             >
               <Icon :name="playing ? 'ph:pause-fill' : 'ph:play-fill'" />
             </button>
-            <button type="button" class="smp-icon-btn" title="下一首" @click="next">
+            <button
+              type="button"
+              class="smp-icon-btn"
+              title="下一首"
+              @click="next"
+            >
               <Icon name="ph:skip-forward-fill" />
             </button>
-            <button type="button" class="smp-icon-btn" title="静音" @click="toggleMute">
-              <Icon :name="muted || volume <= 0 ? 'ph:speaker-slash-fill' : 'ph:speaker-high-fill'" />
+            <button
+              type="button"
+              class="smp-icon-btn"
+              title="静音"
+              @click="toggleMute"
+            >
+              <Icon
+                :name="
+                  muted || volume <= 0
+                    ? 'ph:speaker-slash-fill'
+                    : 'ph:speaker-high-fill'
+                "
+              />
             </button>
-            <button type="button" class="smp-icon-btn" title="收起" @click="collapseBar">
+            <button
+              type="button"
+              class="smp-icon-btn"
+              title="收起"
+              @click="collapseBar"
+            >
               <Icon name="ph:caret-left-bold" />
             </button>
           </div>
@@ -134,371 +187,467 @@
 </template>
 
 <script setup lang="ts">
-type Track = { name: string; artist: string; url: string; pic: string; lrc?: string }
-type PlaylistMeta = { index: number; name: string; server: string; type: string; id: string }
-type PlayMode = 'order' | 'loop' | 'shuffle'
+type Track = {
+  name: string;
+  artist: string;
+  url: string;
+  pic: string;
+  lrc?: string;
+};
+type PlaylistMeta = {
+  index: number;
+  name: string;
+  server: string;
+  type: string;
+  id: string;
+};
+type PlayMode = "order" | "loop" | "shuffle";
 
-const api = useApi()
-const rootRef = ref<HTMLElement | null>(null)
-const audioRef = ref<HTMLAudioElement | null>(null)
-const { setPlaying } = useMusicPlayerState()
-const { slotEl } = useMusicPlayerSlot()
-const slotKey = ref(0)
+const api = useApi();
+const rootRef = ref<HTMLElement | null>(null);
+const audioRef = ref<HTMLAudioElement | null>(null);
+const { setPlaying, playRequest } = useMusicPlayerState();
+const { slotEl } = useMusicPlayerSlot();
+const slotKey = ref(0);
 
-const enabled = ref(false)
-const ready = ref(false)
-const loading = ref(false)
-const autoplay = ref(false)
-const volume = ref(0.55)
-const muted = ref(false)
-const playing = ref(false)
+const enabled = ref(false);
+const ready = ref(false);
+const loading = ref(false);
+const autoplay = ref(false);
+const volume = ref(0.55);
+const muted = ref(false);
+const playing = ref(false);
 
-watch(playing, (v) => setPlaying(v), { immediate: true })
+watch(playing, (v) => setPlaying(v), { immediate: true });
 watch(slotEl, (el) => {
-  if (el) slotKey.value += 1
-})
-const barOpen = ref(false)
-const listOpen = ref(false)
-const tracks = ref<Track[]>([])
-const playlists = ref<PlaylistMeta[]>([])
-const playlistIndex = ref(0)
-const index = ref(0)
-const progress = ref(0)
-const duration = ref(0)
-const mode = ref<PlayMode>('order')
-const playbackRequested = ref(false)
-const errorRecoveryAvailable = ref(false)
-const trackPage = ref(1)
-const hasMoreTracks = ref(false)
-const loadingMore = ref(false)
+  if (el) slotKey.value += 1;
+});
+const barOpen = ref(false);
+const listOpen = ref(false);
+const tracks = ref<Track[]>([]);
+const playlists = ref<PlaylistMeta[]>([]);
+const playlistIndex = ref(0);
+const index = ref(0);
+const progress = ref(0);
+const duration = ref(0);
+const mode = ref<PlayMode>("order");
+const playbackRequested = ref(false);
+const errorRecoveryAvailable = ref(false);
+const trackPage = ref(1);
+const hasMoreTracks = ref(false);
+const loadingMore = ref(false);
+const coverLoaded = ref(false);
+let coverRequestId = 0;
 
-const current = computed(() => tracks.value[index.value] || null)
+const current = computed(() => tracks.value[index.value] || null);
 const coverStyle = computed(() => {
-  if (!current.value?.pic) return {}
+  if (!current.value?.pic || !coverLoaded.value) return {};
   return {
     backgroundImage: `url(${current.value.pic})`,
+  };
+});
+watch(
+  () => current.value?.pic,
+  async (source) => {
+    const requestId = ++coverRequestId;
+    coverLoaded.value = false;
+    if (!source) return;
+    await new Promise<void>((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve();
+      image.onerror = () => resolve();
+      image.src = source;
+    });
+    if (requestId === coverRequestId) coverLoaded.value = true;
+  },
+  { immediate: true },
+);
+watch(playRequest, (request) => {
+  if (!request?.url) return;
+  const existing = tracks.value.findIndex(
+    (track) =>
+      track.url === request.url ||
+      (track.name === request.name && track.artist === request.artist),
+  );
+  if (existing >= 0) index.value = existing;
+  else {
+    tracks.value.unshift({
+      name: request.name,
+      artist: request.artist || "未知音乐人",
+      url: request.url,
+      pic: request.pic || "",
+    });
+    index.value = 0;
   }
-})
+  barOpen.value = true;
+  listOpen.value = false;
+  errorRecoveryAvailable.value = true;
+  void reloadAndPlay();
+});
 const modeIcon = computed(() => {
-  if (mode.value === 'loop') return 'ph:repeat-once-bold'
-  if (mode.value === 'shuffle') return 'ph:shuffle-bold'
-  return 'ph:repeat-bold'
-})
+  if (mode.value === "loop") return "ph:repeat-once-bold";
+  if (mode.value === "shuffle") return "ph:shuffle-bold";
+  return "ph:repeat-bold";
+});
 const modeTitle = computed(() => {
-  if (mode.value === 'loop') return '单曲循环'
-  if (mode.value === 'shuffle') return '随机播放'
-  return '列表循环'
-})
+  if (mode.value === "loop") return "单曲循环";
+  if (mode.value === "shuffle") return "随机播放";
+  return "列表循环";
+});
 
-let autoCollapseTimer: ReturnType<typeof setTimeout> | null = null
-let playlistRequestId = 0
+let autoCollapseTimer: ReturnType<typeof setTimeout> | null = null;
+let playlistRequestId = 0;
 
 onMounted(async () => {
-  document.addEventListener('click', onDocClick)
-  await bootstrap()
-})
+  document.addEventListener("click", onDocClick);
+  await bootstrap();
+});
 
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick)
-  if (autoCollapseTimer) clearTimeout(autoCollapseTimer)
-  setPlaying(false)
-  const a = audioRef.value
+  document.removeEventListener("click", onDocClick);
+  if (autoCollapseTimer) clearTimeout(autoCollapseTimer);
+  setPlaying(false);
+  const a = audioRef.value;
   if (a) {
-    a.pause()
-    a.src = ''
+    a.pause();
+    a.src = "";
   }
-})
+});
 
 function onDocClick(e: MouseEvent) {
-  if (!rootRef.value) return
-  if (rootRef.value.contains(e.target as Node)) return
-  listOpen.value = false
+  if (!rootRef.value) return;
+  if (rootRef.value.contains(e.target as Node)) return;
+  listOpen.value = false;
 }
 
 async function bootstrap() {
   try {
     const cfg = await api.get<{
-      enabled: boolean
-      autoplay: boolean
-      volume: number
-      playlists: PlaylistMeta[]
-    }>('/music/config')
-    enabled.value = !!cfg?.enabled
-    if (!enabled.value) return
-    autoplay.value = !!cfg.autoplay
-    volume.value = typeof cfg.volume === 'number' ? Math.min(1, Math.max(0, cfg.volume)) : 0.55
-    playlists.value = Array.isArray(cfg.playlists) ? cfg.playlists : []
-    await loadPlaylist(0, false)
-    applyVolume()
-    ready.value = true
+      enabled: boolean;
+      autoplay: boolean;
+      volume: number;
+      playlists: PlaylistMeta[];
+    }>("/music/config");
+    enabled.value = !!cfg?.enabled;
+    if (!enabled.value) return;
+    autoplay.value = !!cfg.autoplay;
+    volume.value =
+      typeof cfg.volume === "number"
+        ? Math.min(1, Math.max(0, cfg.volume))
+        : 0.55;
+    playlists.value = Array.isArray(cfg.playlists) ? cfg.playlists : [];
+    await loadPlaylist(0, false);
+    applyVolume();
+    await waitForCurrentCover();
+    await nextTick();
+    ready.value = true;
     if (autoplay.value) {
       // browsers block autoplay with sound; try muted-first then unmute after play
-      await tryAutoplay()
+      await tryAutoplay();
     }
   } catch {
-    enabled.value = false
+    enabled.value = false;
   }
 }
 
+async function waitForCurrentCover() {
+  if (!current.value?.pic || coverLoaded.value) return;
+  await new Promise<void>((resolve) => {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      stop();
+      resolve();
+    };
+    const stop = watch(coverLoaded, (loaded) => {
+      if (loaded) finish();
+    });
+    window.setTimeout(finish, 3500);
+  });
+}
+
 async function loadPlaylist(i: number, refresh = false) {
-  const requestId = ++playlistRequestId
-  loading.value = true
+  const requestId = ++playlistRequestId;
+  loading.value = true;
   try {
     const res = await api.get<{
-      enabled: boolean
-      tracks: Track[]
-      source?: { name: string }
-      page: number
-      hasMore: boolean
-    }>('/music/playlist', {
+      enabled: boolean;
+      tracks: Track[];
+      source?: { name: string };
+      page: number;
+      hasMore: boolean;
+    }>("/music/playlist", {
       index: i,
-      refresh: refresh ? '1' : undefined,
+      refresh: refresh ? "1" : undefined,
       page: 1,
       limit: 50,
-    })
-    if (requestId !== playlistRequestId) return
+    });
+    if (requestId !== playlistRequestId) return;
     if (!res?.enabled) {
-      enabled.value = false
-      return
+      enabled.value = false;
+      return;
     }
-    playlistIndex.value = i
-    tracks.value = res.tracks || []
-    trackPage.value = res.page || 1
-    hasMoreTracks.value = !!res.hasMore
-    index.value = 0
-    progress.value = 0
-    await nextTick()
-    const a = audioRef.value
+    playlistIndex.value = i;
+    tracks.value = res.tracks || [];
+    trackPage.value = res.page || 1;
+    hasMoreTracks.value = !!res.hasMore;
+    index.value = 0;
+    progress.value = 0;
+    await nextTick();
+    const a = audioRef.value;
     if (a) {
-      a.load()
-      if (playing.value) await a.play().catch(() => { playing.value = false })
+      a.load();
+      if (playing.value)
+        await a.play().catch(() => {
+          playing.value = false;
+        });
     }
   } catch {
-    if (requestId === playlistRequestId) tracks.value = []
+    if (requestId === playlistRequestId) tracks.value = [];
   } finally {
-    if (requestId === playlistRequestId) loading.value = false
+    if (requestId === playlistRequestId) loading.value = false;
   }
 }
 
 async function loadMoreTracks() {
-  if (loading.value || loadingMore.value || !hasMoreTracks.value) return
-  const targetPlaylist = playlistIndex.value
-  const targetPage = trackPage.value + 1
-  loadingMore.value = true
+  if (loading.value || loadingMore.value || !hasMoreTracks.value) return;
+  const targetPlaylist = playlistIndex.value;
+  const targetPage = trackPage.value + 1;
+  loadingMore.value = true;
   try {
-    const res = await api.get<{ tracks: Track[]; page: number; hasMore: boolean }>('/music/playlist', {
+    const res = await api.get<{
+      tracks: Track[];
+      page: number;
+      hasMore: boolean;
+    }>("/music/playlist", {
       index: targetPlaylist,
       page: targetPage,
       limit: 50,
-    })
-    if (targetPlaylist !== playlistIndex.value) return
-    const seen = new Set(tracks.value.map(track => track.url))
-    tracks.value.push(...(res.tracks || []).filter(track => !seen.has(track.url)))
-    trackPage.value = res.page || targetPage
-    hasMoreTracks.value = !!res.hasMore
+    });
+    if (targetPlaylist !== playlistIndex.value) return;
+    const seen = new Set(tracks.value.map((track) => track.url));
+    tracks.value.push(
+      ...(res.tracks || []).filter((track) => !seen.has(track.url)),
+    );
+    trackPage.value = res.page || targetPage;
+    hasMoreTracks.value = !!res.hasMore;
   } catch {
     // 保留已经加载的歌曲，允许用户再次滚动重试。
   } finally {
-    loadingMore.value = false
+    loadingMore.value = false;
   }
 }
 
 async function switchPlaylist(i: number) {
-  if (i === playlistIndex.value) return
-  const wasPlaying = playing.value
-  playing.value = wasPlaying
-  await loadPlaylist(i)
-  if (wasPlaying) await play()
+  if (i === playlistIndex.value) return;
+  const wasPlaying = playing.value;
+  playing.value = wasPlaying;
+  await loadPlaylist(i);
+  if (wasPlaying) await play();
 }
 
 function applyVolume() {
-  const a = audioRef.value
-  if (!a) return
-  a.volume = muted.value ? 0 : volume.value
+  const a = audioRef.value;
+  if (!a) return;
+  a.volume = muted.value ? 0 : volume.value;
 }
 
 async function tryAutoplay() {
-  const a = audioRef.value
-  if (!a || !current.value) return
+  const a = audioRef.value;
+  if (!a || !current.value) return;
   try {
-    a.muted = true
-    await a.play()
-    playing.value = true
-    barOpen.value = true
-    scheduleBarCollapse()
+    a.muted = true;
+    await a.play();
+    playing.value = true;
+    barOpen.value = true;
+    scheduleBarCollapse();
     // keep muted unless user interacts — policy
-    a.muted = false
-    muted.value = false
-    applyVolume()
+    a.muted = false;
+    muted.value = false;
+    applyVolume();
   } catch {
-    playing.value = false
-    a.muted = false
+    playing.value = false;
+    a.muted = false;
   }
 }
 
 function onMiniPlay() {
-  barOpen.value = true
-  togglePlay()
-  scheduleBarCollapse()
+  barOpen.value = true;
+  togglePlay();
+  scheduleBarCollapse();
 }
 
 function togglePlay() {
-  if (!current.value) return
-  if (!barOpen.value) barOpen.value = true
-  if (playing.value) pause()
+  if (!current.value) return;
+  if (!barOpen.value) barOpen.value = true;
+  if (playing.value) pause();
   else {
-    errorRecoveryAvailable.value = true
-    play()
+    errorRecoveryAvailable.value = true;
+    play();
   }
-  scheduleBarCollapse()
+  scheduleBarCollapse();
 }
 
 async function play() {
-  const a = audioRef.value
-  if (!a || !current.value) return
-  playbackRequested.value = true
+  const a = audioRef.value;
+  if (!a || !current.value) return;
+  playbackRequested.value = true;
   try {
-    await a.play()
-    playing.value = true
+    await a.play();
+    playing.value = true;
   } catch {
-    playing.value = false
-    playbackRequested.value = false
+    playing.value = false;
+    playbackRequested.value = false;
   }
 }
 
 function pause() {
-  playbackRequested.value = false
-  audioRef.value?.pause()
-  playing.value = false
+  playbackRequested.value = false;
+  audioRef.value?.pause();
+  playing.value = false;
 }
 
 function prev() {
-  if (!tracks.value.length) return
-  if (mode.value === 'shuffle') {
-    index.value = Math.floor(Math.random() * tracks.value.length)
+  if (!tracks.value.length) return;
+  if (mode.value === "shuffle") {
+    index.value = Math.floor(Math.random() * tracks.value.length);
   } else {
-    index.value = (index.value - 1 + tracks.value.length) % tracks.value.length
+    index.value = (index.value - 1 + tracks.value.length) % tracks.value.length;
   }
-  errorRecoveryAvailable.value = true
-  reloadAndPlay()
+  errorRecoveryAvailable.value = true;
+  reloadAndPlay();
 }
 
 async function next(resetErrorRecovery: boolean | Event = true) {
-  if (!tracks.value.length) return
-  if (mode.value === 'shuffle') {
-    let n = index.value
+  if (!tracks.value.length) return;
+  if (mode.value === "shuffle") {
+    let n = index.value;
     if (tracks.value.length > 1) {
-      while (n === index.value) n = Math.floor(Math.random() * tracks.value.length)
+      while (n === index.value)
+        n = Math.floor(Math.random() * tracks.value.length);
     }
-    index.value = n
+    index.value = n;
   } else {
     if (index.value >= tracks.value.length - 1 && hasMoreTracks.value) {
-      await loadMoreTracks()
+      await loadMoreTracks();
     }
-    index.value = (index.value + 1) % tracks.value.length
+    index.value = (index.value + 1) % tracks.value.length;
   }
-  if (resetErrorRecovery !== false) errorRecoveryAvailable.value = true
-  reloadAndPlay()
+  if (resetErrorRecovery !== false) errorRecoveryAvailable.value = true;
+  reloadAndPlay();
 }
 
 function playAt(i: number) {
-  index.value = i
-  barOpen.value = true
-  errorRecoveryAvailable.value = true
-  reloadAndPlay()
+  index.value = i;
+  barOpen.value = true;
+  errorRecoveryAvailable.value = true;
+  reloadAndPlay();
 }
 
 async function reloadAndPlay() {
-  progress.value = 0
-  await nextTick()
-  const a = audioRef.value
-  if (!a) return
-  a.load()
-  await play()
+  progress.value = 0;
+  await nextTick();
+  const a = audioRef.value;
+  if (!a) return;
+  a.load();
+  await play();
 }
 
 function onEnded() {
-  playbackRequested.value = false
-  if (mode.value === 'loop') {
-    const a = audioRef.value
+  playbackRequested.value = false;
+  if (mode.value === "loop") {
+    const a = audioRef.value;
     if (a) {
-      a.currentTime = 0
-      play()
+      a.currentTime = 0;
+      play();
     }
-    return
+    return;
   }
-  next()
+  next();
 }
 
 function onTime() {
-  const a = audioRef.value
-  if (!a || !a.duration) return
-  duration.value = a.duration
-  progress.value = (a.currentTime / a.duration) * 100
+  const a = audioRef.value;
+  if (!a || !a.duration) return;
+  duration.value = a.duration;
+  progress.value = (a.currentTime / a.duration) * 100;
 }
 
 function onMeta() {
-  duration.value = audioRef.value?.duration || 0
+  duration.value = audioRef.value?.duration || 0;
 }
 
 function onAudioError() {
-  playing.value = false
-  if (playbackRequested.value && errorRecoveryAvailable.value && tracks.value.length > 1) {
-    errorRecoveryAvailable.value = false
-    void next(false)
-    return
+  playing.value = false;
+  if (
+    playbackRequested.value &&
+    errorRecoveryAvailable.value &&
+    tracks.value.length > 1
+  ) {
+    errorRecoveryAvailable.value = false;
+    void next(false);
+    return;
   }
-  playbackRequested.value = false
+  playbackRequested.value = false;
 }
 
 function seek(e: MouseEvent) {
-  const a = audioRef.value
-  const el = e.currentTarget as HTMLElement
-  if (!a || !a.duration || !el) return
-  const rect = el.getBoundingClientRect()
-  const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-  a.currentTime = ratio * a.duration
-  progress.value = ratio * 100
+  const a = audioRef.value;
+  const el = e.currentTarget as HTMLElement;
+  if (!a || !a.duration || !el) return;
+  const rect = el.getBoundingClientRect();
+  const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  a.currentTime = ratio * a.duration;
+  progress.value = ratio * 100;
 }
 
 function cycleMode() {
-  mode.value = mode.value === 'order' ? 'loop' : mode.value === 'loop' ? 'shuffle' : 'order'
+  mode.value =
+    mode.value === "order"
+      ? "loop"
+      : mode.value === "loop"
+        ? "shuffle"
+        : "order";
 }
 
 function toggleMute() {
-  muted.value = !muted.value
-  applyVolume()
+  muted.value = !muted.value;
+  applyVolume();
 }
 
 function toggleList() {
-  listOpen.value = !listOpen.value
-  if (listOpen.value) barOpen.value = true
+  listOpen.value = !listOpen.value;
+  if (listOpen.value) barOpen.value = true;
 }
 
 function onTrackListScroll(event: Event) {
-  const el = event.currentTarget as HTMLElement
-  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 72 && hasMoreTracks.value) {
-    void loadMoreTracks()
+  const el = event.currentTarget as HTMLElement;
+  if (
+    el.scrollTop + el.clientHeight >= el.scrollHeight - 72 &&
+    hasMoreTracks.value
+  ) {
+    void loadMoreTracks();
   }
 }
 
 function collapseBar() {
-  listOpen.value = false
-  barOpen.value = false
+  listOpen.value = false;
+  barOpen.value = false;
 }
 
 function scheduleBarCollapse() {
-  if (autoCollapseTimer) clearTimeout(autoCollapseTimer)
+  if (autoCollapseTimer) clearTimeout(autoCollapseTimer);
   autoCollapseTimer = setTimeout(() => {
-    if (!listOpen.value) barOpen.value = false
-  }, 10000)
+    if (!listOpen.value) barOpen.value = false;
+  }, 10000);
 }
 
-watch(volume, applyVolume)
-watch(muted, applyVolume)
+watch(volume, applyVolume);
+watch(muted, applyVolume);
 watch(listOpen, (v) => {
-  if (v) barOpen.value = true
-})
+  if (v) barOpen.value = true;
+});
 </script>
 
 <style scoped>
@@ -514,6 +663,19 @@ watch(listOpen, (v) => {
   flex-direction: column;
   align-items: flex-start;
   pointer-events: none;
+  opacity: 0;
+  transform: translateY(7px);
+  visibility: hidden;
+  transition:
+    opacity 0.34s ease,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.34s;
+}
+
+.smp.is-ready {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
 }
 
 .smp.is-bar,
@@ -558,8 +720,12 @@ watch(listOpen, (v) => {
   height: var(--smp-h);
   flex-shrink: 0;
   border: none;
-  border-radius:50%;
-  background:linear-gradient(145deg,color-mix(in srgb,var(--c-primary-soft) 72%,transparent),transparent);
+  border-radius: 50%;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--c-primary-soft) 72%, transparent),
+    transparent
+  );
   padding: 0;
   cursor: pointer;
   display: grid;
@@ -573,7 +739,9 @@ watch(listOpen, (v) => {
   background:
     center / cover no-repeat,
     linear-gradient(135deg, var(--c-primary-soft), var(--c-bg-2));
-  box-shadow:0 5px 15px color-mix(in srgb,var(--ld-shadow) 55%,transparent),inset 0 0 0 2px color-mix(in srgb,#fff 16%,transparent);
+  box-shadow:
+    0 5px 15px color-mix(in srgb, var(--ld-shadow) 55%, transparent),
+    inset 0 0 0 2px color-mix(in srgb, #fff 16%, transparent);
   transition: transform 0.35s ease;
 }
 
@@ -610,8 +778,14 @@ watch(listOpen, (v) => {
   transform-origin: bottom;
 }
 
-.smp-eq i:nth-child(2) { animation-delay: 0.15s; height: 70%; }
-.smp-eq i:nth-child(3) { animation-delay: 0.3s; height: 90%; }
+.smp-eq i:nth-child(2) {
+  animation-delay: 0.15s;
+  height: 70%;
+}
+.smp-eq i:nth-child(3) {
+  animation-delay: 0.3s;
+  height: 90%;
+}
 
 .smp-mini-play {
   position: absolute;
@@ -628,10 +802,20 @@ watch(listOpen, (v) => {
   cursor: pointer;
   font-size: 0.62rem;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--c-primary) 40%, transparent);
-  transition: transform 0.15s ease, opacity 0.2s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.2s ease;
 }
 
-.smp:not(.is-bar):not(.is-list)::before { position:absolute; inset:3px; border:1px solid color-mix(in srgb,var(--c-primary) 22%,transparent); border-radius:50%; content:''; pointer-events:none; animation:smp-breathe 3.2s ease-in-out infinite; }
+.smp:not(.is-bar):not(.is-list)::before {
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, transparent);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+  animation: smp-breathe 3.2s ease-in-out infinite;
+}
 
 .smp-mini-play:hover {
   transform: scale(1.08);
@@ -711,7 +895,9 @@ watch(listOpen, (v) => {
   place-items: center;
   cursor: pointer;
   font-size: 0.85rem;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .smp-icon-btn:hover {
@@ -731,7 +917,9 @@ watch(listOpen, (v) => {
   cursor: pointer;
   font-size: 0.9rem;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--c-primary) 35%, transparent);
-  transition: transform 0.15s ease, opacity 0.15s;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s;
 }
 
 .smp-play:hover {
@@ -751,7 +939,11 @@ watch(listOpen, (v) => {
 .smp-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--c-primary), color-mix(in srgb, var(--c-primary) 60%, #fff));
+  background: linear-gradient(
+    90deg,
+    var(--c-primary),
+    color-mix(in srgb, var(--c-primary) 60%, #fff)
+  );
   transition: width 0.1s linear;
 }
 
@@ -789,7 +981,9 @@ watch(listOpen, (v) => {
   scrollbar-width: none;
 }
 
-.smp-list-tabs::-webkit-scrollbar { display: none; }
+.smp-list-tabs::-webkit-scrollbar {
+  display: none;
+}
 
 .smp-tab {
   flex-shrink: 0;
@@ -911,15 +1105,27 @@ watch(listOpen, (v) => {
 }
 
 @keyframes smp-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes smp-eq {
-  0%, 100% { transform: scaleY(0.35); }
-  50% { transform: scaleY(1); }
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
 }
 
-@keyframes smp-breathe { 50% { opacity:.32; transform:scale(1.08); } }
+@keyframes smp-breathe {
+  50% {
+    opacity: 0.32;
+    transform: scale(1.08);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .smp.is-playing .smp-cover,

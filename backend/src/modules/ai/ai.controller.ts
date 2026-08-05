@@ -96,12 +96,16 @@ export class AiController {
   async chat(@Body() dto: ChatDto, @Req() req: Request) {
     const actor = this.chatActor(req);
     const result = await this.ai.petChat(actor, dto.message, dto.article);
-    const recommendations = await this.aiNative.search(dto.message, [], 4);
+    const recommendations = await this.aiNative.search(
+      dto.message,
+      this.recommendationTypes(dto.article?.type, dto.message),
+      4,
+    );
     await this.aiNative
       .track(
         actor,
         {
-          scene: dto.article?.slug ? 'article' : 'home',
+          scene: dto.article?.scene || dto.article?.type || 'home',
           action: 'chat',
           contentType: dto.article?.type,
           sourceId: dto.article?.sourceId,
@@ -141,12 +145,16 @@ export class AiController {
         dto.article,
         (token) => writeEvent('token', token),
       );
-      const recommendations = await this.aiNative.search(dto.message, [], 4);
+      const recommendations = await this.aiNative.search(
+        dto.message,
+        this.recommendationTypes(dto.article?.type, dto.message),
+        4,
+      );
       await this.aiNative
         .track(
           actor,
           {
-            scene: dto.article?.slug ? 'article' : 'home',
+            scene: dto.article?.scene || dto.article?.type || 'home',
             action: 'chat',
             contentType: dto.article?.type,
             sourceId: dto.article?.sourceId,
@@ -163,6 +171,25 @@ export class AiController {
     } finally {
       if (!res.writableEnded && !res.destroyed) res.end();
     }
+  }
+
+  private recommendationTypes(type?: string, query = '') {
+    if (/文章|随笔|post|article/i.test(query)) return ['post'];
+    if (/相册|相簿|照片|摄影|album|photo/i.test(query))
+      return ['album', 'photo'];
+    if (/书影|书籍|读书|电影|影视|book|film|movie/i.test(query))
+      return ['library'];
+    const byScene: Record<string, string[]> = {
+      post: ['post'],
+      library: ['library'],
+      album: ['album', 'photo'],
+      photo: ['photo', 'album'],
+      moment: ['moment'],
+      place: ['place'],
+      journey: ['journey'],
+      story: ['story'],
+    };
+    return byScene[String(type || '')] || [];
   }
 
   @UseGuards(OptionalJwtAuthGuard)

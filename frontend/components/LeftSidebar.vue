@@ -1,6 +1,6 @@
 <template>
   <aside class="sidebar-left" :class="{ 'is-collapsed': collapsed }">
-    <div class="sidebar-scroll">
+    <div class="sidebar-hero">
       <div class="hero">
         <span class="hero-glow hero-glow-one" aria-hidden="true" />
         <span class="hero-glow hero-glow-two" aria-hidden="true" />
@@ -20,7 +20,9 @@
           </NuxtLink>
         </div>
       </div>
+    </div>
 
+    <div class="sidebar-scroll">
       <div v-if="!isPanel" class="search-box" @click="openSearch">
         <input type="text" placeholder="搜索文章..." readonly />
         <Icon name="ph:magnifying-glass-bold" class="search-suffix" />
@@ -43,82 +45,83 @@
     </div>
 
     <div class="sidebar-bottom">
-      <div class="sidebar-divider"></div>
       <div ref="playerSlotRef" class="sidebar-player-slot" />
-      <NuxtLink v-if="!isLoggedIn && !isPanel" to="/login" class="login-link">
-        <Icon name="ph:sign-in-bold" /> 登录 / 注册
-      </NuxtLink>
-      <div v-else-if="isLoggedIn" class="user-card">
-        <div class="user-row">
-          <button type="button" class="user-main" @click="goPanel">
-            <div class="avatar-wrapper">
-              <img
-                v-if="user?.avatar"
-                :src="avatarSrc"
-                alt=""
-                class="avatar-img"
-              />
-              <Icon v-else name="ph:user-circle-fill" class="avatar-icon" />
-            </div>
-            <span class="user-name">{{ user?.username ?? "用户" }}</span>
-            <span v-if="isUserAdmin" class="user-badge">管</span>
-          </button>
-          <NotificationBell />
+      <div class="sidebar-bottom-scroll">
+        <div class="sidebar-divider"></div>
+        <NuxtLink v-if="!isLoggedIn && !isPanel" to="/login" class="login-link">
+          <Icon name="ph:sign-in-bold" /> 登录 / 注册
+        </NuxtLink>
+        <div v-else-if="isLoggedIn" class="user-card">
+          <div class="user-row">
+            <button type="button" class="user-main" @click="goPanel">
+              <div class="avatar-wrapper">
+                <img
+                  v-if="user?.avatar"
+                  :src="avatarSrc"
+                  alt=""
+                  class="avatar-img"
+                />
+                <Icon v-else name="ph:user-circle-fill" class="avatar-icon" />
+              </div>
+              <span class="user-name">{{ user?.username ?? "用户" }}</span>
+              <span v-if="isUserAdmin" class="user-badge">管</span>
+            </button>
+            <NotificationBell />
+            <button
+              type="button"
+              class="user-logout"
+              title="退出登录"
+              @click="handleLogout"
+            >
+              <Icon name="ph:sign-out-bold" />
+            </button>
+          </div>
+          <NuxtLink v-if="isPanel" to="/home" class="user-back">
+            <Icon name="ph:arrow-left-bold" />
+            <span>返回前台</span>
+          </NuxtLink>
+        </div>
+        <div class="theme-pill">
           <button
-            type="button"
-            class="user-logout"
-            title="退出登录"
-            @click="handleLogout"
+            :class="{ active: theme === 'light' }"
+            @click="setTheme('light')"
+            title="亮色"
           >
-            <Icon name="ph:sign-out-bold" />
+            <Icon name="ph:sun-bold" />
+          </button>
+          <button
+            :class="{ active: theme === 'dark' }"
+            @click="setTheme('dark')"
+            title="深色"
+          >
+            <Icon name="ph:moon-bold" />
+          </button>
+          <button
+            :class="{ active: theme === 'auto' }"
+            @click="setTheme('auto')"
+            title="跟随系统"
+          >
+            <Icon name="ph:monitor-bold" />
           </button>
         </div>
-        <NuxtLink v-if="isPanel" to="/home" class="user-back">
-          <Icon name="ph:arrow-left-bold" />
-          <span>返回前台</span>
-        </NuxtLink>
-      </div>
-      <div class="theme-pill">
         <button
-          :class="{ active: theme === 'light' }"
-          @click="setTheme('light')"
-          title="亮色"
+          v-if="isPanel && isUserAdmin && allowCollapse"
+          class="admin-collapse-button"
+          type="button"
+          :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'"
+          @click="emit('toggle-collapse')"
         >
-          <Icon name="ph:sun-bold" />
+          <Icon
+            :name="
+              collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-simple-bold'
+            "
+          />
+          <span>{{ collapsed ? "展开侧栏" : "收起侧栏" }}</span>
+          <Icon
+            :name="collapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'"
+          />
         </button>
-        <button
-          :class="{ active: theme === 'dark' }"
-          @click="setTheme('dark')"
-          title="深色"
-        >
-          <Icon name="ph:moon-bold" />
-        </button>
-        <button
-          :class="{ active: theme === 'auto' }"
-          @click="setTheme('auto')"
-          title="跟随系统"
-        >
-          <Icon name="ph:monitor-bold" />
-        </button>
-      </div>
-      <button
-        v-if="isPanel && isUserAdmin && allowCollapse"
-        class="admin-collapse-button"
-        type="button"
-        :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'"
-        @click="emit('toggle-collapse')"
-      >
-        <Icon
-          :name="
-            collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-simple-bold'
-          "
-        />
-        <span>{{ collapsed ? "展开侧栏" : "收起侧栏" }}</span>
-        <Icon
-          :name="collapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'"
-        />
-      </button>
-      <!-- 字体切换暂不展示，保留结构与样式便于后续恢复。
+        <!-- 字体切换暂不展示，保留结构与样式便于后续恢复。
       <div v-if="!isPanel" class="font-pill" role="group" aria-label="全局字体">
         <button
           v-for="option in fontPresets"
@@ -132,7 +135,7 @@
           {{ option.short }}
         </button>
       </div>
-      -->
+      --></div>
     </div>
   </aside>
 </template>
@@ -323,12 +326,19 @@ watch(
   height: 100%;
 }
 
+.sidebar-hero {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .sidebar-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 2px;
+  padding: 11px 2px 8px 0;
+  overscroll-behavior: contain;
 }
 
 .sidebar-player-slot {
@@ -346,7 +356,7 @@ watch(
 /* ===== Hero ===== */
 .hero {
   position: relative;
-  margin: 0 0 3px;
+  margin: 0;
   padding: 12px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
@@ -531,7 +541,7 @@ watch(
 
 /* ===== Search ===== */
 .search-box {
-  margin-top: 14px;
+  margin-top: 0;
   position: relative;
   display: flex;
   align-items: center;
@@ -578,7 +588,7 @@ watch(
 
 /* ===== Nav ===== */
 .nav-menu {
-  margin-top: 16px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -616,13 +626,26 @@ watch(
 
 /* ===== Bottom ===== */
 .sidebar-bottom {
+  position: relative;
   flex-shrink: 0;
-  margin-top: 8px;
-  padding-top: 12px;
+  max-height: 44%;
+  margin-top: 0;
+  padding-top: 7px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
   overflow: visible;
+}
+
+.sidebar-bottom-scroll {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
 }
 
 .sidebar-divider {
@@ -975,24 +998,6 @@ watch(
   .wind-stroke,
   .hero-status i {
     animation: none;
-  }
-}
-
-@media (max-height: 720px) and (min-width: 901px) {
-  .sidebar-left {
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-  }
-
-  .sidebar-scroll {
-    flex: 0 0 auto;
-    overflow: visible;
-    padding-right: 0;
-  }
-
-  .sidebar-bottom {
-    margin-top: 12px;
   }
 }
 </style>

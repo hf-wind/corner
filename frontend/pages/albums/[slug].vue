@@ -171,7 +171,7 @@ const loading = ref(true);
 const album = ref<any>(null);
 const lightboxOpen = ref(false);
 const lightboxIndex = ref(0);
-const { selectMemory } = useMemorySelection();
+const { selectMemory, clearMemory } = useMemorySelection();
 const issueNumber = computed(() =>
   String(
     album.value?.publishedAt
@@ -221,6 +221,9 @@ watch(lightboxIndex, (index) => {
       href: `/albums/${album.value.slug}?photo=${item.id}`,
     });
 });
+watch(lightboxOpen, (open) => {
+  if (!open) clearMemory();
+});
 function mapLink(item: any) {
   const location = item.publicLocation;
   return {
@@ -251,6 +254,7 @@ async function load() {
   }
 }
 onMounted(load);
+onUnmounted(clearMemory);
 useHead({
   title: computed(() =>
     album.value ? `${album.value.title} · 风隅相册` : "相册",

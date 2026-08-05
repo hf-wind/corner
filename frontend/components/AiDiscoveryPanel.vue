@@ -92,7 +92,7 @@
 
             <div v-if="answer" class="discovery-answer" aria-live="polite">
               <span><Icon name="ph:quotes-fill" /></span>
-              <p>{{ answer }}</p>
+              <div class="discovery-markdown" v-html="renderMarkdown(answer)" />
             </div>
 
             <div v-if="cards.length" class="discovery-results">
@@ -114,7 +114,7 @@
                 </figure>
                 <div>
                   <span>{{ labels[card.type] || card.type }}</span>
-                  <strong>{{ card.title }}</strong>
+                  <strong>{{ cardTitle(card) }}</strong>
                   <p v-if="cardExcerpt(card)">{{ cardExcerpt(card) }}</p>
                 </div>
                 <Icon name="ph:arrow-up-right-bold" class="card-arrow" />
@@ -128,8 +128,9 @@
 </template>
 
 <script setup lang="ts">
+import MarkdownIt from "markdown-it";
 import type { AiContentCard } from "~/utils/aiContent";
-import { aiCardImage, cleanAiExcerpt } from "~/utils/aiContent";
+import { aiCardImage, cleanAiExcerpt, cleanAiTitle } from "~/utils/aiContent";
 
 const api = useApi();
 const { mediaUrl } = useMediaUrl();
@@ -140,6 +141,24 @@ const cards = ref<AiContentCard[]>([]);
 const panelOpen = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
 const panelRef = ref<HTMLElement | null>(null);
+const markdown = new MarkdownIt({
+  html: false,
+  breaks: true,
+  linkify: true,
+  typographer: true,
+});
+const defaultLinkOpen = markdown.renderer.rules.link_open;
+markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  tokens[idx].attrSet("target", "_blank");
+  tokens[idx].attrSet("rel", "noopener noreferrer");
+  return defaultLinkOpen
+    ? defaultLinkOpen(tokens, idx, options, env, self)
+    : self.renderToken(tokens, idx, options);
+};
+
+function renderMarkdown(content: string) {
+  return markdown.render(content || "");
+}
 
 const prompts = [
   "最近适合安静读的内容",
@@ -180,6 +199,10 @@ function cardImage(card: AiContentCard) {
 
 function cardExcerpt(card: AiContentCard) {
   return cleanAiExcerpt(card.excerpt);
+}
+
+function cardTitle(card: AiContentCard) {
+  return cleanAiTitle(card.title, card.type);
 }
 
 function openPanel() {
@@ -506,11 +529,30 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 .discovery-answer > span {
   color: var(--c-primary);
 }
-.discovery-answer p {
+.discovery-markdown {
   margin: 0;
   color: var(--c-text-2);
   font-size: 0.7rem;
   line-height: 1.72;
+}
+.discovery-markdown :deep(> :first-child) {
+  margin-top: 0;
+}
+.discovery-markdown :deep(> :last-child) {
+  margin-bottom: 0;
+}
+.discovery-markdown :deep(p) {
+  margin: 0 0 0.55em;
+}
+.discovery-markdown :deep(ul),
+.discovery-markdown :deep(ol) {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.discovery-markdown :deep(a) {
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .discovery-results {
   display: grid;

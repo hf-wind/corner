@@ -38,6 +38,7 @@
 const showSearch = ref(false);
 const mobileNavOpen = ref(false);
 const route = useRoute();
+const { selectedMemory } = useMemorySelection();
 const showContextAi = computed(() =>
   /^\/(moments|library|places|albums|stories|journeys|time)\//.test(route.path),
 );
@@ -65,12 +66,15 @@ const pageContext = computed(() => {
           scene: section,
           title: "当前页面",
         };
+  const selected = selectedMemory.value;
+  const selectedType = section === "albums" && selected?.type === "photo" ? "photo" : profile.type;
+  const selectedId = selectedType === "photo" ? String(selected?.id || "").replace(/^photo:/, "") : "";
   return {
-    type: profile.type,
-    scene: profile.scene,
-    slug: parts.at(-1) || "",
-    sourceId: "",
-    title: profile.title,
+    type: selectedType,
+    scene: selectedType,
+    slug: selectedId || parts.at(-1) || "",
+    sourceId: selectedId,
+    title: selectedType === "photo" ? "当前照片" : profile.title,
     content: "",
   };
 });
@@ -178,9 +182,7 @@ watch(
     box-shadow: 18px 0 48px rgb(0 0 0 / 18%);
     transform: translate3d(-105%, 0, 0);
     visibility: hidden;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
+    overflow: visible;
     transition:
       transform 0.24s ease,
       visibility 0.24s;
@@ -193,21 +195,21 @@ watch(
 
   .sidebar-shell :deep(.sidebar-left) {
     width: 100%;
-    height: auto;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
     padding-top: 4px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
     overflow: visible;
   }
 
   .sidebar-shell :deep(.sidebar-scroll) {
-    flex: 0 0 auto;
-    overflow: visible;
-    padding-right: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .sidebar-shell :deep(.sidebar-bottom) {
-    margin-top: auto;
+    max-height: 46%;
   }
 
   .layout-page {

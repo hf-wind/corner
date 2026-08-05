@@ -11,6 +11,22 @@ export type AiContentCard = {
 const MARKDOWN_IMAGE_RE = /!\[[^\]]*\]\(([^)]+)\)/i;
 const RAW_IMAGE_RE =
   /(?:(?:https?:\/\/)|(?:https?%3a%2f%2f)|(?:\/uploads\/)|(?:%2fuploads%2f))[^\s<>()]+\.(?:avif|gif|jpe?g|png|svg|webp)(?:(?:\?|%3f)[^\s<>()]*)?/i;
+const IMAGE_FILENAME_RE = /^[\w.-]+\.(?:avif|gif|jpe?g|png|svg|webp)$/i;
+
+export function cleanAiTitle(value?: string | null, type?: string) {
+  const title = String(value || "").trim();
+  if (!title) return type === "photo" ? "照片记忆" : "内容线索";
+  let decoded = title;
+  try {
+    decoded = decodeURIComponent(title);
+  } catch {
+    /* keep the original title */
+  }
+  if (IMAGE_FILENAME_RE.test(decoded) || /^https?:\/\//i.test(decoded)) {
+    return type === "photo" ? "照片记忆" : "图片记忆";
+  }
+  return title;
+}
 
 export function aiCardImage(card?: Partial<AiContentCard> | null) {
   if (card?.image) return String(card.image).trim();
