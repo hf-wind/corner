@@ -1,7 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
+import { AiNativeService } from '../ai/ai-native.service';
 import { MediaService } from '../media/media.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -29,8 +36,20 @@ type PublishedPostSnapshot = {
   locationPrecision: LocationPrecision;
   locationSource: LocationSource | null;
   locationExactConfirmedAt: string | null;
-  category: { id: string; name: string; slug: string; icon?: string | null; color?: string | null } | null;
-  tags: Array<{ id: string; name: string; slug: string; icon?: string | null; color?: string | null }>;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    icon?: string | null;
+    color?: string | null;
+  } | null;
+  tags: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    icon?: string | null;
+    color?: string | null;
+  }>;
 };
 
 type VisitContext = {
@@ -40,8 +59,16 @@ type VisitContext = {
 
 const postInclude = {
   author: { select: { id: true, username: true, avatar: true } },
-  category: { select: { id: true, name: true, slug: true, icon: true, color: true } },
-  tags: { include: { tag: { select: { id: true, name: true, slug: true, icon: true, color: true } } } },
+  category: {
+    select: { id: true, name: true, slug: true, icon: true, color: true },
+  },
+  tags: {
+    include: {
+      tag: {
+        select: { id: true, name: true, slug: true, icon: true, color: true },
+      },
+    },
+  },
 } satisfies Prisma.PostInclude;
 
 const postAdminSelect = {
@@ -89,11 +116,15 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     private prisma: PrismaService,
     private media: MediaService,
     private memoryGraph?: MemoryGraphService,
+    private aiNative?: AiNativeService,
   ) {}
 
   onModuleInit() {
     void this.publishScheduledPosts();
-    this.scheduleTimer = setInterval(() => void this.publishScheduledPosts(), 30_000);
+    this.scheduleTimer = setInterval(
+      () => void this.publishScheduledPosts(),
+      30_000,
+    );
     this.scheduleTimer.unref?.();
   }
 
@@ -103,13 +134,17 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
 
   private isAdminListQuery(query: PostQueryDto) {
     return (
-      (query.status !== undefined && query.status !== null && String(query.status).length > 0) ||
+      (query.status !== undefined &&
+        query.status !== null &&
+        String(query.status).length > 0) ||
       query.needsPublish === true
     );
   }
 
   async findAll(query: PostQueryDto) {
-    return this.isAdminListQuery(query) ? this.findAdminList(query) : this.findPublicList(query);
+    return this.isAdminListQuery(query)
+      ? this.findAdminList(query)
+      : this.findPublicList(query);
   }
 
   async findBySlug(slug: string, visit: VisitContext = {}) {
@@ -117,12 +152,19 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     if (!post) throw new NotFoundException('Post not found');
 
     const counted = await this.recordUniqueView(post.id, visit);
-    return this.formatPublic({ ...post, viewCount: post.viewCount + (counted ? 1 : 0) });
+    return this.formatPublic({
+      ...post,
+      viewCount: post.viewCount + (counted ? 1 : 0),
+    });
   }
 
   private async recordUniqueView(postId: string, visit: VisitContext) {
     const userAgent = String(visit.userAgent || '').slice(0, 500);
-    if (/bot|crawler|spider|slurp|preview|headless|lighthouse|uptime|monitor/i.test(userAgent)) {
+    if (
+      /bot|crawler|spider|slurp|preview|headless|lighthouse|uptime|monitor/i.test(
+        userAgent,
+      )
+    ) {
       return false;
     }
 
@@ -134,7 +176,10 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
       month: '2-digit',
       day: '2-digit',
     }).format(new Date());
-    const salt = process.env.VIEW_COUNT_SALT || process.env.JWT_SECRET || 'corner-view-count';
+    const salt =
+      process.env.VIEW_COUNT_SALT ||
+      process.env.JWT_SECRET ||
+      'corner-view-count';
     const visitKey = createHash('sha256')
       .update(`${postId}|${visitDay}|${ipHash}|${salt}`)
       .digest('hex');
@@ -219,9 +264,15 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
 
   async create(dto: CreatePostDto, authorId: string) {
     const {
-      tagIds, status: _status, placeId: _placeId, occurredAt: _occurredAt,
-      locationVisibility: _visibility, locationPrecision: _precision,
-      locationSource: _source, confirmExactLocation: _confirmExact, ...data
+      tagIds,
+      status: _status,
+      placeId: _placeId,
+      occurredAt: _occurredAt,
+      locationVisibility: _visibility,
+      locationPrecision: _precision,
+      locationSource: _source,
+      confirmExactLocation: _confirmExact,
+      ...data
     } = dto;
     const slug = await this.uniqueSlug(data.slug);
     const spacetime = await this.prepareContentSpacetime(dto);
@@ -235,7 +286,9 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
         status: 'draft',
         needsPublish: true,
         publishedSnapshot: Prisma.DbNull,
-        tags: tagIds?.length ? { create: tagIds.map((tagId) => ({ tagId })) } : undefined,
+        tags: tagIds?.length
+          ? { create: tagIds.map((tagId) => ({ tagId })) }
+          : undefined,
       },
       select: postAdminSelect,
     });
@@ -251,15 +304,25 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     if (!existing) throw new NotFoundException('Post not found');
 
     const {
-      tagIds, status: _status, placeId: _placeId, occurredAt: _occurredAt,
-      locationVisibility: _visibility, locationPrecision: _precision,
-      locationSource: _source, confirmExactLocation: _confirmExact, ...data
+      tagIds,
+      status: _status,
+      placeId: _placeId,
+      occurredAt: _occurredAt,
+      locationVisibility: _visibility,
+      locationPrecision: _precision,
+      locationSource: _source,
+      confirmExactLocation: _confirmExact,
+      ...data
     } = dto;
     const spacetime = await this.prepareContentSpacetime(dto, existing);
-    const nextSlug = data.slug ? await this.uniqueSlug(data.slug, existing.id) : undefined;
+    const nextSlug = data.slug
+      ? await this.uniqueSlug(data.slug, existing.id)
+      : undefined;
     const currentSnapshot =
       this.readSnapshot(existing.publishedSnapshot) ||
-      (existing.status === 'published' ? this.buildSnapshotFromPost(existing) : null);
+      (existing.status === 'published'
+        ? this.buildSnapshotFromPost(existing)
+        : null);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (tagIds) {
@@ -272,7 +335,9 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
           ...data,
           ...spacetime,
           ...(nextSlug ? { slug: nextSlug } : {}),
-          tags: tagIds ? { create: tagIds.map((tagId) => ({ tagId })) } : undefined,
+          tags: tagIds
+            ? { create: tagIds.map((tagId) => ({ tagId })) }
+            : undefined,
         },
         select: postAdminSelect,
       });
@@ -320,6 +385,7 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.memoryGraph?.scheduleRebuild();
+    this.aiNative?.schedulePrecompute('post', post.id);
     return this.format(post);
   }
 
@@ -328,7 +394,10 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) {
       throw new BadRequestException('定时发布时间必须晚于当前时间');
     }
-    const existing = await this.prisma.post.findUnique({ where: { slug }, select: { id: true } });
+    const existing = await this.prisma.post.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
     if (!existing) throw new NotFoundException('Post not found');
     const post = await this.prisma.post.update({
       where: { id: existing.id },
@@ -339,7 +408,10 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
   }
 
   async cancelSchedule(slug: string) {
-    const existing = await this.prisma.post.findUnique({ where: { slug }, select: { id: true } });
+    const existing = await this.prisma.post.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
     if (!existing) throw new NotFoundException('Post not found');
     const post = await this.prisma.post.update({
       where: { id: existing.id },
@@ -350,7 +422,10 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
   }
 
   async makePrivate(slug: string) {
-    const existing = await this.prisma.post.findUnique({ where: { slug }, select: { id: true } });
+    const existing = await this.prisma.post.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
     if (!existing) throw new NotFoundException('Post not found');
     const post = await this.prisma.post.update({
       where: { id: existing.id },
@@ -362,11 +437,13 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async publishScheduledPosts() {
-    const due = await this.prisma.post.findMany({
-      where: { scheduledAt: { lte: new Date() } },
-      select: { slug: true },
-      take: 50,
-    }).catch(() => []);
+    const due = await this.prisma.post
+      .findMany({
+        where: { scheduledAt: { lte: new Date() } },
+        select: { slug: true },
+        take: 50,
+      })
+      .catch(() => []);
     for (const post of due) {
       await this.publish(post.slug).catch(() => undefined);
     }
@@ -486,7 +563,9 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
       posts = posts.filter((post) => post.category?.slug === query.category);
     }
     if (query.tag) {
-      posts = posts.filter((post) => post.tags?.some((item: any) => item.slug === query.tag));
+      posts = posts.filter((post) =>
+        post.tags?.some((item: any) => item.slug === query.tag),
+      );
     }
     if (query.featured) {
       posts = posts.filter((post) => !!post.featured);
@@ -494,21 +573,26 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     if (query.search) {
       const keyword = query.search.toLowerCase();
       posts = posts.filter((post) =>
-        `${post.title || ''} ${post.excerpt || ''}`.toLowerCase().includes(keyword),
+        `${post.title || ''} ${post.excerpt || ''}`
+          .toLowerCase()
+          .includes(keyword),
       );
     }
     if (query.archive) {
       const year = parseInt(query.archive, 10);
       if (!Number.isNaN(year)) {
         posts = posts.filter((post) => {
-          const publishedAt = post.publishedAt ? new Date(post.publishedAt) : null;
+          const publishedAt = post.publishedAt
+            ? new Date(post.publishedAt)
+            : null;
           return publishedAt?.getFullYear() === year;
         });
       }
     }
 
     posts.sort((a, b) => {
-      if (query.sort === 'popular') return (b.viewCount ?? 0) - (a.viewCount ?? 0);
+      if (query.sort === 'popular')
+        return (b.viewCount ?? 0) - (a.viewCount ?? 0);
       const timeA = new Date(a.publishedAt || a.createdAt || 0).getTime();
       const timeB = new Date(b.publishedAt || b.createdAt || 0).getTime();
       return query.sort === 'oldest' ? timeA - timeB : timeB - timeA;
@@ -533,7 +617,8 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     });
     if (byCurrentSlug) {
       const snapshot = this.readSnapshot(byCurrentSlug.publishedSnapshot);
-      if (!snapshot || snapshot.slug === slug || byCurrentSlug.slug === slug) return byCurrentSlug;
+      if (!snapshot || snapshot.slug === slug || byCurrentSlug.slug === slug)
+        return byCurrentSlug;
     }
 
     const candidates = await this.prisma.post.findMany({
@@ -601,7 +686,9 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
       excerpt: post.excerpt ?? null,
       coverImage: post.coverImage ?? null,
       featured: !!post.featured,
-      occurredAt: post.occurredAt ? new Date(post.occurredAt).toISOString() : null,
+      occurredAt: post.occurredAt
+        ? new Date(post.occurredAt).toISOString()
+        : null,
       place: this.placeSnapshot(post.place),
       locationVisibility: this.visibility(post.locationVisibility),
       locationPrecision: this.precision(post.locationPrecision),
@@ -614,8 +701,10 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
             id: String(post.category.id),
             name: String(post.category.name),
             slug: String(post.category.slug),
-            icon: post.category.icon == null ? null : String(post.category.icon),
-            color: post.category.color == null ? null : String(post.category.color),
+            icon:
+              post.category.icon == null ? null : String(post.category.icon),
+            color:
+              post.category.color == null ? null : String(post.category.color),
           }
         : null,
       tags,
@@ -628,7 +717,7 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     if (!snapshot.title || !snapshot.slug) return null;
 
     const tags = Array.isArray(snapshot.tags)
-      ? snapshot.tags
+      ? (snapshot.tags
           .map((item) => {
             if (!item || typeof item !== 'object') return null;
             const tag = item as Record<string, unknown>;
@@ -641,21 +730,27 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
               color: tag.color == null ? null : String(tag.color),
             };
           })
-          .filter(Boolean) as PublishedPostSnapshot['tags']
+          .filter(Boolean) as PublishedPostSnapshot['tags'])
       : [];
 
     const category =
       snapshot.category && typeof snapshot.category === 'object'
         ? {
             id: String((snapshot.category as Record<string, unknown>).id || ''),
-            name: String((snapshot.category as Record<string, unknown>).name || ''),
-            slug: String((snapshot.category as Record<string, unknown>).slug || ''),
-            icon: (snapshot.category as Record<string, unknown>).icon == null
-              ? null
-              : String((snapshot.category as Record<string, unknown>).icon),
-            color: (snapshot.category as Record<string, unknown>).color == null
-              ? null
-              : String((snapshot.category as Record<string, unknown>).color),
+            name: String(
+              (snapshot.category as Record<string, unknown>).name || '',
+            ),
+            slug: String(
+              (snapshot.category as Record<string, unknown>).slug || '',
+            ),
+            icon:
+              (snapshot.category as Record<string, unknown>).icon == null
+                ? null
+                : String((snapshot.category as Record<string, unknown>).icon),
+            color:
+              (snapshot.category as Record<string, unknown>).color == null
+                ? null
+                : String((snapshot.category as Record<string, unknown>).color),
           }
         : null;
 
@@ -664,17 +759,27 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
       slug: String(snapshot.slug),
       content: String(snapshot.content ?? ''),
       excerpt: snapshot.excerpt == null ? null : String(snapshot.excerpt),
-      coverImage: snapshot.coverImage == null ? null : String(snapshot.coverImage),
+      coverImage:
+        snapshot.coverImage == null ? null : String(snapshot.coverImage),
       featured: !!snapshot.featured,
       occurredAt: snapshot.occurredAt ? String(snapshot.occurredAt) : null,
       place: this.placeSnapshot(snapshot.place),
-      locationVisibility: this.visibility(String(snapshot.locationVisibility || 'private')),
-      locationPrecision: this.precision(String(snapshot.locationPrecision || 'place')),
-      locationSource: this.source(snapshot.locationSource == null ? null : String(snapshot.locationSource)),
+      locationVisibility: this.visibility(
+        String(snapshot.locationVisibility || 'private'),
+      ),
+      locationPrecision: this.precision(
+        String(snapshot.locationPrecision || 'place'),
+      ),
+      locationSource: this.source(
+        snapshot.locationSource == null
+          ? null
+          : String(snapshot.locationSource),
+      ),
       locationExactConfirmedAt: snapshot.locationExactConfirmedAt
         ? String(snapshot.locationExactConfirmedAt)
         : null,
-      category: category?.id && category.name && category.slug ? category : null,
+      category:
+        category?.id && category.name && category.slug ? category : null,
       tags,
     };
   }
@@ -697,21 +802,29 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     const base = this.format(post);
     const active = snapshot || this.buildSnapshotFromPost(post);
     const {
-      publishedSnapshot: _snapshot, needsPublish: _needsPublish, placeId: _placeId,
-      place: _place, locationVisibility: _visibility, locationPrecision: _precision,
-      locationSource: _source, locationExactConfirmedAt: _confirmed, ...rest
+      publishedSnapshot: _snapshot,
+      needsPublish: _needsPublish,
+      placeId: _placeId,
+      place: _place,
+      locationVisibility: _visibility,
+      locationPrecision: _precision,
+      locationSource: _source,
+      locationExactConfirmedAt: _confirmed,
+      ...rest
     } = base;
 
     const liveCategory = base.category;
     const category = active.category
       ? {
           ...active.category,
-          icon: liveCategory?.id === active.category.id
-            ? liveCategory.icon || active.category.icon || null
-            : active.category.icon || null,
-          color: liveCategory?.id === active.category.id
-            ? liveCategory.color || active.category.color || null
-            : active.category.color || null,
+          icon:
+            liveCategory?.id === active.category.id
+              ? liveCategory.icon || active.category.icon || null
+              : active.category.icon || null,
+          color:
+            liveCategory?.id === active.category.id
+              ? liveCategory.color || active.category.color || null
+              : active.category.color || null,
         }
       : null;
     const tags = active.tags.map((tag) => {
@@ -744,9 +857,15 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private async prepareContentSpacetime(dto: CreatePostDto | UpdatePostDto, existing?: any) {
+  private async prepareContentSpacetime(
+    dto: CreatePostDto | UpdatePostDto,
+    existing?: any,
+  ) {
     return prepareSpacetime(dto, existing, async (placeId) => {
-      const place = await this.prisma.place.findUnique({ where: { id: placeId }, select: { id: true } });
+      const place = await this.prisma.place.findUnique({
+        where: { id: placeId },
+        select: { id: true },
+      });
       if (!place) throw new BadRequestException('所选地点不存在');
     });
   }
@@ -756,14 +875,25 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     const place = raw as Record<string, unknown>;
     const latitude = Number(place.latitude);
     const longitude = Number(place.longitude);
-    if (!place.id || !place.name || !place.slug || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    if (
+      !place.id ||
+      !place.name ||
+      !place.slug ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    )
+      return null;
     return {
-      id: String(place.id), name: String(place.name), slug: String(place.slug),
+      id: String(place.id),
+      name: String(place.name),
+      slug: String(place.slug),
       address: place.address == null ? null : String(place.address),
       city: place.city == null ? null : String(place.city),
       province: place.province == null ? null : String(place.province),
       country: place.country == null ? null : String(place.country),
-      latitude, longitude, type: String(place.type || 'poi'),
+      latitude,
+      longitude,
+      type: String(place.type || 'poi'),
     };
   }
 
@@ -772,10 +902,17 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
   }
 
   private precision(value?: string | null): LocationPrecision {
-    return value === 'exact' || value === 'city' || value === 'province' ? value : 'place';
+    return value === 'exact' || value === 'city' || value === 'province'
+      ? value
+      : 'place';
   }
 
   private source(value?: string | null): LocationSource | null {
-    return value === 'manual' || value === 'exif' || value === 'map' || value === 'imported' ? value : null;
+    return value === 'manual' ||
+      value === 'exif' ||
+      value === 'map' ||
+      value === 'imported'
+      ? value
+      : null;
   }
 }

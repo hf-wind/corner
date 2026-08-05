@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 
 export class ChatArticleDto {
   @IsOptional()
@@ -16,6 +21,16 @@ export class ChatArticleDto {
   @IsString()
   @MaxLength(255)
   slug?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  type?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(180)
+  sourceId?: string;
 }
 
 export class ChatDto {

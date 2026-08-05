@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,9 +12,16 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
-import { AiService } from './ai.service';
+import { AiService, type AiChatActor } from './ai.service';
+import { AiNativeService } from './ai-native.service';
+import {
+  AiEventDto,
+  AiExploreDto,
+  AiNarrativeDto,
+  AiPrivateQueryDto,
+  AiWriteTransformDto,
+} from './dto/ai-native.dto';
 import { SummarizeDto } from './dto/summarize.dto';
 import { ChatDto } from './dto/chat.dto';
 import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
@@ -26,18 +34,33 @@ import { TestAiConnectionDto } from './dto/test-ai-connection.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 @Controller('ai')
 export class AiController {
-  constructor(private ai: AiService) {}
+  constructor(
+    private ai: AiService,
+    private aiNative: AiNativeService,
+  ) {}
+
+  private chatActor(req: Request): AiChatActor {
+    const userId = (req.user as { id?: string } | undefined)?.id;
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    if (userId) return { userId, ip };
+
+    const guestId = String(req.headers['x-ai-guest-id'] || '').trim();
+    if (!/^[a-zA-Z0-9_-]{16,128}$/.test(guestId)) {
+      throw new BadRequestException('游客会话标识无效，请刷新页面后重试');
+    }
+    return { guestId, ip };
+  }
 
   @Get('pet/meta')
   petMeta() {
     return this.ai.getPetMeta();
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('summarize')
   summarize(@Body() dto: SummarizeDto) {
     return this.ai.summarize(dto.title || '', dto.content || '');
@@ -68,21 +91,36 @@ export class AiController {
     );
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('chat')
-  chat(@Body() dto: ChatDto, @Req() req: Request) {
-    const userId = (req.user as any).id;
-    return this.ai.petChat(userId, dto.message, dto.article);
+  async chat(@Body() dto: ChatDto, @Req() req: Request) {
+    const actor = this.chatActor(req);
+    const result = await this.ai.petChat(actor, dto.message, dto.article);
+    const recommendations = await this.aiNative.search(dto.message, [], 4);
+    await this.aiNative
+      .track(
+        actor,
+        {
+          scene: dto.article?.slug ? 'article' : 'home',
+          action: 'chat',
+          contentType: dto.article?.type,
+          sourceId: dto.article?.sourceId,
+          metadata: { query: dto.message.slice(0, 160) },
+        },
+        { sourceCount: recommendations.length },
+      )
+      .catch(() => undefined);
+    return { ...result, recommendations };
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('chat/stream')
   async chatStream(
     @Body() dto: ChatDto,
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const userId = (req.user as any).id;
+    const actor = this.chatActor(req);
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -98,31 +136,45 @@ export class AiController {
 
     try {
       const result = await this.ai.petChatStream(
-        userId,
+        actor,
         dto.message,
         dto.article,
         (token) => writeEvent('token', token),
       );
-      writeEvent('done', result);
-    } catch {
-      writeEvent('error', { message: 'AI 回复暂时不可用' });
+      const recommendations = await this.aiNative.search(dto.message, [], 4);
+      await this.aiNative
+        .track(
+          actor,
+          {
+            scene: dto.article?.slug ? 'article' : 'home',
+            action: 'chat',
+            contentType: dto.article?.type,
+            sourceId: dto.article?.sourceId,
+            metadata: { query: dto.message.slice(0, 160) },
+          },
+          { sourceCount: recommendations.length },
+        )
+        .catch(() => undefined);
+      writeEvent('done', { ...result, recommendations });
+    } catch (error) {
+      writeEvent('error', {
+        message: error instanceof Error ? error.message : 'AI 回复暂时不可用',
+      });
     } finally {
       if (!res.writableEnded && !res.destroyed) res.end();
     }
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('chat/history')
   history(@Req() req: Request, @Query('limit') limit?: string) {
-    const userId = (req.user as any).id;
-    return this.ai.getHistory(userId, limit ? Number(limit) : 30);
+    return this.ai.getHistory(this.chatActor(req), limit ? Number(limit) : 30);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(OptionalJwtAuthGuard)
   @Delete('chat/history')
   clearMyHistory(@Req() req: Request) {
-    const userId = (req.user as any).id;
-    return this.ai.clearHistory(userId);
+    return this.ai.clearHistory(this.chatActor(req));
   }
 
   @Get('admin/config')
@@ -236,6 +288,82 @@ export class AiController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   clearConversation(@Param('userId') userId: string) {
-    return this.ai.clearHistory(userId);
+    return this.ai.clearHistory({ userId, ip: 'admin' });
+  }
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('explore')
+  async explore(@Body() dto: AiExploreDto, @Req() req: Request) {
+    const actor = this.chatActor(req);
+    const result = await this.aiNative.explore(dto.query, dto.types, dto.limit);
+    await this.aiNative
+      .track(
+        actor,
+        { scene: 'home', action: 'recommend', metadata: { query: dto.query } },
+        { sourceCount: result.cards.length },
+      )
+      .catch(() => undefined);
+    return result;
+  }
+
+  @Get('content/:type/:slug/insight')
+  insight(@Param('type') type: string, @Param('slug') slug: string) {
+    return this.aiNative.insight(type, slug);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('personalized')
+  personalized(@Req() req: Request, @Query('limit') limit?: string) {
+    return this.aiNative.personalized(
+      this.chatActor(req),
+      limit ? Number(limit) : 6,
+    );
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('events')
+  event(@Body() dto: AiEventDto, @Req() req: Request) {
+    return this.aiNative.track(this.chatActor(req), dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('admin/index/rebuild')
+  rebuildIndex() {
+    return this.aiNative.syncIndex();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get('admin/analytics')
+  analytics() {
+    return this.aiNative.analytics();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('write/transform')
+  transform(@Body() dto: AiWriteTransformDto, @Req() req: Request) {
+    return this.aiNative.transform((req.user as any).id, dto.text, dto.action);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('admin/style/rebuild')
+  rebuildStyle(@Req() req: Request) {
+    return this.aiNative.rebuildStyle((req.user as any).id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('admin/narratives')
+  narrative(@Body() dto: AiNarrativeDto, @Req() req: Request) {
+    return this.aiNative.narrative((req.user as any).id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('admin/private-query')
+  privateQuery(@Body() dto: AiPrivateQueryDto, @Req() req: Request) {
+    return this.aiNative.privateQuery((req.user as any).id, dto.query);
   }
 }

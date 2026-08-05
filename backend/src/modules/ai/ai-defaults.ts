@@ -43,6 +43,11 @@ export const AI_SETTING_KEYS = [
   'ai_friend_moderate_temperature',
   'ai_friend_moderate_max_tokens',
   'ai_daily_quota',
+  'ai_guest_daily_quota',
+  'ai_guest_ip_daily_quota',
+  'ai_chat_input_max_chars',
+  'ai_guest_chat_max_tokens',
+  'ai_chat_article_context_max_chars',
   'ai_article_enabled',
   'ai_article_prompt',
   'ai_article_meta_prompt',
@@ -111,6 +116,11 @@ export type AiConfig = {
   ai_friend_moderate_temperature: number;
   ai_friend_moderate_max_tokens: number;
   ai_daily_quota: number;
+  ai_guest_daily_quota: number;
+  ai_guest_ip_daily_quota: number;
+  ai_chat_input_max_chars: number;
+  ai_guest_chat_max_tokens: number;
+  ai_chat_article_context_max_chars: number;
   ai_article_enabled: boolean;
   ai_article_prompt: string;
   ai_article_meta_prompt: string;
@@ -224,7 +234,12 @@ export const AI_DEFAULTS: AiConfig = {
   ].join('\n'),
   ai_friend_moderate_temperature: 0.1,
   ai_friend_moderate_max_tokens: 300,
-  ai_daily_quota: 100,
+  ai_daily_quota: 40,
+  ai_guest_daily_quota: 12,
+  ai_guest_ip_daily_quota: 48,
+  ai_chat_input_max_chars: 500,
+  ai_guest_chat_max_tokens: 256,
+  ai_chat_article_context_max_chars: 5000,
 
   ai_article_enabled: true,
   ai_article_prompt: [

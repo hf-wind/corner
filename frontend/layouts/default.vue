@@ -28,37 +28,65 @@
       <slot />
     </div>
     <SearchModal :visible="showSearch" @close="showSearch = false" />
+    <ClientOnly
+      ><AiPet v-if="showContextAi" mode="context" :article="pageContext"
+    /></ClientOnly>
   </div>
 </template>
 
 <script setup lang="ts">
-const showSearch = ref(false)
-const mobileNavOpen = ref(false)
-const route = useRoute()
+const showSearch = ref(false);
+const mobileNavOpen = ref(false);
+const route = useRoute();
+const showContextAi = computed(() =>
+  /^\/(moments|library|places|albums|stories|journeys|time)\//.test(route.path),
+);
+const pageContext = computed(() => {
+  const parts = route.path.split("/").filter(Boolean);
+  const map: Record<string, string> = {
+    moments: "moment",
+    library: "library",
+    places: "place",
+    albums: "album",
+    stories: "story",
+    journeys: "journey",
+    time: parts[1] === "map" ? "place" : "journey",
+  };
+  return {
+    type: map[parts[0]] || parts[0],
+    slug: parts.at(-1) || "",
+    sourceId: "",
+    title: "",
+    content: "",
+  };
+});
 
 function openSearch() {
-  mobileNavOpen.value = false
-  showSearch.value = true
+  mobileNavOpen.value = false;
+  showSearch.value = true;
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && mobileNavOpen.value) {
-    mobileNavOpen.value = false
-    return
+  if (e.key === "Escape" && mobileNavOpen.value) {
+    mobileNavOpen.value = false;
+    return;
   }
 
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault()
-    openSearch()
+  if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+    e.preventDefault();
+    openSearch();
   }
 }
 
-onMounted(() => document.addEventListener('keydown', onKeydown))
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+onMounted(() => document.addEventListener("keydown", onKeydown));
+onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 
-watch(() => route.fullPath, () => {
-  mobileNavOpen.value = false
-})
+watch(
+  () => route.fullPath,
+  () => {
+    mobileNavOpen.value = false;
+  },
+);
 </script>
 
 <style scoped>
@@ -136,7 +164,9 @@ watch(() => route.fullPath, () => {
     box-shadow: 18px 0 48px rgb(0 0 0 / 18%);
     transform: translate3d(-105%, 0, 0);
     visibility: hidden;
-    transition: transform 0.24s ease, visibility 0.24s;
+    transition:
+      transform 0.24s ease,
+      visibility 0.24s;
   }
 
   .sidebar-shell.open {

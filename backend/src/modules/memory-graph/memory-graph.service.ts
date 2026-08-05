@@ -434,8 +434,14 @@ export class MemoryGraphService implements OnModuleInit {
       const snapshotSlug = this.stringValue(snapshot?.slug);
       const snapshotPlace = this.snapshotPlace(snapshot?.place);
       const albumPlace = snapshotPlace || album.place;
-      const albumVisibility = this.stringValue(snapshot?.locationVisibility) || album.locationVisibility;
-      const snapshotItems = Array.isArray(snapshot?.items) ? snapshot.items.map((item) => this.record(item)).filter(Boolean) as Record<string, any>[] : null;
+      const albumVisibility =
+        this.stringValue(snapshot?.locationVisibility) ||
+        album.locationVisibility;
+      const snapshotItems = Array.isArray(snapshot?.items)
+        ? (snapshot.items
+            .map((item) => this.record(item))
+            .filter(Boolean) as Record<string, any>[])
+        : null;
       const albumId = `album:${album.id}`;
       const albumVisible = albumVisibility !== 'private';
       addNode(
@@ -447,8 +453,13 @@ export class MemoryGraphService implements OnModuleInit {
           slug: snapshotSlug || album.slug,
           excerpt: this.cleanText(snapshot?.description || album.description),
           href: `/albums/${snapshotSlug || album.slug}`,
-          image: this.stringValue(this.record(snapshot?.cover)?.path) || album.coverMedia?.path,
-          occurredAt: this.dateValue(snapshot?.happenedAt) || album.happenedAt || album.publishedAt,
+          image:
+            this.stringValue(this.record(snapshot?.cover)?.path) ||
+            album.coverMedia?.path,
+          occurredAt:
+            this.dateValue(snapshot?.happenedAt) ||
+            album.happenedAt ||
+            album.publishedAt,
           placeId: albumVisible ? albumPlace?.id || null : null,
           metadata: {
             photoCount: snapshotItems?.length ?? album.items.length,
@@ -463,9 +474,13 @@ export class MemoryGraphService implements OnModuleInit {
       for (const item of activeItems) {
         const media = this.record(item.media) || item.media;
         const photoId = `photo:${this.stringValue(item.id)}`;
-        const itemVisibility = this.stringValue(item.locationVisibility) || 'private';
+        const itemVisibility =
+          this.stringValue(item.locationVisibility) || 'private';
         const itemVisible = itemVisibility !== 'private';
-        const itemPlace = this.snapshotPlace(item.place) || item.place || media?.metadata?.confirmedPlace;
+        const itemPlace =
+          this.snapshotPlace(item.place) ||
+          item.place ||
+          media?.metadata?.confirmedPlace;
         const caption = this.stringValue(item.caption);
         addNode(
           this.node({
@@ -495,7 +510,10 @@ export class MemoryGraphService implements OnModuleInit {
             albumId,
             photoId,
             'same_album',
-            { albumId: album.id, albumTitle: this.stringValue(snapshot?.title) || album.title },
+            {
+              albumId: album.id,
+              albumTitle: this.stringValue(snapshot?.title) || album.title,
+            },
             1,
           ),
         );
@@ -516,7 +534,9 @@ export class MemoryGraphService implements OnModuleInit {
     for (const item of libraryItems) {
       const snapshot = this.record(item.publishedSnapshot);
       const activePlace = this.snapshotPlace(snapshot?.place) || item.place;
-      const activeVisibility = this.stringValue(snapshot?.locationVisibility) || item.locationVisibility;
+      const activeVisibility =
+        this.stringValue(snapshot?.locationVisibility) ||
+        item.locationVisibility;
       const activeSlug = this.stringValue(snapshot?.slug) || item.slug;
       const id = `library:${item.id}`;
       const visible = activeVisibility !== 'private';
@@ -527,13 +547,19 @@ export class MemoryGraphService implements OnModuleInit {
           sourceId: item.id,
           title: this.stringValue(snapshot?.title) || item.title,
           slug: activeSlug,
-          excerpt: this.cleanText(snapshot?.reflection || snapshot?.summary || item.reflection || item.summary),
+          excerpt: this.cleanText(
+            snapshot?.reflection ||
+              snapshot?.summary ||
+              item.reflection ||
+              item.summary,
+          ),
           href: `/library/${activeSlug}`,
           image: this.stringValue(snapshot?.coverImage) || item.coverImage,
           occurredAt:
             this.dateValue(snapshot?.finishDate) ||
             this.dateValue(snapshot?.startDate) ||
-            item.finishDate || item.startDate ||
+            item.finishDate ||
+            item.startDate ||
             item.publishedAt ||
             item.createdAt,
           placeId: visible ? activePlace?.id || null : null,
@@ -545,7 +571,9 @@ export class MemoryGraphService implements OnModuleInit {
             genres: snapshot?.genres ?? item.genres,
             featured: snapshot?.recommended ?? item.recommended,
             locationVisibility: activeVisibility,
-            locationPrecision: this.stringValue(snapshot?.locationPrecision) || item.locationPrecision,
+            locationPrecision:
+              this.stringValue(snapshot?.locationPrecision) ||
+              item.locationPrecision,
           },
         }),
       );
@@ -593,6 +621,25 @@ export class MemoryGraphService implements OnModuleInit {
     }
 
     for (const story of stories) {
+      const storyId = `story:${story.id}`;
+      addNode(
+        this.node({
+          id: storyId,
+          type: 'story',
+          sourceId: story.id,
+          title: story.title,
+          slug: story.slug,
+          excerpt: this.cleanText(story.description),
+          href: `/stories/${story.slug}`,
+          image: story.coverImage,
+          occurredAt: story.publishedAt,
+          placeId: null,
+          metadata: {
+            stepCount: story.steps.length,
+            journeyId: story.journeyId,
+          },
+        }),
+      );
       const stepNodeIds = story.steps
         .map((step) => step.nodeId)
         .filter((id): id is string => !!id && nodes.has(id));
@@ -608,6 +655,16 @@ export class MemoryGraphService implements OnModuleInit {
             ),
           );
       }
+      for (const nodeId of stepNodeIds)
+        addRelation(
+          this.relation(
+            storyId,
+            nodeId,
+            'story_sequence',
+            { storyId: story.id },
+            0.9,
+          ),
+        );
       for (let index = 1; index < stepNodeIds.length; index += 1) {
         addRelation(
           this.relation(

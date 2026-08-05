@@ -7,29 +7,29 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  username     String   @unique @db.VarChar(50)
-  email        String   @unique @db.VarChar(255)
-  passwordHash String   @map("password_hash") @db.Text
-  avatar       String?
-  bio          String?  @db.Text
-  role         String   @default("user") @db.VarChar(20)
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  posts        Post[]
-  media        Media[]
-  chatMessages ChatMessage[]
-  chatDailyQuotas ChatDailyQuota[]
-  comments     Comment[]
-  commentLikes CommentLike[]
-  moments      Moment[]
-  momentComments MomentComment[]
+  id                 String              @id @default(uuid()) @db.Uuid
+  username           String              @unique @db.VarChar(50)
+  email              String              @unique @db.VarChar(255)
+  passwordHash       String              @map("password_hash") @db.Text
+  avatar             String?
+  bio                String?             @db.Text
+  role               String              @default("user") @db.VarChar(20)
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  posts              Post[]
+  media              Media[]
+  chatMessages       ChatMessage[]
+  chatDailyQuotas    ChatDailyQuota[]
+  comments           Comment[]
+  commentLikes       CommentLike[]
+  moments            Moment[]
+  momentComments     MomentComment[]
   momentCommentLikes MomentCommentLike[]
-  momentLikes  MomentLike[]
-  albums       Album[]
-  journeys     Journey[]
-  storyRoutes  StoryRoute[]
+  momentLikes        MomentLike[]
+  albums             Album[]
+  journeys           Journey[]
+  storyRoutes        StoryRoute[]
 
   @@index([isActive, role])
   @@map("users")
@@ -51,47 +51,47 @@ model Category {
 }
 
 model Tag {
-  id    String     @id @default(uuid()) @db.Uuid
-  name  String     @db.VarChar(50)
-  slug  String     @unique @db.VarChar(50)
-  icon  String?    @db.VarChar(50)
-  color String?    @db.VarChar(20)
+  id    String    @id @default(uuid()) @db.Uuid
+  name  String    @db.VarChar(50)
+  slug  String    @unique @db.VarChar(50)
+  icon  String?   @db.VarChar(50)
+  color String?   @db.VarChar(20)
   posts PostTag[]
 
   @@map("tags")
 }
 
 model Post {
-  id          String    @id @default(uuid()) @db.Uuid
-  title       String    @db.VarChar(255)
-  slug        String    @unique @db.VarChar(255)
-  content     String    @db.Text
-  excerpt     String?   @db.Text
-  coverImage  String?   @map("cover_image") @db.Text
-  authorId    String    @map("author_id") @db.Uuid
-  categoryId  String?   @map("category_id") @db.Uuid
-  status      String    @default("draft") @db.VarChar(20)
-  viewCount   Int       @default(0) @map("view_count")
-  likeCount   Int       @default(0) @map("like_count")
-  featured    Boolean   @default(false)
-  needsPublish Boolean  @default(true) @map("needs_publish")
-  publishedSnapshot Json? @map("published_snapshot")
-  scheduledAt DateTime? @map("scheduled_at")
-  occurredAt  DateTime? @map("occurred_at")
-  placeId     String?   @map("place_id") @db.Uuid
-  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
-  locationPrecision String @default("place") @map("location_precision") @db.VarChar(20)
-  locationSource String? @map("location_source") @db.VarChar(20)
-  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
-  publishedAt DateTime? @map("published_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  author      User      @relation(fields: [authorId], references: [id])
-  category    Category? @relation(fields: [categoryId], references: [id])
-  place       Place?    @relation(fields: [placeId], references: [id], onDelete: Restrict)
-  tags        PostTag[]
-  comments    Comment[]
-  visitStats  VisitStat[]
+  id                       String      @id @default(uuid()) @db.Uuid
+  title                    String      @db.VarChar(255)
+  slug                     String      @unique @db.VarChar(255)
+  content                  String      @db.Text
+  excerpt                  String?     @db.Text
+  coverImage               String?     @map("cover_image") @db.Text
+  authorId                 String      @map("author_id") @db.Uuid
+  categoryId               String?     @map("category_id") @db.Uuid
+  status                   String      @default("draft") @db.VarChar(20)
+  viewCount                Int         @default(0) @map("view_count")
+  likeCount                Int         @default(0) @map("like_count")
+  featured                 Boolean     @default(false)
+  needsPublish             Boolean     @default(true) @map("needs_publish")
+  publishedSnapshot        Json?       @map("published_snapshot")
+  scheduledAt              DateTime?   @map("scheduled_at")
+  occurredAt               DateTime?   @map("occurred_at")
+  placeId                  String?     @map("place_id") @db.Uuid
+  locationVisibility       String      @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String      @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource           String?     @map("location_source") @db.VarChar(20)
+  locationExactConfirmedAt DateTime?   @map("location_exact_confirmed_at")
+  publishedAt              DateTime?   @map("published_at")
+  createdAt                DateTime    @default(now()) @map("created_at")
+  updatedAt                DateTime    @updatedAt @map("updated_at")
+  author                   User        @relation(fields: [authorId], references: [id])
+  category                 Category?   @relation(fields: [categoryId], references: [id])
+  place                    Place?      @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  tags                     PostTag[]
+  comments                 Comment[]
+  visitStats               VisitStat[]
 
   @@index([status, publishedAt])
   @@index([publishedAt])
@@ -102,31 +102,31 @@ model Post {
 }
 
 model Moment {
-  id                String          @id @default(uuid()) @db.Uuid
-  title             String          @db.VarChar(255)
-  slug              String          @unique @db.VarChar(255)
-  content           String          @db.Text
-  excerpt           String?         @db.Text
-  authorId          String          @map("author_id") @db.Uuid
-  status            String          @default("draft") @db.VarChar(20)
-  viewCount         Int             @default(0) @map("view_count")
-  likeCount         Int             @default(0) @map("like_count")
-  needsPublish      Boolean         @default(true) @map("needs_publish")
-  publishedSnapshot Json?           @map("published_snapshot")
-  placeId           String?         @map("place_id") @db.Uuid
-  happenedAt        DateTime?       @map("happened_at")
-  locationVisibility String         @default("private") @map("location_visibility") @db.VarChar(20)
-  locationPrecision String          @default("place") @map("location_precision") @db.VarChar(20)
-  locationSource    String?         @map("location_source") @db.VarChar(20)
-  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
-  publishedAt       DateTime?       @map("published_at")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-  author            User            @relation(fields: [authorId], references: [id])
-  place             Place?          @relation(fields: [placeId], references: [id], onDelete: Restrict)
-  comments          MomentComment[]
-  likes             MomentLike[]
-  albumItems        AlbumItem[]
+  id                       String          @id @default(uuid()) @db.Uuid
+  title                    String          @db.VarChar(255)
+  slug                     String          @unique @db.VarChar(255)
+  content                  String          @db.Text
+  excerpt                  String?         @db.Text
+  authorId                 String          @map("author_id") @db.Uuid
+  status                   String          @default("draft") @db.VarChar(20)
+  viewCount                Int             @default(0) @map("view_count")
+  likeCount                Int             @default(0) @map("like_count")
+  needsPublish             Boolean         @default(true) @map("needs_publish")
+  publishedSnapshot        Json?           @map("published_snapshot")
+  placeId                  String?         @map("place_id") @db.Uuid
+  happenedAt               DateTime?       @map("happened_at")
+  locationVisibility       String          @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String          @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource           String?         @map("location_source") @db.VarChar(20)
+  locationExactConfirmedAt DateTime?       @map("location_exact_confirmed_at")
+  publishedAt              DateTime?       @map("published_at")
+  createdAt                DateTime        @default(now()) @map("created_at")
+  updatedAt                DateTime        @updatedAt @map("updated_at")
+  author                   User            @relation(fields: [authorId], references: [id])
+  place                    Place?          @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  comments                 MomentComment[]
+  likes                    MomentLike[]
+  albumItems               AlbumItem[]
 
   @@index([status, publishedAt])
   @@index([publishedAt])
@@ -136,29 +136,29 @@ model Moment {
 }
 
 model Place {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String   @db.VarChar(150)
-  slug         String   @unique @db.VarChar(160)
-  address      String?  @db.Text
-  city         String?  @db.VarChar(100)
-  province     String?  @db.VarChar(100)
-  country      String?  @db.VarChar(100)
-  latitude     Float
-  longitude    Float
-  type         String   @default("poi") @db.VarChar(30)
-  coverMediaId String?  @map("cover_media_id") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  coverMedia   Media?   @relation("PlaceCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
-  moments      Moment[]
-  posts        Post[]
-  libraryItems LibraryItem[]
-  albums       Album[]
-  albumItems   AlbumItem[]
+  id                     String          @id @default(uuid()) @db.Uuid
+  name                   String          @db.VarChar(150)
+  slug                   String          @unique @db.VarChar(160)
+  address                String?         @db.Text
+  city                   String?         @db.VarChar(100)
+  province               String?         @db.VarChar(100)
+  country                String?         @db.VarChar(100)
+  latitude               Float
+  longitude              Float
+  type                   String          @default("poi") @db.VarChar(30)
+  coverMediaId           String?         @map("cover_media_id") @db.Uuid
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @updatedAt @map("updated_at")
+  coverMedia             Media?          @relation("PlaceCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+  moments                Moment[]
+  posts                  Post[]
+  libraryItems           LibraryItem[]
+  albums                 Album[]
+  albumItems             AlbumItem[]
   confirmedMediaMetadata MediaMetadata[]
-  memoryNodes  MemoryNode[]
-  journeyStops JourneyStop[]
-  storySteps   StoryStep[]
+  memoryNodes            MemoryNode[]
+  journeyStops           JourneyStop[]
+  storySteps             StoryStep[]
 
   @@index([name])
   @@index([city, name])
@@ -177,23 +177,23 @@ model PostTag {
 }
 
 model Comment {
-  id             String   @id @default(uuid()) @db.Uuid
-  postId         String   @map("post_id") @db.Uuid
-  userId         String?  @map("user_id") @db.Uuid
-  authorName     String?  @map("author_name") @db.VarChar(100)
-  authorEmail    String?  @map("author_email") @db.VarChar(255)
-  content        String   @db.Text
-  parentId       String?  @map("parent_id") @db.Uuid
-  replyToName    String?  @map("reply_to_name") @db.VarChar(100)
-  status         String   @default("pending") @db.VarChar(20)
-  rejectReason   String?  @map("reject_reason") @db.Text
-  aiReview       String?  @map("ai_review") @db.Text
-  aiReviewResult String?  @map("ai_review_result") @db.VarChar(20)
-  createdAt      DateTime @default(now()) @map("created_at")
-  post           Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user           User?    @relation(fields: [userId], references: [id])
-  parent         Comment? @relation("CommentReply", fields: [parentId], references: [id])
-  replies        Comment[] @relation("CommentReply")
+  id             String        @id @default(uuid()) @db.Uuid
+  postId         String        @map("post_id") @db.Uuid
+  userId         String?       @map("user_id") @db.Uuid
+  authorName     String?       @map("author_name") @db.VarChar(100)
+  authorEmail    String?       @map("author_email") @db.VarChar(255)
+  content        String        @db.Text
+  parentId       String?       @map("parent_id") @db.Uuid
+  replyToName    String?       @map("reply_to_name") @db.VarChar(100)
+  status         String        @default("pending") @db.VarChar(20)
+  rejectReason   String?       @map("reject_reason") @db.Text
+  aiReview       String?       @map("ai_review") @db.Text
+  aiReviewResult String?       @map("ai_review_result") @db.VarChar(20)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  post           Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id])
+  parent         Comment?      @relation("CommentReply", fields: [parentId], references: [id])
+  replies        Comment[]     @relation("CommentReply")
   likes          CommentLike[]
 
   @@map("comments")
@@ -212,35 +212,35 @@ model CommentLike {
 }
 
 model MomentComment {
-  id        String   @id @default(uuid()) @db.Uuid
-  momentId  String   @map("moment_id") @db.Uuid
-  userId    String?  @map("user_id") @db.Uuid
-  authorName String? @map("author_name") @db.VarChar(100)
-  authorEmail String? @map("author_email") @db.VarChar(255)
-  content   String   @db.Text
-  parentId  String?  @map("parent_id") @db.Uuid
-  replyToName String? @map("reply_to_name") @db.VarChar(100)
-  status    String   @default("pending") @db.VarChar(20)
-  rejectReason String? @map("reject_reason") @db.Text
-  aiReview  String?  @map("ai_review") @db.Text
-  aiReviewResult String? @map("ai_review_result") @db.VarChar(20)
-  createdAt DateTime @default(now()) @map("created_at")
-  moment    Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id])
-  parent    MomentComment? @relation("MomentCommentReply", fields: [parentId], references: [id])
-  replies   MomentComment[] @relation("MomentCommentReply")
-  likes     MomentCommentLike[]
+  id             String              @id @default(uuid()) @db.Uuid
+  momentId       String              @map("moment_id") @db.Uuid
+  userId         String?             @map("user_id") @db.Uuid
+  authorName     String?             @map("author_name") @db.VarChar(100)
+  authorEmail    String?             @map("author_email") @db.VarChar(255)
+  content        String              @db.Text
+  parentId       String?             @map("parent_id") @db.Uuid
+  replyToName    String?             @map("reply_to_name") @db.VarChar(100)
+  status         String              @default("pending") @db.VarChar(20)
+  rejectReason   String?             @map("reject_reason") @db.Text
+  aiReview       String?             @map("ai_review") @db.Text
+  aiReviewResult String?             @map("ai_review_result") @db.VarChar(20)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  moment         Moment              @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user           User?               @relation(fields: [userId], references: [id])
+  parent         MomentComment?      @relation("MomentCommentReply", fields: [parentId], references: [id])
+  replies        MomentComment[]     @relation("MomentCommentReply")
+  likes          MomentCommentLike[]
 
   @@index([momentId, createdAt])
   @@map("moment_comments")
 }
 
 model MomentCommentLike {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  commentId String   @map("comment_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id])
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  commentId String        @map("comment_id") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at")
+  user      User          @relation(fields: [userId], references: [id])
   comment   MomentComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, commentId])
@@ -260,21 +260,21 @@ model MomentLike {
 }
 
 model Media {
-  id           String   @id @default(uuid()) @db.Uuid
-  filename     String   @db.VarChar(255)
-  originalName String?  @map("original_name") @db.VarChar(255)
-  mimeType     String?  @map("mime_type") @db.VarChar(100)
-  size         Int?
-  path         String   @db.Text
-  originalPath String?  @map("original_path") @db.Text
-  folder       String?  @db.VarChar(100)
-  uploadedBy   String?  @map("uploaded_by") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
-  uploader     User?    @relation(fields: [uploadedBy], references: [id])
-  placeCovers  Place[]  @relation("PlaceCover")
-  albumCovers  Album[]  @relation("AlbumCover")
-  albumItems   AlbumItem[]
-  metadata     MediaMetadata?
+  id              String         @id @default(uuid()) @db.Uuid
+  filename        String         @db.VarChar(255)
+  originalName    String?        @map("original_name") @db.VarChar(255)
+  mimeType        String?        @map("mime_type") @db.VarChar(100)
+  size            Int?
+  path            String         @db.Text
+  originalPath    String?        @map("original_path") @db.Text
+  folder          String?        @db.VarChar(100)
+  uploadedBy      String?        @map("uploaded_by") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at")
+  uploader        User?          @relation(fields: [uploadedBy], references: [id])
+  placeCovers     Place[]        @relation("PlaceCover")
+  albumCovers     Album[]        @relation("AlbumCover")
+  albumItems      AlbumItem[]
+  metadata        MediaMetadata?
   storyStepPhotos StoryStep[]
 
   @@map("media")
@@ -336,26 +336,26 @@ model AlbumItem {
 }
 
 model MediaMetadata {
-  id                       String    @id @default(uuid()) @db.Uuid
-  mediaId                  String    @unique @map("media_id") @db.Uuid
-  status                   String    @default("pending") @db.VarChar(20)
-  rawExif                  Json?     @map("raw_exif")
-  capturedAt               DateTime? @map("captured_at")
-  latitude                 Float?
-  longitude                Float?
-  width                    Int?
-  height                   Int?
-  cameraMake               String?   @map("camera_make") @db.VarChar(120)
-  cameraModel              String?   @map("camera_model") @db.VarChar(160)
-  lensModel                String?   @map("lens_model") @db.VarChar(200)
-  confirmedCapturedAt      DateTime? @map("confirmed_captured_at")
-  confirmedPlaceId         String?   @map("confirmed_place_id") @db.Uuid
-  error                    String?   @db.Text
-  processedAt              DateTime? @map("processed_at")
-  createdAt                DateTime  @default(now()) @map("created_at")
-  updatedAt                DateTime  @updatedAt @map("updated_at")
-  media                    Media     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
-  confirmedPlace           Place?    @relation(fields: [confirmedPlaceId], references: [id], onDelete: SetNull)
+  id                  String    @id @default(uuid()) @db.Uuid
+  mediaId             String    @unique @map("media_id") @db.Uuid
+  status              String    @default("pending") @db.VarChar(20)
+  rawExif             Json?     @map("raw_exif")
+  capturedAt          DateTime? @map("captured_at")
+  latitude            Float?
+  longitude           Float?
+  width               Int?
+  height              Int?
+  cameraMake          String?   @map("camera_make") @db.VarChar(120)
+  cameraModel         String?   @map("camera_model") @db.VarChar(160)
+  lensModel           String?   @map("lens_model") @db.VarChar(200)
+  confirmedCapturedAt DateTime? @map("confirmed_captured_at")
+  confirmedPlaceId    String?   @map("confirmed_place_id") @db.Uuid
+  error               String?   @db.Text
+  processedAt         DateTime? @map("processed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  media               Media     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  confirmedPlace      Place?    @relation(fields: [confirmedPlaceId], references: [id], onDelete: SetNull)
 
   @@index([status, processedAt])
   @@index([confirmedPlaceId])
@@ -401,27 +401,27 @@ model VisitStat {
 }
 
 model EmojiPack {
-  id               String   @id @default(uuid()) @db.Uuid
-  name             String   @db.VarChar(100)
-  type             String   @default("static") @db.VarChar(20)
-  sort             Int      @default(0)
-  enabled          Boolean  @default(true)
-  compressAnimated Boolean  @default(false) @map("compress_animated")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id               String      @id @default(uuid()) @db.Uuid
+  name             String      @db.VarChar(100)
+  type             String      @default("static") @db.VarChar(20)
+  sort             Int         @default(0)
+  enabled          Boolean     @default(true)
+  compressAnimated Boolean     @default(false) @map("compress_animated")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
   items            EmojiItem[]
 
   @@map("emoji_packs")
 }
 
 model EmojiItem {
-  id      String    @id @default(uuid()) @db.Uuid
-  packId  String    @map("pack_id") @db.Uuid
-  label   String?   @db.VarChar(100)
-  char    String?   @db.VarChar(20)
-  imageUrl String?  @map("image_url") @db.Text
-  sort    Int       @default(0)
-  pack    EmojiPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+  id       String    @id @default(uuid()) @db.Uuid
+  packId   String    @map("pack_id") @db.Uuid
+  label    String?   @db.VarChar(100)
+  char     String?   @db.VarChar(20)
+  imageUrl String?   @map("image_url") @db.Text
+  sort     Int       @default(0)
+  pack     EmojiPack @relation(fields: [packId], references: [id], onDelete: Cascade)
 
   @@map("emoji_items")
 }
@@ -464,16 +464,16 @@ model VerificationCode {
 }
 
 model EmailLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  to        String   @db.VarChar(255)
-  subject   String   @db.VarChar(255)
-  type      String   @db.VarChar(50)
-  content   String?  @db.Text
-  status    String   @default("pending") @db.VarChar(20)
-  error     String?  @db.Text
-  postId    String?  @map("post_id") @db.Uuid
-  userId    String?  @map("user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String    @id @default(uuid()) @db.Uuid
+  to        String    @db.VarChar(255)
+  subject   String    @db.VarChar(255)
+  type      String    @db.VarChar(50)
+  content   String?   @db.Text
+  status    String    @default("pending") @db.VarChar(20)
+  error     String?   @db.Text
+  postId    String?   @map("post_id") @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
   sentAt    DateTime? @map("sent_at")
 
   @@index([type])
@@ -517,49 +517,49 @@ model FriendApplication {
 }
 
 model LibraryItem {
-  id              String    @id @default(uuid()) @db.Uuid
-  type            String    @db.VarChar(20)
-  title           String    @db.VarChar(255)
-  originalTitle   String?   @map("original_title") @db.VarChar(255)
-  slug            String    @unique @db.VarChar(255)
-  coverImage      String?   @map("cover_image") @db.Text
-  creator         String?   @db.VarChar(255)
-  summary         String?   @db.Text
-  reflection      String?   @db.Text
-  highlights      Json      @default("[]")
-  quotes          Json      @default("[]")
-  genres          Json      @default("[]")
-  cast            Json      @default("[]")
-  publishStatus   String    @default("draft") @map("publish_status") @db.VarChar(20)
-  needsPublish    Boolean   @default(true) @map("needs_publish")
-  publishedSnapshot Json?   @map("published_snapshot")
-  progressStatus  String?   @map("progress_status") @db.VarChar(30)
-  rating          Float?
-  rank            Int?
-  recommended     Boolean   @default(false)
-  placeId         String?   @map("place_id") @db.Uuid
-  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
-  locationPrecision String  @default("place") @map("location_precision") @db.VarChar(20)
-  locationSource  String?   @map("location_source") @db.VarChar(20)
+  id                       String    @id @default(uuid()) @db.Uuid
+  type                     String    @db.VarChar(20)
+  title                    String    @db.VarChar(255)
+  originalTitle            String?   @map("original_title") @db.VarChar(255)
+  slug                     String    @unique @db.VarChar(255)
+  coverImage               String?   @map("cover_image") @db.Text
+  creator                  String?   @db.VarChar(255)
+  summary                  String?   @db.Text
+  reflection               String?   @db.Text
+  highlights               Json      @default("[]")
+  quotes                   Json      @default("[]")
+  genres                   Json      @default("[]")
+  cast                     Json      @default("[]")
+  publishStatus            String    @default("draft") @map("publish_status") @db.VarChar(20)
+  needsPublish             Boolean   @default(true) @map("needs_publish")
+  publishedSnapshot        Json?     @map("published_snapshot")
+  progressStatus           String?   @map("progress_status") @db.VarChar(30)
+  rating                   Float?
+  rank                     Int?
+  recommended              Boolean   @default(false)
+  placeId                  String?   @map("place_id") @db.Uuid
+  locationVisibility       String    @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String    @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource           String?   @map("location_source") @db.VarChar(20)
   locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
-  startDate       DateTime? @map("start_date") @db.Date
-  finishDate      DateTime? @map("finish_date") @db.Date
-  releaseYear     Int?      @map("release_year")
-  country         String?   @db.VarChar(100)
-  language        String?   @db.VarChar(100)
-  publisher       String?   @db.VarChar(255)
-  isbn            String?   @db.VarChar(30)
-  totalPages      Int?      @map("total_pages")
-  director        String?   @db.VarChar(255)
-  runtimeMinutes  Int?      @map("runtime_minutes")
-  episodeCount    Int?      @map("episode_count")
-  platform        String?   @db.VarChar(100)
-  sourceUrl       String?   @map("source_url") @db.Text
-  viewCount       Int       @default(0) @map("view_count")
-  publishedAt     DateTime? @map("published_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  place           Place?    @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  startDate                DateTime? @map("start_date") @db.Date
+  finishDate               DateTime? @map("finish_date") @db.Date
+  releaseYear              Int?      @map("release_year")
+  country                  String?   @db.VarChar(100)
+  language                 String?   @db.VarChar(100)
+  publisher                String?   @db.VarChar(255)
+  isbn                     String?   @db.VarChar(30)
+  totalPages               Int?      @map("total_pages")
+  director                 String?   @db.VarChar(255)
+  runtimeMinutes           Int?      @map("runtime_minutes")
+  episodeCount             Int?      @map("episode_count")
+  platform                 String?   @db.VarChar(100)
+  sourceUrl                String?   @map("source_url") @db.Text
+  viewCount                Int       @default(0) @map("view_count")
+  publishedAt              DateTime? @map("published_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+  place                    Place?    @relation(fields: [placeId], references: [id], onDelete: Restrict)
 
   @@index([type, publishStatus])
   @@index([recommended, publishedAt])
@@ -568,22 +568,22 @@ model LibraryItem {
 }
 
 model MemoryNode {
-  id             String   @id @db.VarChar(180)
-  type           String   @db.VarChar(30)
-  sourceId       String   @map("source_id") @db.VarChar(100)
-  title          String   @db.VarChar(255)
-  slug           String?  @db.VarChar(255)
-  excerpt        String?  @db.Text
-  href           String   @db.Text
-  image          String?  @db.Text
-  occurredAt     DateTime? @map("occurred_at")
-  placeId        String?  @map("place_id") @db.Uuid
-  coordinateSeed Int      @map("coordinate_seed")
-  contentHash    String   @map("content_hash") @db.VarChar(64)
-  metadata       Json     @default("{}")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  place          Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  id             String           @id @db.VarChar(180)
+  type           String           @db.VarChar(30)
+  sourceId       String           @map("source_id") @db.VarChar(100)
+  title          String           @db.VarChar(255)
+  slug           String?          @db.VarChar(255)
+  excerpt        String?          @db.Text
+  href           String           @db.Text
+  image          String?          @db.Text
+  occurredAt     DateTime?        @map("occurred_at")
+  placeId        String?          @map("place_id") @db.Uuid
+  coordinateSeed Int              @map("coordinate_seed")
+  contentHash    String           @map("content_hash") @db.VarChar(64)
+  metadata       Json             @default("{}")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  place          Place?           @relation(fields: [placeId], references: [id], onDelete: SetNull)
   outgoing       MemoryRelation[] @relation("MemoryRelationSource")
   incoming       MemoryRelation[] @relation("MemoryRelationTarget")
   storySteps     StoryStep[]
@@ -595,19 +595,19 @@ model MemoryNode {
 }
 
 model MemoryRelation {
-  id         String   @id @db.VarChar(64)
-  sourceId   String   @map("source_id") @db.VarChar(180)
-  targetId   String   @map("target_id") @db.VarChar(180)
-  type       String   @db.VarChar(40)
-  origin     String   @default("automatic") @db.VarChar(20)
-  status     String   @default("active") @db.VarChar(20)
-  evidence   Json     @default("{}")
-  weight     Float    @default(0.5)
-  hidden     Boolean  @default(false)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  source     MemoryNode @relation("MemoryRelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
-  target     MemoryNode @relation("MemoryRelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  id        String     @id @db.VarChar(64)
+  sourceId  String     @map("source_id") @db.VarChar(180)
+  targetId  String     @map("target_id") @db.VarChar(180)
+  type      String     @db.VarChar(40)
+  origin    String     @default("automatic") @db.VarChar(20)
+  status    String     @default("active") @db.VarChar(20)
+  evidence  Json       @default("{}")
+  weight    Float      @default(0.5)
+  hidden    Boolean    @default(false)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  source    MemoryNode @relation("MemoryRelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target    MemoryNode @relation("MemoryRelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([sourceId, targetId, type, origin])
   @@index([sourceId, hidden, status])
@@ -617,19 +617,19 @@ model MemoryRelation {
 }
 
 model Journey {
-  id          String   @id @default(uuid()) @db.Uuid
-  title       String   @db.VarChar(255)
-  slug        String   @unique @db.VarChar(255)
-  description String?  @db.Text
-  status      String   @default("draft") @db.VarChar(20)
-  coverImage  String?  @map("cover_image") @db.Text
-  authorId    String   @map("author_id") @db.Uuid
-  happenedAt  DateTime? @map("happened_at")
-  endedAt     DateTime? @map("ended_at")
-  publishedAt DateTime? @map("published_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  author      User     @relation(fields: [authorId], references: [id])
+  id          String        @id @default(uuid()) @db.Uuid
+  title       String        @db.VarChar(255)
+  slug        String        @unique @db.VarChar(255)
+  description String?       @db.Text
+  status      String        @default("draft") @db.VarChar(20)
+  coverImage  String?       @map("cover_image") @db.Text
+  authorId    String        @map("author_id") @db.Uuid
+  happenedAt  DateTime?     @map("happened_at")
+  endedAt     DateTime?     @map("ended_at")
+  publishedAt DateTime?     @map("published_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  author      User          @relation(fields: [authorId], references: [id])
   stops       JourneyStop[]
   storyRoutes StoryRoute[]
 
@@ -638,20 +638,20 @@ model Journey {
 }
 
 model JourneyStop {
-  id         String   @id @default(uuid()) @db.Uuid
-  journeyId  String   @map("journey_id") @db.Uuid
-  placeId    String?  @map("place_id") @db.Uuid
-  sort       Int      @default(0)
-  title      String   @db.VarChar(255)
-  narration  String?  @db.Text
-  occurredAt DateTime? @map("occurred_at")
-  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
-  locationPrecision String @default("place") @map("location_precision") @db.VarChar(20)
+  id                       String    @id @default(uuid()) @db.Uuid
+  journeyId                String    @map("journey_id") @db.Uuid
+  placeId                  String?   @map("place_id") @db.Uuid
+  sort                     Int       @default(0)
+  title                    String    @db.VarChar(255)
+  narration                String?   @db.Text
+  occurredAt               DateTime? @map("occurred_at")
+  locationVisibility       String    @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String    @default("place") @map("location_precision") @db.VarChar(20)
   locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  journey    Journey  @relation(fields: [journeyId], references: [id], onDelete: Cascade)
-  place      Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+  journey                  Journey   @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  place                    Place?    @relation(fields: [placeId], references: [id], onDelete: SetNull)
 
   @@unique([journeyId, sort])
   @@index([placeId])
@@ -659,20 +659,20 @@ model JourneyStop {
 }
 
 model StoryRoute {
-  id          String   @id @default(uuid()) @db.Uuid
-  title       String   @db.VarChar(255)
-  slug        String   @unique @db.VarChar(255)
-  description String?  @db.Text
-  status      String   @default("draft") @db.VarChar(20)
-  shareToken  String   @unique @map("share_token") @db.VarChar(64)
-  coverImage  String?  @map("cover_image") @db.Text
-  journeyId   String?  @map("journey_id") @db.Uuid
-  authorId    String   @map("author_id") @db.Uuid
-  publishedAt DateTime? @map("published_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  journey     Journey? @relation(fields: [journeyId], references: [id], onDelete: SetNull)
-  author      User     @relation(fields: [authorId], references: [id])
+  id          String      @id @default(uuid()) @db.Uuid
+  title       String      @db.VarChar(255)
+  slug        String      @unique @db.VarChar(255)
+  description String?     @db.Text
+  status      String      @default("draft") @db.VarChar(20)
+  shareToken  String      @unique @map("share_token") @db.VarChar(64)
+  coverImage  String?     @map("cover_image") @db.Text
+  journeyId   String?     @map("journey_id") @db.Uuid
+  authorId    String      @map("author_id") @db.Uuid
+  publishedAt DateTime?   @map("published_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  journey     Journey?    @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+  author      User        @relation(fields: [authorId], references: [id])
   steps       StoryStep[]
 
   @@index([status, publishedAt])
@@ -680,29 +680,130 @@ model StoryRoute {
 }
 
 model StoryStep {
-  id            String   @id @default(uuid()) @db.Uuid
-  routeId       String   @map("route_id") @db.Uuid
-  nodeId        String?  @map("node_id") @db.VarChar(180)
-  placeId       String?  @map("place_id") @db.Uuid
-  photoMediaId  String?  @map("photo_media_id") @db.Uuid
-  sort          Int      @default(0)
-  title         String?  @db.VarChar(255)
-  narration     String?  @db.Text
-  musicUrl      String?  @map("music_url") @db.Text
-  musicStartSec Float?   @map("music_start_sec")
-  musicEndSec   Float?   @map("music_end_sec")
-  durationSec   Int      @default(8) @map("duration_sec")
-  locationVisibility String @default("private") @map("location_visibility") @db.VarChar(20)
-  locationPrecision String @default("place") @map("location_precision") @db.VarChar(20)
-  locationExactConfirmedAt DateTime? @map("location_exact_confirmed_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  route         StoryRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  node          MemoryNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
-  place         Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
-  photoMedia    Media?   @relation(fields: [photoMediaId], references: [id], onDelete: SetNull)
+  id                       String      @id @default(uuid()) @db.Uuid
+  routeId                  String      @map("route_id") @db.Uuid
+  nodeId                   String?     @map("node_id") @db.VarChar(180)
+  placeId                  String?     @map("place_id") @db.Uuid
+  photoMediaId             String?     @map("photo_media_id") @db.Uuid
+  sort                     Int         @default(0)
+  title                    String?     @db.VarChar(255)
+  narration                String?     @db.Text
+  musicUrl                 String?     @map("music_url") @db.Text
+  musicStartSec            Float?      @map("music_start_sec")
+  musicEndSec              Float?      @map("music_end_sec")
+  durationSec              Int         @default(8) @map("duration_sec")
+  locationVisibility       String      @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String      @default("place") @map("location_precision") @db.VarChar(20)
+  locationExactConfirmedAt DateTime?   @map("location_exact_confirmed_at")
+  createdAt                DateTime    @default(now()) @map("created_at")
+  updatedAt                DateTime    @updatedAt @map("updated_at")
+  route                    StoryRoute  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  node                     MemoryNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  place                    Place?      @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  photoMedia               Media?      @relation(fields: [photoMediaId], references: [id], onDelete: SetNull)
 
   @@unique([routeId, sort])
   @@index([nodeId])
   @@map("story_steps")
+}
+
+model AiContentIndex {
+  id          String    @id @default(uuid()) @db.Uuid
+  contentType String    @map("content_type") @db.VarChar(30)
+  sourceId    String    @map("source_id") @db.VarChar(180)
+  title       String    @db.VarChar(255)
+  slug        String?   @db.VarChar(255)
+  href        String    @db.Text
+  excerpt     String?   @db.Text
+  body        String    @db.Text
+  image       String?   @db.Text
+  occurredAt  DateTime? @map("occurred_at")
+  embedding   Json
+  metadata    Json      @default("{}")
+  contentHash String    @map("content_hash") @db.VarChar(64)
+  indexedAt   DateTime  @default(now()) @map("indexed_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([contentType, sourceId])
+  @@index([contentType, occurredAt])
+  @@map("ai_content_indexes")
+}
+
+model AiContentInsight {
+  id          String   @id @default(uuid()) @db.Uuid
+  contentType String   @map("content_type") @db.VarChar(30)
+  sourceId    String   @map("source_id") @db.VarChar(180)
+  slug        String?  @db.VarChar(255)
+  summary     String   @db.Text
+  keyPoints   Json     @default("[]") @map("key_points")
+  related     Json     @default("[]")
+  generatedBy String   @default("local") @map("generated_by") @db.VarChar(20)
+  contentHash String   @map("content_hash") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([contentType, sourceId])
+  @@index([contentType, slug])
+  @@map("ai_content_insights")
+}
+
+model AiInteraction {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorType     String   @map("actor_type") @db.VarChar(20)
+  userId        String?  @map("user_id") @db.Uuid
+  guestIdHash   String?  @map("guest_id_hash") @db.VarChar(64)
+  scene         String   @db.VarChar(30)
+  action        String   @db.VarChar(30)
+  contentType   String?  @map("content_type") @db.VarChar(30)
+  sourceId      String?  @map("source_id") @db.VarChar(180)
+  href          String?  @db.Text
+  model         String?  @db.VarChar(150)
+  durationMs    Int?     @map("duration_ms")
+  inputChars    Int?     @map("input_chars")
+  outputChars   Int?     @map("output_chars")
+  inputTokens   Int?     @map("input_tokens")
+  outputTokens  Int?     @map("output_tokens")
+  sourceCount   Int      @default(0) @map("source_count")
+  sourceClicked Boolean  @default(false) @map("source_clicked")
+  continued     Boolean  @default(false)
+  helpful       Boolean?
+  errorType     String?  @map("error_type") @db.VarChar(80)
+  fallback      Boolean  @default(false)
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([scene, action, createdAt])
+  @@index([userId, createdAt])
+  @@index([guestIdHash, createdAt])
+  @@map("ai_interactions")
+}
+
+model AiAuthorStyleProfile {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @unique @map("user_id") @db.Uuid
+  profile    Json     @default("{}")
+  sampleHash String   @map("sample_hash") @db.VarChar(64)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_author_style_profiles")
+}
+
+model AiNarrative {
+  id          String    @id @default(uuid()) @db.Uuid
+  kind        String    @db.VarChar(30)
+  title       String    @db.VarChar(255)
+  content     String    @db.Text
+  periodStart DateTime? @map("period_start")
+  periodEnd   DateTime? @map("period_end")
+  filters     Json      @default("{}")
+  nodeIds     Json      @default("[]") @map("node_ids")
+  status      String    @default("draft") @db.VarChar(20)
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([kind, periodStart, periodEnd])
+  @@index([createdBy, createdAt])
+  @@map("ai_narratives")
 }

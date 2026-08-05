@@ -1,43 +1,45 @@
 <template>
   <aside class="sidebar-left" :class="{ 'is-collapsed': collapsed }">
     <div class="sidebar-scroll">
-    <div class="hero">
-      <span class="hero-glow hero-glow-one" aria-hidden="true" />
-      <span class="hero-glow hero-glow-two" aria-hidden="true" />
-      <span class="wind-stroke wind-stroke-one" aria-hidden="true" />
-      <span class="wind-stroke wind-stroke-two" aria-hidden="true" />
-      <div class="hero-content">
-        <NuxtLink :to="heroLink" class="hero-row" :title="heroTitle">
-          <div class="logo-wrap">
-            <SiteWindLogo />
-          </div>
-          <div class="hero-text">
-            <span class="hero-kicker">WIND · CORNER</span>
-            <div class="hero-name">{{ heroTitle }}</div>
-            <div class="hero-slogan">{{ heroSlogan }}</div>
-          </div>
-          <span class="hero-status" aria-hidden="true"><i /></span>
-        </NuxtLink>
+      <div class="hero">
+        <span class="hero-glow hero-glow-one" aria-hidden="true" />
+        <span class="hero-glow hero-glow-two" aria-hidden="true" />
+        <span class="wind-stroke wind-stroke-one" aria-hidden="true" />
+        <span class="wind-stroke wind-stroke-two" aria-hidden="true" />
+        <div class="hero-content">
+          <NuxtLink :to="heroLink" class="hero-row" :title="heroTitle">
+            <div class="logo-wrap">
+              <SiteWindLogo />
+            </div>
+            <div class="hero-text">
+              <span class="hero-kicker">WIND · CORNER</span>
+              <div class="hero-name">{{ heroTitle }}</div>
+              <div class="hero-slogan">{{ heroSlogan }}</div>
+            </div>
+            <span class="hero-status" aria-hidden="true"><i /></span>
+          </NuxtLink>
+        </div>
       </div>
-    </div>
 
-    <div v-if="!isPanel" class="search-box" @click="openSearch">
-      <input type="text" placeholder="搜索文章..." readonly>
-      <Icon name="ph:magnifying-glass-bold" class="search-suffix" />
-    </div>
+      <div v-if="!isPanel" class="search-box" @click="openSearch">
+        <input type="text" placeholder="搜索文章..." readonly />
+        <Icon name="ph:magnifying-glass-bold" class="search-suffix" />
+      </div>
 
-    <nav class="nav-menu">
-      <NuxtLink
-        v-for="item in navItems"
-        :key="item.to"
-        :to="item.to"
-        class="nav-item"
-        :class="{ active: isNavActive(item.to) }"
-        :title="collapsed ? item.label : undefined"
-      >
-        <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
-      </NuxtLink>
-    </nav>
+      <nav class="nav-menu">
+        <NuxtLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="nav-item"
+          :class="{ active: isNavActive(item.to) }"
+          :title="collapsed ? item.label : undefined"
+        >
+          <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{
+            item.label
+          }}</span>
+        </NuxtLink>
+      </nav>
     </div>
 
     <div class="sidebar-bottom">
@@ -50,14 +52,24 @@
         <div class="user-row">
           <button type="button" class="user-main" @click="goPanel">
             <div class="avatar-wrapper">
-              <img v-if="user?.avatar" :src="avatarSrc" alt="" class="avatar-img">
+              <img
+                v-if="user?.avatar"
+                :src="avatarSrc"
+                alt=""
+                class="avatar-img"
+              />
               <Icon v-else name="ph:user-circle-fill" class="avatar-icon" />
             </div>
-            <span class="user-name">{{ user?.username ?? '用户' }}</span>
+            <span class="user-name">{{ user?.username ?? "用户" }}</span>
             <span v-if="isUserAdmin" class="user-badge">管</span>
           </button>
           <NotificationBell />
-          <button type="button" class="user-logout" title="退出登录" @click="handleLogout">
+          <button
+            type="button"
+            class="user-logout"
+            title="退出登录"
+            @click="handleLogout"
+          >
             <Icon name="ph:sign-out-bold" />
           </button>
         </div>
@@ -67,20 +79,44 @@
         </NuxtLink>
       </div>
       <div class="theme-pill">
-        <button :class="{ active: theme === 'light' }" @click="setTheme('light')" title="亮色">
+        <button
+          :class="{ active: theme === 'light' }"
+          @click="setTheme('light')"
+          title="亮色"
+        >
           <Icon name="ph:sun-bold" />
         </button>
-        <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')" title="深色">
+        <button
+          :class="{ active: theme === 'dark' }"
+          @click="setTheme('dark')"
+          title="深色"
+        >
           <Icon name="ph:moon-bold" />
         </button>
-        <button :class="{ active: theme === 'auto' }" @click="setTheme('auto')" title="跟随系统">
+        <button
+          :class="{ active: theme === 'auto' }"
+          @click="setTheme('auto')"
+          title="跟随系统"
+        >
           <Icon name="ph:monitor-bold" />
         </button>
       </div>
-      <button v-if="isPanel && isUserAdmin && allowCollapse" class="admin-collapse-button" type="button" :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'" @click="emit('toggle-collapse')">
-        <Icon :name="collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-simple-bold'" />
-        <span>{{ collapsed ? '展开侧栏' : '收起侧栏' }}</span>
-        <Icon :name="collapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'" />
+      <button
+        v-if="isPanel && isUserAdmin && allowCollapse"
+        class="admin-collapse-button"
+        type="button"
+        :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'"
+        @click="emit('toggle-collapse')"
+      >
+        <Icon
+          :name="
+            collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-simple-bold'
+          "
+        />
+        <span>{{ collapsed ? "展开侧栏" : "收起侧栏" }}</span>
+        <Icon
+          :name="collapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'"
+        />
       </button>
       <!-- 字体切换暂不展示，保留结构与样式便于后续恢复。
       <div v-if="!isPanel" class="font-pill" role="group" aria-label="全局字体">
@@ -102,23 +138,26 @@
 </template>
 
 <script setup lang="ts">
-import { useFeatureFlags } from '~/composables/useFeatureFlags'
+import { useFeatureFlags } from "~/composables/useFeatureFlags";
 
-const props = withDefaults(defineProps<{
-  variant?: 'site' | 'admin'
-  collapsed?: boolean
-  allowCollapse?: boolean
-}>(), {
-  variant: 'site',
-  collapsed: false,
-  allowCollapse: true,
-})
+const props = withDefaults(
+  defineProps<{
+    variant?: "site" | "admin";
+    collapsed?: boolean;
+    allowCollapse?: boolean;
+  }>(),
+  {
+    variant: "site",
+    collapsed: false,
+    allowCollapse: true,
+  },
+);
 
-const emit = defineEmits<{ openSearch: []; 'toggle-collapse': [] }>()
-const { theme, setTheme } = useTheme()
-const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings()
+const emit = defineEmits<{ openSearch: []; "toggle-collapse": [] }>();
+const { theme, setTheme } = useTheme();
+const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings();
 // 字体切换入口暂时隐藏：const { fontPreset, fontPresets, setFontPreset } = useTypography()
-const { registerSlot, unregisterSlot } = useMusicPlayerSlot()
+const { registerSlot, unregisterSlot } = useMusicPlayerSlot();
 const {
   user,
   isLoggedIn,
@@ -127,138 +166,149 @@ const {
   refreshProfile,
   clearSession,
   panelHome,
-} = useAuth()
-const { mediaUrl } = useMediaUrl()
-const route = useRoute()
-const router = useRouter()
+} = useAuth();
+const { mediaUrl } = useMediaUrl();
+const route = useRoute();
+const router = useRouter();
 
-const isPanel = computed(() => props.variant === 'admin')
-const collapsed = computed(() => props.collapsed && isPanel.value)
-const allowCollapse = computed(() => props.allowCollapse)
-const { albumsEnabled, mapEnabled, constellationEnabled, storiesEnabled } = useFeatureFlags()
-const avatarSrc = computed(() => mediaUrl(user.value?.avatar))
-const playerSlotRef = ref<HTMLElement | null>(null)
-let registeredSlot: HTMLElement | null = null
+const isPanel = computed(() => props.variant === "admin");
+const collapsed = computed(() => props.collapsed && isPanel.value);
+const allowCollapse = computed(() => props.allowCollapse);
+const { albumsEnabled, mapEnabled, constellationEnabled, storiesEnabled } =
+  useFeatureFlags();
+const avatarSrc = computed(() => mediaUrl(user.value?.avatar));
+const playerSlotRef = ref<HTMLElement | null>(null);
+let registeredSlot: HTMLElement | null = null;
 
-watch(playerSlotRef, (el) => {
-  if (registeredSlot && registeredSlot !== el) unregisterSlot(registeredSlot)
-  registeredSlot = el
-  if (el) registerSlot(el)
-}, { immediate: true })
+watch(
+  playerSlotRef,
+  (el) => {
+    if (registeredSlot && registeredSlot !== el) unregisterSlot(registeredSlot);
+    registeredSlot = el;
+    if (el) registerSlot(el);
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   if (registeredSlot) {
-    unregisterSlot(registeredSlot)
-    registeredSlot = null
+    unregisterSlot(registeredSlot);
+    registeredSlot = null;
   }
-})
+});
 
 const siteNav = [
-  { to: '/home', icon: 'ph:house-bold', label: '首页' },
-  { to: '/archive', icon: 'ph:archive-bold', label: '归档' },
-  { to: '/category', icon: 'ph:folder-open-bold', label: '分类' },
-  { to: '/tags', icon: 'ph:tag-bold', label: '标签' },
-  { to: '/library', icon: 'ph:books-bold', label: '书影' },
-  { to: '/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
-  { to: '/time/map', icon: 'ph:map-trifold-bold', label: '地图' },
-  { to: '/time/constellation', icon: 'ph:graph-bold', label: '星图' },
-  { to: '/albums', icon: 'ph:images-square-bold', label: '相册' },
-  { to: '/stories', icon: 'ph:path-bold', label: '航线' },
-  { to: '/friends', icon: 'ph:handshake-bold', label: '友链' },
-  { to: '/about', icon: 'ph:info-bold', label: '关于' },
-]
+  { to: "/home", icon: "ph:house-bold", label: "首页" },
+  { to: "/archive", icon: "ph:archive-bold", label: "归档" },
+  { to: "/category", icon: "ph:folder-open-bold", label: "分类" },
+  { to: "/tags", icon: "ph:tag-bold", label: "标签" },
+  { to: "/library", icon: "ph:books-bold", label: "书影" },
+  { to: "/moments", icon: "ph:sparkle-bold", label: "瞬间" },
+  { to: "/time/map", icon: "ph:map-trifold-bold", label: "地图" },
+  { to: "/time/constellation", icon: "ph:graph-bold", label: "星图" },
+  { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
+  { to: "/stories", icon: "ph:path-bold", label: "航线" },
+  { to: "/friends", icon: "ph:handshake-bold", label: "友链" },
+  { to: "/about", icon: "ph:info-bold", label: "关于" },
+];
 
 const adminFullNav = [
-  { to: '/admin', icon: 'ph:gauge-bold', label: '仪表盘' },
-  { to: '/admin/analytics', icon: 'ph:chart-line-up-bold', label: '访问统计' },
-  { to: '/admin/posts', icon: 'ph:article-bold', label: '文章' },
-  { to: '/admin/moments', icon: 'ph:sparkle-bold', label: '瞬间' },
-  { to: '/admin/library', icon: 'ph:books-bold', label: '书影' },
-  { to: '/admin/albums', icon: 'ph:images-square-bold', label: '相册' },
-  { to: '/admin/memory-graph', icon: 'ph:planet-bold', label: '时光星图' },
-  { to: '/admin/categories', icon: 'ph:folder-open-bold', label: '分类' },
-  { to: '/admin/tags', icon: 'ph:tag-bold', label: '标签' },
-  { to: '/admin/comments', icon: 'ph:chat-circle-dots-bold', label: '评论' },
-  { to: '/admin/media', icon: 'ph:image-bold', label: '文件' },
-  { to: '/admin/users', icon: 'ph:users-three-bold', label: '用户' },
-  { to: '/admin/friends', icon: 'ph:handshake-bold', label: '友链' },
-  { to: '/admin/friend-applications', icon: 'ph:link-bold', label: '友联申请' },
-  { to: '/admin/ai', icon: 'ph:robot-bold', label: 'AI' },
-  { to: '/admin/email', icon: 'ph:envelope-bold', label: '邮件' },
-  { to: '/admin/emoji', icon: 'ph:smiley-bold', label: '表情' },
-  { to: '/admin/about', icon: 'ph:identification-card-bold', label: '关于我' },
-  { to: '/admin/settings', icon: 'ph:gear-bold', label: '设置' },
-  { to: '/admin/info', icon: 'ph:info-bold', label: '系统信息' },
-  { to: '/admin/profile', icon: 'ph:user-bold', label: '我的信息' },
-  { to: '/admin/messages', icon: 'ph:bell-bold', label: '我的消息' },
-]
+  { to: "/admin", icon: "ph:gauge-bold", label: "仪表盘" },
+  { to: "/admin/analytics", icon: "ph:chart-line-up-bold", label: "访问统计" },
+  { to: "/admin/posts", icon: "ph:article-bold", label: "文章" },
+  { to: "/admin/moments", icon: "ph:sparkle-bold", label: "瞬间" },
+  { to: "/admin/library", icon: "ph:books-bold", label: "书影" },
+  { to: "/admin/albums", icon: "ph:images-square-bold", label: "相册" },
+  { to: "/admin/memory-graph", icon: "ph:planet-bold", label: "时光星图" },
+  { to: "/admin/categories", icon: "ph:folder-open-bold", label: "分类" },
+  { to: "/admin/tags", icon: "ph:tag-bold", label: "标签" },
+  { to: "/admin/comments", icon: "ph:chat-circle-dots-bold", label: "评论" },
+  { to: "/admin/media", icon: "ph:image-bold", label: "文件" },
+  { to: "/admin/users", icon: "ph:users-three-bold", label: "用户" },
+  { to: "/admin/friends", icon: "ph:handshake-bold", label: "友链" },
+  { to: "/admin/friend-applications", icon: "ph:link-bold", label: "友联申请" },
+  { to: "/admin/ai", icon: "ph:robot-bold", label: "AI" },
+  { to: "/admin/ai-native", icon: "ph:sparkle-bold", label: "AI 原生" },
+  { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件" },
+  { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情" },
+  { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
+  { to: "/admin/settings", icon: "ph:gear-bold", label: "设置" },
+  { to: "/admin/info", icon: "ph:info-bold", label: "系统信息" },
+  { to: "/admin/profile", icon: "ph:user-bold", label: "我的信息" },
+  { to: "/admin/messages", icon: "ph:bell-bold", label: "我的消息" },
+];
 
 const userPanelNav = [
-  { to: '/admin/profile', icon: 'ph:user-bold', label: '我的信息' },
-  { to: '/admin/messages', icon: 'ph:bell-bold', label: '我的消息' },
-]
+  { to: "/admin/profile", icon: "ph:user-bold", label: "我的信息" },
+  { to: "/admin/messages", icon: "ph:bell-bold", label: "我的消息" },
+];
 
 const navItems = computed(() => {
-  const filterFeatures = (items: typeof siteNav) => items.filter(item =>
-    (albumsEnabled || !item.to.includes('/albums'))
-    && (mapEnabled || !item.to.includes('/time/map'))
-    && (constellationEnabled || !item.to.includes('/time/constellation'))
-    && (storiesEnabled || !item.to.includes('/stories')),
-  )
-  if (!isPanel.value) return filterFeatures(siteNav)
-  return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav
-})
+  const filterFeatures = (items: typeof siteNav) =>
+    items.filter(
+      (item) =>
+        (albumsEnabled || !item.to.includes("/albums")) &&
+        (mapEnabled || !item.to.includes("/time/map")) &&
+        (constellationEnabled || !item.to.includes("/time/constellation")) &&
+        (storiesEnabled || !item.to.includes("/stories")),
+    );
+  if (!isPanel.value) return filterFeatures(siteNav);
+  return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav;
+});
 
 const heroLink = computed(() => {
-  if (!isPanel.value) return '/home'
-  return panelHome()
-})
+  if (!isPanel.value) return "/home";
+  return panelHome();
+});
 
 const heroTitle = computed(() => {
-  if (!isPanel.value) return siteTitle.value
-  return isUserAdmin.value ? '管理后台' : '个人中心'
-})
+  if (!isPanel.value) return siteTitle.value;
+  return isUserAdmin.value ? "管理后台" : "个人中心";
+});
 
 const heroSlogan = computed(() => {
-  if (!isPanel.value) return siteDescription.value
-  return isUserAdmin.value ? `${siteTitle.value} · 内容管理` : '管理账号与消息'
-})
+  if (!isPanel.value) return siteDescription.value;
+  return isUserAdmin.value ? `${siteTitle.value} · 内容管理` : "管理账号与消息";
+});
 
 function isNavActive(to: string) {
   if (isPanel.value) {
-    if (to === '/admin') return route.path === '/admin'
-    return route.path === to || route.path.startsWith(`${to}/`)
+    if (to === "/admin") return route.path === "/admin";
+    return route.path === to || route.path.startsWith(`${to}/`);
   }
-  return route.path === to || route.path.startsWith(`${to}/`)
+  return route.path === to || route.path.startsWith(`${to}/`);
 }
 
 function openSearch() {
-  emit('openSearch')
+  emit("openSearch");
 }
 
 function goPanel() {
-  router.push(panelHome())
+  router.push(panelHome());
 }
 
 function handleLogout() {
-  clearSession()
+  clearSession();
   try {
-    const toast = useToast()
-    toast.success('已退出登录')
+    const toast = useToast();
+    toast.success("已退出登录");
   } catch {
     // ignore
   }
-  router.replace('/home')
+  router.replace("/home");
 }
 
 onMounted(() => {
-  void loadSiteSettings()
-  readStorage()
-  if (isLoggedIn.value) refreshProfile()
-})
-watch(() => route.fullPath, () => {
-  readStorage()
-})
+  void loadSiteSettings();
+  readStorage();
+  if (isLoggedIn.value) refreshProfile();
+});
+watch(
+  () => route.fullPath,
+  () => {
+    readStorage();
+  },
+);
 </script>
 
 <style scoped>
@@ -301,41 +351,101 @@ watch(() => route.fullPath, () => {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
   border-radius: 16px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary-soft) 64%, var(--ld-bg-card)), var(--ld-bg-card) 70%);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--c-primary-soft) 64%, var(--ld-bg-card)),
+    var(--ld-bg-card) 70%
+  );
   box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
   isolation: isolate;
 }
-.hero::after { position:absolute; top:-58px; right:-46px; width:126px; height:126px; border:1px dashed color-mix(in srgb,var(--c-primary) 18%,transparent); border-radius:50%; content:''; animation:hero-orbit 24s linear infinite; }
-.hero-glow { position:absolute; z-index:-1; border-radius:50%; filter:blur(18px); opacity:.5; }
-.hero-glow-one { top:-28px; left:-20px; width:90px; height:90px; background:color-mix(in srgb,var(--c-primary) 18%,transparent); animation:hero-drift 7s ease-in-out infinite alternate; }
-.hero-glow-two { right:-24px; bottom:-32px; width:88px; height:88px; background:color-mix(in srgb,#9b78df 14%,transparent); animation:hero-drift 9s ease-in-out -2s infinite alternate-reverse; }
-.wind-stroke { position:absolute; z-index:-1; height:1px; border-radius:99px; background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--c-primary) 35%,transparent),transparent); transform:rotate(-8deg); }
-.wind-stroke-one { top:20px; right:-8px; width:94px; animation:wind-pass 5.4s ease-in-out infinite; }
-.wind-stroke-two { right:8px; bottom:16px; width:64px; animation:wind-pass 6.8s ease-in-out -2s infinite; }
-.hero-content { position:relative; z-index:1; }
+.hero::after {
+  position: absolute;
+  top: -58px;
+  right: -46px;
+  width: 126px;
+  height: 126px;
+  border: 1px dashed color-mix(in srgb, var(--c-primary) 18%, transparent);
+  border-radius: 50%;
+  content: "";
+  animation: hero-orbit 24s linear infinite;
+}
+.hero-glow {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  filter: blur(18px);
+  opacity: 0.5;
+}
+.hero-glow-one {
+  top: -28px;
+  left: -20px;
+  width: 90px;
+  height: 90px;
+  background: color-mix(in srgb, var(--c-primary) 18%, transparent);
+  animation: hero-drift 7s ease-in-out infinite alternate;
+}
+.hero-glow-two {
+  right: -24px;
+  bottom: -32px;
+  width: 88px;
+  height: 88px;
+  background: color-mix(in srgb, #9b78df 14%, transparent);
+  animation: hero-drift 9s ease-in-out -2s infinite alternate-reverse;
+}
+.wind-stroke {
+  position: absolute;
+  z-index: -1;
+  height: 1px;
+  border-radius: 99px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--c-primary) 35%, transparent),
+    transparent
+  );
+  transform: rotate(-8deg);
+}
+.wind-stroke-one {
+  top: 20px;
+  right: -8px;
+  width: 94px;
+  animation: wind-pass 5.4s ease-in-out infinite;
+}
+.wind-stroke-two {
+  right: 8px;
+  bottom: 16px;
+  width: 64px;
+  animation: wind-pass 6.8s ease-in-out -2s infinite;
+}
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
 
 .hero-row {
   display: flex;
   align-items: center;
-  align-items:flex-start;
+  align-items: flex-start;
   gap: 10px;
   text-decoration: none;
   color: inherit;
 }
 
 .logo-wrap {
-  position:relative;
-  display:grid;
+  position: relative;
+  display: grid;
   width: 46px;
   height: 46px;
   flex-shrink: 0;
-  border:1px solid color-mix(in srgb,var(--c-primary) 34%,var(--border));
-  padding:7px;
-  border-radius:14px;
-  background:color-mix(in srgb,var(--ld-bg-card) 80%,transparent);
-  box-shadow:inset 0 0 0 5px color-mix(in srgb,var(--c-primary-soft) 38%,transparent);
-  color:var(--c-primary);
-  place-items:center;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border));
+  padding: 7px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ld-bg-card) 80%, transparent);
+  box-shadow: inset 0 0 0 5px
+    color-mix(in srgb, var(--c-primary-soft) 38%, transparent);
+  color: var(--c-primary);
+  place-items: center;
 }
 
 .hero-text {
@@ -344,34 +454,80 @@ watch(() => route.fullPath, () => {
 }
 
 .hero-name {
-  margin-top:2px;
-  font-family:var(--font-brand);
-  font-size: .94rem;
+  margin-top: 2px;
+  font-family: var(--font-brand);
+  font-size: 0.94rem;
   font-weight: 700;
   color: var(--c-text);
   letter-spacing: 0.04em;
   line-height: 1.3;
 }
-.hero-kicker { color:var(--c-primary); font-family:var(--font-accent); font-size:.41rem; font-weight:760; letter-spacing:.11em; }
-.hero-status { display:grid; width:14px; height:14px; flex:0 0 auto; margin-top:2px; border:1px solid var(--border); border-radius:50%; background:color-mix(in srgb,var(--ld-bg-card) 82%,transparent); place-items:center; }
-.hero-status i { width:5px; height:5px; border-radius:50%; background:#47b985; box-shadow:0 0 0 3px color-mix(in srgb,#47b985 13%,transparent); animation:status-pulse 2.4s ease-in-out infinite; }
+.hero-kicker {
+  color: var(--c-primary);
+  font-family: var(--font-accent);
+  font-size: 0.41rem;
+  font-weight: 760;
+  letter-spacing: 0.11em;
+}
+.hero-status {
+  display: grid;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ld-bg-card) 82%, transparent);
+  place-items: center;
+}
+.hero-status i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #47b985;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #47b985 13%, transparent);
+  animation: status-pulse 2.4s ease-in-out infinite;
+}
 
 .hero-slogan {
-  max-width:138px;
-  font-family:var(--font-summary);
+  max-width: 138px;
+  font-family: var(--font-summary);
   font-size: 0.57rem;
   color: var(--c-text-2);
   margin-top: 1px;
   letter-spacing: 0.06em;
-  line-height:1.45;
-  white-space:normal;
-  overflow-wrap:anywhere;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-@keyframes hero-orbit { to { transform:rotate(360deg); } }
-@keyframes hero-drift { to { transform:translate3d(10px,8px,0) scale(1.12); } }
-@keyframes wind-pass { 0%,100% { opacity:.15; transform:translateX(-12px) rotate(-8deg); } 50% { opacity:.75; transform:translateX(12px) rotate(-8deg); } }
-@keyframes logo-breathe { 50% { opacity:.5; transform:scale(.94); } }
+@keyframes hero-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hero-drift {
+  to {
+    transform: translate3d(10px, 8px, 0) scale(1.12);
+  }
+}
+@keyframes wind-pass {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translateX(-12px) rotate(-8deg);
+  }
+  50% {
+    opacity: 0.75;
+    transform: translateX(12px) rotate(-8deg);
+  }
+}
+@keyframes logo-breathe {
+  50% {
+    opacity: 0.5;
+    transform: scale(0.94);
+  }
+}
 
 /* ===== Search ===== */
 .search-box {
@@ -402,7 +558,9 @@ watch(() => route.fullPath, () => {
   font-size: 0.78rem;
   outline: none;
   cursor: pointer;
-  transition: border 0.2s, box-shadow 0.2s;
+  transition:
+    border 0.2s,
+    box-shadow 0.2s;
 }
 
 .search-box input:focus {
@@ -470,9 +628,31 @@ watch(() => route.fullPath, () => {
   margin: 0 0 4px;
 }
 
-.admin-collapse-button { display:flex; width:100%; min-height:34px; align-items:center; justify-content:center; gap:8px; padding:7px 10px; border:1px solid color-mix(in srgb,var(--border) 78%,transparent); border-radius:11px; background:var(--c-bg-1); color:var(--c-text-3); cursor:pointer; font:inherit; font-size:.68rem; transition:.2s; }
-.admin-collapse-button:hover { border-color:color-mix(in srgb,var(--c-primary) 35%,var(--border)); background:var(--c-primary-soft); color:var(--c-primary); }
-.admin-collapse-button :deep(svg:last-child) { margin-left:auto; }
+.admin-collapse-button {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 11px;
+  background: var(--c-bg-1);
+  color: var(--c-text-3);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  transition: 0.2s;
+}
+.admin-collapse-button:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 35%, var(--border));
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+.admin-collapse-button :deep(svg:last-child) {
+  margin-left: auto;
+}
 
 .login-link {
   display: flex;
@@ -593,7 +773,9 @@ watch(() => route.fullPath, () => {
   color: var(--c-text-3);
   font-size: 1rem;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .user-logout:hover {
@@ -678,7 +860,10 @@ watch(() => route.fullPath, () => {
   font-family: var(--font-body);
   font-size: 0.68rem;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
 }
 
 .font-pill button:hover {
@@ -692,29 +877,100 @@ watch(() => route.fullPath, () => {
   box-shadow: 0.1em 0.2em 0.5em var(--ld-shadow);
 }
 
-.sidebar-left.is-collapsed { width:72px; padding-inline:9px; }
-.is-collapsed .sidebar-scroll { padding-right:0; }
-.is-collapsed .hero { padding:8px; border-radius:14px; }
-.is-collapsed .hero-row { justify-content:center; }
-.is-collapsed .logo-wrap { width:42px; height:42px; border-radius:13px; }
-.is-collapsed .hero-text,.is-collapsed .hero-status,.is-collapsed .search-box,.is-collapsed .nav-label,.is-collapsed .user-name,.is-collapsed .user-badge,.is-collapsed .user-logout,.is-collapsed .user-back span { display:none; }
-.is-collapsed .nav-menu { gap:5px; }
-.is-collapsed .nav-item { justify-content:center; padding:9px 0; }
-.is-collapsed .nav-icon { width:auto; font-size:1.08rem; }
-.is-collapsed .sidebar-bottom { align-items:center; }
-.is-collapsed .sidebar-player-slot { width:44px; }
-.is-collapsed .login-link { width:42px; height:42px; padding:0; font-size:0; }
-.is-collapsed .login-link :deep(svg) { font-size:1rem; }
-.is-collapsed .user-card { width:44px; padding:6px; }
-.is-collapsed .user-row,.is-collapsed .user-main { justify-content:center; }
-.is-collapsed .user-main { flex:0 0 auto; padding:0; }
-.is-collapsed .user-card :deep(.notif-bell-wrap) { display:none; }
-.is-collapsed .theme-pill { width:42px; flex-direction:column; border-radius:14px; }
-.is-collapsed .theme-pill button { width:34px; padding:7px 0; }
-.is-collapsed .admin-collapse-button { width:42px; padding:8px 0; }
-.is-collapsed .admin-collapse-button span,.is-collapsed .admin-collapse-button :deep(svg:last-child) { display:none; }
+.sidebar-left.is-collapsed {
+  width: 72px;
+  padding-inline: 9px;
+}
+.is-collapsed .sidebar-scroll {
+  padding-right: 0;
+}
+.is-collapsed .hero {
+  padding: 8px;
+  border-radius: 14px;
+}
+.is-collapsed .hero-row {
+  justify-content: center;
+}
+.is-collapsed .logo-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+.is-collapsed .hero-text,
+.is-collapsed .hero-status,
+.is-collapsed .search-box,
+.is-collapsed .nav-label,
+.is-collapsed .user-name,
+.is-collapsed .user-badge,
+.is-collapsed .user-logout,
+.is-collapsed .user-back span {
+  display: none;
+}
+.is-collapsed .nav-menu {
+  gap: 5px;
+}
+.is-collapsed .nav-item {
+  justify-content: center;
+  padding: 9px 0;
+}
+.is-collapsed .nav-icon {
+  width: auto;
+  font-size: 1.08rem;
+}
+.is-collapsed .sidebar-bottom {
+  align-items: center;
+}
+.is-collapsed .sidebar-player-slot {
+  width: 44px;
+}
+.is-collapsed .login-link {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  font-size: 0;
+}
+.is-collapsed .login-link :deep(svg) {
+  font-size: 1rem;
+}
+.is-collapsed .user-card {
+  width: 44px;
+  padding: 6px;
+}
+.is-collapsed .user-row,
+.is-collapsed .user-main {
+  justify-content: center;
+}
+.is-collapsed .user-main {
+  flex: 0 0 auto;
+  padding: 0;
+}
+.is-collapsed .user-card :deep(.notif-bell-wrap) {
+  display: none;
+}
+.is-collapsed .theme-pill {
+  width: 42px;
+  flex-direction: column;
+  border-radius: 14px;
+}
+.is-collapsed .theme-pill button {
+  width: 34px;
+  padding: 7px 0;
+}
+.is-collapsed .admin-collapse-button {
+  width: 42px;
+  padding: 8px 0;
+}
+.is-collapsed .admin-collapse-button span,
+.is-collapsed .admin-collapse-button :deep(svg:last-child) {
+  display: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .hero::after,.hero-glow,.wind-stroke,.hero-status i { animation:none; }
+  .hero::after,
+  .hero-glow,
+  .wind-stroke,
+  .hero-status i {
+    animation: none;
+  }
 }
 </style>

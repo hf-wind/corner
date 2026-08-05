@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMomentDto } from './dto/create-moment.dto';
@@ -16,6 +20,7 @@ import {
 } from '../../common/location/public-location';
 import type { PublicMapMemory } from '../memory-map/memory-map.types';
 import { MemoryGraphService } from '../memory-graph/memory-graph.service';
+import { AiNativeService } from '../ai/ai-native.service';
 
 type PublishedMomentSnapshot = {
   title: string;
@@ -30,7 +35,11 @@ type PublishedMomentSnapshot = {
   locationExactConfirmedAt: string | null;
 };
 
-const momentAuthorSelect = { id: true, username: true, avatar: true } satisfies Prisma.UserSelect;
+const momentAuthorSelect = {
+  id: true,
+  username: true,
+  avatar: true,
+} satisfies Prisma.UserSelect;
 
 @Injectable()
 export class MomentService {
@@ -38,6 +47,7 @@ export class MomentService {
     private prisma: PrismaService,
     private notificationService: NotificationService,
     private memoryGraph?: MemoryGraphService,
+    private aiNative?: AiNativeService,
   ) {}
 
   private buildListSelect(currentUserId?: string): Prisma.MomentSelect {
@@ -94,12 +104,18 @@ export class MomentService {
 
   private isAdminListQuery(query: MomentQueryDto) {
     return (
-      (query.status !== undefined && query.status !== null && String(query.status).length > 0) ||
+      (query.status !== undefined &&
+        query.status !== null &&
+        String(query.status).length > 0) ||
       query.needsPublish === true
     );
   }
 
-  async findAll(query: MomentQueryDto, currentUserId?: string, isAdmin = false) {
+  async findAll(
+    query: MomentQueryDto,
+    currentUserId?: string,
+    isAdmin = false,
+  ) {
     const { sort, search, status } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
@@ -137,7 +153,12 @@ export class MomentService {
 
     const select = this.buildListSelect(currentUserId);
     if (!adminView) {
-      const rows = await this.prisma.moment.findMany({ where, select, orderBy, take: 1000 });
+      const rows = await this.prisma.moment.findMany({
+        where,
+        select,
+        orderBy,
+        take: 1000,
+      });
       const filtered = rows
         .map((item) => this.formatPublic(item))
         .filter((item) => this.matchesPublicQuery(item, query));
@@ -214,7 +235,10 @@ export class MomentService {
   }
 
   async update(slug: string, dto: UpdateMomentDto) {
-    const existing = await this.prisma.moment.findUnique({ where: { slug }, include: { place: true } });
+    const existing = await this.prisma.moment.findUnique({
+      where: { slug },
+      include: { place: true },
+    });
     if (!existing) throw new NotFoundException('Moment not found');
 
     let snapshot = this.readSnapshot(existing.publishedSnapshot);
@@ -239,16 +263,26 @@ export class MomentService {
       slug: data.slug ?? existing.slug,
       content: data.content ?? existing.content,
       excerpt: data.excerpt !== undefined ? data.excerpt : existing.excerpt,
-      happenedAt: location.happenedAt !== undefined ? location.happenedAt : existing.happenedAt,
-      place: location.placeId !== undefined
-        ? await this.findPlaceSnapshot(location.placeId)
-        : this.placeSnapshot(existing.place),
-      locationVisibility: location.locationVisibility ?? existing.locationVisibility,
-      locationPrecision: location.locationPrecision ?? existing.locationPrecision,
-      locationSource: location.locationSource !== undefined ? location.locationSource : existing.locationSource,
-      locationExactConfirmedAt: location.locationExactConfirmedAt !== undefined
-        ? location.locationExactConfirmedAt
-        : existing.locationExactConfirmedAt,
+      happenedAt:
+        location.happenedAt !== undefined
+          ? location.happenedAt
+          : existing.happenedAt,
+      place:
+        location.placeId !== undefined
+          ? await this.findPlaceSnapshot(location.placeId)
+          : this.placeSnapshot(existing.place),
+      locationVisibility:
+        location.locationVisibility ?? existing.locationVisibility,
+      locationPrecision:
+        location.locationPrecision ?? existing.locationPrecision,
+      locationSource:
+        location.locationSource !== undefined
+          ? location.locationSource
+          : existing.locationSource,
+      locationExactConfirmedAt:
+        location.locationExactConfirmedAt !== undefined
+          ? location.locationExactConfirmedAt
+          : existing.locationExactConfirmedAt,
     };
     const needsPublish = !snapshot || !this.snapshotEquals(snapshot, next);
 
@@ -258,7 +292,9 @@ export class MomentService {
         ...data,
         ...location,
         needsPublish,
-        publishedSnapshot: snapshot ? (snapshot as unknown as Prisma.InputJsonValue) : undefined,
+        publishedSnapshot: snapshot
+          ? (snapshot as unknown as Prisma.InputJsonValue)
+          : undefined,
       },
       include: this.buildInclude(),
     });
@@ -267,7 +303,10 @@ export class MomentService {
   }
 
   async publish(slug: string) {
-    const existing = await this.prisma.moment.findUnique({ where: { slug }, include: { place: true } });
+    const existing = await this.prisma.moment.findUnique({
+      where: { slug },
+      include: { place: true },
+    });
     if (!existing) throw new NotFoundException('Moment not found');
 
     const snapshot = this.buildSnapshotFromMoment(existing);
@@ -282,11 +321,15 @@ export class MomentService {
       include: this.buildInclude(),
     });
     this.memoryGraph?.scheduleRebuild();
+    this.aiNative?.schedulePrecompute('moment', moment.id);
     return this.format(moment);
   }
 
   async makePrivate(slug: string) {
-    const existing = await this.prisma.moment.findUnique({ where: { slug }, select: { id: true } });
+    const existing = await this.prisma.moment.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
     if (!existing) throw new NotFoundException('Moment not found');
     const moment = await this.prisma.moment.update({
       where: { id: existing.id },
@@ -308,7 +351,9 @@ export class MomentService {
     if (existing) {
       await this.prisma.momentLike.delete({ where: { id: existing.id } });
     } else {
-      await this.prisma.momentLike.create({ data: { userId, momentId: moment.id } });
+      await this.prisma.momentLike.create({
+        data: { userId, momentId: moment.id },
+      });
       if (moment.authorId && moment.authorId !== userId) {
         const liker = await this.prisma.user.findUnique({
           where: { id: userId },
@@ -323,7 +368,9 @@ export class MomentService {
       }
     }
 
-    const likeCount = await this.prisma.momentLike.count({ where: { momentId: moment.id } });
+    const likeCount = await this.prisma.momentLike.count({
+      where: { momentId: moment.id },
+    });
     await this.prisma.moment.update({
       where: { id: moment.id },
       data: { likeCount },
@@ -342,34 +389,59 @@ export class MomentService {
     this.memoryGraph?.scheduleRebuild();
   }
 
-  async findPublicPlaces(query: { search?: string; city?: string; page?: number; limit?: number }) {
+  async findPublicPlaces(query: {
+    search?: string;
+    city?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const rows = await this.prisma.moment.findMany({
       where: { status: 'published' },
       select: this.buildListSelect(),
       orderBy: { publishedAt: 'desc' },
       take: 1000,
     });
-    const grouped = new Map<string, { id: string; slug: string; name: string; city?: string; province?: string; country?: string; momentCount: number }>();
+    const grouped = new Map<
+      string,
+      {
+        id: string;
+        slug: string;
+        name: string;
+        city?: string;
+        province?: string;
+        country?: string;
+        momentCount: number;
+      }
+    >();
     for (const row of rows) {
       const location = this.formatPublic(row).publicLocation;
       if (!location?.slug) continue;
       const current = grouped.get(location.slug);
       if (current) current.momentCount += 1;
-      else grouped.set(location.slug, {
-        id: location.slug,
-        slug: location.slug,
-        name: location.name,
-        city: location.city,
-        province: location.province,
-        country: location.country,
-        momentCount: 1,
-      });
+      else
+        grouped.set(location.slug, {
+          id: location.slug,
+          slug: location.slug,
+          name: location.name,
+          city: location.city,
+          province: location.province,
+          country: location.country,
+          momentCount: 1,
+        });
     }
-    const keyword = String(query.search || '').trim().toLocaleLowerCase();
-    const city = String(query.city || '').trim().toLocaleLowerCase();
+    const keyword = String(query.search || '')
+      .trim()
+      .toLocaleLowerCase();
+    const city = String(query.city || '')
+      .trim()
+      .toLocaleLowerCase();
     const filtered = [...grouped.values()].filter((place) => {
-      const haystack = `${place.name} ${place.city || ''} ${place.province || ''}`.toLocaleLowerCase();
-      return (!keyword || haystack.includes(keyword)) && (!city || place.city?.toLocaleLowerCase() === city);
+      const haystack =
+        `${place.name} ${place.city || ''} ${place.province || ''}`.toLocaleLowerCase();
+      return (
+        (!keyword || haystack.includes(keyword)) &&
+        (!city || place.city?.toLocaleLowerCase() === city)
+      );
     });
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -392,16 +464,18 @@ export class MomentService {
     return rows.flatMap((row) => {
       const moment = this.formatPublic(row);
       if (!this.hasMapCoordinate(moment.publicLocation)) return [];
-      return [{
-        id: `moment:${moment.id}`,
-        type: 'moment' as const,
-        title: moment.title,
-        excerpt: moment.excerpt,
-        thumbnail: firstMomentImage(moment.content),
-        occurredAt: moment.happenedAt || moment.publishedAt,
-        href: `/moments?focus=${encodeURIComponent(moment.slug)}`,
-        publicLocation: moment.publicLocation,
-      }];
+      return [
+        {
+          id: `moment:${moment.id}`,
+          type: 'moment' as const,
+          title: moment.title,
+          excerpt: moment.excerpt,
+          thumbnail: firstMomentImage(moment.content),
+          occurredAt: moment.happenedAt || moment.publishedAt,
+          href: `/moments?focus=${encodeURIComponent(moment.slug)}`,
+          publicLocation: moment.publicLocation,
+        },
+      ];
     });
   }
 
@@ -413,7 +487,8 @@ export class MomentService {
     });
     if (byWork) {
       const snapshot = this.readSnapshot(byWork.publishedSnapshot);
-      if (!snapshot || snapshot.slug === slug || byWork.slug === slug) return byWork;
+      if (!snapshot || snapshot.slug === slug || byWork.slug === slug)
+        return byWork;
     }
 
     const candidates = await this.prisma.moment.findMany({
@@ -493,7 +568,9 @@ export class MomentService {
       slug: moment.slug,
       content: moment.content,
       excerpt: moment.excerpt,
-      happenedAt: moment.happenedAt ? new Date(moment.happenedAt).toISOString() : null,
+      happenedAt: moment.happenedAt
+        ? new Date(moment.happenedAt).toISOString()
+        : null,
       place: this.placeSnapshot(moment.place),
       locationVisibility: this.visibility(moment.locationVisibility),
       locationPrecision: this.precision(moment.locationPrecision),
@@ -535,7 +612,8 @@ export class MomentService {
       a.locationVisibility === this.visibility(b.locationVisibility) &&
       a.locationPrecision === this.precision(b.locationPrecision) &&
       norm(a.locationSource) === norm(this.source(b.locationSource)) &&
-      normalizeTime(a.locationExactConfirmedAt) === normalizeTime(b.locationExactConfirmedAt)
+      normalizeTime(a.locationExactConfirmedAt) ===
+        normalizeTime(b.locationExactConfirmedAt)
     );
   }
 
@@ -543,7 +621,9 @@ export class MomentService {
     const place = this.placeSnapshot(moment.place);
     return {
       ...moment,
-      place: place ? { ...place, mapLocation: toGcj02(place.longitude, place.latitude) } : null,
+      place: place
+        ? { ...place, mapLocation: toGcj02(place.longitude, place.latitude) }
+        : null,
       liked: moment.likes?.length > 0,
       commentCount: moment._count?.comments ?? 0,
       needsPublish: moment.needsPublish ?? true,
@@ -551,7 +631,9 @@ export class MomentService {
   }
 
   private formatPublic(moment: any) {
-    const snapshot = this.readSnapshot(moment.publishedSnapshot) || this.buildSnapshotFromMoment(moment);
+    const snapshot =
+      this.readSnapshot(moment.publishedSnapshot) ||
+      this.buildSnapshotFromMoment(moment);
     const base = this.format(moment);
     const {
       publishedSnapshot: _snapshot,
@@ -593,51 +675,79 @@ export class MomentService {
     },
   ) {
     const placeId = dto.placeId !== undefined ? dto.placeId : existing?.placeId;
-    const visibility = this.visibility(dto.locationVisibility ?? existing?.locationVisibility);
-    const precision = this.precision(dto.locationPrecision ?? existing?.locationPrecision);
+    const visibility = this.visibility(
+      dto.locationVisibility ?? existing?.locationVisibility,
+    );
+    const precision = this.precision(
+      dto.locationPrecision ?? existing?.locationPrecision,
+    );
     if (placeId) await this.findPlaceSnapshot(placeId);
     if (!placeId && visibility !== 'private') {
       throw new BadRequestException('公开位置前必须先选择地点');
     }
     if (visibility === 'public' && precision !== 'exact') {
-      throw new BadRequestException('公开策略仅支持精确位置；降低精度请使用模糊公开');
+      throw new BadRequestException(
+        '公开策略仅支持精确位置；降低精度请使用模糊公开',
+      );
     }
     if (visibility === 'blurred' && precision === 'exact') {
       throw new BadRequestException('模糊公开不能使用精确坐标');
     }
 
-    const exactChanged = Boolean(existing) && (
-      placeId !== existing?.placeId ||
-      visibility !== existing?.locationVisibility ||
-      precision !== existing?.locationPrecision
-    );
+    const exactChanged =
+      Boolean(existing) &&
+      (placeId !== existing?.placeId ||
+        visibility !== existing?.locationVisibility ||
+        precision !== existing?.locationPrecision);
     let exactConfirmedAt: Date | null | undefined;
     if (visibility === 'public' && precision === 'exact') {
       if (dto.confirmExactLocation) exactConfirmedAt = new Date();
-      else if (!existing || exactChanged || !existing.locationExactConfirmedAt) {
+      else if (
+        !existing ||
+        exactChanged ||
+        !existing.locationExactConfirmedAt
+      ) {
         throw new BadRequestException('精确公开位置需要二次确认');
       }
-    } else if (existing || dto.locationVisibility !== undefined || dto.locationPrecision !== undefined) {
+    } else if (
+      existing ||
+      dto.locationVisibility !== undefined ||
+      dto.locationPrecision !== undefined
+    ) {
       exactConfirmedAt = null;
     }
 
     return {
-      ...(dto.placeId !== undefined || !existing ? { placeId: dto.placeId ?? null } : {}),
+      ...(dto.placeId !== undefined || !existing
+        ? { placeId: dto.placeId ?? null }
+        : {}),
       ...(dto.happenedAt !== undefined || !existing
         ? { happenedAt: dto.happenedAt ? new Date(dto.happenedAt) : null }
         : {}),
-      ...(dto.locationVisibility !== undefined || !existing ? { locationVisibility: visibility } : {}),
-      ...(dto.locationPrecision !== undefined || !existing ? { locationPrecision: precision } : {}),
-      ...(dto.locationSource !== undefined || !existing
-        ? { locationSource: placeId ? dto.locationSource ?? existing?.locationSource ?? 'manual' : null }
+      ...(dto.locationVisibility !== undefined || !existing
+        ? { locationVisibility: visibility }
         : {}),
-      ...(exactConfirmedAt !== undefined ? { locationExactConfirmedAt: exactConfirmedAt } : {}),
+      ...(dto.locationPrecision !== undefined || !existing
+        ? { locationPrecision: precision }
+        : {}),
+      ...(dto.locationSource !== undefined || !existing
+        ? {
+            locationSource: placeId
+              ? (dto.locationSource ?? existing?.locationSource ?? 'manual')
+              : null,
+          }
+        : {}),
+      ...(exactConfirmedAt !== undefined
+        ? { locationExactConfirmedAt: exactConfirmedAt }
+        : {}),
     };
   }
 
   private async findPlaceSnapshot(placeId?: string | null) {
     if (!placeId) return null;
-    const place = await this.prisma.place.findUnique({ where: { id: placeId } });
+    const place = await this.prisma.place.findUnique({
+      where: { id: placeId },
+    });
     if (!place) throw new BadRequestException('所选地点不存在');
     return this.placeSnapshot(place);
   }
@@ -668,11 +778,16 @@ export class MomentService {
   }
 
   private precision(value: unknown): LocationPrecision {
-    return value === 'exact' || value === 'city' || value === 'province' ? value : 'place';
+    return value === 'exact' || value === 'city' || value === 'province'
+      ? value
+      : 'place';
   }
 
   private source(value: unknown): LocationSource | null {
-    return value === 'exif' || value === 'map' || value === 'imported' || value === 'manual'
+    return value === 'exif' ||
+      value === 'map' ||
+      value === 'imported' ||
+      value === 'manual'
       ? value
       : null;
   }
@@ -680,26 +795,40 @@ export class MomentService {
   private matchesPublicQuery(moment: any, query: MomentQueryDto) {
     if (query.search) {
       const keyword = query.search.toLocaleLowerCase();
-      const content = `${moment.title} ${moment.excerpt || ''} ${moment.content || ''}`.toLocaleLowerCase();
+      const content =
+        `${moment.title} ${moment.excerpt || ''} ${moment.content || ''}`.toLocaleLowerCase();
       if (!content.includes(keyword)) return false;
     }
-    if (query.place && moment.publicLocation?.slug !== query.place) return false;
+    if (query.place && moment.publicLocation?.slug !== query.place)
+      return false;
     if (query.from || query.to) {
-      const happenedAt = moment.happenedAt ? new Date(moment.happenedAt).getTime() : Number.NaN;
+      const happenedAt = moment.happenedAt
+        ? new Date(moment.happenedAt).getTime()
+        : Number.NaN;
       if (!Number.isFinite(happenedAt)) return false;
-      if (query.from && happenedAt < new Date(query.from).getTime()) return false;
+      if (query.from && happenedAt < new Date(query.from).getTime())
+        return false;
       if (query.to && happenedAt > new Date(query.to).getTime()) return false;
     }
     return true;
   }
 
-  private hasMapCoordinate(location: unknown): location is NonNullable<ReturnType<typeof buildPublicLocation>> {
+  private hasMapCoordinate(
+    location: unknown,
+  ): location is NonNullable<ReturnType<typeof buildPublicLocation>> {
     if (!location || typeof location !== 'object') return false;
     const value = location as { latitude?: unknown; longitude?: unknown };
-    return Number.isFinite(Number(value.latitude)) && Number.isFinite(Number(value.longitude));
+    return (
+      Number.isFinite(Number(value.latitude)) &&
+      Number.isFinite(Number(value.longitude))
+    );
   }
 }
 
 function firstMomentImage(content?: string | null) {
-  return String(content || '').match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1]?.trim() || null;
+  return (
+    String(content || '')
+      .match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1]
+      ?.trim() || null
+  );
 }

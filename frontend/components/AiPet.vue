@@ -1,7 +1,12 @@
 <template>
-  <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isArticleMode }">
+  <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isContentMode }">
     <Transition name="pet-panel">
-      <div v-if="chatOpen" class="pet-chat" role="dialog" aria-label="和哆啦A梦聊天">
+      <div
+        v-if="chatOpen"
+        class="pet-chat"
+        role="dialog"
+        aria-label="和哆啦A梦聊天"
+      >
         <header class="pet-chat-head">
           <div class="pet-chat-title">
             <span class="pet-chat-avatar" aria-hidden="true">
@@ -13,41 +18,104 @@
                 <span class="pet-online">在线</span>
               </div>
               <p>{{ description }}</p>
-              <span v-if="isArticleMode" class="pet-context-label">正在陪你读这篇文章</span>
+              <span v-if="isContentMode" class="pet-context-label">{{
+                contextLabel
+              }}</span>
+              <span class="pet-usage">{{ usageText }}</span>
             </div>
           </div>
-          <button type="button" class="pet-icon-btn" aria-label="关闭" @click="closeChat">
+          <button
+            type="button"
+            class="pet-icon-btn"
+            aria-label="关闭"
+            @click="closeChat"
+          >
             <Icon name="ph:x-bold" />
           </button>
         </header>
 
         <div ref="listRef" class="pet-chat-list">
-          <div v-for="(m, i) in messages" :key="i" class="pet-msg" :class="m.role">
+          <div
+            v-for="(m, i) in messages"
+            :key="i"
+            class="pet-msg"
+            :class="m.role"
+          >
             <template v-if="m.role === 'assistant'">
-              <div v-if="m.streaming && m.renderedHtml" class="pet-bubble pet-markdown pet-streaming" v-html="m.renderedHtml" />
-              <div v-else-if="!m.streaming" class="pet-bubble pet-markdown" v-html="renderMarkdown(m.content)" />
+              <div
+                v-if="m.streaming && m.renderedHtml"
+                class="pet-bubble pet-markdown pet-streaming"
+                v-html="m.renderedHtml"
+              />
+              <div
+                v-else-if="!m.streaming"
+                class="pet-bubble pet-markdown"
+                v-html="renderMarkdown(m.content)"
+              />
+              <div
+                v-if="!m.streaming && m.cards?.length"
+                class="pet-source-cards"
+              >
+                <NuxtLink
+                  v-for="card in m.cards"
+                  :key="`${card.type}:${card.sourceId}`"
+                  :to="card.href"
+                  @click="trackCard(card)"
+                  ><small>{{ card.type }}</small
+                  ><strong>{{ card.title }}</strong
+                  ><span>{{ card.excerpt }}</span></NuxtLink
+                >
+              </div>
+              <div v-if="!m.streaming && m.content" class="pet-feedback">
+                <span>这次回答有帮助吗？</span
+                ><button
+                  :class="{ active: m.feedback === true }"
+                  @click="feedback(m, true)"
+                >
+                  有帮助</button
+                ><button
+                  :class="{ active: m.feedback === false }"
+                  @click="feedback(m, false)"
+                >
+                  没帮助
+                </button>
+              </div>
             </template>
             <div v-else class="pet-bubble">{{ m.content }}</div>
           </div>
           <div v-if="sending && !streamStarted" class="pet-msg assistant">
-            <div class="pet-bubble typing">
-              <span /><span /><span />
-            </div>
+            <div class="pet-bubble typing"><span /><span /><span /></div>
           </div>
         </div>
 
         <div class="pet-suggestions">
-          <button v-for="action in quickActions" :key="action.label" type="button"
-            :disabled="sending" @click="runQuickAction(action)">
+          <button
+            v-for="action in quickActions"
+            :key="action.label"
+            type="button"
+            :disabled="sending"
+            @click="runQuickAction(action)"
+          >
             <Icon :name="action.icon" />
             <span>{{ action.label }}</span>
           </button>
         </div>
 
         <form class="pet-chat-form" @submit.prevent="send">
-          <input v-model="input" class="pet-input" type="text" maxlength="500" :placeholder="inputPlaceholder"
-            :disabled="sending" />
-          <button type="submit" class="pet-send" :disabled="sending || !input.trim()" aria-label="发送">
+          <input
+            v-model="input"
+            class="pet-input"
+            type="text"
+            :maxlength="inputMaxChars"
+            :placeholder="inputPlaceholder"
+            :disabled="sending"
+          />
+          <button
+            type="submit"
+            class="pet-send"
+            :disabled="sending || !input.trim()"
+            aria-label="发送"
+          >
             <Icon name="ph:paper-plane-right-fill" />
           </button>
         </form>
@@ -56,465 +124,635 @@
 
     <Transition name="pet-actions">
       <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
-        <button v-for="action in quickActions.slice(0, 3)" :key="action.label" type="button"
-          @click="runQuickAction(action)">
+        <button
+          v-for="action in quickActions.slice(0, 3)"
+          :key="action.label"
+          type="button"
+          @click="runQuickAction(action)"
+        >
           <Icon :name="action.icon" />
           <span>{{ action.label }}</span>
         </button>
       </div>
     </Transition>
 
-    <button type="button" class="pet-fab" :title="chatOpen ? '收起' : '和哆啦A梦聊天'" @click="toggleChat">
+    <button
+      type="button"
+      class="pet-fab"
+      :title="chatOpen ? '收起' : '和哆啦A梦聊天'"
+      @click="toggleChat"
+    >
       <span class="pet-sprite-wrap" :style="wrapStyle">
         <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
       </span>
       <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
-      <span v-if="showLoginBubble" class="pet-hint pet-hint-login">登录后就能和我聊天啦～</span>
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import MarkdownIt from 'markdown-it'
-import petMeta from '~/assets/dram/pet.json'
-const spriteUrl = '/dram/spritesheet.webp'
+import MarkdownIt from "markdown-it";
+import petMeta from "~/assets/dram/pet.json";
+const spriteUrl = "/dram/spritesheet.webp";
 
 const markdown = new MarkdownIt({
   html: false,
   breaks: true,
   linkify: true,
   typographer: true,
-})
+});
 
-const defaultLinkOpen = markdown.renderer.rules.link_open
+const defaultLinkOpen = markdown.renderer.rules.link_open;
 markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  tokens[idx].attrSet('target', '_blank')
-  tokens[idx].attrSet('rel', 'noopener noreferrer')
-  return defaultLinkOpen ? defaultLinkOpen(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options)
-}
+  tokens[idx].attrSet("target", "_blank");
+  tokens[idx].attrSet("rel", "noopener noreferrer");
+  return defaultLinkOpen
+    ? defaultLinkOpen(tokens, idx, options, env, self)
+    : self.renderToken(tokens, idx, options);
+};
 
 function renderMarkdown(content: string) {
-  return markdown.render(content || '')
+  return markdown.render(content || "");
 }
 
-type Role = 'user' | 'assistant'
-interface Msg { role: Role; content: string; streaming?: boolean; renderedHtml?: string }
-type QuickAction = { label: string; icon: string; prompt: string; kind?: 'summary' }
-type ArticleContext = { title?: string; content?: string; slug?: string }
+type Role = "user" | "assistant";
+type SourceCard = {
+  type: string;
+  sourceId: string;
+  title: string;
+  href: string;
+  excerpt: string;
+};
+interface Msg {
+  role: Role;
+  content: string;
+  streaming?: boolean;
+  renderedHtml?: string;
+  cards?: SourceCard[];
+  feedback?: boolean;
+}
+type ChatUsage = {
+  audience: "user" | "guest";
+  limit: number;
+  remaining: number;
+  inputMaxChars: number;
+  outputMaxTokens: number;
+};
+type QuickAction = {
+  label: string;
+  icon: string;
+  prompt: string;
+  kind?: "summary";
+};
+type ArticleContext = {
+  title?: string;
+  content?: string;
+  slug?: string;
+  type?: string;
+  sourceId?: string;
+};
 
-const props = withDefaults(defineProps<{
-  mode?: 'home' | 'article'
-  article?: ArticleContext
-}>(), {
-  mode: 'home',
-})
+const props = withDefaults(
+  defineProps<{
+    mode?: "home" | "article" | "context";
+    article?: ArticleContext;
+  }>(),
+  {
+    mode: "home",
+  },
+);
 
-type AnimClip = { row: number; frames: number; fps: number }
+type AnimClip = { row: number; frames: number; fps: number };
 
 const meta = petMeta as {
-  displayName: string
-  description: string
-  frameWidth: number
-  frameHeight: number
-  displayWidth: number
-  displayHeight: number
-  cols: number
-  rows: number
-  idle: AnimClip
-  play?: AnimClip
-  greetings: string[]
-}
+  displayName: string;
+  description: string;
+  frameWidth: number;
+  frameHeight: number;
+  displayWidth: number;
+  displayHeight: number;
+  cols: number;
+  rows: number;
+  idle: AnimClip;
+  play?: AnimClip;
+  greetings: string[];
+};
 
-const api = useApi()
-const { isLoggedIn } = useAuth()
-const chatOpen = ref(false)
-const sending = ref(false)
-const streamStarted = ref(false)
-const input = ref('')
-const messages = ref<Msg[]>([])
-const listRef = ref<HTMLElement | null>(null)
-const showHint = ref(true)
-const showLoginBubble = ref(false)
-const historyLoaded = ref(false)
-const suppressActions = ref(false)
-let streamController: AbortController | null = null
-let scrollFrame: number | null = null
-let typingBuffer = ''
-let typingHtml = ''
-let typingText = ''
-let typingVisibleCount = 0
-let typingTimer: ReturnType<typeof setTimeout> | null = null
-let typingMessageIndex = -1
-let typingDrainResolvers: Array<() => void> = []
+const api = useApi();
+const { isLoggedIn } = useAuth();
+const chatOpen = ref(false);
+const sending = ref(false);
+const streamStarted = ref(false);
+const input = ref("");
+const messages = ref<Msg[]>([]);
+const listRef = ref<HTMLElement | null>(null);
+const showHint = ref(true);
+const historyLoaded = ref(false);
+const suppressActions = ref(false);
+let streamController: AbortController | null = null;
+let scrollFrame: number | null = null;
+let typingBuffer = "";
+let typingHtml = "";
+let typingText = "";
+let typingVisibleCount = 0;
+let typingTimer: ReturnType<typeof setTimeout> | null = null;
+let typingMessageIndex = -1;
+let typingDrainResolvers: Array<() => void> = [];
 
-const displayName = ref(meta.displayName || '哆啦A梦')
-const description = ref(meta.description || '阿风的伙伴 · 蓝色机器猫')
-const greetings = ref<string[]>([...(meta.greetings || [])])
-const selectedGreeting = ref('你好呀～')
+const displayName = ref(meta.displayName || "哆啦A梦");
+const description = ref(meta.description || "阿风的伙伴 · 蓝色机器猫");
+const greetings = ref<string[]>([...(meta.greetings || [])]);
+const selectedGreeting = ref("你好呀～");
+const inputMaxChars = ref(500);
+const userDailyLimit = ref(40);
+const guestDailyLimit = ref(12);
+const remainingQuota = ref<number | null>(null);
 
-const isArticleMode = computed(() => props.mode === 'article')
+const isArticleMode = computed(() => props.mode === "article");
+const isContentMode = computed(
+  () => props.mode === "article" || props.mode === "context",
+);
+const contextLabel = computed(() =>
+  props.mode === "article" ? "正在陪你读这篇文章" : "正在结合当前页面陪你探索",
+);
 function compactHint(value: string, maxLength = 26) {
-  const normalized = value.replace(/\s+/g, ' ').trim()
-  const characters = Array.from(normalized)
-  return characters.length > maxLength ? `${characters.slice(0, maxLength).join('')}…` : normalized
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const characters = Array.from(normalized);
+  return characters.length > maxLength
+    ? `${characters.slice(0, maxLength).join("")}…`
+    : normalized;
 }
 
-const hintText = computed(() => compactHint(isArticleMode.value ? '要我帮你读懂这篇吗？' : selectedGreeting.value))
-const inputPlaceholder = computed(() => isArticleMode.value ? '问问这篇文章…' : '问我文章推荐或本站内容…')
-const actionsVisible = computed(() => isLoggedIn.value && !chatOpen.value && !suppressActions.value && !showHint.value && !showLoginBubble.value)
-const quickActions = computed<QuickAction[]>(() => isArticleMode.value
-  ? [
-      { label: '三句话总结', icon: 'ph:magic-wand-bold', prompt: '请用三句话总结当前文章。', kind: 'summary' },
-      { label: '提炼核心要点', icon: 'ph:list-checks-bold', prompt: '请结合当前文章，提炼 4 到 6 个核心要点，表达简洁。' },
-      { label: '这篇适合谁', icon: 'ph:users-three-bold', prompt: '请说明这篇文章适合哪些读者，以及读完能获得什么。' },
-      { label: '解释难点', icon: 'ph:lightbulb-filament-bold', prompt: '请找出当前文章里最难理解的部分，并用通俗方式解释。' },
-    ]
-  : [
-      { label: '推荐一篇文章', icon: 'ph:sparkle-bold', prompt: '请根据本站最近发布的内容，推荐一篇值得先读的文章，并简要说明理由。' },
-      { label: '本站有什么内容', icon: 'ph:books-bold', prompt: '请简洁介绍这个博客主要有哪些内容方向，并各推荐一篇文章。' },
-      { label: '帮我发现内容', icon: 'ph:compass-bold', prompt: '我还没想好读什么，请用三个简短问题了解兴趣，再为我推荐本站文章。' },
-      { label: '看看最近更新', icon: 'ph:clock-counter-clockwise-bold', prompt: '请从本站最近发布的内容中挑出三篇，用一句话分别介绍。' },
-      { label: '随机探索', icon: 'ph:dice-five-bold', prompt: '请从本站文章里随机挑一个值得探索的内容，并简短说明为什么选它。' },
-    ])
+const hintText = computed(() =>
+  compactHint(
+    isContentMode.value ? "要我帮你理解当前内容吗？" : selectedGreeting.value,
+  ),
+);
+const inputPlaceholder = computed(() =>
+  isContentMode.value ? "问问当前内容…" : "问我文章推荐或本站内容…",
+);
+const dailyLimit = computed(() =>
+  isLoggedIn.value ? userDailyLimit.value : guestDailyLimit.value,
+);
+const usageText = computed(() =>
+  remainingQuota.value == null
+    ? `${isLoggedIn.value ? "登录用户" : "游客"}每日可聊 ${dailyLimit.value} 次 · 单次 ${inputMaxChars.value} 字`
+    : `今日剩余 ${remainingQuota.value}/${dailyLimit.value} 次`,
+);
+const actionsVisible = computed(
+  () => !chatOpen.value && !suppressActions.value && !showHint.value,
+);
+
+watch(isLoggedIn, () => {
+  remainingQuota.value = null;
+  historyLoaded.value = false;
+  messages.value = [];
+  if (chatOpen.value) void prepareChat();
+});
+const quickActions = computed<QuickAction[]>(() =>
+  isContentMode.value
+    ? [
+        {
+          label: "三句话总结",
+          icon: "ph:magic-wand-bold",
+          prompt: "请用三句话总结当前文章。",
+          kind: "summary",
+        },
+        {
+          label: "提炼核心要点",
+          icon: "ph:list-checks-bold",
+          prompt: "请结合当前文章，提炼 4 到 6 个核心要点，表达简洁。",
+        },
+        {
+          label: "这篇适合谁",
+          icon: "ph:users-three-bold",
+          prompt: "请说明这篇文章适合哪些读者，以及读完能获得什么。",
+        },
+        {
+          label: "解释难点",
+          icon: "ph:lightbulb-filament-bold",
+          prompt: "请找出当前文章里最难理解的部分，并用通俗方式解释。",
+        },
+      ]
+    : [
+        {
+          label: "推荐一篇文章",
+          icon: "ph:sparkle-bold",
+          prompt:
+            "请根据本站最近发布的内容，推荐一篇值得先读的文章，并简要说明理由。",
+        },
+        {
+          label: "本站有什么内容",
+          icon: "ph:books-bold",
+          prompt: "请简洁介绍这个博客主要有哪些内容方向，并各推荐一篇文章。",
+        },
+        {
+          label: "帮我发现内容",
+          icon: "ph:compass-bold",
+          prompt:
+            "我还没想好读什么，请用三个简短问题了解兴趣，再为我推荐本站文章。",
+        },
+        {
+          label: "看看最近更新",
+          icon: "ph:clock-counter-clockwise-bold",
+          prompt: "请从本站最近发布的内容中挑出三篇，用一句话分别介绍。",
+        },
+        {
+          label: "随机探索",
+          icon: "ph:dice-five-bold",
+          prompt:
+            "请从本站文章里随机挑一个值得探索的内容，并简短说明为什么选它。",
+        },
+      ],
+);
 
 function chooseGreeting() {
-  const list = greetings.value.length ? greetings.value : ['你好，我是哆啦A梦！']
-  const previous = sessionStorage.getItem('corner:pet:last-greeting') || ''
-  const candidates = list.length > 1 ? list.filter(item => item !== previous) : list
-  const next = candidates[Math.floor(Math.random() * candidates.length)] || list[0]
-  selectedGreeting.value = next
-  sessionStorage.setItem('corner:pet:last-greeting', next)
+  const list = greetings.value.length
+    ? greetings.value
+    : ["你好，我是哆啦A梦！"];
+  const previous = sessionStorage.getItem("corner:pet:last-greeting") || "";
+  const candidates =
+    list.length > 1 ? list.filter((item) => item !== previous) : list;
+  const next =
+    candidates[Math.floor(Math.random() * candidates.length)] || list[0];
+  selectedGreeting.value = next;
+  sessionStorage.setItem("corner:pet:last-greeting", next);
 }
 
 async function loadPetMeta() {
   try {
     const res = await api.get<{
-      displayName?: string
-      description?: string
-      greetings?: string[]
-    }>('/ai/pet/meta')
-    if (res?.displayName) displayName.value = res.displayName
-    if (res?.description) description.value = res.description
+      displayName?: string;
+      description?: string;
+      greetings?: string[];
+      limits?: {
+        userDaily?: number;
+        guestDaily?: number;
+        inputMaxChars?: number;
+      };
+    }>("/ai/pet/meta");
+    if (res?.displayName) displayName.value = res.displayName;
+    if (res?.description) description.value = res.description;
+    if (res?.limits?.userDaily) userDailyLimit.value = res.limits.userDaily;
+    if (res?.limits?.guestDaily) guestDailyLimit.value = res.limits.guestDaily;
+    if (res?.limits?.inputMaxChars)
+      inputMaxChars.value = res.limits.inputMaxChars;
     if (Array.isArray(res?.greetings) && res.greetings.length) {
-      greetings.value = [...new Set([...(meta.greetings || []), ...res.greetings])]
-      chooseGreeting()
+      greetings.value = [
+        ...new Set([...(meta.greetings || []), ...res.greetings]),
+      ];
+      chooseGreeting();
     }
   } catch {
     // keep local pet.json defaults
   }
 }
 
-const dw = meta.displayWidth || 96
-const dh = meta.displayHeight || 104
-const bgCols = meta.cols || 8
-const bgRows = meta.rows || 9
+const dw = meta.displayWidth || 96;
+const dh = meta.displayHeight || 104;
+const bgCols = meta.cols || 8;
+const bgRows = meta.rows || 9;
 
 const idleClip: AnimClip = {
   row: meta.idle?.row ?? 0,
   frames: meta.idle?.frames ?? 6,
   fps: meta.idle?.fps ?? 6,
-}
-const activeClip = computed(() => idleClip)
-const animKey = computed(() => `${activeClip.value.row}-${activeClip.value.frames}-${activeClip.value.fps}`)
+};
+const activeClip = computed(() => idleClip);
+const animKey = computed(
+  () =>
+    `${activeClip.value.row}-${activeClip.value.frames}-${activeClip.value.fps}`,
+);
 
-const wrapStyle = { width: `${dw}px`, height: `${dh}px` }
+const wrapStyle = { width: `${dw}px`, height: `${dh}px` };
 
 const spriteStyle = computed(() => {
-  const clip = activeClip.value
-  const frames = Math.max(1, clip.frames)
-  const fps = Math.max(1, clip.fps)
-  const row = Math.max(0, clip.row)
+  const clip = activeClip.value;
+  const frames = Math.max(1, clip.frames);
+  const fps = Math.max(1, clip.fps);
+  const row = Math.max(0, clip.row);
   return {
-    '--pet-frame-shift': `${-frames * dw}px`,
-    '--pet-duration': `${frames / fps}s`,
-    '--pet-steps': String(frames),
+    "--pet-frame-shift": `${-frames * dw}px`,
+    "--pet-duration": `${frames / fps}s`,
+    "--pet-steps": String(frames),
     backgroundImage: `url(${spriteUrl})`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: '0 0',
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "0 0",
     backgroundSize: `${bgCols * dw}px ${bgRows * dh}px`,
     width: `${bgCols * dw}px`,
     height: `${bgRows * dh}px`,
     top: `${-row * dh}px`,
-  }
-})
+  };
+});
 
-let hintTimer: ReturnType<typeof setTimeout> | null = null
-let loginBubbleTimer: ReturnType<typeof setTimeout> | null = null
-let actionRevealTimer: ReturnType<typeof setTimeout> | null = null
+let hintTimer: ReturnType<typeof setTimeout> | null = null;
+let actionRevealTimer: ReturnType<typeof setTimeout> | null = null;
 
 function openChat() {
-  if (actionRevealTimer) clearTimeout(actionRevealTimer)
-  suppressActions.value = true
-  chatOpen.value = true
+  void api
+    .post("/ai/events", {
+      scene: isArticleMode.value ? "article" : props.mode || "home",
+      action: "open",
+      contentType: props.article?.type,
+      sourceId: props.article?.sourceId,
+    })
+    .catch(() => undefined);
+  if (actionRevealTimer) clearTimeout(actionRevealTimer);
+  suppressActions.value = true;
+  chatOpen.value = true;
 }
 
 function closeChat() {
-  chatOpen.value = false
-  if (actionRevealTimer) clearTimeout(actionRevealTimer)
+  chatOpen.value = false;
+  if (actionRevealTimer) clearTimeout(actionRevealTimer);
   actionRevealTimer = setTimeout(() => {
-    suppressActions.value = false
-  }, 160)
+    suppressActions.value = false;
+  }, 160);
 }
 
 async function toggleChat() {
-  showHint.value = false
-  if (!isLoggedIn.value) {
-    showLoginNotice()
-    return
-  }
+  showHint.value = false;
   if (chatOpen.value) {
-    closeChat()
-    return
+    closeChat();
+    return;
   }
-  openChat()
-  await prepareChat()
-}
-
-function showLoginNotice() {
-  showLoginBubble.value = true
-  if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
-  loginBubbleTimer = setTimeout(() => { showLoginBubble.value = false }, 3000)
+  openChat();
+  await prepareChat();
 }
 
 async function prepareChat() {
   if (!historyLoaded.value) {
-    await loadHistory()
-    historyLoaded.value = true
+    await loadHistory();
+    historyLoaded.value = true;
   }
   if (messages.value.length === 0) {
-    const fallback = isArticleMode.value ? '我已经准备好陪你读这篇文章啦！' : selectedGreeting.value
-    messages.value.push({ role: 'assistant', content: fallback })
+    const fallback = isContentMode.value
+      ? "我已经准备好陪你探索当前内容啦！"
+      : selectedGreeting.value;
+    messages.value.push({ role: "assistant", content: fallback });
   }
-  await nextTick(scrollBottom)
+  await nextTick(scrollBottom);
 }
 
 async function loadHistory() {
   try {
-    const history = await api.get<{ role: string; content: string }[]>('/ai/chat/history')
+    const history =
+      await api.get<{ role: string; content: string }[]>("/ai/chat/history");
     messages.value = (history || []).map((m) => ({
       role: m.role as Role,
       content: m.content,
-    }))
+    }));
   } catch {
     // not logged in or network error — keep messages empty
   }
 }
 
 async function send() {
-  const text = input.value.trim()
-  if (!text || sending.value) return
-  input.value = ''
-  await sendMessage(text)
+  const text = input.value.trim();
+  if (!text || sending.value) return;
+  input.value = "";
+  await sendMessage(text);
 }
 
 async function sendMessage(text: string) {
-  if (!text.trim() || sending.value) return
-  messages.value.push({ role: 'user', content: text })
-  sending.value = true
-  streamStarted.value = false
-  await nextTick(scrollBottom)
+  if (!text.trim() || sending.value) return;
+  messages.value.push({ role: "user", content: text });
+  sending.value = true;
+  streamStarted.value = false;
+  await nextTick(scrollBottom);
 
-  const assistantIndex = messages.value.length
-  messages.value.push({ role: 'assistant', content: '', streaming: true })
-  resetTypingBuffer(assistantIndex)
-  streamController?.abort()
-  streamController = new AbortController()
+  const assistantIndex = messages.value.length;
+  messages.value.push({ role: "assistant", content: "", streaming: true });
+  resetTypingBuffer(assistantIndex);
+  streamController?.abort();
+  streamController = new AbortController();
 
   try {
-    let responseMarkdown = ''
-    const article = isArticleMode.value ? {
-      title: props.article?.title || '',
-      content: String(props.article?.content || '').slice(0, 10000),
-      slug: props.article?.slug || '',
-    } : undefined
-    await api.postStream('/ai/chat/stream', { message: text, article }, ({ event, data }) => {
-      if (event === 'token' && typeof data === 'string') {
-        responseMarkdown += data
-      }
-      if (event === 'error') throw new Error(data?.message || 'Stream failed')
-    }, streamController.signal)
-    enqueueTyping(responseMarkdown || '……', assistantIndex)
-    await waitForTypingDrain()
+    let responseMarkdown = "";
+    const article = isContentMode.value
+      ? {
+          title: props.article?.title || "",
+          content: String(props.article?.content || "").slice(0, 10000),
+          slug: props.article?.slug || "",
+          type: props.article?.type || (isArticleMode.value ? "post" : ""),
+          sourceId: props.article?.sourceId || "",
+        }
+      : undefined;
+    await api.postStream(
+      "/ai/chat/stream",
+      { message: text, article },
+      ({ event, data }) => {
+        if (event === "token" && typeof data === "string") {
+          responseMarkdown += data;
+        }
+        if (event === "done" && Array.isArray(data?.recommendations)) {
+          const message = messages.value[assistantIndex];
+          if (message) message.cards = data.recommendations;
+        }
+        if (event === "done" && data?.usage) {
+          const usage = data.usage as ChatUsage;
+          remainingQuota.value = usage.remaining;
+          inputMaxChars.value = usage.inputMaxChars;
+          if (usage.audience === "user") userDailyLimit.value = usage.limit;
+          else guestDailyLimit.value = usage.limit;
+        }
+        if (event === "error")
+          throw new Error(data?.message || "Stream failed");
+      },
+      streamController.signal,
+    );
+    enqueueTyping(responseMarkdown || "……", assistantIndex);
+    await waitForTypingDrain();
   } catch (error: any) {
-    if (error?.name !== 'AbortError') {
-      enqueueTyping('呜，任意门开小差了。稍后再试，或者先逛逛文章吧～', assistantIndex)
-      await waitForTypingDrain()
+    if (error?.name !== "AbortError") {
+      enqueueTyping(
+        error?.message || "呜，任意门开小差了。稍后再试，或者先逛逛文章吧～",
+        assistantIndex,
+      );
+      await waitForTypingDrain();
     }
   } finally {
-    if (messages.value[assistantIndex]) messages.value[assistantIndex].streaming = false
-    sending.value = false
-    streamStarted.value = false
-    streamController = null
-    await nextTick(scrollBottom)
-  }
-}
-
-async function summarizeArticle() {
-  if (sending.value) return
-  const title = props.article?.title || ''
-  const content = props.article?.content || ''
-  messages.value.push({ role: 'user', content: '请帮我快速总结这篇文章。' })
-  sending.value = true
-  await nextTick(scrollBottom)
-  try {
-    const res = await api.post<{ excerpt: string }>('/ai/summarize', { title, content })
-    messages.value.push({
-      role: 'assistant',
-      content: res.excerpt ? `文章小结：${res.excerpt}` : '这篇文章暂时没有可提取的正文内容。',
-    })
-  } catch {
-    messages.value.push({ role: 'assistant', content: '总结工具暂时开小差了，你可以直接问我文章里的具体问题。' })
-  } finally {
-    sending.value = false
-    await nextTick(scrollBottom)
+    if (messages.value[assistantIndex])
+      messages.value[assistantIndex].streaming = false;
+    sending.value = false;
+    streamStarted.value = false;
+    streamController = null;
+    await nextTick(scrollBottom);
   }
 }
 
 async function runQuickAction(action: QuickAction) {
-  showHint.value = false
-  if (!isLoggedIn.value) {
-    showLoginNotice()
-    return
-  }
-  openChat()
-  await prepareChat()
-  if (action.kind === 'summary' && isArticleMode.value) await summarizeArticle()
-  else await sendMessage(action.prompt)
+  showHint.value = false;
+  openChat();
+  await prepareChat();
+  await sendMessage(action.prompt);
+}
+
+function feedback(message: Msg, helpful: boolean) {
+  message.feedback = helpful;
+  void api
+    .post("/ai/events", {
+      scene: isArticleMode.value ? "article" : props.mode || "home",
+      action: "feedback",
+      contentType: props.article?.type,
+      sourceId: props.article?.sourceId,
+      helpful,
+    })
+    .catch(() => undefined);
+}
+
+function trackCard(card: SourceCard) {
+  void api
+    .post("/ai/events", {
+      scene: isArticleMode.value ? "article" : props.mode || "home",
+      action: "recommend_click",
+      contentType: card.type,
+      sourceId: card.sourceId,
+      href: card.href,
+      sourceClicked: true,
+    })
+    .catch(() => undefined);
 }
 
 function scrollBottom() {
-  const el = listRef.value
-  if (el) el.scrollTop = el.scrollHeight
+  const el = listRef.value;
+  if (el) el.scrollTop = el.scrollHeight;
 }
 
 function queueScrollBottom() {
-  if (scrollFrame !== null) return
+  if (scrollFrame !== null) return;
   scrollFrame = requestAnimationFrame(() => {
-    scrollFrame = null
-    scrollBottom()
-  })
+    scrollFrame = null;
+    scrollBottom();
+  });
 }
 
 function resolveTypingDrain() {
-  const resolvers = typingDrainResolvers
-  typingDrainResolvers = []
-  resolvers.forEach(resolve => resolve())
+  const resolvers = typingDrainResolvers;
+  typingDrainResolvers = [];
+  resolvers.forEach((resolve) => resolve());
 }
 
 function resetTypingBuffer(messageIndex: number) {
-  if (typingTimer) clearTimeout(typingTimer)
-  typingTimer = null
-  typingBuffer = ''
-  typingHtml = ''
-  typingText = ''
-  typingVisibleCount = 0
-  typingMessageIndex = messageIndex
-  resolveTypingDrain()
+  if (typingTimer) clearTimeout(typingTimer);
+  typingTimer = null;
+  typingBuffer = "";
+  typingHtml = "";
+  typingText = "";
+  typingVisibleCount = 0;
+  typingMessageIndex = messageIndex;
+  resolveTypingDrain();
 }
 
 function enqueueTyping(text: string, messageIndex: number) {
-  if (!text) return
-  if (typingMessageIndex !== messageIndex) resetTypingBuffer(messageIndex)
-  typingBuffer = text
-  typingHtml = renderMarkdown(text)
-  const container = document.createElement('div')
-  container.innerHTML = typingHtml
-  typingText = container.textContent || ''
-  typingVisibleCount = 0
-  const message = messages.value[messageIndex]
+  if (!text) return;
+  if (typingMessageIndex !== messageIndex) resetTypingBuffer(messageIndex);
+  typingBuffer = text;
+  typingHtml = renderMarkdown(text);
+  const container = document.createElement("div");
+  container.innerHTML = typingHtml;
+  typingText = container.textContent || "";
+  typingVisibleCount = 0;
+  const message = messages.value[messageIndex];
   if (message) {
-    message.content = text
-    message.renderedHtml = ''
+    message.content = text;
+    message.renderedHtml = "";
   }
-  streamStarted.value = true
-  if (!typingTimer) typeNextCharacter()
+  streamStarted.value = true;
+  if (!typingTimer) typeNextCharacter();
 }
 
 function renderHtmlPrefix(html: string, visibleCount: number) {
-  const source = document.createElement('template')
-  source.innerHTML = html
-  let remaining = visibleCount
+  const source = document.createElement("template");
+  source.innerHTML = html;
+  let remaining = visibleCount;
 
   const clonePrefix = (node: Node): Node | null => {
     if (node.nodeType === Node.TEXT_NODE) {
-      if (remaining <= 0) return null
-      const characters = Array.from(node.textContent || '')
-      const value = characters.slice(0, remaining).join('')
-      remaining -= Math.min(remaining, characters.length)
-      return value ? document.createTextNode(value) : null
+      if (remaining <= 0) return null;
+      const characters = Array.from(node.textContent || "");
+      const value = characters.slice(0, remaining).join("");
+      remaining -= Math.min(remaining, characters.length);
+      return value ? document.createTextNode(value) : null;
     }
-    if (node.nodeType !== Node.ELEMENT_NODE) return null
-    const element = node as HTMLElement
-    const clone = element.cloneNode(false) as HTMLElement
+    if (node.nodeType !== Node.ELEMENT_NODE) return null;
+    const element = node as HTMLElement;
+    const clone = element.cloneNode(false) as HTMLElement;
     for (const child of Array.from(element.childNodes)) {
-      const childClone = clonePrefix(child)
-      if (childClone) clone.appendChild(childClone)
-      if (remaining <= 0) break
+      const childClone = clonePrefix(child);
+      if (childClone) clone.appendChild(childClone);
+      if (remaining <= 0) break;
     }
-    if (clone.childNodes.length || ['BR', 'HR'].includes(clone.tagName)) return clone
-    return null
-  }
+    if (clone.childNodes.length || ["BR", "HR"].includes(clone.tagName))
+      return clone;
+    return null;
+  };
 
-  const output = document.createElement('div')
+  const output = document.createElement("div");
   for (const child of Array.from(source.content.childNodes)) {
-    const clone = clonePrefix(child)
-    if (clone) output.appendChild(clone)
-    if (remaining <= 0) break
+    const clone = clonePrefix(child);
+    if (clone) output.appendChild(clone);
+    if (remaining <= 0) break;
   }
-  return output.innerHTML
+  return output.innerHTML;
 }
 
 function typeNextCharacter() {
   if (!typingBuffer || typingMessageIndex < 0) {
-    typingTimer = null
-    resolveTypingDrain()
-    return
+    typingTimer = null;
+    resolveTypingDrain();
+    return;
   }
 
-  const characters = Array.from(typingText)
-  const character = characters[typingVisibleCount] || ''
-  typingVisibleCount += 1
-  const message = messages.value[typingMessageIndex]
-  if (message) message.renderedHtml = renderHtmlPrefix(typingHtml, typingVisibleCount)
-  queueScrollBottom()
+  const characters = Array.from(typingText);
+  const character = characters[typingVisibleCount] || "";
+  typingVisibleCount += 1;
+  const message = messages.value[typingMessageIndex];
+  if (message)
+    message.renderedHtml = renderHtmlPrefix(typingHtml, typingVisibleCount);
+  queueScrollBottom();
 
   if (typingVisibleCount >= characters.length) {
-    typingBuffer = ''
-    typingTimer = null
-    resolveTypingDrain()
-    return
+    typingBuffer = "";
+    typingTimer = null;
+    resolveTypingDrain();
+    return;
   }
 
   const delay = /[。！？.!?\n]/u.test(character)
     ? 96
     : /[，、；：,;:]/u.test(character)
       ? 58
-      : 34
-  typingTimer = setTimeout(typeNextCharacter, delay)
+      : 34;
+  typingTimer = setTimeout(typeNextCharacter, delay);
 }
 
 function waitForTypingDrain() {
-  if (!typingBuffer && !typingTimer) return Promise.resolve()
-  return new Promise<void>((resolve) => typingDrainResolvers.push(resolve))
+  if (!typingBuffer && !typingTimer) return Promise.resolve();
+  return new Promise<void>((resolve) => typingDrainResolvers.push(resolve));
 }
 
 onMounted(() => {
-  chooseGreeting()
-  loadPetMeta()
-  hintTimer = setTimeout(() => { showHint.value = false }, isArticleMode.value ? 4200 : 6000)
-})
+  chooseGreeting();
+  loadPetMeta();
+  hintTimer = setTimeout(
+    () => {
+      showHint.value = false;
+    },
+    isContentMode.value ? 4200 : 6000,
+  );
+});
 
 onUnmounted(() => {
-  if (hintTimer) clearTimeout(hintTimer)
-  if (loginBubbleTimer) clearTimeout(loginBubbleTimer)
-  if (actionRevealTimer) clearTimeout(actionRevealTimer)
-  streamController?.abort()
-  if (scrollFrame !== null) cancelAnimationFrame(scrollFrame)
-  if (typingTimer) clearTimeout(typingTimer)
-  typingTimer = null
-  typingBuffer = ''
-  resolveTypingDrain()
-})
+  if (hintTimer) clearTimeout(hintTimer);
+  if (actionRevealTimer) clearTimeout(actionRevealTimer);
+  streamController?.abort();
+  if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+  if (typingTimer) clearTimeout(typingTimer);
+  typingTimer = null;
+  typingBuffer = "";
+  resolveTypingDrain();
+});
 </script>
 
 <style scoped>
@@ -550,7 +788,7 @@ onUnmounted(() => {
 }
 
 .pet-fab::after {
-  content: '';
+  content: "";
   position: absolute;
   z-index: -1;
   left: 22%;
@@ -606,7 +844,7 @@ onUnmounted(() => {
 }
 
 .pet-hint::after {
-  content: '';
+  content: "";
   position: absolute;
   right: -6px;
   top: 50%;
@@ -623,7 +861,8 @@ onUnmounted(() => {
   flex-direction: column;
   border-radius: 18px;
   background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-primary-soft));
-  box-shadow: 0 18px 46px color-mix(in srgb, #000 20%, var(--ld-shadow)),
+  box-shadow:
+    0 18px 46px color-mix(in srgb, #000 20%, var(--ld-shadow)),
     0 1px 0 color-mix(in srgb, #fff 60%, transparent) inset;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
@@ -636,7 +875,11 @@ onUnmounted(() => {
   gap: 10px;
   padding: 13px 14px 11px;
   background:
-    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--c-primary) 16%, transparent), transparent 48%),
+    radial-gradient(
+      circle at 12% 0%,
+      color-mix(in srgb, var(--c-primary) 16%, transparent),
+      transparent 48%
+    ),
     linear-gradient(135deg, var(--c-primary-soft), transparent 72%);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
@@ -658,7 +901,11 @@ onUnmounted(() => {
   place-items: center;
   border-radius: 12px;
   color: #fff;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary) 78%, #fff), var(--c-primary));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--c-primary) 78%, #fff),
+    var(--c-primary)
+  );
   box-shadow: 0 8px 20px color-mix(in srgb, var(--c-primary) 28%, transparent);
   flex-shrink: 0;
 }
@@ -683,7 +930,7 @@ onUnmounted(() => {
 }
 
 .pet-online::before {
-  content: '';
+  content: "";
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -707,6 +954,13 @@ onUnmounted(() => {
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.pet-usage {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-3);
+  font-size: 0.58rem;
 }
 
 .pet-context-label {
@@ -747,7 +1001,11 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
   background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--c-primary) 7%, transparent), transparent 35%),
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--c-primary) 7%, transparent),
+      transparent 35%
+    ),
     color-mix(in srgb, var(--c-bg-1) 74%, transparent);
 }
 
@@ -906,7 +1164,11 @@ onUnmounted(() => {
   color: var(--c-text-1);
   font-family: inherit;
   cursor: pointer;
-  transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .pet-suggestions button {
@@ -927,7 +1189,8 @@ onUnmounted(() => {
 .pet-actions button:hover {
   color: var(--c-primary);
   border-color: color-mix(in srgb, var(--c-primary) 48%, var(--border));
-  box-shadow: 0 7px 18px color-mix(in srgb, var(--c-primary) 12%, var(--ld-shadow));
+  box-shadow: 0 7px 18px
+    color-mix(in srgb, var(--c-primary) 12%, var(--ld-shadow));
   transform: translateY(-1px);
 }
 
@@ -1016,7 +1279,8 @@ onUnmounted(() => {
 }
 
 @keyframes pet-bob {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -1042,7 +1306,9 @@ onUnmounted(() => {
 }
 
 @keyframes typing {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     transform: translateY(0);
     opacity: 0.45;
   }
@@ -1054,7 +1320,9 @@ onUnmounted(() => {
 
 .pet-panel-enter-active,
 .pet-panel-leave-active {
-  transition: opacity 0.14s ease, transform 0.14s ease;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
 }
 
 .pet-panel-enter-from,
@@ -1064,7 +1332,9 @@ onUnmounted(() => {
 }
 
 .pet-actions-enter-active {
-  transition: opacity 0.14s ease, transform 0.14s ease;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
 }
 
 .pet-actions-leave-active {
@@ -1141,5 +1411,62 @@ onUnmounted(() => {
   .pet-actions-leave-active {
     transition: none;
   }
+}
+
+.pet-feedback {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  color: var(--c-text-3);
+  font-size: 0.5rem;
+}
+.pet-feedback button {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-text-3);
+  font-size: 0.5rem;
+  cursor: pointer;
+}
+.pet-feedback button.active {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+.pet-source-cards {
+  display: grid;
+  gap: 6px;
+  margin-top: 7px;
+}
+.pet-source-cards a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--ld-bg-card);
+  color: inherit;
+  text-decoration: none;
+}
+.pet-source-cards small {
+  color: var(--c-primary);
+  font-size: 0.5rem;
+  text-transform: uppercase;
+}
+.pet-source-cards strong {
+  color: var(--c-text);
+  font-size: 0.66rem;
+}
+.pet-source-cards span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: 0.56rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 </style>
