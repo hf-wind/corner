@@ -41,7 +41,7 @@ export function useTheme(): ThemeContext {
     if (transitionTimer) clearTimeout(transitionTimer)
     transitionTimer = setTimeout(() => {
       document.documentElement.classList.remove('theme-switching')
-    }, 280)
+    }, 520)
   }
 
   function init() {

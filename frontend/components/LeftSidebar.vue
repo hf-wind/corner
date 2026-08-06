@@ -158,6 +158,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ openSearch: []; "toggle-collapse": [] }>();
 const { theme, setTheme } = useTheme();
+const { confirm } = useConfirm();
 const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings();
 // 字体切换入口暂时隐藏：const { fontPreset, fontPresets, setFontPreset } = useTypography()
 const { registerSlot, unregisterSlot } = useMusicPlayerSlot();
@@ -290,7 +291,14 @@ function goPanel() {
   router.push(panelHome());
 }
 
-function handleLogout() {
+async function handleLogout() {
+  const accepted = await confirm({
+    title: "退出登录？",
+    message: "退出后仍可继续浏览公开内容。",
+    confirmText: "退出",
+    danger: true,
+  });
+  if (!accepted) return;
   clearSession();
   try {
     const toast = useToast();
@@ -831,21 +839,25 @@ watch(
 }
 
 .theme-pill {
+  --theme-pill-pad: 3px;
+  --theme-pill-ease: cubic-bezier(0.47, 1.64, 0.41, 0.8);
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 3px;
-  padding: 3px;
+  padding: var(--theme-pill-pad);
   width: fit-content;
   margin: 0 auto;
   background: var(--c-bg-2);
   border-radius: 1.2rem;
   isolation: isolate;
 }
-.theme-pill::before { position:absolute; z-index:0; top:3px; bottom:3px; left:3px; width:34px; border-radius:1rem; background:var(--ld-bg-card); box-shadow:.1em .2em .5em var(--ld-shadow); content:''; transform:translate3d(0,0,0); transition:transform .5s cubic-bezier(.16,1,.3,1),background-color .3s ease; }
+.theme-pill::after { position:absolute; z-index:-1; inset:0; border-radius:inherit; background:color-mix(in srgb,var(--c-bg-2) 88%,transparent); content:''; transition:inset .25s ease, box-shadow .25s ease; }
+.theme-pill::before { position:absolute; z-index:0; top:var(--theme-pill-pad); bottom:var(--theme-pill-pad); left:var(--theme-pill-pad); width:34px; border-radius:1rem; background:var(--ld-bg-card); box-shadow:inset 0 1px 1px color-mix(in srgb,#fff 32%,transparent),.1em .2em .5em var(--ld-shadow); content:''; transform:translate3d(0,0,0); transition:transform .5s var(--theme-pill-ease),background-color .5s ease,box-shadow .5s ease; }
 .theme-pill.theme-dark::before { transform:translate3d(37px,0,0); }
 .theme-pill.theme-auto::before { transform:translate3d(74px,0,0); }
+.theme-pill:focus-within::after { inset:-3px; box-shadow:0 0 0 3px color-mix(in srgb,var(--c-primary) 14%,transparent); }
 
 .theme-pill button {
   position: relative;
@@ -863,6 +875,14 @@ watch(
   transition: all 0.15s;
   line-height: 1;
 }
+
+.theme-pill button:hover {
+  color: var(--c-text);
+}
+
+.theme-pill.theme-light:hover::before { transform: translate3d(2px, 0, 0); }
+.theme-pill.theme-dark:hover::before { transform: translate3d(39px, 0, 0); }
+.theme-pill.theme-auto:hover::before { transform: translate3d(76px, 0, 0); }
 
 .theme-pill button.active {
   background: transparent;

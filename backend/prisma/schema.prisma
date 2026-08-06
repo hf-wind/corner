@@ -30,9 +30,27 @@ model User {
   albums             Album[]
   journeys           Journey[]
   storyRoutes        StoryRoute[]
+  musicFavorites     MusicFavorite[]
 
   @@index([isActive, role])
   @@map("users")
+}
+
+model MusicFavorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  trackKey  String   @map("track_key") @db.VarChar(128)
+  name      String   @db.VarChar(255)
+  artist    String   @db.VarChar(255)
+  sourceUrl String   @map("source_url") @db.Text
+  picUrl    String?  @map("pic_url") @db.Text
+  lrc       String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackKey])
+  @@index([userId, createdAt])
+  @@map("music_favorites")
 }
 
 model Category {

@@ -43,6 +43,15 @@
               >
                 {{ pl.name }}
               </button>
+              <button
+                v-if="isLoggedIn"
+                type="button"
+                class="smp-tab smp-favorite-tab"
+                :class="{ active: playlistTab === 'favorites' }"
+                @click="switchFavoritePlaylist"
+              >
+                <Icon name="ph:heart-fill" /> 我的收藏<span v-if="favoriteTracks.length">{{ favoriteTracks.length }}</span>
+              </button>
             </div>
             <div class="smp-list-actions">
               <button type="button" class="smp-icon-btn" title="定位当前歌曲" @click="locateCurrentTrack">
@@ -54,13 +63,16 @@
             </div>
           </div>
           <div class="smp-list-body" @scroll.passive="onTrackListScroll">
-            <button
+            <div
               v-for="(t, i) in tracks"
               :key="`${t.url}-${i}`"
-              type="button"
               class="smp-track"
+              role="option"
+              tabindex="0"
               :class="{ active: i === index }"
               @click="playAt(i)"
+              @keydown.enter.prevent="playAt(i)"
+              @keydown.space.prevent="playAt(i)"
             >
               <span class="smp-track-idx">{{ i + 1 }}</span>
               <span class="smp-track-meta">
@@ -72,12 +84,22 @@
                 name="ph:waveform-bold"
                 class="smp-track-wave"
               />
-            </button>
+              <button
+                v-if="isLoggedIn"
+                type="button"
+                class="smp-track-favorite"
+                :class="{ active: isFavorite(t) }"
+                :title="isFavorite(t) ? '取消收藏' : '收藏歌曲'"
+                @click.stop="toggleFavorite(t)"
+              >
+                <Icon :name="isFavorite(t) ? 'ph:heart-fill' : 'ph:heart-bold'" />
+              </button>
+            </div>
             <div v-if="hasMoreTracks" class="smp-list-loading">
               {{ loadingMore ? "正在加载更多歌曲…" : "继续滚动以加载更多歌曲" }}
             </div>
             <div v-if="!tracks.length" class="smp-empty">
-              {{ loading ? "加载中…" : "暂无歌曲" }}
+              {{ loading || favoritesLoading ? "加载中…" : "暂无歌曲" }}
             </div>
           </div>
         </div>
@@ -118,6 +140,16 @@
               @click="cycleMode"
             >
               <Icon :name="modeIcon" />
+            </button>
+            <button
+              type="button"
+              class="smp-icon-btn"
+              v-if="isLoggedIn && current"
+              :class="{ active: isFavorite(current) }"
+              :title="isFavorite(current) ? '取消收藏' : '收藏歌曲'"
+              @click="toggleFavorite(current)"
+            >
+              <Icon :name="isFavorite(current) ? 'ph:heart-fill' : 'ph:heart-bold'" />
             </button>
             <button
               type="button"
@@ -193,6 +225,7 @@ type Track = {
   url: string;
   pic: string;
   lrc?: string;
+  key?: string;
 };
 type PlaylistMeta = {
   index: number;
@@ -204,6 +237,8 @@ type PlaylistMeta = {
 type PlayMode = "order" | "loop" | "shuffle";
 
 const api = useApi();
+const toast = useToast();
+const { isLoggedIn } = useAuth();
 const rootRef = ref<HTMLElement | null>(null);
 const audioRef = ref<HTMLAudioElement | null>(null);
 const { setPlaying, playRequest } = useMusicPlayerState();
@@ -226,6 +261,9 @@ const barOpen = ref(false);
 const listOpen = ref(false);
 const tracks = ref<Track[]>([]);
 const playlists = ref<PlaylistMeta[]>([]);
+const favoriteTracks = ref<Track[]>([]);
+const favoritesLoading = ref(false);
+const playlistTab = ref<"preset" | "favorites">("preset");
 const playlistIndex = ref(0);
 const index = ref(0);
 const progress = ref(0);
@@ -276,6 +314,7 @@ watch(playRequest, (request) => {
       artist: request.artist || "未知音乐人",
       url: request.url,
       pic: request.pic || "",
+      key: request.key,
     });
     index.value = 0;
   }
@@ -337,6 +376,7 @@ async function bootstrap() {
         : 0.55;
     playlists.value = Array.isArray(cfg.playlists) ? cfg.playlists : [];
     await loadPlaylist(0, false);
+    if (isLoggedIn.value) void loadFavorites();
     applyVolume();
     await waitForCurrentCover();
     await nextTick();
@@ -347,6 +387,23 @@ async function bootstrap() {
     }
   } catch {
     enabled.value = false;
+  }
+}
+
+async function loadFavorites() {
+  if (!isLoggedIn.value) {
+    favoriteTracks.value = [];
+    return;
+  }
+  favoritesLoading.value = true;
+  try {
+    const result = await api.get<{ tracks?: Track[] }>("/music/favorites");
+    favoriteTracks.value = Array.isArray(result?.tracks) ? result.tracks : [];
+    if (playlistTab.value === "favorites") tracks.value = [...favoriteTracks.value];
+  } catch {
+    favoriteTracks.value = [];
+  } finally {
+    favoritesLoading.value = false;
   }
 }
 
@@ -389,6 +446,7 @@ async function loadPlaylist(i: number, refresh = false) {
       return;
     }
     playlistIndex.value = i;
+    playlistTab.value = "preset";
     tracks.value = res.tracks || [];
     trackPage.value = res.page || 1;
     hasMoreTracks.value = !!res.hasMore;
@@ -408,6 +466,23 @@ async function loadPlaylist(i: number, refresh = false) {
   } finally {
     if (requestId === playlistRequestId) loading.value = false;
   }
+}
+
+async function switchFavoritePlaylist() {
+  if (!isLoggedIn.value) return;
+  if (playlistTab.value === "favorites") return;
+  const wasPlaying = playing.value;
+  playlistTab.value = "favorites";
+  playlistIndex.value = -1;
+  if (!favoriteTracks.value.length && !favoritesLoading.value) await loadFavorites();
+  tracks.value = [...favoriteTracks.value];
+  trackPage.value = 1;
+  hasMoreTracks.value = false;
+  index.value = 0;
+  progress.value = 0;
+  await nextTick();
+  audioRef.value?.load();
+  if (wasPlaying && current.value) await play();
 }
 
 async function loadMoreTracks() {
@@ -440,11 +515,66 @@ async function loadMoreTracks() {
 }
 
 async function switchPlaylist(i: number) {
-  if (i === playlistIndex.value) return;
+  if (playlistTab.value === "preset" && i === playlistIndex.value) return;
   const wasPlaying = playing.value;
-  playing.value = wasPlaying;
+  playlistTab.value = "preset";
   await loadPlaylist(i);
   if (wasPlaying) await play();
+}
+
+function isFavorite(track: Track | null | undefined) {
+  if (!track) return false;
+  return favoriteTracks.value.some(
+    (item) => (track.key && item.key === track.key) ||
+      (item.name === track.name && item.artist === track.artist),
+  );
+}
+
+async function toggleFavorite(track: Track) {
+  if (!isLoggedIn.value) {
+    toast.info("登录后可以收藏歌曲");
+    return;
+  }
+  if (!track.key) {
+    toast.warning("这首歌曲暂时无法收藏");
+    return;
+  }
+  try {
+    if (isFavorite(track)) {
+      const wasPlaying = playing.value;
+      await api.delete(`/music/favorites/${encodeURIComponent(track.key)}`);
+      favoriteTracks.value = favoriteTracks.value.filter((item) => item.key !== track.key);
+      if (playlistTab.value === "favorites") {
+        const nextIndex = Math.min(index.value, Math.max(0, favoriteTracks.value.length - 1));
+        tracks.value = [...favoriteTracks.value];
+        if (!tracks.value.length) {
+          pause();
+          index.value = 0;
+        } else {
+          index.value = nextIndex;
+          await nextTick();
+          audioRef.value?.load();
+          if (wasPlaying) await play();
+        }
+      }
+      toast.success("已取消收藏");
+    } else {
+      const result = await api.post<{ track?: Track }>("/music/favorites", {
+        name: track.name,
+        artist: track.artist,
+        url: track.url,
+        pic: track.pic,
+        lrc: track.lrc,
+      });
+      if (result?.track) {
+        favoriteTracks.value = [result.track, ...favoriteTracks.value.filter((item) => item.key !== result.track?.key)];
+        if (playlistTab.value === "favorites") tracks.value = [...favoriteTracks.value];
+      }
+      toast.success("已加入收藏歌单");
+    }
+  } catch {
+    toast.error("歌曲收藏更新失败");
+  }
 }
 
 function applyVolume() {
@@ -657,6 +787,16 @@ watch(volume, applyVolume);
 watch(muted, applyVolume);
 watch(listOpen, (v) => {
   if (v) barOpen.value = true;
+});
+watch(isLoggedIn, (loggedIn) => {
+  if (loggedIn) void loadFavorites();
+  else {
+    favoriteTracks.value = [];
+    if (playlistTab.value === "favorites") {
+      playlistTab.value = "preset";
+      void loadPlaylist(0);
+    }
+  }
 });
 </script>
 
@@ -1015,6 +1155,25 @@ watch(listOpen, (v) => {
   font-weight: 650;
 }
 
+.smp-favorite-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.smp-favorite-tab :deep(svg) {
+  font-size: 0.72rem;
+}
+
+.smp-favorite-tab span {
+  min-width: 14px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-primary) 12%, transparent);
+  font-size: 0.56rem;
+  text-align: center;
+}
+
 .smp-list-body {
   overflow-y: auto;
   padding: 4px;
@@ -1086,6 +1245,32 @@ watch(listOpen, (v) => {
   color: var(--c-primary);
   font-size: 0.9rem;
   flex-shrink: 0;
+}
+
+.smp-track-favorite {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-text-3);
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.smp-track-favorite:hover,
+.smp-track-favorite.active,
+.smp-icon-btn.active {
+  color: #df6d86;
+  background: color-mix(in srgb, #df6d86 12%, transparent);
+}
+
+.smp-track-favorite:hover {
+  transform: translateY(-1px) scale(1.04);
 }
 
 .smp-empty {

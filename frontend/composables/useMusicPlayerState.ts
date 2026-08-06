@@ -5,6 +5,7 @@ export type MusicPlayRequest = {
   url: string;
   pic?: string;
   playlist?: string;
+  key?: string;
 };
 const playRequest = shallowRef<
   (MusicPlayRequest & { requestId: number }) | null

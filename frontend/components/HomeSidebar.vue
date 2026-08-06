@@ -104,7 +104,7 @@ const loading = ref(true);
 const stats = ref({ posts: 0, comments: 0, views: 0 });
 const popularPosts = ref<any[]>([]);
 const tags = ref<any[]>([]);
-const latestActivity = ref<Array<{ id: string; type: string; label: string; title: string; href: string; icon: string }>>([]);
+const latestActivity = ref<Array<{ id: string; type: string; label: string; title: string; href: string; icon: string; timestamp?: string | null }>>([]);
 let idleHandle: number | null = null;
 
 const overviewItems = computed(() => [
@@ -126,29 +126,34 @@ function compactNumber(value: number) {
 
 async function loadSidebar() {
   try {
-    const [overview, posts, tagList, moments, albums, library] = await Promise.all([
+    const [overview, posts, latestPosts, tagList, moments, albums, library] = await Promise.all([
       api.get<any>("/stats/overview"),
       api.get<any>("/posts", { page: 1, limit: 4, sort: "popular" }),
+      api.get<any>("/posts", { page: 1, limit: 1, sort: "latest" }),
       api.get<any[]>("/tags"),
-      api.get<any>("/moments", { page: 1, limit: 1 }),
-      api.get<any>("/albums", { page: 1, limit: 1 }),
-      api.get<any>("/library", { page: 1, limit: 1 }),
+      api.get<any>("/moments", { page: 1, limit: 1, sort: "latest" }),
+      api.get<any>("/albums", { page: 1, limit: 1, sort: "latest" }),
+      api.get<any>("/library", { page: 1, limit: 1, sort: "latest" }),
     ]);
     stats.value = { ...stats.value, ...(overview || {}) };
     popularPosts.value = posts?.items ?? [];
     tags.value = [...(tagList || [])]
       .sort((a, b) => (b._count?.posts ?? 0) - (a._count?.posts ?? 0))
       .slice(0, 8);
-    const recentPost = posts?.items?.[0];
+    const recentPost = latestPosts?.items?.[0];
     const recentMoment = moments?.items?.[0];
     const recentAlbum = albums?.items?.[0];
     const recentLibrary = library?.items?.[0];
     latestActivity.value = [
-      recentPost && { id: recentPost.id, type: 'post', label: '新文章', title: recentPost.title, href: `/article/${recentPost.slug}`, icon: 'ph:article-bold' },
-      recentMoment && { id: recentMoment.id, type: 'moment', label: '新瞬间', title: recentMoment.title, href: `/moments/${recentMoment.slug}`, icon: 'ph:sparkle-bold' },
-      recentAlbum && { id: recentAlbum.id, type: 'album', label: '新相册', title: recentAlbum.title, href: `/albums/${recentAlbum.slug}`, icon: 'ph:images-square-bold' },
-      recentLibrary && { id: recentLibrary.id, type: 'library', label: '新书影', title: recentLibrary.title, href: `/library/${recentLibrary.slug}`, icon: 'ph:books-bold' },
-    ].filter(Boolean).slice(0, 3) as typeof latestActivity.value;
+      recentPost && { id: recentPost.id, type: 'post', label: '新文章', title: recentPost.title, href: `/article/${recentPost.slug}`, icon: 'ph:article-bold', timestamp: recentPost.publishedAt || recentPost.createdAt },
+      recentMoment && { id: recentMoment.id, type: 'moment', label: '新瞬间', title: recentMoment.title, href: `/moments/${recentMoment.slug}`, icon: 'ph:sparkle-bold', timestamp: recentMoment.publishedAt || recentMoment.createdAt || recentMoment.happenedAt },
+      recentAlbum && { id: recentAlbum.id, type: 'album', label: '新相册', title: recentAlbum.title, href: `/albums/${recentAlbum.slug}`, icon: 'ph:images-square-bold', timestamp: recentAlbum.publishedAt || recentAlbum.createdAt },
+      recentLibrary && { id: recentLibrary.id, type: 'library', label: '新书影', title: recentLibrary.title, href: `/library/${recentLibrary.slug}`, icon: 'ph:books-bold', timestamp: recentLibrary.publishedAt || recentLibrary.createdAt },
+    ].filter(Boolean).sort((left: any, right: any) => {
+      const leftTime = new Date(left?.timestamp || 0).getTime();
+      const rightTime = new Date(right?.timestamp || 0).getTime();
+      return rightTime - leftTime;
+    }).slice(0, 3) as typeof latestActivity.value;
   } catch {
     // Sidebar content is supplementary; keep the page usable when it fails.
   } finally {

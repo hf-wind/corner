@@ -7,6 +7,7 @@
     </RouterView>
   </component>
   <GlobalToast v-if="toasts.length" />
+  <LightConfirm />
   <SidebarMusicPlayer v-if="showPlayer" />
 </template>
 
@@ -16,6 +17,7 @@ import { RouterView, useRoute } from 'vue-router'
 import DefaultLayout from './layouts/default.vue'
 import AdminLayout from './layouts/admin.vue'
 import WelcomeLayout from './layouts/welcome.vue'
+import LightConfirm from './components/LightConfirm.vue'
 
 const GlobalToast = defineAsyncComponent(() => import('./components/GlobalToast.vue'))
 const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/SidebarMusicPlayer.vue'))

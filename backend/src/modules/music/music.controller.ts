@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Post,
+  Param,
   Put,
   Query,
   Req,
@@ -19,6 +21,7 @@ import { MusicService } from './music.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UpdateMusicConfigDto } from './dto/update-music-config.dto';
+import { MusicFavoriteDto } from './dto/music-favorite.dto';
 
 @Controller('music')
 export class MusicController {
@@ -98,6 +101,24 @@ export class MusicController {
       res.off('close', abortUpstream);
       controller.abort();
     }
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('favorites')
+  favorites(@Req() req: any) {
+    return this.music.listFavorites(req.user.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('favorites')
+  addFavorite(@Req() req: any, @Body() dto: MusicFavoriteDto) {
+    return this.music.addFavorite(req.user.id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('favorites/:key')
+  removeFavorite(@Req() req: any, @Param('key') key: string) {
+    return this.music.removeFavorite(req.user.id, key);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

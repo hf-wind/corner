@@ -3,7 +3,7 @@
     <div v-if="visible" class="search-overlay" @click.self="close" @keydown.esc="close">
       <div class="search-panel" ref="panelRef">
         <div class="search-input-wrap">
-          <svg class="search-prefix" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <Icon name="ph:magnifying-glass-bold" class="search-prefix" />
           <input ref="inputRef" v-model="query" type="text" placeholder="搜索文章、瞬间、相册、书影和旅程..." @input="onInput" class="search-input">
           <kbd class="search-esc" @click="close">ESC</kbd>
         </div>

@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { SettingsService } from '../settings/settings.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { MusicFavoriteDto } from './dto/music-favorite.dto';
 import {
   MUSIC_DEFAULTS,
   MUSIC_SETTING_KEYS,
@@ -21,6 +23,7 @@ export type MusicTrack = {
   url: string;
   pic: string;
   lrc?: string;
+  key?: string;
 };
 
 type CacheEntry = {
@@ -37,6 +40,7 @@ export class MusicService {
   constructor(
     private settings: SettingsService,
     private redis: RedisService,
+    private prisma: PrismaService,
   ) {}
 
   async getConfig(): Promise<MusicConfig & { apiConfigured: boolean }> {
@@ -186,6 +190,69 @@ export class MusicService {
     }));
   }
 
+  async listFavorites(userId: string) {
+    const favorites = await this.prisma.musicFavorite.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return {
+      name: '我的收藏',
+      tracks: favorites.map((favorite) =>
+        this.presentTrack({
+          name: favorite.name,
+          artist: favorite.artist,
+          url: favorite.sourceUrl,
+          pic: favorite.picUrl || '',
+          lrc: favorite.lrc || undefined,
+        }),
+      ),
+      total: favorites.length,
+    };
+  }
+
+  async addFavorite(userId: string, dto: MusicFavoriteDto) {
+    const sourceUrl = this.extractSignedMediaUrl(dto.url);
+    const picUrl = dto.pic ? this.extractSignedMediaUrl(dto.pic, false) : '';
+    const trackKey = this.trackKey(sourceUrl);
+    const favorite = await this.prisma.musicFavorite.upsert({
+      where: { userId_trackKey: { userId, trackKey } },
+      create: {
+        userId,
+        trackKey,
+        name: String(dto.name || '').trim().slice(0, 255),
+        artist: String(dto.artist || '未知音乐人').trim().slice(0, 255),
+        sourceUrl,
+        picUrl: picUrl || null,
+        lrc: dto.lrc ? String(dto.lrc).slice(0, 200000) : null,
+      },
+      update: {
+        name: String(dto.name || '').trim().slice(0, 255),
+        artist: String(dto.artist || '未知音乐人').trim().slice(0, 255),
+        picUrl: picUrl || null,
+        lrc: dto.lrc ? String(dto.lrc).slice(0, 200000) : null,
+      },
+    });
+    return {
+      favorite: true,
+      track: this.presentTrack({
+        name: favorite.name,
+        artist: favorite.artist,
+        url: favorite.sourceUrl,
+        pic: favorite.picUrl || '',
+        lrc: favorite.lrc || undefined,
+      }),
+    };
+  }
+
+  async removeFavorite(userId: string, key: string) {
+    const trackKey = String(key || '').trim();
+    if (!/^[a-f0-9]{64}$/i.test(trackKey)) {
+      throw new BadRequestException('收藏歌曲标识无效');
+    }
+    await this.prisma.musicFavorite.deleteMany({ where: { userId, trackKey } });
+    return { favorite: false, key: trackKey };
+  }
+
   async getRecommendedTracks(query: string, limit = 4) {
     const cfg = await this.getConfig();
     if (!cfg.music_enabled) return [];
@@ -228,6 +295,7 @@ export class MusicService {
           playlist: track.playlist.slice(0, 40),
           url: presented.url,
           pic: presented.pic,
+          key: presented.key,
         };
       });
   }
@@ -292,7 +360,53 @@ export class MusicService {
       ...track,
       url: this.createMediaProxyUrl(track.url),
       pic: track.pic ? this.createMediaProxyUrl(track.pic) : '',
+      key: this.trackKey(track.url),
     };
+  }
+
+  private trackKey(url: string) {
+    return createHash('sha256').update(String(url)).digest('hex');
+  }
+
+  private extractSignedMediaUrl(raw: string, required = true) {
+    let parsed: URL;
+    try {
+      parsed = new URL(String(raw || ''), 'https://corner.local');
+    } catch {
+      if (required) throw new BadRequestException('歌曲地址无效');
+      return '';
+    }
+    if (!parsed.pathname.endsWith('/api/music/proxy') && !parsed.pathname.endsWith('/music/proxy')) {
+      if (required) throw new BadRequestException('歌曲地址不是受信任的媒体地址');
+      return '';
+    }
+    const url = parsed.searchParams.get('url') || '';
+    const expires = Number(parsed.searchParams.get('expires'));
+    const signature = parsed.searchParams.get('signature') || '';
+    if (!url || !Number.isSafeInteger(expires) || !signature) {
+      if (required) throw new BadRequestException('歌曲地址签名无效');
+      return '';
+    }
+    const now = Math.floor(Date.now() / 1000);
+    if (expires < now || expires > now + 172800) {
+      if (required) throw new UnauthorizedException('歌曲地址已过期');
+      return '';
+    }
+    let target: URL;
+    try {
+      target = new URL(url);
+    } catch {
+      if (required) throw new BadRequestException('歌曲源地址无效');
+      return '';
+    }
+    const expected = this.signMediaUrl(target.toString(), expires);
+    const actual = Buffer.from(signature);
+    const wanted = Buffer.from(expected);
+    if (actual.length !== wanted.length || !timingSafeEqual(actual, wanted)) {
+      if (required) throw new UnauthorizedException('歌曲地址签名无效');
+      return '';
+    }
+    return target.toString();
   }
 
   private createMediaProxyUrl(url: string) {
