@@ -292,7 +292,7 @@ export class CommentService {
           type: 'system',
           title: '评论审核通过',
           content: `文章：《${post.title}》\n你的评论：${contentPreview(comment.content)}\n审核结果：已通过并发布`,
-          link: `/article/${post.slug || post.id}`,
+          link: `/article/${post.slug || post.id}?reviewComment=${comment.id}&review=approved`,
         });
       }
     } else if (comment.userId) {
@@ -300,7 +300,7 @@ export class CommentService {
         type: 'system',
         title: '评论审核未通过',
         content: `文章：《${post.title}》\n你的评论：${contentPreview(comment.content)}\n审核结果：未通过\n原因：${reason}`,
-        link: `/article/${post.slug || post.id}`,
+        link: `/article/${post.slug || post.id}?reviewComment=${comment.id}&review=rejected`,
       });
     }
   }
@@ -329,6 +329,7 @@ export class CommentService {
             this.logger.error(`发送管理员站内通知失败: ${admin.id}`, error);
           });
         }
+        if (admin.id === comment.userId) return;
         if (!admin.email) return;
         adminEmails.add(admin.email.toLowerCase());
         await this.emailService.sendCommentModerationNotification({
@@ -499,7 +500,7 @@ export class CommentService {
         type: 'system',
         title: '评论审核通过',
         content: `文章：《${existing.post.title}》\n你的评论：${contentPreview(existing.content)}\n审核结果：已通过并发布`,
-        link: `/article/${existing.post.slug || existing.postId}`,
+        link: `/article/${existing.post.slug || existing.postId}?reviewComment=${existing.id}&review=approved`,
       });
     }
 
@@ -528,7 +529,7 @@ export class CommentService {
         type: 'system',
         title: '评论审核未通过',
         content: `文章：《${existing.post.title}》\n你的评论：${contentPreview(existing.content)}\n审核结果：未通过${reason ? `\n原因：${reason}` : ''}`,
-        link: `/article/${existing.post.slug || existing.postId}`,
+        link: `/article/${existing.post.slug || existing.postId}?reviewComment=${existing.id}&review=rejected`,
       });
     }
 

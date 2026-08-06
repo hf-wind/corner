@@ -29,6 +29,20 @@
       </div>
     </section>
 
+    <section v-if="latestActivity.length" class="side-card activity-card" aria-labelledby="home-latest-title">
+      <div class="side-card-head">
+        <span id="home-latest-title"><Icon name="ph:activity-bold" /> 最新动态</span>
+        <span class="head-note">NEW</span>
+      </div>
+      <div class="activity-list">
+        <NuxtLink v-for="item in latestActivity" :key="`${item.type}:${item.id}`" :to="item.href">
+          <span class="overview-icon"><Icon :name="item.icon" /></span>
+          <span><small>{{ item.label }}</small><strong>{{ item.title }}</strong></span>
+          <Icon name="ph:arrow-up-right-bold" />
+        </NuxtLink>
+      </div>
+    </section>
+
     <section
       class="side-card reading-route"
       aria-labelledby="home-popular-title"
@@ -90,6 +104,7 @@ const loading = ref(true);
 const stats = ref({ posts: 0, comments: 0, views: 0 });
 const popularPosts = ref<any[]>([]);
 const tags = ref<any[]>([]);
+const latestActivity = ref<Array<{ id: string; type: string; label: string; title: string; href: string; icon: string }>>([]);
 let idleHandle: number | null = null;
 
 const overviewItems = computed(() => [
@@ -111,16 +126,29 @@ function compactNumber(value: number) {
 
 async function loadSidebar() {
   try {
-    const [overview, posts, tagList] = await Promise.all([
+    const [overview, posts, tagList, moments, albums, library] = await Promise.all([
       api.get<any>("/stats/overview"),
       api.get<any>("/posts", { page: 1, limit: 4, sort: "popular" }),
       api.get<any[]>("/tags"),
+      api.get<any>("/moments", { page: 1, limit: 1 }),
+      api.get<any>("/albums", { page: 1, limit: 1 }),
+      api.get<any>("/library", { page: 1, limit: 1 }),
     ]);
     stats.value = { ...stats.value, ...(overview || {}) };
     popularPosts.value = posts?.items ?? [];
     tags.value = [...(tagList || [])]
       .sort((a, b) => (b._count?.posts ?? 0) - (a._count?.posts ?? 0))
       .slice(0, 8);
+    const recentPost = posts?.items?.[0];
+    const recentMoment = moments?.items?.[0];
+    const recentAlbum = albums?.items?.[0];
+    const recentLibrary = library?.items?.[0];
+    latestActivity.value = [
+      recentPost && { id: recentPost.id, type: 'post', label: '新文章', title: recentPost.title, href: `/article/${recentPost.slug}`, icon: 'ph:article-bold' },
+      recentMoment && { id: recentMoment.id, type: 'moment', label: '新瞬间', title: recentMoment.title, href: `/moments/${recentMoment.slug}`, icon: 'ph:sparkle-bold' },
+      recentAlbum && { id: recentAlbum.id, type: 'album', label: '新相册', title: recentAlbum.title, href: `/albums/${recentAlbum.slug}`, icon: 'ph:images-square-bold' },
+      recentLibrary && { id: recentLibrary.id, type: 'library', label: '新书影', title: recentLibrary.title, href: `/library/${recentLibrary.slug}`, icon: 'ph:books-bold' },
+    ].filter(Boolean).slice(0, 3) as typeof latestActivity.value;
   } catch {
     // Sidebar content is supplementary; keep the page usable when it fails.
   } finally {
@@ -243,13 +271,14 @@ onUnmounted(() => {
 }
 .overview-icon {
   display: grid;
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  background: var(--c-primary-soft);
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb,var(--c-primary) 12%,transparent);
+  border-radius: 10px;
+  background: linear-gradient(145deg,var(--c-primary-soft),color-mix(in srgb,var(--ld-bg-card) 72%,transparent));
   color: var(--c-primary);
   place-items: center;
-  font-size: 0.78rem;
+  font-size: 1rem;
 }
 .overview-copy {
   display: flex;
@@ -350,6 +379,13 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 6px;
 }
+.activity-list { display: grid; gap: 3px; }
+.activity-list a { display: grid; grid-template-columns: 30px minmax(0,1fr) 12px; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 9px; color: inherit; text-decoration: none; transition: background .2s ease, transform .28s cubic-bezier(.16,1,.3,1); }
+.activity-list a:hover { background: var(--c-primary-soft); transform: translateX(2px); }
+.activity-list a>span:nth-child(2) { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.activity-list small { color: var(--c-primary); font-size: .48rem; }
+.activity-list strong { overflow: hidden; color: var(--c-text-2); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.activity-list a>svg { color: var(--c-text-3); font-size: .62rem; }
 .topic-tag {
   display: inline-flex;
   align-items: center;

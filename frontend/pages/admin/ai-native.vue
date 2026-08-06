@@ -32,6 +32,16 @@
           {{ analytics.feedbackTotal || 0 }} 次反馈</span
         >
       </article>
+      <article><small>前台 Token</small><strong>{{ formatNumber(usage.totals?.totalTokens) }}</strong><span>输入 {{ formatNumber(usage.totals?.inputTokens) }} · 输出 {{ formatNumber(usage.totals?.outputTokens) }}</span></article>
+      <article><small>估算费用</small><strong><em>$</em>{{ formatCost(usage.totals?.estimatedCostUsd) }}</strong><span>{{ usage.pricing?.inputPerMillionUsd || usage.pricing?.outputPerMillionUsd ? '按配置单价估算' : '尚未配置 Token 单价' }}</span></article>
+    </section>
+    <section class="usage-panel">
+      <header><div><span>FRONTEND USAGE</span><h2>前台 AI 消耗明细</h2></div><small>最多展示 Token 消耗最高的 50 位用户与访客</small></header>
+      <div class="usage-table-wrap">
+        <table><thead><tr><th>身份</th><th>账户</th><th>调用</th><th>输入 Token</th><th>输出 Token</th><th>合计</th><th>估算费用</th></tr></thead>
+          <tbody><tr v-for="actor in usage.actors || []" :key="`${actor.actorType}:${actor.actorId}`"><td><span class="actor-type" :class="actor.actorType">{{ actor.actorType === 'user' ? '用户' : '访客' }}</span></td><td><strong>{{ actor.name }}</strong><small>{{ actor.email || actor.actorId }}</small></td><td>{{ actor.calls }}</td><td>{{ formatNumber(actor.inputTokens) }}</td><td>{{ formatNumber(actor.outputTokens) }}</td><td>{{ formatNumber(actor.totalTokens) }}</td><td>${{ formatCost(actor.estimatedCostUsd) }}</td></tr>
+          <tr v-if="!(usage.actors || []).length"><td colspan="7" class="usage-empty">暂无前台 AI 消耗记录</td></tr></tbody></table>
+      </div>
     </section>
     <div class="grid">
       <a-card title="作者风格档案" :bordered="false"
@@ -98,6 +108,7 @@ const api = useApi();
 const toast = useToast();
 const busy = ref("");
 const analytics = ref<any>({});
+const usage = ref<any>({});
 const styleResult = ref<any>();
 const privateQuery = ref("");
 const privateResult = ref<any>();
@@ -115,11 +126,16 @@ const actionLabels: Record<string, string> = {
 function actionLabel(action: string) {
   return actionLabels[action] || action;
 }
+function formatNumber(value?: number) { return new Intl.NumberFormat('zh-CN').format(Number(value) || 0) }
+function formatCost(value?: number) { return (Number(value) || 0).toFixed(6) }
 async function load() {
   try {
-    analytics.value = await api.get("/ai/admin/analytics");
+    const [analyticsResult, usageResult] = await Promise.all([api.get("/ai/admin/analytics"), api.get("/ai/admin/usage")]);
+    analytics.value = analyticsResult;
+    usage.value = usageResult;
   } catch {
     analytics.value = {};
+    usage.value = {};
   }
 }
 async function rebuildIndex() {
@@ -195,9 +211,11 @@ onMounted(load);
 }
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
+.usage-panel { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--ld-bg-card); }
+.usage-panel>header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:12px; }.usage-panel h2 { margin:4px 0 0; font-size:.92rem; }.usage-panel header small { color:var(--c-text-3); font-size:.56rem; }.usage-table-wrap { overflow-x:auto; }.usage-panel table { width:100%; min-width:760px; border-collapse:collapse; }.usage-panel th,.usage-panel td { padding:9px 10px; border-bottom:1px solid var(--border); color:var(--c-text-2); font-size:.62rem; text-align:left; }.usage-panel th { color:var(--c-text-3); font-size:.54rem; font-weight:600; }.usage-panel td:nth-child(n+3) { font-variant-numeric:tabular-nums; }.usage-panel td strong,.usage-panel td small { display:block; }.usage-panel td small { margin-top:2px; color:var(--c-text-3); font-size:.5rem; }.actor-type { display:inline-flex; padding:2px 6px; border-radius:6px; background:var(--c-primary-soft); color:var(--c-primary); }.actor-type.guest { background:color-mix(in srgb,#d89454 12%,transparent); color:#bb6d2b; }.usage-empty { padding:28px!important; text-align:center!important; }
 .metrics article {
   padding: 16px;
   border: 1px solid var(--border);

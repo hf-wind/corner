@@ -15,7 +15,6 @@
         <small>AI READING</small>
         <strong>30 秒读懂</strong>
       </span>
-      <span class="reading-summary">{{ insight.summary }}</span>
       <span class="reading-toggle">
         <span>{{ expanded ? "收起" : "展开" }}</span>
         <Icon name="ph:caret-down-bold" />
@@ -23,7 +22,7 @@
     </button>
 
     <Transition name="reading-body">
-      <div v-if="expanded" class="reading-body">
+  <div v-if="expanded" class="reading-body">
         <p>{{ insight.summary }}</p>
         <ul v-if="points.length">
           <li v-for="(point, index) in points" :key="point">
@@ -132,7 +131,7 @@ watch(() => props.slug, load);
 .reading-head {
   display: grid;
   width: 100%;
-  grid-template-columns: 32px auto minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 11px 13px;
@@ -167,15 +166,6 @@ watch(() => props.slug, load);
 .reading-title strong {
   color: var(--c-text);
   font-size: 0.78rem;
-}
-.reading-summary {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--c-text-2);
-  font-size: 0.67rem;
-  line-height: 1.55;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .reading-toggle {
   display: flex;
@@ -225,8 +215,8 @@ watch(() => props.slug, load);
 .reading-body-enter-active,
 .reading-body-leave-active {
   transition:
-    opacity 0.24s ease,
-    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 0.38s ease,
+    transform 0.52s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .reading-body-enter-from,
 .reading-body-leave-to {
@@ -244,9 +234,6 @@ watch(() => props.slug, load);
 @media (max-width: 620px) {
   .reading-head {
     grid-template-columns: 32px minmax(0, 1fr) auto;
-  }
-  .reading-summary {
-    display: none;
   }
   .reading-body {
     padding-left: 13px;

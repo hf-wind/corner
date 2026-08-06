@@ -265,7 +265,7 @@ export class MomentCommentService {
           type: 'system',
           title: '瞬间评论已通过',
           content: `瞬间：「${moment.title}」\n你的评论：${contentPreview(comment.content)}\n审核结果：已通过并展示`,
-          link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
+          link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}&reviewComment=${comment.id}&review=approved`,
         });
       }
     } else if (comment.userId) {
@@ -273,7 +273,7 @@ export class MomentCommentService {
         type: 'system',
         title: '瞬间评论未通过',
         content: `瞬间：「${moment.title}」\n你的评论：${contentPreview(comment.content)}\n审核结果：未通过\n原因：${reason}`,
-        link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
+        link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}&reviewComment=${comment.id}&review=rejected`,
       });
     }
   }
@@ -302,6 +302,7 @@ export class MomentCommentService {
             this.logger.error(`发送管理员瞬间评论站内通知失败: ${admin.id}`, error);
           });
         }
+        if (admin.id === comment.userId) return;
         if (!admin.email) return;
         adminEmails.add(admin.email.toLowerCase());
         await this.emailService.sendCommentModerationNotification({
@@ -446,7 +447,7 @@ export class MomentCommentService {
         type: 'system',
         title: '瞬间评论已通过',
         content: `瞬间：「${existing.moment.title}」\n你的评论：${contentPreview(existing.content)}\n审核结果：已通过并展示`,
-        link: `/moments?focus=${encodeURIComponent(existing.moment.slug || existing.momentId)}`,
+        link: `/moments?focus=${encodeURIComponent(existing.moment.slug || existing.momentId)}&reviewComment=${existing.id}&review=approved`,
       });
     }
 
@@ -475,7 +476,7 @@ export class MomentCommentService {
         type: 'system',
         title: '瞬间评论未通过',
         content: `瞬间：「${existing.moment.title}」\n你的评论：${contentPreview(existing.content)}\n审核结果：未通过${reason ? `\n原因：${reason}` : ''}`,
-        link: `/moments?focus=${encodeURIComponent(existing.moment.slug || existing.momentId)}`,
+        link: `/moments?focus=${encodeURIComponent(existing.moment.slug || existing.momentId)}&reviewComment=${existing.id}&review=rejected`,
       });
     }
 

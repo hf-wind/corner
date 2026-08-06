@@ -96,11 +96,9 @@ export class AiController {
   async chat(@Body() dto: ChatDto, @Req() req: Request) {
     const actor = this.chatActor(req);
     const result = await this.ai.petChat(actor, dto.message, dto.article);
-    const recommendations = await this.aiNative.search(
-      dto.message,
-      this.recommendationTypes(dto.article?.type, dto.message),
-      4,
-    );
+    const recommendations = this.shouldRecommend(dto.message)
+      ? await this.aiNative.search(dto.message, this.recommendationTypes(dto.article?.type, dto.message), 2)
+      : [];
     await this.aiNative
       .track(
         actor,
@@ -111,7 +109,14 @@ export class AiController {
           sourceId: dto.article?.sourceId,
           metadata: { query: dto.message.slice(0, 160) },
         },
-        { sourceCount: recommendations.length },
+        {
+          sourceCount: recommendations.length,
+          inputChars: dto.message.length,
+          outputChars: String(result.reply || '').length,
+          inputTokens: Math.ceil(dto.message.length / 2),
+          outputTokens: Math.ceil(String(result.reply || '').length / 2),
+          fallback: result.source !== 'ai',
+        },
       )
       .catch(() => undefined);
     return { ...result, recommendations };
@@ -138,18 +143,20 @@ export class AiController {
       }
     };
 
+    let streamOutput = '';
     try {
       const result = await this.ai.petChatStream(
         actor,
         dto.message,
         dto.article,
-        (token) => writeEvent('token', token),
+        (token) => {
+          streamOutput += token;
+          writeEvent('token', token);
+        },
       );
-      const recommendations = await this.aiNative.search(
-        dto.message,
-        this.recommendationTypes(dto.article?.type, dto.message),
-        4,
-      );
+      const recommendations = this.shouldRecommend(dto.message)
+        ? await this.aiNative.search(dto.message, this.recommendationTypes(dto.article?.type, dto.message), 2)
+        : [];
       await this.aiNative
         .track(
           actor,
@@ -160,7 +167,14 @@ export class AiController {
             sourceId: dto.article?.sourceId,
             metadata: { query: dto.message.slice(0, 160) },
           },
-          { sourceCount: recommendations.length },
+          {
+            sourceCount: recommendations.length,
+            inputChars: dto.message.length,
+            outputChars: streamOutput.length,
+            inputTokens: Math.ceil(dto.message.length / 2),
+            outputTokens: Math.ceil(streamOutput.length / 2),
+            fallback: result.source !== 'ai',
+          },
         )
         .catch(() => undefined);
       writeEvent('done', { ...result, recommendations });
@@ -192,10 +206,19 @@ export class AiController {
     return byScene[String(type || '')] || [];
   }
 
+  private shouldRecommend(query: string) {
+    return /(推荐|找一|找个|看看|探索|类似|下一篇|哪本|哪部|相册|书影|歌|音乐|内容)/u.test(query);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get('chat/history')
   history(@Req() req: Request, @Query('limit') limit?: string) {
     return this.ai.getHistory(this.chatActor(req), limit ? Number(limit) : 30);
+  }
+
+  @Get('search')
+  search(@Query('q') query = '', @Query('limit') limit?: string) {
+    return this.aiNative.search(String(query || ''), [], limit ? Number(limit) : 12);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -364,6 +387,13 @@ export class AiController {
   @Get('admin/analytics')
   analytics() {
     return this.aiNative.analytics();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get('admin/usage')
+  usage() {
+    return this.aiNative.usageAnalytics();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

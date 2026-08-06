@@ -108,8 +108,7 @@
     <aside class="sidebar-right">
       <section v-if="mySite" class="right-card site-card">
         <span class="aside-kicker">MY SITE CARD</span>
-        <div class="site-avatar"><img v-if="mySite.avatar" :src="mediaUrl(mySite.avatar)" :alt="mySite.name"><Icon v-else name="ph:house-line-bold" /></div>
-        <h3>{{ mySite.name }}</h3>
+        <div class="site-avatar"><img :src="siteLogoUrl" :alt="`${mySite.name} Logo`"></div>
         <dl class="site-details">
           <div v-for="item in siteCopyItems" :key="item.label"><button type="button" :title="`复制${item.label}`" :aria-label="`复制${item.label}`" @click="copySiteField(item.label, item.value)"><Icon :name="item.icon" /><span>{{ item.value }}</span><Icon name="ph:copy-bold" /></button></div>
         </dl>
@@ -307,4 +306,6 @@ useHead({ title: '友情链接' })
 .welcome-orbit-track { position:absolute; inset:0; border-radius:50%; animation:welcome-spin 10s linear infinite; }.welcome-orbit-track::before { position:absolute; inset:13px; border:1px dashed color-mix(in srgb,var(--c-primary) 34%,transparent); border-radius:50%; content:''; }.welcome-orbit-track i { position:absolute; width:9px; height:9px; border:2px solid var(--ld-bg-card); border-radius:50%; background:var(--c-primary); box-shadow:0 0 12px color-mix(in srgb,var(--c-primary) 55%,transparent); }.welcome-orbit-track i:first-child { top:8px; right:12px; }.welcome-orbit-track i:last-child { bottom:11px; left:5px; background:var(--ui-accent-warm); }.welcome-orbit>svg { position:relative; z-index:1; animation:welcome-planet 4.5s ease-in-out infinite; }.welcome-orbit-pulse { position:absolute; inset:28px; border-radius:50%; background:var(--c-primary-soft); animation:welcome-pulse 3.2s ease-in-out infinite; }
 @keyframes welcome-spin { to { transform:rotate(360deg); } } @keyframes welcome-planet { 50% { transform:translateY(-4px) rotate(8deg); } } @keyframes welcome-pulse { 50% { opacity:.25; transform:scale(1.45); } }
 @media (prefers-reduced-motion:reduce) { .welcome-orbit-track,.welcome-orbit>svg,.welcome-orbit-pulse { animation:none; } }
+.form-icon { width:38px; height:38px; border:1px solid color-mix(in srgb,var(--c-primary) 12%,transparent); border-radius:10px; background:linear-gradient(145deg,var(--c-primary-soft),color-mix(in srgb,var(--ld-bg-card) 72%,transparent)); box-shadow:none; color:var(--c-primary); }
+.form-icon.danger { border-color:color-mix(in srgb,#e56a6a 18%,transparent); background:color-mix(in srgb,#e56a6a 10%,var(--ld-bg-card)); color:#cf6262; }
 </style>

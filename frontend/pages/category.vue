@@ -169,4 +169,6 @@ useHead({ title: '文章分类' })
 .category-card.active { background:linear-gradient(135deg,color-mix(in srgb,var(--category-color) 10%,var(--ld-bg-card)),var(--ld-bg-card)); }
 .category-icon { color:var(--category-color); background:color-mix(in srgb,var(--category-color) 13%,transparent); }
 .category-count strong,.category-arrow { color:var(--category-color); }
+.category-icon { width:42px; height:42px; border:1px solid color-mix(in srgb,var(--category-color) 14%,transparent); border-radius:10px; background:linear-gradient(145deg,color-mix(in srgb,var(--category-color) 12%,transparent),color-mix(in srgb,var(--ld-bg-card) 72%,transparent)); color:var(--category-color); font-size:1.25rem; }
+.result-icon { width:34px; height:34px; border:1px solid color-mix(in srgb,var(--c-primary) 12%,transparent); border-radius:10px; background:linear-gradient(145deg,var(--c-primary-soft),color-mix(in srgb,var(--ld-bg-card) 72%,transparent)); box-shadow:none; color:var(--c-primary); }
 </style>

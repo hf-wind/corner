@@ -10,7 +10,7 @@
         <header class="pet-chat-head">
           <div class="pet-chat-title">
             <span class="pet-chat-avatar" aria-hidden="true">
-              <Icon name="ph:sparkle-fill" />
+              <span class="dora-avatar-image" :style="{ backgroundImage: `url(${spriteUrl})` }" />
             </span>
             <div>
               <div class="pet-name-row">
@@ -34,6 +34,9 @@
         </header>
 
         <div ref="listRef" class="pet-chat-list">
+          <div v-if="historyLoading" class="pet-history-loading" aria-label="正在加载历史消息">
+            <span /><span /><span />
+          </div>
           <div
             v-for="(m, i) in messages"
             :key="i"
@@ -331,6 +334,7 @@ const listRef = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const showHint = ref(true);
 const historyLoaded = ref(false);
+const historyLoading = ref(false);
 const suppressActions = ref(false);
 let streamController: AbortController | null = null;
 let scrollFrame: number | null = null;
@@ -798,8 +802,13 @@ async function toggleChat() {
 
 async function prepareChat() {
   if (!historyLoaded.value && !isContentMode.value) {
-    await loadHistory();
-    historyLoaded.value = true;
+    historyLoading.value = true;
+    try {
+      await loadHistory();
+      historyLoaded.value = true;
+    } finally {
+      historyLoading.value = false;
+    }
   }
   if (messages.value.length === 0) {
     const fallback = isContentMode.value
@@ -859,6 +868,7 @@ async function sendMessage(text: string) {
           scene: eventScene.value,
         }
       : undefined;
+    let pendingCards: SourceCard[] = [];
     await api.postStream(
       "/ai/chat/stream",
       { message: text, article },
@@ -867,8 +877,7 @@ async function sendMessage(text: string) {
           responseMarkdown += data;
         }
         if (event === "done" && Array.isArray(data?.recommendations)) {
-          const message = messages.value[assistantIndex];
-          if (message) message.cards = data.recommendations;
+          pendingCards = data.recommendations.slice(0, 2);
         }
         if (event === "done" && Array.isArray(data?.music)) {
           const message = messages.value[assistantIndex];
@@ -888,6 +897,11 @@ async function sendMessage(text: string) {
     );
     enqueueTyping(responseMarkdown || "……", assistantIndex);
     await waitForTypingDrain();
+    if (pendingCards.length) {
+      await new Promise(resolve => window.setTimeout(resolve, 180));
+      const message = messages.value[assistantIndex];
+      if (message) message.cards = pendingCards;
+    }
   } catch (error: any) {
     if (error?.name !== "AbortError") {
       enqueueTyping(
@@ -1236,15 +1250,15 @@ onUnmounted(() => {
 .pet-hint {
   position: absolute;
   right: calc(100% + 10px);
-  top: 50%;
+  top: 46%;
   transform: translateY(-50%);
   width: max-content;
-  max-width: min(240px, calc(100vw - 132px));
-  padding: 8px 12px;
-  border-radius: 12px;
+  max-width: min(196px, calc(100vw - 132px));
+  padding: 6px 9px;
+  border-radius: 10px;
   background: var(--ld-bg-card);
   color: var(--c-text-1);
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
   text-align: left;
@@ -1271,13 +1285,13 @@ onUnmounted(() => {
   height: min(520px, calc(100dvh - 150px));
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
+  border-radius: 18px;
   background: color-mix(in srgb, var(--ld-bg-card) 98%, var(--c-primary-soft));
   box-shadow:
     0 18px 46px color-mix(in srgb, #000 20%, var(--ld-shadow)),
     0 1px 0 color-mix(in srgb, #fff 60%, transparent) inset;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 12%, var(--border));
 }
 
 .pet-chat-head {
@@ -1288,9 +1302,9 @@ onUnmounted(() => {
   padding: 14px;
   background: color-mix(in srgb, var(--ld-bg-card) 80%, var(--c-primary-soft));
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-  box-shadow: inset 0 2px 0
-    color-mix(in srgb, var(--c-primary) 48%, transparent);
+  position: relative;
 }
+.pet-chat-head::after { content: ""; position: absolute; left: 14px; bottom: -1px; width: 32px; height: 3px; border-radius: 999px; background: var(--c-primary); opacity: .65; }
 
 .pet-chat-title {
   display: flex;
@@ -1307,16 +1321,14 @@ onUnmounted(() => {
   height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  color: #fff;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--c-primary) 78%, #fff),
-    var(--c-primary)
-  );
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--c-primary-soft);
   box-shadow: 0 8px 20px color-mix(in srgb, var(--c-primary) 28%, transparent);
   flex-shrink: 0;
 }
+
+.dora-avatar-image { display: block; width: 100%; height: 100%; background-repeat: no-repeat; background-size: 288px 312px; background-position: 0 0; transform: scale(1.18); transform-origin: center; }
 
 .pet-chat-avatar :deep(.icon) {
   font-size: 1rem;
@@ -1638,16 +1650,21 @@ onUnmounted(() => {
   grid-template-columns: 18px minmax(0, 1fr) 40px;
   align-items: end;
   gap: 8px;
-  margin: 10px;
-  padding: 8px 8px 8px 11px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
-  border-radius: 8px;
-  background: var(--c-bg-1);
+  margin: 10px 12px 12px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c-bg-1) 74%, transparent);
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
 }
+
+.pet-history-loading { display: grid; gap: 8px; width: 74%; padding: 4px 0 10px; }
+.pet-history-loading span { display: block; height: 34px; border-radius: 14px 14px 14px 4px; background: linear-gradient(90deg, var(--c-bg-2), color-mix(in srgb, var(--c-primary-soft) 65%, var(--c-bg-2)), var(--c-bg-2)); background-size: 220% 100%; animation: pet-loading 1.2s ease-in-out infinite; }
+.pet-history-loading span:nth-child(2) { width: 86%; margin-left: 14%; border-radius: 14px 14px 4px 14px; }
+.pet-history-loading span:nth-child(3) { width: 62%; }
+@keyframes pet-loading { to { background-position: -120% 0; } }
 
 .pet-chat-form:focus-within {
   border-color: color-mix(in srgb, var(--c-primary) 58%, var(--border));
@@ -1808,7 +1825,7 @@ onUnmounted(() => {
   .pet-chat {
     width: min(368px, calc(100vw - 20px));
     height: min(500px, calc(68dvh - env(safe-area-inset-bottom)));
-    border-radius: 8px;
+    border-radius: 18px;
   }
 
   .pet-actions {
@@ -1904,14 +1921,15 @@ onUnmounted(() => {
   gap: 6px;
   width: 94%;
   margin-top: 7px;
+  animation: pet-source-in .48s cubic-bezier(.16,1,.3,1) both;
 }
 .pet-source-cards a {
   position: relative;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 12px;
+  grid-template-columns: 38px minmax(0, 1fr) 12px;
   align-items: center;
   gap: 8px;
-  min-height: 56px;
+  min-height: 46px;
   padding: 5px 8px 5px 5px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -1928,14 +1946,15 @@ onUnmounted(() => {
 }
 .pet-source-media {
   display: grid;
-  width: 48px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   overflow: hidden;
   border-radius: 6px;
   background: var(--c-bg-2);
   color: var(--c-primary);
   place-items: center;
 }
+@keyframes pet-source-in { from { opacity: 0; transform: translateY(7px); } }
 .pet-source-media img {
   width: 100%;
   height: 100%;

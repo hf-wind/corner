@@ -211,7 +211,9 @@ onUnmounted(() => {
   transform: scale(0.7);
   opacity: 0.4;
   contain: layout paint;
-  transition: transform 0.28s ease-out, opacity 0.24s ease-out;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ld-shadow) 32%, transparent);
+  will-change: transform;
+  transition: transform 0.5s cubic-bezier(.16,1,.3,1), opacity 0.32s ease, box-shadow 0.5s cubic-bezier(.16,1,.3,1);
 }
 
 .swiper-card-3d.prev,
@@ -233,14 +235,16 @@ onUnmounted(() => {
   z-index: 3;
   transform: scale(1);
   opacity: 1;
-  outline: 1px solid color-mix(in srgb, var(--c-primary) 22%, transparent);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--ld-shadow) 58%, transparent);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .swiper-card-3d:hover {
     opacity: 1;
-    outline-color: color-mix(in srgb, var(--c-primary) 48%, transparent);
+    box-shadow: 0 22px 44px color-mix(in srgb, var(--ld-shadow) 72%, transparent);
   }
+  .swiper-card-3d.active:hover { transform: translate3d(0,-5px,0) scale(1.025); }
+  .swiper-card-3d.prev:hover,.swiper-card-3d.next:hover { transform: translate3d(0,-3px,0) scale(.89); }
 }
 
 .swiper-card-3d img {
@@ -248,7 +252,9 @@ onUnmounted(() => {
   height: 160px;
   object-fit: cover;
   display: block;
+  transition: transform .7s cubic-bezier(.16,1,.3,1), filter .45s ease;
 }
+.swiper-card-3d:hover img { transform: scale(1.045); filter: saturate(1.08); }
 
 .swiper-overlay {
   position: absolute;

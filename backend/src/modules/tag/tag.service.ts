@@ -17,7 +17,7 @@ export class TagService {
 
   async findAll() {
     const items = await this.prisma.tag.findMany({
-      include: { _count: { select: { posts: true } } },
+      include: { _count: { select: { posts: { where: { post: { status: 'published' } } } } } },
       orderBy: { name: 'asc' },
     });
     return items.map((t) => ({ ...t, postCount: t._count.posts }));
@@ -26,7 +26,7 @@ export class TagService {
   async findBySlug(slug: string) {
     const tag = await this.prisma.tag.findUnique({
       where: { slug },
-      include: { _count: { select: { posts: true } } },
+      include: { _count: { select: { posts: { where: { post: { status: 'published' } } } } } },
     });
     if (!tag) throw new NotFoundException('Tag not found');
     return { ...tag, postCount: tag._count.posts };
@@ -35,7 +35,7 @@ export class TagService {
   async findPosts(slug: string, page = 1, limit = 20) {
     const tag = await this.prisma.tag.findUnique({ where: { slug } });
     if (!tag) throw new NotFoundException('Tag not found');
-    const where = { tags: { some: { tagId: tag.id } } };
+    const where = { status: 'published' as const, tags: { some: { tagId: tag.id } } };
     const [items, total] = await Promise.all([
       this.prisma.post.findMany({
         where,

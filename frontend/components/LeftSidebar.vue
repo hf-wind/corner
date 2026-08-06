@@ -81,7 +81,7 @@
             <span>返回前台</span>
           </NuxtLink>
         </div>
-        <div class="theme-pill">
+        <div class="theme-pill" :class="`theme-${theme}`">
           <button
             :class="{ active: theme === 'light' }"
             @click="setTheme('light')"
@@ -831,6 +831,7 @@ watch(
 }
 
 .theme-pill {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -840,9 +841,15 @@ watch(
   margin: 0 auto;
   background: var(--c-bg-2);
   border-radius: 1.2rem;
+  isolation: isolate;
 }
+.theme-pill::before { position:absolute; z-index:0; top:3px; bottom:3px; left:3px; width:34px; border-radius:1rem; background:var(--ld-bg-card); box-shadow:.1em .2em .5em var(--ld-shadow); content:''; transform:translate3d(0,0,0); transition:transform .5s cubic-bezier(.16,1,.3,1),background-color .3s ease; }
+.theme-pill.theme-dark::before { transform:translate3d(37px,0,0); }
+.theme-pill.theme-auto::before { transform:translate3d(74px,0,0); }
 
 .theme-pill button {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -858,9 +865,9 @@ watch(
 }
 
 .theme-pill button.active {
-  background: var(--ld-bg-card);
+  background: transparent;
   color: var(--c-text);
-  box-shadow: 0.1em 0.2em 0.5em var(--ld-shadow);
+  box-shadow: none;
 }
 
 .font-pill {
@@ -983,6 +990,9 @@ watch(
   width: 34px;
   padding: 7px 0;
 }
+.is-collapsed .theme-pill::before { top:3px; left:4px; width:34px; height:31px; bottom:auto; }
+.is-collapsed .theme-pill.theme-dark::before { transform:translate3d(0,34px,0); }
+.is-collapsed .theme-pill.theme-auto::before { transform:translate3d(0,68px,0); }
 .is-collapsed .admin-collapse-button {
   width: 42px;
   padding: 8px 0;

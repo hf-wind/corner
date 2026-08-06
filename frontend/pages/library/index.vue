@@ -14,7 +14,7 @@
 
     <section class="collection-section">
       <header class="collection-toolbar">
-        <div class="filter-tabs" role="tablist">
+        <div class="filter-tabs" role="tablist" :style="{ '--active-index': activeTabIndex }">
           <button v-for="option in tabs" :key="option.value" type="button" :class="{ active: activeType === option.value }" @click="changeType(option.value)">
             <Icon :name="option.icon" />{{ option.label }}<span>{{ option.count }}</span>
           </button>
@@ -60,6 +60,7 @@ const page = ref(1)
 const totalPages = ref(1)
 const meta = reactive({ books: 0, films: 0, total: 0 })
 let requestSequence = 0
+const activeTabIndex = computed(() => Math.max(0, ['all', 'book', 'film'].indexOf(activeType.value)))
 const tabs = computed(() => [
   { value: 'all' as FilterType, label: '全部收藏', icon: 'ph:squares-four-bold', count: meta.total },
   { value: 'book' as FilterType, label: '阅读书架', icon: 'ph:book-open-text-bold', count: meta.books },
@@ -113,7 +114,7 @@ useHead({ title: '书影', meta: [{ name: 'description', content: '风隅随笔�
 .hero-number { position:absolute; right:1px; bottom:12px; color:var(--c-text-3); font-size:.44rem; letter-spacing:.15em; line-height:1.5; text-align:right; opacity:.65; }
 .collection-section { position:relative; width:100%; margin:0 auto; padding:26px 0 44px; }
 .collection-toolbar { display:flex; align-items:center; justify-content:space-between; gap:20px; }
-.filter-tabs { display:flex; gap:5px; padding:4px; border-radius:12px; background:var(--c-bg-2); }.filter-tabs button { display:flex; height:36px; align-items:center; gap:7px; padding:0 13px; border:0; border-radius:9px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.68rem; transition:.2s ease; }.filter-tabs button span { color:var(--c-text-3); font-size:.53rem; }.filter-tabs button.active { background:var(--ld-bg-card); box-shadow:0 4px 13px var(--ld-shadow); color:var(--library-accent); font-weight:700; }
+.filter-tabs { --active-index:0; position:relative; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; padding:4px; border-radius:12px; background:var(--c-bg-2); isolation:isolate; }.filter-tabs::before { position:absolute; z-index:0; top:4px; bottom:4px; left:4px; width:calc((100% - 18px)/3); border-radius:9px; background:var(--ld-bg-card); box-shadow:0 4px 13px var(--ld-shadow); content:''; transform:translate3d(calc(var(--active-index) * (100% + 5px)),0,0); transition:transform .5s cubic-bezier(.16,1,.3,1),background-color .3s ease; }.filter-tabs button { position:relative; z-index:1; display:flex; min-width:0; height:36px; align-items:center; justify-content:center; gap:7px; padding:0 13px; border:0; border-radius:9px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.68rem; transition:color .32s ease,transform .42s cubic-bezier(.16,1,.3,1); }.filter-tabs button span { color:var(--c-text-3); font-size:.53rem; }.filter-tabs button.active { color:var(--library-accent); font-weight:700; transform:translateY(-1px); }
 .library-search { display:flex; width:min(270px,100%); height:38px; align-items:center; gap:8px; padding:0 11px; border-bottom:1px solid var(--border); color:var(--c-text-3); transition:border-color .2s; }.library-search:focus-within { border-color:var(--library-accent); }.library-search input { min-width:0; flex:1; border:0; outline:0; background:transparent; color:var(--c-text); font:inherit; font-size:.68rem; }.library-search button { display:grid; border:0; background:transparent; color:var(--c-text-3); cursor:pointer; place-items:center; }
 .section-intro { display:flex; align-items:flex-end; justify-content:space-between; gap:30px; margin:30px 0 16px; }.section-intro span { color:var(--library-accent); font-size:.48rem; font-weight:700; letter-spacing:.2em; }.section-intro h2 { margin:5px 0 0; font-family:var(--font-heading); font-size:1.3rem; }.section-intro p { max-width:465px; color:var(--c-text-3); font-size:.65rem; line-height:1.8; text-align:right; }
 .card-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }

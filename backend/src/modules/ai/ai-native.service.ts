@@ -673,4 +673,37 @@ export class AiNativeService {
       })),
     };
   }
+
+  async usageAnalytics() {
+    const [totals, userGroups, guestGroups, daily] = await Promise.all([
+      this.prisma.aiInteraction.aggregate({ where: { action: 'chat' }, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true } }),
+      this.prisma.aiInteraction.groupBy({ by: ['userId'], where: { action: 'chat', userId: { not: null } }, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true }, orderBy: { _sum: { outputTokens: 'desc' } }, take: 50 }),
+      this.prisma.aiInteraction.groupBy({ by: ['guestIdHash'], where: { action: 'chat', actorType: 'guest', guestIdHash: { not: null } }, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true }, orderBy: { _sum: { outputTokens: 'desc' } }, take: 50 }),
+      this.prisma.aiInteraction.findMany({ where: { action: 'chat', createdAt: { gte: new Date(Date.now() - 30 * 86400000) } }, select: { createdAt: true, inputTokens: true, outputTokens: true }, orderBy: { createdAt: 'asc' } }),
+    ]);
+    const userIds = userGroups.map((item) => item.userId).filter(Boolean) as string[];
+    const users = await this.prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, username: true, email: true } });
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const inputPrice = Math.max(0, Number(process.env.AI_INPUT_PRICE_PER_1M || 0));
+    const outputPrice = Math.max(0, Number(process.env.AI_OUTPUT_PRICE_PER_1M || 0));
+    const present = (input = 0, output = 0) => ({ inputTokens: input, outputTokens: output, totalTokens: input + output, estimatedCostUsd: Number(((input * inputPrice + output * outputPrice) / 1_000_000).toFixed(6)) });
+    const byDay = new Map<string, { input: number; output: number; calls: number }>();
+    for (const item of daily) {
+      const key = item.createdAt.toISOString().slice(0, 10);
+      const current = byDay.get(key) || { input: 0, output: 0, calls: 0 };
+      current.input += item.inputTokens || 0;
+      current.output += item.outputTokens || 0;
+      current.calls += 1;
+      byDay.set(key, current);
+    }
+    return {
+      pricing: { inputPerMillionUsd: inputPrice, outputPerMillionUsd: outputPrice, estimated: true },
+      totals: { calls: totals._count._all, ...present(totals._sum.inputTokens || 0, totals._sum.outputTokens || 0) },
+      actors: [
+        ...userGroups.map((item) => { const user = item.userId ? userMap.get(item.userId) : undefined; return { actorType: 'user', actorId: item.userId, name: user?.username || '已注销用户', email: user?.email || '', calls: item._count._all, ...present(item._sum.inputTokens || 0, item._sum.outputTokens || 0) }; }),
+        ...guestGroups.map((item) => ({ actorType: 'guest', actorId: item.guestIdHash?.slice(0, 12), name: `访客 ${item.guestIdHash?.slice(0, 8)}`, email: '', calls: item._count._all, ...present(item._sum.inputTokens || 0, item._sum.outputTokens || 0) })),
+      ].sort((left, right) => right.totalTokens - left.totalTokens),
+      daily: [...byDay.entries()].map(([date, item]) => ({ date, calls: item.calls, ...present(item.input, item.output) })),
+    };
+  }
 }

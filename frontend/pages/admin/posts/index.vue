@@ -10,7 +10,7 @@
 
     <a-spin :spinning="loading" class="table-spin">
       <a-card :bordered="false" class="list-card" size="small">
-        <a-table :dataSource="posts" :columns="columns" rowKey="slug" size="small" :pagination="false" :locale="{ emptyText: '暂无文章' }">
+        <a-table :dataSource="posts" :columns="columns" rowKey="slug" size="small" :pagination="false" :scroll="{ x: 1230 }" :locale="{ emptyText: '暂无文章' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'title'">
               <div class="post-title">
@@ -98,7 +98,7 @@ const statusOptions = [
 ]
 
 const columns = [
-  { title: '标题', dataIndex: 'title', key: 'title', minWidth: 200 },
+  { title: '标题', dataIndex: 'title', key: 'title', width: 360 },
   { title: '分类', dataIndex: 'categoryName', key: 'categoryName', width: 90 },
   { title: '标签', key: 'tags', width: 140 },
   { title: '状态', key: 'status', width: 100 },

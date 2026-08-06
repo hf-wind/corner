@@ -1,5 +1,6 @@
 import type { Comment, Reply } from '~/types/article'
 import { renderCommentContent } from '~/utils/commentContent'
+import { useNotifications } from '~/composables/useNotifications'
 
 export interface UseCommentsOptions {
   apiBase: '/comments' | '/moment-comments'
@@ -12,6 +13,7 @@ export function useComments(opts: UseCommentsOptions) {
   const api = useApi()
   const { mediaUrl } = useMediaUrl()
   const { user, isLoggedIn } = useAuth()
+  const { latestItems, connectRealtime } = useNotifications()
 
   const PAGE_SIZE = opts.pageSize ?? 10
   const REPLY_PAGE_SIZE = opts.replyPageSize ?? 3
@@ -26,6 +28,8 @@ export function useComments(opts: UseCommentsOptions) {
   const replyTarget = ref<{ commentId: string; parentId: string; name: string } | null>(null)
   const replySubmitting = ref(false)
   const loadedReplyPages = new Map<string, number>()
+  const pendingReviewIds = new Set<string>()
+  const reviewTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   const hasMore = computed(() => page.value < totalPages.value)
 
@@ -145,7 +149,7 @@ export function useComments(opts: UseCommentsOptions) {
       total.value += 1
       totalPages.value = Math.max(1, Math.ceil(total.value / PAGE_SIZE))
       toast.success('评论已提交，正在审核')
-      pollStatus(created.id)
+      watchReviewStatus(created.id)
       return true
     } catch (e: any) {
       toast.error(`评论失败：${e?.message || ''}`)
@@ -171,7 +175,7 @@ export function useComments(opts: UseCommentsOptions) {
       parentComment.localReplies.push(newReply)
       parentComment.replyCount = (parentComment.replyCount || 0) + 1
       toast.success('回复已提交，正在审核')
-      pollStatus(created.id)
+      watchReviewStatus(created.id)
       return true
     } catch (e: any) {
       toast.error(`回复失败：${e?.message || ''}`)
@@ -232,24 +236,54 @@ export function useComments(opts: UseCommentsOptions) {
     }
   }
 
-  function pollStatus(commentId: string, maxAttempts = 60) {
-    let attempts = 0
-    const timer = setInterval(async () => {
-      attempts += 1
-      if (attempts > maxAttempts) {
-        clearInterval(timer)
-        return
-      }
-      try {
-        const result = await api.get<any>(replyEndpoint(`/${commentId}/status`))
-        if (!result || result.status === 'pending') return
-        clearInterval(timer)
+  function applyReviewNotification(notification: { link?: string | null }) {
+    if (!notification.link) return
+    try {
+      const url = new URL(notification.link, window.location.origin)
+      const commentId = url.searchParams.get('reviewComment') || ''
+      const status = url.searchParams.get('review')
+      if (!commentId || !pendingReviewIds.has(commentId) || !['approved', 'rejected'].includes(status || '')) return
+      pendingReviewIds.delete(commentId)
+      const timer = reviewTimers.get(commentId)
+      if (timer) clearTimeout(timer)
+      reviewTimers.delete(commentId)
+      applyStatus(commentId, status as 'approved' | 'rejected')
+      if (status === 'approved') useToast().success('你的评论已通过审核')
+      else useToast().error('你的评论未通过审核')
+    } catch { /* malformed notification links are ignored */ }
+  }
+
+  watch(latestItems, (items) => items.forEach(applyReviewNotification), { deep: true })
+
+  function watchReviewStatus(commentId: string) {
+    pendingReviewIds.add(commentId)
+    connectRealtime()
+    const timer = setTimeout(() => void fallbackReviewCheck(commentId, 0), 15000)
+    reviewTimers.set(commentId, timer)
+    latestItems.value.forEach(applyReviewNotification)
+  }
+
+  async function fallbackReviewCheck(commentId: string, attempts: number) {
+    if (!pendingReviewIds.has(commentId) || attempts >= 4) return
+    try {
+      const result = await api.get<any>(replyEndpoint(`/${commentId}/status`))
+      if (result && result.status !== 'pending') {
+        pendingReviewIds.delete(commentId)
         applyStatus(commentId, result.status)
         if (result.status === 'approved') useToast().success('你的评论已通过审核')
-        else useToast().error(`你的评论未通过审核${result.aiReview ? `：${result.aiReview}` : ''}`)
-      } catch { /* retry transient failures */ }
-    }, opts.apiBase === '/moment-comments' ? 2000 : 5000)
+        else useToast().error('你的评论未通过审核')
+        return
+      }
+    } catch { /* SSE remains the primary path */ }
+    const timer = setTimeout(() => void fallbackReviewCheck(commentId, attempts + 1), 10000)
+    reviewTimers.set(commentId, timer)
   }
+
+  onUnmounted(() => {
+    reviewTimers.forEach(timer => clearTimeout(timer))
+    reviewTimers.clear()
+    pendingReviewIds.clear()
+  })
 
   function cancelReply() {
     replyTarget.value = null
@@ -276,7 +310,7 @@ export function useComments(opts: UseCommentsOptions) {
     submitComment,
     submitReply,
     toggleLike,
-    pollStatus,
+    pollStatus: watchReviewStatus,
     cancelReply,
   }
 }

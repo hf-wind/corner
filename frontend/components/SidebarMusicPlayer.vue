@@ -44,14 +44,14 @@
                 {{ pl.name }}
               </button>
             </div>
-            <button
-              type="button"
-              class="smp-icon-btn"
-              title="关闭"
-              @click="listOpen = false"
-            >
-              <Icon name="ph:caret-down-bold" />
-            </button>
+            <div class="smp-list-actions">
+              <button type="button" class="smp-icon-btn" title="定位当前歌曲" @click="locateCurrentTrack">
+                <Icon name="ph:crosshair-bold" />
+              </button>
+              <button type="button" class="smp-icon-btn" title="关闭" @click="listOpen = false">
+                <Icon name="ph:caret-down-bold" />
+              </button>
+            </div>
           </div>
           <div class="smp-list-body" @scroll.passive="onTrackListScroll">
             <button
@@ -618,7 +618,17 @@ function toggleMute() {
 
 function toggleList() {
   listOpen.value = !listOpen.value;
-  if (listOpen.value) barOpen.value = true;
+  if (listOpen.value) {
+    barOpen.value = true;
+    void nextTick(locateCurrentTrack);
+  }
+}
+
+function locateCurrentTrack() {
+  rootRef.value?.querySelector<HTMLElement>(".smp-track.active")?.scrollIntoView({
+    block: "center",
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+  });
 }
 
 function onTrackListScroll(event: Event) {
@@ -971,6 +981,7 @@ watch(listOpen, (v) => {
   padding: 8px 8px 6px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
+.smp-list-actions { display: flex; align-items: center; gap: 2px; }
 
 .smp-list-tabs {
   flex: 1;
@@ -1094,14 +1105,14 @@ watch(listOpen, (v) => {
 .smp-list-enter-active,
 .smp-list-leave-active {
   transition:
-    opacity 0.22s ease,
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.32s ease,
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .smp-list-enter-from,
 .smp-list-leave-to {
   opacity: 0;
-  transform: translateY(8px) scale(0.96);
+  transform: translate3d(0, 12px, 0) scale(0.975);
 }
 
 @keyframes smp-spin {

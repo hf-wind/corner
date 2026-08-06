@@ -148,4 +148,5 @@ useHead({ title: '文章标签' })
 .tag-chip { --tag-color:var(--c-primary); border-color:color-mix(in srgb,var(--tag-color) 24%,var(--border)); background:color-mix(in srgb,var(--ld-bg-card) 92%,var(--tag-color) 8%); color:var(--tag-color); }
 .tag-chip:hover { border-color:var(--tag-color); color:var(--tag-color); }
 .tag-chip.active { border-color:var(--tag-color); background:var(--tag-color); box-shadow:0 7px 18px color-mix(in srgb,var(--tag-color) 28%,transparent); color:#fff; }
+.result-icon { width:34px; height:34px; border:1px solid color-mix(in srgb,var(--c-primary) 12%,transparent); border-radius:10px; background:linear-gradient(145deg,var(--c-primary-soft),color-mix(in srgb,var(--ld-bg-card) 72%,transparent)); }
 </style>

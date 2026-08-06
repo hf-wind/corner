@@ -15,6 +15,7 @@
         <span
           v-for="card in previewCards"
           :key="`${card.type}:${card.sourceId}`"
+          :class="`preview-${card.type}`"
         >
           <img v-if="cardImage(card)" :src="cardImage(card)" alt="" />
           <Icon v-else :name="typeIcon(card.type)" />
@@ -97,10 +98,12 @@
 
             <div v-if="cards.length" class="discovery-results">
               <NuxtLink
-                v-for="card in cards"
+                v-for="(card, index) in cards"
                 :key="`${card.type}:${card.sourceId}`"
                 :to="card.href"
                 class="discovery-card"
+                :class="`type-${card.type}`"
+                :style="{ '--result-index': index }"
                 @click="track(card)"
               >
                 <figure>
@@ -112,10 +115,10 @@
                   />
                   <Icon v-else :name="typeIcon(card.type)" />
                 </figure>
-                <div>
+                <div v-if="card.type !== 'photo'">
                   <span>{{ labels[card.type] || card.type }}</span>
                   <strong>{{ cardTitle(card) }}</strong>
-                  <p v-if="cardExcerpt(card)">{{ cardExcerpt(card) }}</p>
+                  <p v-if="cardExcerpt(card) && !['album'].includes(card.type)">{{ cardExcerpt(card) }}</p>
                 </div>
                 <Icon name="ph:arrow-up-right-bold" class="card-arrow" />
               </NuxtLink>
@@ -288,15 +291,15 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 .discovery-trigger {
   display: grid;
   width: 100%;
-  min-height: 66px;
-  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+  min-height: 104px;
+  grid-template-columns: 52px minmax(150px, 1fr) minmax(132px, 220px) auto;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 20%, var(--border));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-primary-soft));
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--ld-shadow) 58%, transparent);
+  padding: 15px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(118deg, color-mix(in srgb, var(--c-primary-soft) 58%, var(--ld-bg-card)), var(--ld-bg-card) 52%, color-mix(in srgb, #f2a65a 8%, var(--ld-bg-card)));
+  box-shadow: 0 9px 30px color-mix(in srgb, var(--ld-shadow) 38%, transparent);
   color: inherit;
   cursor: pointer;
   text-align: left;
@@ -306,7 +309,6 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
     transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .discovery-trigger:hover {
-  border-color: color-mix(in srgb, var(--c-primary) 48%, var(--border));
   box-shadow: 0 14px 34px
     color-mix(in srgb, var(--c-primary) 12%, var(--ld-shadow));
   transform: translateY(-2px);
@@ -320,10 +322,11 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
   color: var(--c-primary);
 }
 .trigger-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 8px;
-  font-size: 1.05rem;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  box-shadow: 0 0 0 7px color-mix(in srgb, var(--c-primary-soft) 55%, transparent);
 }
 .trigger-copy {
   display: flex;
@@ -341,7 +344,7 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 .trigger-copy strong {
   overflow: hidden;
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -361,17 +364,18 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
   transform: translateX(3px);
 }
 .trigger-previews {
-  display: flex;
-  padding-left: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  height: 70px;
 }
 .trigger-previews > span {
   display: grid;
-  width: 30px;
-  height: 30px;
-  margin-left: -10px;
+  width: auto;
+  height: 70px;
   overflow: hidden;
-  border: 2px solid var(--ld-bg-card);
-  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--ld-bg-card) 82%, transparent);
+  border-radius: 8px;
   background: var(--c-bg-2);
   color: var(--c-primary);
   place-items: center;
@@ -392,12 +396,12 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
   place-items: center;
 }
 .discovery-panel {
-  width: min(820px, 100%);
+  width: min(860px, 100%);
   max-height: min(760px, calc(100dvh - 48px));
   overflow-y: auto;
   padding: 22px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 24%, var(--border));
-  border-radius: 8px;
+  border-radius: 18px;
   background: color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft));
   box-shadow: 0 34px 100px rgb(0 0 0 / 34%);
 }
@@ -410,7 +414,7 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 .panel-symbol {
   width: 46px;
   height: 46px;
-  border-radius: 8px;
+  border-radius: 13px;
   font-size: 1.15rem;
 }
 .panel-head h2 {
@@ -557,20 +561,22 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 .discovery-results {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 14px;
 }
 .discovery-card {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 104px;
+  min-height: 118px;
+  grid-column: span 6;
   grid-template-columns: 94px minmax(0, 1fr);
   gap: 11px;
   padding: 8px 34px 8px 8px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--ld-bg-card);
   color: inherit;
   text-decoration: none;
@@ -578,6 +584,7 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
     border-color 0.25s ease,
     box-shadow 0.3s ease,
     transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: discovery-result-in .48s calc(var(--result-index) * 45ms) cubic-bezier(.16,1,.3,1) both;
 }
 .discovery-card:hover {
   border-color: color-mix(in srgb, var(--c-primary) 42%, var(--border));
@@ -588,12 +595,27 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
   display: grid;
   min-height: 86px;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--c-bg-2);
   color: var(--c-primary);
   font-size: 1.45rem;
   place-items: center;
 }
+.discovery-card.type-moment { grid-template-columns: 1fr; grid-template-rows: 105px auto; padding: 8px 8px 12px; }
+.discovery-card.type-moment figure { min-height: 105px; }
+.discovery-card.type-moment > div { padding: 0 4px; }
+.discovery-card.type-library { grid-template-columns: 76px minmax(0,1fr); }
+.discovery-card.type-library figure { min-height: 104px; }
+.discovery-card.type-album { min-height: 170px; grid-template-columns: 1fr; padding: 0; }
+.discovery-card.type-album figure { position: absolute; inset: 0; border-radius: inherit; }
+.discovery-card.type-album figure::after { position: absolute; inset: 42% 0 0; background: linear-gradient(transparent, rgb(0 0 0 / 72%)); content: ""; }
+.discovery-card.type-album > div { position: relative; z-index: 1; align-self: end; padding: 16px; }
+.discovery-card.type-album > div span, .discovery-card.type-album > div strong { color: #fff; }
+.discovery-card.type-photo { min-height: 170px; grid-template-columns: 1fr; padding: 0; }
+.discovery-card.type-photo figure { position: absolute; inset: 0; border-radius: inherit; }
+.discovery-card.type-photo .card-arrow { color: #fff; filter: drop-shadow(0 1px 3px rgb(0 0 0 / 50%)); }
+.discovery-card.type-place, .discovery-card.type-journey, .discovery-card.type-story { grid-column: span 4; grid-template-columns: 1fr; grid-template-rows: 86px auto; padding-right: 8px; }
+@keyframes discovery-result-in { from { opacity: 0; transform: translateY(10px); } }
 .discovery-card figure img {
   width: 100%;
   height: 100%;
@@ -711,8 +733,13 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
     grid-template-columns: 1fr;
   }
   .discovery-card {
+    grid-column: 1 !important;
     grid-template-columns: 82px minmax(0, 1fr);
   }
+  .discovery-card.type-moment,
+  .discovery-card.type-place,
+  .discovery-card.type-journey,
+  .discovery-card.type-story { grid-template-columns: 1fr; }
   .discovery-composer {
     margin-top: 16px;
     padding-left: 11px;

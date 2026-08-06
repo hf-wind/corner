@@ -4,16 +4,16 @@
       <div class="search-panel" ref="panelRef">
         <div class="search-input-wrap">
           <svg class="search-prefix" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input ref="inputRef" v-model="query" type="text" placeholder="搜索文章..." @input="onInput" class="search-input">
+          <input ref="inputRef" v-model="query" type="text" placeholder="搜索文章、瞬间、相册、书影和旅程..." @input="onInput" class="search-input">
           <kbd class="search-esc" @click="close">ESC</kbd>
         </div>
-        <div class="search-hints" v-if="!query">输入关键词搜索文章...</div>
+        <div class="search-hints" v-if="!query">输入关键词搜索站内全部内容...</div>
         <div class="search-hints" v-if="query && searching">搜索中...</div>
         <div class="search-results" v-if="query && !searching && results.length > 0">
-          <NuxtLink v-for="r in results" :key="r.slug" :to="'/article/' + r.slug" class="search-result-row" @click="close">
-            <div class="search-row-icon"><Icon name="ph:file-text-bold" /></div>
+          <NuxtLink v-for="r in results" :key="`${r.type}:${r.sourceId}`" :to="r.href" class="search-result-row" @click="close">
+            <div class="search-row-icon"><Icon :name="r.icon" /></div>
             <div class="search-row-body">
-              <div class="search-row-title" v-html="r.title"></div>
+              <div class="search-row-title">{{ r.title }}</div>
               <div class="search-row-desc">{{ r.excerpt }}</div>
             </div>
           </NuxtLink>
@@ -40,11 +40,15 @@ async function doSearch(q: string) {
   if (!q.trim()) { results.value = []; return }
   searching.value = true
   try {
-    const res = await api.get<any>('/posts', { search: q, limit: 10 })
-    results.value = (res.items ?? []).map((p: any) => ({
-      slug: p.slug,
-      title: p.title,
-      excerpt: p.excerpt || '',
+    const res = await api.get<any[]>('/ai/search', { q, limit: 12 })
+    const icons: Record<string, string> = { post: 'ph:article-bold', moment: 'ph:sparkle-bold', album: 'ph:images-square-bold', photo: 'ph:image-bold', library: 'ph:books-bold', place: 'ph:map-pin-bold', journey: 'ph:path-bold', story: 'ph:film-strip-bold' }
+    results.value = (res ?? []).map((item: any) => ({
+      type: item.type,
+      sourceId: item.sourceId,
+      href: item.href,
+      title: item.title,
+      excerpt: item.excerpt || '',
+      icon: icons[item.type] || 'ph:sparkle-bold',
     }))
   } catch { results.value = [] }
   searching.value = false

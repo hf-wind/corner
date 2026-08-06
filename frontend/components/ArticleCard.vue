@@ -101,15 +101,17 @@ function saveScroll() {
   color: inherit;
   contain: layout paint;
   transform: translateZ(0);
-  transition: transform 0.32s cubic-bezier(.16, 1, .3, 1), background-color 0.28s ease, box-shadow 0.32s cubic-bezier(.16, 1, .3, 1);
+  will-change: transform;
+  transition: transform 0.48s cubic-bezier(.16, 1, .3, 1), background-color 0.28s ease, box-shadow 0.48s cubic-bezier(.16, 1, .3, 1);
   animation: article-card-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--article-index, 0) * 36ms);
 }
 .article-card:hover {
   background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-primary-soft));
   box-shadow: 0 16px 34px color-mix(in srgb, var(--ld-shadow) 70%, transparent);
-  transform: translate3d(0, -3px, 0);
+  transform: translate3d(0, -5px, 0);
 }
+.article-card:active { transform: translate3d(0, -1px, 0) scale(.995); transition-duration: .12s; }
 
 .card-cover {
   width: 140px;
