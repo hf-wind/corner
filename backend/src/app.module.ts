@@ -34,6 +34,7 @@ import { HttpCacheInterceptor } from './common/interceptors/http-cache.intercept
 import { RssModule } from './modules/rss/rss.module';
 import { MemoryGraphModule } from './modules/memory-graph/memory-graph.module';
 import { JourneyModule } from './modules/journey/journey.module';
+import { VisitorModule } from './modules/visitor/visitor.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { JourneyModule } from './modules/journey/journey.module';
     MemoryGraphModule,
     JourneyModule,
     RssModule,
+    VisitorModule,
   ],
   controllers: [AppController],
   providers: [

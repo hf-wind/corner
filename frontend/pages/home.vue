@@ -164,7 +164,7 @@ onUnmounted(() => {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 28px 112px;
+  padding: 24px 28px 28px;
   min-width: 0;
   min-height: 0;
   overscroll-behavior: contain;

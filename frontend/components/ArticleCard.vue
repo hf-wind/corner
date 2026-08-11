@@ -239,6 +239,7 @@ function saveScroll() {
 .card-tags {
   display: flex;
   gap: 4px;
+  margin-top: 4px;
   flex-wrap: wrap;
 }
 .card-tags span {

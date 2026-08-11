@@ -20,9 +20,26 @@ function aiGuestId(): string {
   return generated;
 }
 
+function visitorGuestId(): string {
+  if (typeof window === "undefined") return "";
+  const storageKey = "corner:visitor:id";
+  const existing = localStorage.getItem(storageKey);
+  if (existing && /^[a-zA-Z0-9-]{8,64}$/.test(existing)) return existing;
+
+  const generated =
+    typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) =>
+          value.toString(16).padStart(2, "0"),
+        ).join("");
+  localStorage.setItem(storageKey, generated);
+  return generated;
+}
+
 function requestHeaders(path: string): Record<string, string> {
   const headers = authHeaders();
   if (path.startsWith("/ai/")) headers["X-AI-Guest-ID"] = aiGuestId();
+  if (path.startsWith("/visitor/")) headers["X-Visitor-ID"] = visitorGuestId();
   return headers;
 }
 

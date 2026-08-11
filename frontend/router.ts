@@ -23,6 +23,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/category", component: () => import("./pages/category.vue") },
   { path: "/tags", component: () => import("./pages/tags.vue") },
   { path: "/friends", component: () => import("./pages/friends.vue") },
+  { path: "/guestbook", component: () => import("./pages/guestbook.vue") },
   { path: "/about", component: () => import("./pages/about.vue") },
   { path: "/moments", component: () => import("./pages/moments/index.vue") },
   {
@@ -180,6 +181,11 @@ const routes: RouteRecordRaw[] = [
     meta: adminMeta,
   },
   {
+    path: "/admin/visitor",
+    component: () => import("./pages/admin/visitor.vue"),
+    meta: adminMeta,
+  },
+  {
     path: "/admin/memory-graph",
     component: () => import("./pages/admin/memory-graph.vue"),
     meta: adminMeta,
@@ -283,6 +289,10 @@ router.beforeEach(async (to) => {
     const { mapEnabled } = useFeatureFlags();
     if (!mapEnabled) return "/home";
   }
+  if (to.path === "/guestbook") {
+    const { guestbookEnabled } = useFeatureFlags();
+    if (!guestbookEnabled) return "/home";
+  }
   if (
     to.path === "/albums" ||
     to.path.startsWith("/albums/") ||
@@ -314,12 +324,35 @@ router.beforeEach(async (to) => {
   return true;
 });
 
-router.afterEach(() => {
+router.afterEach((to) => {
   if (typeof document === "undefined") return;
   window.requestAnimationFrame(() =>
     document.documentElement.classList.remove("space-pending"),
   );
+  void trackVisitorVisit(to);
 });
+
+function pageTypeOf(path: string): string {
+  if (path === "/" || path === "/home") return "home";
+  if (path.startsWith("/article/")) return "post";
+  if (path.startsWith("/albums/")) return "album";
+  if (path === "/time/map") return "memory-map";
+  if (path === "/time/constellation") return "memory-graph";
+  if (path === "/guestbook") return "guestbook";
+  if (path.startsWith("/journeys/")) return "journey";
+  return "page";
+}
+
+function trackVisitorVisit(to: { path: string; name?: unknown }) {
+  if (typeof document === "undefined") return;
+  if (!navigator.onLine) return;
+  const pageType = pageTypeOf(to.path);
+  import("./composables/useVisitor").then(({ useVisitor }) => {
+    const visitor = useVisitor();
+    const title = document.title || to.path;
+    visitor.trackVisit(pageType, title, to.path);
+  });
+}
 
 router.onError(() => {
   if (typeof document !== "undefined")

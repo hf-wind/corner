@@ -42,6 +42,7 @@
           }}</span>
         </NuxtLink>
       </nav>
+
     </div>
 
     <div class="sidebar-bottom">
@@ -178,7 +179,7 @@ const router = useRouter();
 const isPanel = computed(() => props.variant === "admin");
 const collapsed = computed(() => props.collapsed && isPanel.value);
 const allowCollapse = computed(() => props.allowCollapse);
-const { albumsEnabled, mapEnabled, constellationEnabled, storiesEnabled } =
+const { albumsEnabled, mapEnabled, constellationEnabled, storiesEnabled, guestbookEnabled } =
   useFeatureFlags();
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar));
 const playerSlotRef = ref<HTMLElement | null>(null);
@@ -212,6 +213,7 @@ const siteNav = [
   { to: "/time/constellation", icon: "ph:graph-bold", label: "星图" },
   { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
   { to: "/stories", icon: "ph:path-bold", label: "航线" },
+  { to: "/guestbook", icon: "ph:chat-circle-dots-bold", label: "时光留言" },
   { to: "/friends", icon: "ph:handshake-bold", label: "友链" },
   { to: "/about", icon: "ph:info-bold", label: "关于" },
 ];
@@ -231,6 +233,7 @@ const adminFullNav = [
   { to: "/admin/users", icon: "ph:users-three-bold", label: "用户" },
   { to: "/admin/friends", icon: "ph:handshake-bold", label: "友链" },
   { to: "/admin/friend-applications", icon: "ph:link-bold", label: "友联申请" },
+  { to: "/admin/visitor", icon: "ph:footprints-bold", label: "访客时光" },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "AI" },
   { to: "/admin/ai-native", icon: "ph:sparkle-bold", label: "AI 原生" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件" },
@@ -254,7 +257,8 @@ const navItems = computed(() => {
         (albumsEnabled || !item.to.includes("/albums")) &&
         (mapEnabled || !item.to.includes("/time/map")) &&
         (constellationEnabled || !item.to.includes("/time/constellation")) &&
-        (storiesEnabled || !item.to.includes("/stories")),
+        (storiesEnabled || !item.to.includes("/stories")) &&
+        (guestbookEnabled || !item.to.includes("/guestbook")),
     );
   if (!isPanel.value) return filterFeatures(siteNav);
   return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav;

@@ -825,3 +825,66 @@ model AiNarrative {
   @@index([createdBy, createdAt])
   @@map("ai_narratives")
 }
+
+model VisitorProfile {
+  id            String    @id @default(uuid()) @db.Uuid
+  visitorIdHash String    @unique @map("visitor_id_hash") @db.VarChar(64)
+  nickname      String    @db.VarChar(20)
+  email         String?   @db.VarChar(255)
+  ipHash        String?   @map("ip_hash") @db.VarChar(64)
+  firstSeenAt   DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at")
+  messageCount  Int       @default(0) @map("message_count")
+  visitCount    Int       @default(0) @map("visit_count")
+  isBanned      Boolean   @default(false) @map("is_banned")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([isBanned, lastSeenAt])
+  @@map("visitor_profiles")
+}
+
+model VisitorMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  type           String    @db.VarChar(10)
+  content        String    @db.VarChar(200)
+  nickname       String    @db.VarChar(20)
+  visitorIdHash  String?   @map("visitor_id_hash") @db.VarChar(64)
+  status         String    @default("pending") @db.VarChar(20)
+  aiReview       String?   @map("ai_review") @db.Text
+  aiReviewResult String?   @map("ai_review_result") @db.VarChar(20)
+  rejectReason   String?   @map("reject_reason") @db.Text
+  caughtByIdHash String?   @map("caught_by_id_hash") @db.VarChar(64)
+  caughtAt       DateTime? @map("caught_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([type, status, createdAt])
+  @@index([caughtByIdHash, caughtAt])
+  @@map("visitor_messages")
+}
+
+model VisitorVisit {
+  id            String   @id @default(uuid()) @db.Uuid
+  visitorIdHash String   @map("visitor_id_hash") @db.VarChar(64)
+  pageType      String   @db.VarChar(30)
+  targetTitle   String?  @map("target_title") @db.VarChar(255)
+  targetHref    String?  @map("target_href") @db.VarChar(255)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([visitorIdHash, createdAt])
+  @@index([pageType, createdAt])
+  @@map("visitor_visits")
+}
+
+model VisitorAchievement {
+  id            String   @id @default(uuid()) @db.Uuid
+  visitorIdHash String   @map("visitor_id_hash") @db.VarChar(64)
+  code          String   @db.VarChar(40)
+  unlockedAt    DateTime @default(now()) @map("unlocked_at")
+
+  @@unique([visitorIdHash, code])
+  @@index([code])
+  @@map("visitor_achievements")
+}

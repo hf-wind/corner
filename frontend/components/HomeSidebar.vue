@@ -32,66 +32,13 @@
     <section v-if="latestActivity.length" class="side-card activity-card" aria-labelledby="home-latest-title">
       <div class="side-card-head">
         <span id="home-latest-title"><Icon name="ph:activity-bold" /> 最新动态</span>
-        <span class="head-note">NEW</span>
+        <span class="live-badge" role="status" title="实时更新" aria-label="实时更新"><i class="live-dot" aria-hidden="true" /></span>
       </div>
       <div class="activity-list">
         <NuxtLink v-for="item in latestActivity" :key="`${item.type}:${item.id}`" :to="item.href">
-          <span class="overview-icon"><Icon :name="item.icon" /></span>
-          <span><small>{{ item.label }}</small><strong>{{ item.title }}</strong></span>
-          <Icon name="ph:arrow-up-right-bold" />
-        </NuxtLink>
-      </div>
-    </section>
-
-    <section
-      class="side-card reading-route"
-      aria-labelledby="home-popular-title"
-    >
-      <div class="side-card-head">
-        <span id="home-popular-title"
-          ><Icon name="ph:compass-bold" /> 今日阅读航线</span
-        >
-        <span class="head-note">随风挑选</span>
-      </div>
-      <div v-if="popularPosts.length" class="popular-list">
-        <NuxtLink
-          v-for="(post, index) in popularPosts"
-          :key="post.slug"
-          :to="`/article/${post.slug}`"
-          class="popular-item"
-        >
-          <span class="popular-rank">{{
-            String(index + 1).padStart(2, "0")
-          }}</span>
-          <span class="popular-main">
-            <strong>{{ post.title }}</strong>
-            <small>{{
-              post.category?.name || post.tags?.[0]?.name || "文章"
-            }}</small>
-          </span>
-          <Icon name="ph:caret-right-bold" />
-        </NuxtLink>
-      </div>
-      <div v-else class="side-empty">热门文章正在整理中</div>
-    </section>
-
-    <section
-      v-if="tags.length"
-      class="side-card"
-      aria-labelledby="home-tags-title"
-    >
-      <div class="side-card-head">
-        <span id="home-tags-title"><Icon name="ph:hash-bold" /> 探索主题</span>
-        <NuxtLink to="/tags">全部</NuxtLink>
-      </div>
-      <div class="tag-list">
-        <NuxtLink
-          v-for="tag in tags"
-          :key="tag.id || tag.slug"
-          to="/tags"
-          class="topic-tag"
-        >
-          {{ tag.name }}<small>{{ tag._count?.posts ?? 0 }}</small>
+          <span class="overview-icon" :class="`activity-${item.type}`"><Icon :name="item.icon" /></span>
+          <span class="activity-copy"><small>{{ item.label }}</small><strong>{{ item.title }}</strong></span>
+          <time v-if="item.timestamp" :title="formatTime(item.timestamp)">{{ fromNowText(item.timestamp) }}</time>
         </NuxtLink>
       </div>
     </section>
@@ -99,11 +46,16 @@
 </template>
 
 <script setup lang="ts">
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import "dayjs/locale/zh-cn";
+
+dayjs.extend(relativeTime);
+dayjs.locale("zh-cn");
+
 const api = useApi();
 const loading = ref(true);
 const stats = ref({ posts: 0, comments: 0, views: 0 });
-const popularPosts = ref<any[]>([]);
-const tags = ref<any[]>([]);
 const latestActivity = ref<Array<{ id: string; type: string; label: string; title: string; href: string; icon: string; timestamp?: string | null }>>([]);
 let idleHandle: number | null = null;
 
@@ -117,6 +69,17 @@ const overviewItems = computed(() => [
   { label: "翻阅", value: stats.value.views, icon: "ph:book-open-text-bold" },
 ]);
 
+const TYPE_ICONS: Record<string, string> = {
+  post: "ph:article-bold",
+  moment: "ph:sparkle-bold",
+  album: "ph:images-square-bold",
+  library: "ph:books-bold",
+  comment: "ph:chat-circle-bold",
+  guestbook: "ph:note-pencil-bold",
+  like: "ph:heart-bold",
+  footprint: "ph:footprints-bold",
+};
+
 function compactNumber(value: number) {
   return new Intl.NumberFormat("zh-CN", {
     notation: "compact",
@@ -124,36 +87,25 @@ function compactNumber(value: number) {
   }).format(value || 0);
 }
 
+function fromNowText(time: string) {
+  return dayjs(time).fromNow();
+}
+
+function formatTime(time: string) {
+  return dayjs(time).format("YYYY-MM-DD HH:mm");
+}
+
 async function loadSidebar() {
   try {
-    const [overview, posts, latestPosts, tagList, moments, albums, library] = await Promise.all([
+    const [overview, activities] = await Promise.all([
       api.get<any>("/stats/overview"),
-      api.get<any>("/posts", { page: 1, limit: 4, sort: "popular" }),
-      api.get<any>("/posts", { page: 1, limit: 1, sort: "latest" }),
-      api.get<any[]>("/tags"),
-      api.get<any>("/moments", { page: 1, limit: 1, sort: "latest" }),
-      api.get<any>("/albums", { page: 1, limit: 1, sort: "latest" }),
-      api.get<any>("/library", { page: 1, limit: 1, sort: "latest" }),
+      api.get<any[]>("/stats/activities", { limit: 5 }),
     ]);
     stats.value = { ...stats.value, ...(overview || {}) };
-    popularPosts.value = posts?.items ?? [];
-    tags.value = [...(tagList || [])]
-      .sort((a, b) => (b._count?.posts ?? 0) - (a._count?.posts ?? 0))
-      .slice(0, 8);
-    const recentPost = latestPosts?.items?.[0];
-    const recentMoment = moments?.items?.[0];
-    const recentAlbum = albums?.items?.[0];
-    const recentLibrary = library?.items?.[0];
-    latestActivity.value = [
-      recentPost && { id: recentPost.id, type: 'post', label: '新文章', title: recentPost.title, href: `/article/${recentPost.slug}`, icon: 'ph:article-bold', timestamp: recentPost.publishedAt || recentPost.createdAt },
-      recentMoment && { id: recentMoment.id, type: 'moment', label: '新瞬间', title: recentMoment.title, href: `/moments/${recentMoment.slug}`, icon: 'ph:sparkle-bold', timestamp: recentMoment.publishedAt || recentMoment.createdAt || recentMoment.happenedAt },
-      recentAlbum && { id: recentAlbum.id, type: 'album', label: '新相册', title: recentAlbum.title, href: `/albums/${recentAlbum.slug}`, icon: 'ph:images-square-bold', timestamp: recentAlbum.publishedAt || recentAlbum.createdAt },
-      recentLibrary && { id: recentLibrary.id, type: 'library', label: '新书影', title: recentLibrary.title, href: `/library/${recentLibrary.slug}`, icon: 'ph:books-bold', timestamp: recentLibrary.publishedAt || recentLibrary.createdAt },
-    ].filter(Boolean).sort((left: any, right: any) => {
-      const leftTime = new Date(left?.timestamp || 0).getTime();
-      const rightTime = new Date(right?.timestamp || 0).getTime();
-      return rightTime - leftTime;
-    }).slice(0, 3) as typeof latestActivity.value;
+    latestActivity.value = (activities ?? []).map((item) => ({
+      ...item,
+      icon: TYPE_ICONS[item.type] ?? "ph:activity-bold",
+    }));
   } catch {
     // Sidebar content is supplementary; keep the page usable when it fails.
   } finally {
@@ -242,10 +194,39 @@ onUnmounted(() => {
 .side-card-head a:hover {
   color: var(--c-primary);
 }
-.head-note {
-  color: var(--c-text-3);
-  font-size: 0.58rem;
-  font-weight: 500;
+.live-badge {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+}
+.live-dot {
+  position: relative;
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c-primary) 60%, transparent);
+}
+.live-dot::after {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--c-primary);
+  border-radius: 50%;
+  content: "";
+  animation: live-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes live-ping {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.8;
+  }
+  70%,
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
 }
 
 .overview-grid {
@@ -313,108 +294,86 @@ onUnmounted(() => {
   display: none;
 }
 
-.popular-list {
-  display: flex;
-  flex-direction: column;
+.activity-list {
+  display: grid;
+  gap: 2px;
 }
-.popular-item {
-  position: relative;
+.activity-list a {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  padding: 8px 5px;
+  padding: 5px 6px;
+  border-radius: 9px;
   color: inherit;
   text-decoration: none;
-  border-top: 1px solid color-mix(in srgb, var(--border) 48%, transparent);
-  border-radius: 9px;
-  transition:
-    background 0.2s ease,
-    transform 0.24s ease;
+  transition: background 0.15s ease;
 }
-.popular-item:first-child {
-  border-top: 0;
-  padding-top: 2px;
+.activity-list a:hover {
+  background: color-mix(in srgb, var(--c-primary-soft) 46%, transparent);
 }
-.popular-item:hover {
-  background: color-mix(in srgb, var(--c-primary-soft) 55%, transparent);
-  transform: translateX(2px);
+.activity-list .overview-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-color: color-mix(in srgb, var(--act, var(--c-primary)) 16%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--act, var(--c-primary)) 9%, var(--ld-bg-card));
+  color: var(--act, var(--c-primary));
+  font-size: 0.85rem;
 }
-.popular-item:hover .popular-main strong {
-  color: var(--c-primary);
-}
-.popular-rank {
-  display: grid;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-  font-size: 0.54rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  place-items: center;
-}
-.popular-main {
+.activity-copy {
   display: flex;
-  flex: 1;
   min-width: 0;
+  flex: 1;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
 }
-.popular-main strong {
+.activity-copy small {
   overflow: hidden;
-  color: var(--c-text-1);
-  font-size: 0.68rem;
+  color: var(--c-text-3);
+  font-size: 0.48rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 0.15s ease;
 }
-.popular-main small {
+.activity-copy strong {
+  overflow: hidden;
+  color: var(--c-text);
+  font-size: 0.66rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-list time {
+  flex: 0 0 auto;
   color: var(--c-text-3);
-  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  white-space: nowrap;
 }
-.popular-item > :deep(.icon) {
-  color: var(--c-text-3);
-  font-size: 0.62rem;
+.activity-post {
+  --act: #4f8ff7;
 }
-
-.tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.activity-moment {
+  --act: #f0a04b;
 }
-.activity-list { display: grid; gap: 3px; }
-.activity-list a { display: grid; grid-template-columns: 30px minmax(0,1fr) 12px; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 9px; color: inherit; text-decoration: none; transition: background .2s ease, transform .28s cubic-bezier(.16,1,.3,1); }
-.activity-list a:hover { background: var(--c-primary-soft); transform: translateX(2px); }
-.activity-list a>span:nth-child(2) { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.activity-list small { color: var(--c-primary); font-size: .48rem; }
-.activity-list strong { overflow: hidden; color: var(--c-text-2); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
-.activity-list a>svg { color: var(--c-text-3); font-size: .62rem; }
-.topic-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 7px;
-  border-radius: 7px;
-  background: var(--c-bg-1);
-  color: var(--c-text-2);
-  font-size: 0.6rem;
-  text-decoration: none;
+.activity-album {
+  --act: #34a06e;
 }
-.topic-tag:hover {
-  color: var(--c-primary);
-  background: var(--c-primary-soft);
+.activity-library {
+  --act: #7a56d6;
 }
-.topic-tag small {
-  color: var(--c-text-3);
-  font-size: 0.52rem;
+.activity-comment {
+  --act: #4f8ff7;
 }
-.side-empty {
-  padding: 12px 0;
-  color: var(--c-text-3);
-  font-size: 0.65rem;
-  text-align: center;
+.activity-guestbook {
+  --act: #e2703a;
+}
+.activity-like {
+  --act: #e0446c;
+}
+.activity-footprint {
+  --act: #2f9d6b;
 }
 @media (prefers-reduced-motion: reduce) {
   .home-sidebar.ready .side-card {
@@ -422,7 +381,10 @@ onUnmounted(() => {
     opacity: 1;
     transform: none;
   }
-  .popular-main strong {
+  .live-dot::after {
+    animation: none;
+  }
+  .activity-list a {
     transition: none;
   }
 }

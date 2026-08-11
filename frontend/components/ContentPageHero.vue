@@ -36,6 +36,10 @@
       <template v-if="variant === 'stories'">
         <span class="visual-chapter chapter-one">01</span><span class="visual-chapter chapter-two">02</span>
       </template>
+      <template v-if="variant === 'guestbook'">
+        <span class="visual-wave wave-one" /><span class="visual-wave wave-two" /><span class="visual-wave wave-three" />
+        <span class="visual-bubble bubble-one" /><span class="visual-bubble bubble-two" /><span class="visual-bubble bubble-three" />
+      </template>
     </div>
 
     <div v-if="metric !== undefined" class="hero-metric">
@@ -52,7 +56,7 @@ withDefaults(defineProps<{
   icon: string
   metric?: string | number
   metricLabel?: string
-  variant?: 'archive' | 'category' | 'tags' | 'friends' | 'albums' | 'library' | 'moments' | 'journeys' | 'stories'
+  variant?: 'archive' | 'category' | 'tags' | 'friends' | 'albums' | 'library' | 'moments' | 'journeys' | 'stories' | 'guestbook'
 }>(), {
   metricLabel: '',
   variant: 'archive',
@@ -119,6 +123,9 @@ withDefaults(defineProps<{
 .hero-journeys .visual-ring { border-style:dashed; transform:rotate(-12deg) scaleY(.72); }.hero-journeys .visual-core { --core-rotation:-45deg; border-radius:50% 50% 50% 8px; }.hero-journeys .visual-core :deep(svg) { transform:rotate(45deg); }
 .route-line { position:absolute; top:80px; left:8px; width:134px; height:34px; border-top:1px dashed color-mix(in srgb,var(--c-primary) 48%,transparent); border-radius:50%; transform:rotate(13deg); animation:route-drift 5s ease-in-out infinite; }.route-dot { position:absolute; width:7px; height:7px; border:2px solid var(--ld-bg-card); border-radius:50%; background:var(--c-primary); box-shadow:0 0 12px color-mix(in srgb,var(--c-primary) 50%,transparent); }.route-start { top:81px; left:10px; }.route-end { right:9px; bottom:28px; background:var(--ui-accent-warm); }
 .hero-stories .ring-inner { border-style:dashed; }.hero-stories .visual-core { border-radius:50%; }.visual-chapter { position:absolute; display:grid; width:30px; height:24px; border:1px solid var(--border); border-radius:7px; background:var(--ld-bg-card); color:var(--c-text-3); font-family:var(--font-mono); font-size:.46rem; box-shadow:0 6px 16px color-mix(in srgb,var(--ld-shadow) 35%,transparent); place-items:center; animation:chapter-float 4.8s ease-in-out infinite; }.chapter-one { top:9px; left:14px; }.chapter-two { right:3px; bottom:25px; color:var(--ui-accent-warm); animation-delay:-2.4s; }
+.hero-guestbook .visual-core { border-radius:50%; }.hero-guestbook .ring-outer { border-style:dotted; }
+.visual-wave { position:absolute; top:50%; left:50%; width:26px; height:26px; border:1px solid color-mix(in srgb,var(--c-primary) 40%,transparent); border-radius:50%; opacity:0; transform:translate(-50%,-50%); animation:wave-ripple 4.2s ease-out infinite; }.wave-two { animation-delay:1.4s; }.wave-three { animation-delay:2.8s; }
+.visual-bubble { position:absolute; border:1px solid color-mix(in srgb,var(--c-primary) 46%,transparent); border-radius:50%; background:color-mix(in srgb,var(--c-primary-soft) 70%,var(--ld-bg-card)); animation:bubble-rise 5.2s ease-in-out infinite; }.bubble-one { top:26px; left:31px; width:9px; height:9px; }.bubble-two { right:20px; bottom:30px; width:13px; height:13px; color:var(--ui-accent-warm); animation-delay:-1.7s; }.bubble-three { top:44px; right:44px; width:5px; height:5px; animation-delay:-3.2s; }
 
 @keyframes hero-orbit { to { transform:rotate(360deg); } }
 @keyframes hero-float { 0%,100% { transform:translateY(0) rotate(var(--core-rotation)); } 50% { transform:translateY(-5px) rotate(var(--core-rotation)); } }
@@ -131,6 +138,8 @@ withDefaults(defineProps<{
 @keyframes spark-breathe { 50% { opacity:.35; transform:translateY(-5px) scale(.82) rotate(12deg); } }
 @keyframes route-drift { 50% { transform:translateY(-5px) rotate(13deg); } }
 @keyframes chapter-float { 50% { transform:translate3d(4px,-6px,0) rotate(3deg); } }
+@keyframes wave-ripple { 0% { width:26px; height:26px; opacity:.9; } 100% { width:118px; height:118px; opacity:0; } }
+@keyframes bubble-rise { 0%,100% { transform:translateY(0); opacity:.55; } 50% { transform:translateY(-7px); opacity:1; } }
 
 @media (max-width:640px) {
   .content-hero { min-height:170px; align-items:flex-start; padding:26px 21px; }
