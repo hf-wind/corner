@@ -850,6 +850,7 @@ model VisitorMessage {
   content        String    @db.VarChar(200)
   nickname       String    @db.VarChar(20)
   visitorIdHash  String?   @map("visitor_id_hash") @db.VarChar(64)
+  userId         String?   @map("user_id") @db.Uuid
   status         String    @default("pending") @db.VarChar(20)
   aiReview       String?   @map("ai_review") @db.Text
   aiReviewResult String?   @map("ai_review_result") @db.VarChar(20)
@@ -862,6 +863,7 @@ model VisitorMessage {
   @@index([status, createdAt])
   @@index([type, status, createdAt])
   @@index([caughtByIdHash, caughtAt])
+  @@index([userId, createdAt])
   @@map("visitor_messages")
 }
 

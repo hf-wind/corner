@@ -10,6 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { NotificationService } from '../notification/notification.service';
 import {
   BOTTLE_RATE_LIMIT_PER_DAY,
   FISH_RATE_LIMIT_PER_DAY,
@@ -22,6 +23,11 @@ type VisitorRequest = {
   headers: Record<string, string | string[] | undefined>;
   ip?: string;
 };
+
+export type VisitorActor = {
+  userId: string;
+  username: string;
+} | null;
 
 const IP_HASH_SALT = 'corner:visitor:ip';
 
@@ -40,6 +46,7 @@ export class VisitorService {
     private prisma: PrismaService,
     private redis: RedisService,
     private aiService: AiService,
+    private notificationService: NotificationService,
   ) {}
 
   resolveVisitorId(req: VisitorRequest): string {
@@ -53,6 +60,12 @@ export class VisitorService {
       throw new BadRequestException('无效的访客标识');
     }
     return hash;
+  }
+
+  resolveVisitorIdOptional(visitorId: string): string | null {
+    const trimmed = (visitorId ?? '').trim();
+    if (!trimmed) return null;
+    return this.resolveVisitorId({ headers: { 'x-visitor-id': trimmed } });
   }
 
   newVisitorId(): string {
@@ -87,6 +100,13 @@ export class VisitorService {
     const clean = nickname.trim().slice(0, 20);
     if (!clean) {
       throw new BadRequestException('昵称不能为空');
+    }
+    const existing = await this.prisma.visitorProfile.findUnique({
+      where: { visitorIdHash },
+      select: { nickname: true },
+    });
+    if (existing && existing.nickname && existing.nickname !== '无名旅人') {
+      throw new BadRequestException('已登记的名字不能修改');
     }
     const cleanEmail = email?.trim().slice(0, 255) || null;
     const profile = await this.prisma.visitorProfile.upsert({
@@ -148,18 +168,29 @@ export class VisitorService {
 
   private async createMessage(
     req: VisitorRequest,
-    visitorIdHash: string,
+    actor: VisitorActor,
+    visitorIdHash: string | null,
     type: 'message' | 'bottle',
     content: string,
   ) {
-    const profile = await this.prisma.visitorProfile.findUnique({
-      where: { visitorIdHash },
-    });
-    if (!profile || !profile.nickname || profile.nickname === '无名旅人') {
-      throw new BadRequestException('请先给自己起一个名字');
-    }
-    if (profile.isBanned) {
-      throw new ForbiddenException('该访客已被封禁');
+    let profile: { nickname: string; visitorIdHash: string; isBanned: boolean } | null = null;
+    if (actor) {
+      if (!actor.username.trim()) {
+        throw new BadRequestException('登录账号缺少用户名');
+      }
+    } else {
+      if (!visitorIdHash) {
+        throw new UnauthorizedException('缺少访客标识');
+      }
+      profile = await this.prisma.visitorProfile.findUnique({
+        where: { visitorIdHash },
+      });
+      if (!profile || !profile.nickname || profile.nickname === '无名旅人') {
+        throw new BadRequestException('请先给自己起一个名字');
+      }
+      if (profile.isBanned) {
+        throw new ForbiddenException('该访客已被封禁');
+      }
     }
     await this.checkRateLimit(req, type, type === 'message' ? MESSAGE_RATE_LIMIT_PER_DAY : BOTTLE_RATE_LIMIT_PER_DAY);
 
@@ -175,52 +206,86 @@ export class VisitorService {
       data: {
         type,
         content: clean,
-        nickname: profile.nickname,
-        visitorIdHash,
+        nickname: actor ? actor.username.slice(0, 20) : profile!.nickname,
+        visitorIdHash: actor ? visitorIdHash : profile!.visitorIdHash,
+        userId: actor?.userId ?? null,
         status,
         aiReview: status === 'rejected' ? review.reason : null,
         aiReviewResult: review.approved ? 'approved' : 'rejected',
       },
     });
 
-    if (status === 'approved' && type === 'message') {
+    if (status === 'approved' && type === 'message' && !actor && visitorIdHash) {
       await this.prisma.visitorProfile.update({
         where: { visitorIdHash },
         data: { messageCount: { increment: 1 } },
       });
     }
 
-    const unlocked = await this.syncAchievements(visitorIdHash);
+    if (actor?.userId) {
+      try {
+        const kindLabel = type === 'message' ? '留言' : '漂流瓶';
+        const excerpt = clean.replace(/\s+/g, ' ').slice(0, 60);
+        await this.notificationService.create(actor.userId, {
+          type: 'guestbook',
+          title:
+            status === 'approved'
+              ? `你的${kindLabel}已通过审核`
+              : `你的${kindLabel}未通过审核`,
+          content:
+            status === 'approved'
+              ? excerpt
+              : (review.reason || '内容未通过 AI 审核').slice(0, 60),
+          link: '/guestbook',
+        });
+      } catch (error) {
+        this.logger.warn(`审核通知发送失败: ${(error as Error).message}`);
+      }
+    }
+
+    const unlocked = visitorIdHash ? await this.syncAchievements(visitorIdHash) : [];
     return { record, unlocked, review };
   }
 
-  async createMessageEntry(req: VisitorRequest, visitorIdHash: string, content: string) {
-    return this.createMessage(req, visitorIdHash, 'message', content);
+  async createMessageEntry(
+    req: VisitorRequest,
+    actor: VisitorActor,
+    visitorIdHash: string | null,
+    content: string,
+  ) {
+    return this.createMessage(req, actor, visitorIdHash, 'message', content);
   }
 
-  async throwBottle(req: VisitorRequest, visitorIdHash: string, content: string) {
-    return this.createMessage(req, visitorIdHash, 'bottle', content);
+  async throwBottle(
+    req: VisitorRequest,
+    actor: VisitorActor,
+    visitorIdHash: string | null,
+    content: string,
+  ) {
+    return this.createMessage(req, actor, visitorIdHash, 'bottle', content);
   }
 
-  async fishBottle(req: VisitorRequest, visitorIdHash: string) {
+  async fishBottle(req: VisitorRequest, actor: VisitorActor, visitorIdHash: string | null) {
     await this.checkRateLimit(req, 'fish', FISH_RATE_LIMIT_PER_DAY);
-    const total = await this.prisma.visitorMessage.count({
-      where: {
-        type: 'bottle',
-        status: 'approved',
-        NOT: { visitorIdHash },
-      },
-    });
+    const where: Record<string, unknown> = {
+      type: 'bottle',
+      status: 'approved',
+    };
+    if (actor) {
+      where.NOT = [{ userId: actor.userId }];
+    } else {
+      if (!visitorIdHash) {
+        throw new UnauthorizedException('缺少访客标识');
+      }
+      where.NOT = [{ visitorIdHash }];
+    }
+    const total = await this.prisma.visitorMessage.count({ where });
     if (total < 1) {
       throw new NotFoundException('海面还很平静，暂时没有可捞起的瓶子');
     }
     const skip = Math.max(0, total - 30);
     const pool = await this.prisma.visitorMessage.findMany({
-      where: {
-        type: 'bottle',
-        status: 'approved',
-        NOT: { visitorIdHash },
-      },
+      where,
       orderBy: { createdAt: 'desc' },
       take: 30,
       skip,
@@ -231,17 +296,23 @@ export class VisitorService {
     const bottle = pool[Math.floor(Math.random() * pool.length)];
     await this.prisma.visitorMessage.update({
       where: { id: bottle.id },
-      data: { status: 'caught', caughtByIdHash: visitorIdHash, caughtAt: new Date() },
+      data: { status: 'caught', caughtByIdHash: visitorIdHash ?? undefined, caughtAt: new Date() },
     });
     let contactEmail: string | null = null;
-    if (bottle.visitorIdHash) {
+    if (bottle.userId) {
+      const owner = await this.prisma.user.findUnique({
+        where: { id: bottle.userId },
+        select: { email: true },
+      });
+      contactEmail = owner?.email ?? null;
+    } else if (bottle.visitorIdHash) {
       const owner = await this.prisma.visitorProfile.findUnique({
         where: { visitorIdHash: bottle.visitorIdHash },
         select: { email: true },
       });
       contactEmail = owner?.email ?? null;
     }
-    const unlocked = await this.syncAchievements(visitorIdHash);
+    const unlocked = visitorIdHash ? await this.syncAchievements(visitorIdHash) : [];
     return {
       bottle: {
         id: bottle.id,
@@ -503,7 +574,19 @@ export class VisitorService {
       }),
       this.prisma.visitorMessage.count({ where }),
     ]);
-    return { items, total, page, pageSize };
+    const userIds = [...new Set(items.map((m) => m.userId).filter(Boolean) as string[])];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, username: true, email: true },
+        })
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const decorated = items.map((m) => ({
+      ...m,
+      account: m.userId ? userMap.get(m.userId) ?? null : null,
+    }));
+    return { items: decorated, total, page, pageSize };
   }
 
   async reviewMessage(id: string, action: 'approve' | 'reject', reason?: string) {

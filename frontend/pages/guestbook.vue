@@ -64,9 +64,17 @@
         <div v-else class="msg-masonry content-reveal">
           <article v-for="msg in messages" :key="msg.id" class="msg-card">
             <header class="msg-head">
-              <span class="msg-avatar">{{ msg.nickname.slice(0, 1) }}</span>
+              <span class="msg-avatar" :class="{ 'is-user': !!msg.userId }">
+                <Icon :name="msg.userId ? 'ph:user-bold' : 'ph:face-mask-bold'" />
+              </span>
               <div class="msg-meta">
-                <span class="msg-name">{{ msg.nickname }}</span>
+                <span class="msg-name-row">
+                  <span class="msg-name">{{ msg.nickname }}</span>
+                  <span class="msg-role" :class="{ 'role-user': !!msg.userId, 'role-guest': !msg.userId }">
+                    <Icon :name="msg.userId ? 'ph:shield-check-bold' : 'ph:user-simple-bold'" />
+                    {{ msg.userId ? '登录' : '访客' }}
+                  </span>
+                </span>
                 <time class="msg-time">{{ msgRelativeTime(msg.createdAt) }}</time>
               </div>
               <span class="msg-pin" aria-hidden="true"><Icon name="ph:push-pin-simple-fill" /></span>
@@ -89,7 +97,9 @@
         <div class="composer content-reveal">
           <div class="composer-head">
             <span class="composer-sign">
-              <span v-if="nickname" class="sign-name"><Icon name="ph:feather-bold" />{{ nickname }}</span>
+              <span v-if="composerName" class="sign-name" :class="{ 'is-user': isLoggedIn }">
+                <Icon :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'" />{{ composerName }}
+              </span>
               <button v-else type="button" class="sign-anon" @click="askName">
                 <Icon name="ph:face-mask-bold" />尚未署名
               </button>
@@ -101,7 +111,7 @@
             class="composer-input"
             :maxlength="200"
             rows="3"
-            :placeholder="nickname ? `把此刻想说的话，留给时光…（${nickname}）` : '先署名，再留下一句话…'"
+            :placeholder="composerName ? `把此刻想说的话，留给时光…（${composerName}）` : '先署名，再留下一句话…'"
             @keydown.ctrl.enter="submitMessage"
             @keydown.meta.enter="submitMessage"
           />
@@ -109,7 +119,7 @@
             <span class="composer-count">{{ composerText.length }}/200</span>
             <button type="button" class="composer-submit" :disabled="sendingMessage" @click="submitMessage">
               <Icon :name="sendingMessage ? 'ph:circle-notch-bold' : 'ph:paper-plane-tilt-bold'" :spin="sendingMessage" />
-              投入时光
+              {{ sendingMessage ? 'AI 审核中…' : '投入时光' }}
             </button>
           </div>
         </div>
@@ -171,7 +181,9 @@
         <div class="composer bottle-composer content-reveal">
           <div class="composer-head">
             <span class="composer-sign">
-              <span v-if="nickname" class="sign-name"><Icon name="ph:feather-bold" />{{ nickname }}</span>
+              <span v-if="composerName" class="sign-name" :class="{ 'is-user': isLoggedIn }">
+                <Icon :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'" />{{ composerName }}
+              </span>
               <button v-else type="button" class="sign-anon" @click="askName">
                 <Icon name="ph:face-mask-bold" />尚未署名
               </button>
@@ -191,7 +203,7 @@
             <span class="composer-count">{{ bottleText.length }}/120</span>
             <button type="button" class="composer-submit sea-submit" :disabled="sendingBottle" @click="submitBottle">
               <Icon :name="sendingBottle ? 'ph:circle-notch-bold' : 'solar:bottle-outline'" :spin="sendingBottle" />
-              投入时光海
+              {{ sendingBottle ? '瓶子审核中…' : '投入时光海' }}
             </button>
           </div>
         </div>
@@ -225,22 +237,27 @@
     <aside class="sidebar-right">
       <section class="right-card my-card">
         <span class="aside-kicker">MY TIME · 我的时光</span>
-        <div class="my-avatar">
-          <span v-if="nickname">{{ nickname.slice(0, 1) }}</span>
+        <div class="my-avatar" :class="{ 'is-user': isLoggedIn }">
+          <Icon v-if="isLoggedIn" name="ph:user-bold" />
+          <Icon v-else-if="nickname" name="ph:feather-bold" />
           <Icon v-else name="ph:user-fill" />
         </div>
-        <h3>{{ nickname || '无名旅人' }}</h3>
-        <p v-if="nickname">
-          第 <strong>{{ me?.visitCount ?? 0 }}</strong> 次光临这座角落
-        </p>
-        <p v-else>还没起名，起个名字开启旅程吧</p>
+        <h3>{{ displayName }}</h3>
+        <p v-if="isLoggedIn" class="my-sub">以账号身份留下的旅人 · <strong>第 {{ me?.visitCount ?? 0 }}</strong> 次光临</p>
+        <p v-else-if="nickname" class="my-sub">第 <strong>{{ me?.visitCount ?? 0 }}</strong> 次光临这座角落</p>
+        <p v-else class="my-sub">还没起名，起个名字开启旅程吧</p>
         <div class="my-stats">
           <div><strong>{{ me?.messageCount ?? 0 }}</strong><span>留言</span></div>
           <div><strong>{{ me?.bottleCount ?? 0 }}</strong><span>投瓶</span></div>
           <div><strong>{{ me?.caughtCount ?? 0 }}</strong><span>捞瓶</span></div>
         </div>
-        <button v-if="nickname" type="button" class="my-rename" @click="askName(true)"><Icon name="ph:pencil-simple-bold" />换个名字</button>
-        <button v-else type="button" class="my-rename primary" @click="askName()"><Icon name="ph:feather-bold" />现在起名</button>
+        <button v-if="isLoggedIn" type="button" class="my-rename primary" @click="toProfile">
+          <Icon name="ph:user-circle-bold" />查看我的账号
+        </button>
+        <button v-else-if="!nickname" type="button" class="my-rename primary" @click="askName()">
+          <Icon name="ph:feather-bold" />现在起名
+        </button>
+        <span v-else class="my-signed"><Icon name="ph:check-circle-bold" />已署名「{{ nickname }}」</span>
       </section>
 
       <section v-if="ownedBadges.length" class="right-card badge-mini-card">
@@ -292,6 +309,14 @@ const {
   peekBottles: fetchPeek,
 } = useVisitor();
 const toast = useToast();
+const { isLoggedIn, user } = useAuth();
+
+const composerName = computed(() =>
+  isLoggedIn.value ? user.value?.username || "" : nickname.value,
+);
+const displayName = computed(() =>
+  isLoggedIn.value ? user.value?.username || "登录旅人" : nickname.value || "无名旅人",
+);
 
 const activeTab = ref<"messages" | "bottles">("messages");
 
@@ -363,10 +388,15 @@ async function handleNameConfirm(name: string, mail: string) {
 }
 
 function requireName(action: () => Promise<void>): boolean {
-  if (nickname.value) return true;
+  if (isLoggedIn.value || nickname.value) return true;
   pendingAction.value = action;
   nameModalVisible.value = true;
   return false;
+}
+
+function toProfile() {
+  const { isAdmin, panelHome } = useAuth();
+  navigateTo(panelHome());
 }
 
 async function refreshMe() {
@@ -418,7 +448,7 @@ async function doSendMessage(text: string) {
       return;
     }
     composerText.value = "";
-    toast.success("留言已投入时光");
+    toast.success("留言已通过审核，展示在时光墙上");
     celebrate(result?.unlocked);
     await Promise.all([loadMessages(true), refreshWall(), refreshMe()]);
   } catch (err: any) {
@@ -447,7 +477,7 @@ async function doThrowBottle(text: string) {
       return;
     }
     bottleText.value = "";
-    toast.success("瓶子已投入时光海，等待有缘人");
+    toast.success("瓶子已通过审核，漂向时光海等待有缘人");
     celebrate(result?.unlocked);
     await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
   } catch (err: any) {
@@ -680,10 +710,13 @@ useHead({ title: "时光留言板" });
   flex: 0 0 30px;
   border-radius: 50%;
   background: linear-gradient(145deg, var(--c-primary-soft), color-mix(in srgb, var(--c-primary) 14%, var(--ld-bg-card)));
-  color: var(--c-primary);
-  font-size: 0.74rem;
-  font-weight: 750;
+  color: color-mix(in srgb, var(--c-primary) 82%, var(--c-text-2));
+  font-size: 0.86rem;
   place-items: center;
+}
+.msg-avatar.is-user {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary) 18%, var(--ld-bg-card)), color-mix(in srgb, var(--c-primary) 30%, var(--ld-bg-card)));
+  color: var(--c-primary);
 }
 .msg-meta {
   display: flex;
@@ -692,6 +725,12 @@ useHead({ title: "时光留言板" });
   flex-direction: column;
   gap: 1px;
 }
+.msg-name-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
 .msg-name {
   overflow: hidden;
   color: var(--c-text);
@@ -699,6 +738,30 @@ useHead({ title: "时光留言板" });
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.msg-role {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-size: 0.5rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.msg-role > svg {
+  font-size: 0.56rem;
+}
+.msg-role.role-user {
+  border: 1px solid color-mix(in srgb, var(--c-primary) 32%, transparent);
+  background: color-mix(in srgb, var(--c-primary) 11%, transparent);
+  color: var(--c-primary);
+}
+.msg-role.role-guest {
+  border: 1px solid color-mix(in srgb, var(--c-text-3) 26%, transparent);
+  background: color-mix(in srgb, var(--c-text-3) 8%, transparent);
+  color: var(--c-text-3);
 }
 .msg-time {
   color: var(--c-text-3);
@@ -784,6 +847,10 @@ useHead({ title: "时光留言板" });
   color: var(--c-primary);
   font-size: 0.64rem;
   font-weight: 700;
+}
+.sign-name.is-user {
+  background: color-mix(in srgb, var(--c-primary) 13%, var(--ld-bg-card));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
 }
 .sign-name > svg {
   font-size: 0.78rem;
@@ -1376,21 +1443,23 @@ useHead({ title: "时光留言板" });
   background: linear-gradient(145deg, var(--c-primary), color-mix(in srgb, var(--c-primary) 52%, #4a5bd0));
   box-shadow: 0 8px 22px color-mix(in srgb, var(--c-primary) 30%, transparent);
   color: #fff;
-  font-size: 1.35rem;
-  font-weight: 750;
+  font-size: 1.5rem;
   place-items: center;
+}
+.my-avatar.is-user {
+  background: linear-gradient(145deg, #3a63c9, color-mix(in srgb, var(--c-primary) 40%, #243a75));
 }
 .my-card h3 {
   margin: 0;
   color: var(--c-text);
   font-size: 0.8rem;
 }
-.my-card > p {
+.my-card .my-sub {
   margin: 6px 0 0;
   color: var(--c-text-2);
   font-size: 0.57rem;
 }
-.my-card > p strong {
+.my-card .my-sub strong {
   color: var(--c-primary);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -1444,6 +1513,17 @@ useHead({ title: "时光留言板" });
   background: var(--c-primary);
   color: #fff;
   font-weight: 700;
+}
+.my-signed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-3);
+  font-size: 0.58rem;
+}
+.my-signed > svg {
+  color: var(--c-primary);
+  font-size: 0.72rem;
 }
 .right-card-title {
   margin-bottom: 12px;

@@ -4,9 +4,10 @@ import { VisitorService } from './visitor.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiModule } from '../ai/ai.module';
 import { RedisModule } from '../../common/redis/redis.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [PrismaModule, AiModule, RedisModule],
+  imports: [PrismaModule, AiModule, RedisModule, NotificationModule],
   controllers: [VisitorController],
   providers: [VisitorService],
   exports: [VisitorService],

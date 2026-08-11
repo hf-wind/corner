@@ -66,6 +66,13 @@
                   </div>
                 </template>
                 <template v-else-if="column.key === 'nickname'"><span class="nick-cell">{{ record.nickname || '无名旅人' }}</span></template>
+                <template v-else-if="column.key === 'account'">
+                  <template v-if="record.account">
+                    <a-tag color="green" class="acct-tag">登录</a-tag>
+                    <span class="acct-cell">{{ record.account.username }}<small v-if="record.account.email">{{ record.account.email }}</small></span>
+                  </template>
+                  <span v-else class="acct-guest">访客</span>
+                </template>
                 <template v-else-if="column.key === 'status'">
                   <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
                   <a-tooltip v-if="record.aiReview" :title="record.aiReview"><a-tag color="purple" class="ai-tag">AI</a-tag></a-tooltip>
@@ -156,6 +163,7 @@ const msgPagination = reactive({ current: 1, pageSize: 20, total: 0, showSizeCha
 const msgColumns = [
   { title: '内容', key: 'content', minWidth: 320 },
   { title: '署名', key: 'nickname', width: 110 },
+  { title: '账号', key: 'account', width: 150 },
   { title: '状态', key: 'status', width: 110 },
   { title: '时间', key: 'createdAt', width: 150 },
   { title: '操作', key: 'actions', width: 130, fixed: 'right' as const },
@@ -323,6 +331,10 @@ function handleBan(record: any, ban: boolean) {
 .content-cell .is-caught { color: var(--c-text-3); }
 .type-tag { flex: 0 0 auto; }
 .nick-cell { color: var(--c-text); font-size: .78rem; }
+.acct-cell { display: inline-flex; flex-direction: column; line-height: 1.35; color: var(--c-text); font-size: .74rem; }
+.acct-cell small { color: var(--c-text-3); font-size: .62rem; }
+.acct-guest { color: var(--c-text-3); font-size: .72rem; }
+.acct-tag { margin-right: 6px; }
 .ai-tag { margin-left: 4px; }
 .banned-tag { margin-left: 6px; }
 .count-cell { color: var(--c-text-2); font-size: .72rem; white-space: nowrap; }

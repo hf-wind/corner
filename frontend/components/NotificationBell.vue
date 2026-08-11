@@ -56,6 +56,7 @@
               <Icon v-if="item.type === 'comment'" name="ph:chat-circle-text-bold" />
               <Icon v-else-if="item.type === 'reply'" name="ph:arrow-bend-double-up-left-bold" />
               <Icon v-else-if="item.type === 'like'" name="ph:heart-bold" />
+              <Icon v-else-if="item.type === 'guestbook'" name="ph:note-pencil-bold" />
               <Icon v-else name="ph:bell-bold" />
             </div>
             <div class="notif-item-body">
@@ -148,7 +149,7 @@ async function readItem(item: any) {
     } catch { /* ignore */ }
   }
   panelOpen.value = false
-  navigateTo({ path: '/admin/messages', query: { notification: item.id } })
+  navigateTo(item.link ? { path: item.link } : { path: '/admin/messages', query: { notification: item.id } })
 }
 
 function formatTime(date: string) {
