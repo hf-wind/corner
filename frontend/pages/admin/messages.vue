@@ -31,6 +31,7 @@
               <Icon v-if="item.type === 'comment'" name="ph:chat-circle-text-bold" />
               <Icon v-else-if="item.type === 'reply'" name="ph:arrow-bend-left-down-bold" />
               <Icon v-else-if="item.type === 'like'" name="ph:heart-bold" />
+              <Icon v-else-if="item.type === 'guestbook'" name="ph:note-pencil-bold" />
               <Icon v-else name="ph:bell-bold" />
             </div>
             <div class="notification-content">
@@ -138,7 +139,7 @@ function goToLinkedPage() {
 }
 
 function notificationTypeLabel(type: string) {
-  return ({ comment: '评论提醒', reply: '回复提醒', like: '点赞提醒', system: '系统通知' } as Record<string, string>)[type] || '消息提醒'
+  return ({ comment: '评论提醒', reply: '回复提醒', like: '点赞提醒', guestbook: '时光留言审核', system: '系统通知' } as Record<string, string>)[type] || '消息提醒'
 }
 
 async function markRead(item: any) {
@@ -260,6 +261,10 @@ function formatDetailTime(date: string) {
   color: var(--c-text);
 }
 .notification-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   margin-top: 4px;
   font-size: 0.82rem;
   color: var(--c-text-2, #666);

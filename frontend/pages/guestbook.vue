@@ -115,6 +115,10 @@
             @keydown.ctrl.enter="submitMessage"
             @keydown.meta.enter="submitMessage"
           />
+          <div v-if="sendingMessage" class="ai-reviewing" role="status" aria-live="polite">
+            <span class="ai-reviewing-bar" />
+            <span class="ai-reviewing-text"><Icon name="ph:sparkle-fill" />AI 正在审核内容，请稍候…</span>
+          </div>
           <div class="composer-foot">
             <span class="composer-count">{{ composerText.length }}/200</span>
             <button type="button" class="composer-submit" :disabled="sendingMessage" @click="submitMessage">
@@ -199,6 +203,10 @@
             @keydown.ctrl.enter="submitBottle"
             @keydown.meta.enter="submitBottle"
           />
+          <div v-if="sendingBottle" class="ai-reviewing sea-reviewing" role="status" aria-live="polite">
+            <span class="ai-reviewing-bar" />
+            <span class="ai-reviewing-text"><Icon name="ph:sparkle-fill" />AI 正在审核瓶子，请稍候…</span>
+          </div>
           <div class="composer-foot">
             <span class="composer-count">{{ bottleText.length }}/120</span>
             <button type="button" class="composer-submit sea-submit" :disabled="sendingBottle" @click="submitBottle">
@@ -443,11 +451,11 @@ async function doSendMessage(text: string) {
   sendingMessage.value = true;
   try {
     const result = await sendMessage(text);
+    composerText.value = "";
     if (result?.review && !result.review.approved) {
       toast.error(`留言未通过审核：${result.review.reason}`);
       return;
     }
-    composerText.value = "";
     toast.success("留言已通过审核，展示在时光墙上");
     celebrate(result?.unlocked);
     await Promise.all([loadMessages(true), refreshWall(), refreshMe()]);
@@ -472,11 +480,11 @@ async function doThrowBottle(text: string) {
   sendingBottle.value = true;
   try {
     const result = await throwBottle(text);
+    bottleText.value = "";
     if (result?.review && !result.review.approved) {
       toast.error(`瓶子未能漂远：${result.review.reason}`);
       return;
     }
-    bottleText.value = "";
     toast.success("瓶子已通过审核，漂向时光海等待有缘人");
     celebrate(result?.unlocked);
     await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
@@ -908,6 +916,44 @@ useHead({ title: "时光留言板" });
   align-items: center;
   justify-content: space-between;
   margin-top: 10px;
+}
+.ai-reviewing {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--c-primary) 8%, var(--c-bg-1));
+}
+.ai-reviewing-bar {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--c-primary) 22%, transparent) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: ai-reviewing-sweep 1.6s linear infinite;
+}
+@keyframes ai-reviewing-sweep {
+  from { transform: translateX(-60%); }
+  to { transform: translateX(60%); }
+}
+.ai-reviewing-text {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--c-primary);
+  font-weight: 600;
+}
+.ai-reviewing-text .icon {
+  animation: ai-reviewing-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ai-reviewing-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 .composer-count {
   color: var(--c-text-3);

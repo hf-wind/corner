@@ -149,7 +149,8 @@ async function readItem(item: any) {
     } catch { /* ignore */ }
   }
   panelOpen.value = false
-  navigateTo(item.link ? { path: item.link } : { path: '/admin/messages', query: { notification: item.id } })
+  const targetPath = item.type === 'guestbook' ? '/admin/messages' : (item.link || '/admin/messages')
+  navigateTo({ path: targetPath, query: { notification: item.id } })
 }
 
 function formatTime(date: string) {
@@ -434,13 +435,14 @@ watch(panelOpen, (v) => {
 }
 
 .notif-item-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 11px;
   color: var(--c-text-2);
-  line-height: 1.4;
+  line-height: 1.45;
   margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .notif-item-time {

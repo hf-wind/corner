@@ -55,6 +55,7 @@
               row-key="id"
               size="small"
               :pagination="msgPagination"
+              :scroll="{ x: 980 }"
               :locale="{ emptyText: '暂无内容' }"
               @change="handleMsgChange"
             >
@@ -109,6 +110,7 @@
               row-key="id"
               size="small"
               :pagination="profilePagination"
+              :scroll="{ x: 800 }"
               :locale="{ emptyText: '暂无访客' }"
               @change="handleProfileChange"
             >
@@ -326,8 +328,8 @@ function handleBan(record: any, ban: boolean) {
 .visitor-tabs :deep(.ant-tabs-nav) { margin-bottom: 12px; }
 .table-toolbar { margin-bottom: 12px; }
 .list-card { border-radius: 8px; }
-.content-cell { display: flex; align-items: center; gap: 8px; }
-.content-cell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.content-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.content-cell span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .content-cell .is-caught { color: var(--c-text-3); }
 .type-tag { flex: 0 0 auto; }
 .nick-cell { color: var(--c-text); font-size: .78rem; }

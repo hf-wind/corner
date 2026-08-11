@@ -225,7 +225,6 @@ export class VisitorService {
     if (actor?.userId) {
       try {
         const kindLabel = type === 'message' ? '留言' : '漂流瓶';
-        const excerpt = clean.replace(/\s+/g, ' ').slice(0, 60);
         await this.notificationService.create(actor.userId, {
           type: 'guestbook',
           title:
@@ -234,8 +233,8 @@ export class VisitorService {
               : `你的${kindLabel}未通过审核`,
           content:
             status === 'approved'
-              ? excerpt
-              : (review.reason || '内容未通过 AI 审核').slice(0, 60),
+              ? clean
+              : (review.reason || '内容未通过 AI 审核'),
           link: '/guestbook',
         });
       } catch (error) {
