@@ -848,7 +848,7 @@ watch(
   gap: 3px;
   padding: var(--theme-pill-pad);
   width: fit-content;
-  margin: 0 auto;
+  margin: 4px auto;
   background: var(--c-bg-2);
   border-radius: 1.2rem;
   isolation: isolate;
@@ -857,7 +857,7 @@ watch(
 .theme-pill::before { position:absolute; z-index:0; top:var(--theme-pill-pad); bottom:var(--theme-pill-pad); left:var(--theme-pill-pad); width:34px; border-radius:1rem; background:var(--ld-bg-card); box-shadow:inset 0 1px 1px color-mix(in srgb,#fff 32%,transparent),.1em .2em .5em var(--ld-shadow); content:''; transform:translate3d(0,0,0); transition:transform .5s var(--theme-pill-ease),background-color .5s ease,box-shadow .5s ease; }
 .theme-pill.theme-dark::before { transform:translate3d(37px,0,0); }
 .theme-pill.theme-auto::before { transform:translate3d(74px,0,0); }
-.theme-pill:focus-within::after { inset:-3px; box-shadow:0 0 0 3px color-mix(in srgb,var(--c-primary) 14%,transparent); }
+/* .theme-pill:focus-within::after { inset:-3px; box-shadow:0 0 0 3px color-mix(in srgb,var(--c-primary) 14%,transparent); } */
 
 .theme-pill button {
   position: relative;

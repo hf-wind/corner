@@ -1,7 +1,7 @@
 <template>
   <nav
     v-if="total > 1"
-    class="floating-pagination"
+    class="premium-pagination"
     :class="[`is-${variant}`, { 'is-collapsed': !isExpanded }]"
     aria-label="分页导航"
     @mouseenter="holdExpanded"
@@ -9,28 +9,54 @@
     @focusin="holdExpanded"
     @focusout="scheduleCollapse"
   >
-    <div class="pagination-halo" aria-hidden="true" />
-    <div class="pagination-surface">
+    <div class="pagination-glass-surface">
+      <!-- 触发按钮 -->
       <button
         type="button"
-        class="pagination-toggle"
+        class="action-toggle"
         :title="isExpanded ? '收起分页' : '展开分页'"
         :aria-label="isExpanded ? '收起分页' : '展开分页'"
         @click="toggle"
       >
-        <Icon :name="leadIcon" />
+        <Icon :name="leadIcon" class="toggle-icon" />
       </button>
 
-      <div class="pagination-details" :aria-hidden="!isExpanded">
-        <span class="pagination-eyebrow">{{ variantLabel }}</span>
-        <div class="pagination-controls">
-          <button type="button" class="page-step" title="上一页" aria-label="上一页" :tabindex="isExpanded ? 0 : -1" :disabled="modelValue <= 1" @click="goTo(modelValue - 1)">
-            <Icon name="ph:caret-left-bold" />
-          </button>
-          <span class="page-counter"><b>{{ modelValue }}</b><i />{{ total }}</span>
-          <button type="button" class="page-step" title="下一页" aria-label="下一页" :tabindex="isExpanded ? 0 : -1" :disabled="modelValue >= total" @click="goTo(modelValue + 1)">
-            <Icon name="ph:caret-right-bold" />
-          </button>
+      <!-- 展开详情区 (利用 Grid 0fr 技巧实现极致丝滑动画) -->
+      <div class="expandable-track" :aria-hidden="!isExpanded">
+        <div class="track-inner">
+          <span class="eyebrow-label">{{ variantLabel }}</span>
+          
+          <div class="control-group">
+            <button 
+              type="button" 
+              class="step-btn" 
+              title="上一页" 
+              aria-label="上一页" 
+              :tabindex="isExpanded ? 0 : -1" 
+              :disabled="modelValue <= 1" 
+              @click="goTo(modelValue - 1)"
+            >
+              <Icon name="ph:caret-left-bold" />
+            </button>
+            
+            <div class="page-indicator">
+              <span class="current-page">{{ modelValue }}</span>
+              <span class="divider">/</span>
+              <span class="total-page">{{ total }}</span>
+            </div>
+            
+            <button 
+              type="button" 
+              class="step-btn" 
+              title="下一页" 
+              aria-label="下一页" 
+              :tabindex="isExpanded ? 0 : -1" 
+              :disabled="modelValue >= total" 
+              @click="goTo(modelValue + 1)"
+            >
+              <Icon name="ph:caret-right-bold" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -38,6 +64,8 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+
 const props = withDefaults(defineProps<{
   modelValue: number
   total: number
@@ -59,11 +87,12 @@ const leadIcon = computed(() => props.variant === 'comments'
   : props.variant === 'articles'
     ? 'ph:article-bold'
     : 'ph:compass-bold')
+
 const variantLabel = computed(() => props.variant === 'comments' ? '评论进度' : props.variant === 'articles' ? '文章索引' : '浏览进度')
 
 function scheduleCollapse() {
   if (collapseTimer) clearTimeout(collapseTimer)
-  collapseTimer = setTimeout(() => { isExpanded.value = false }, 5000)
+  collapseTimer = setTimeout(() => { isExpanded.value = false }, 4000) // 缩短至4秒，体验更紧凑
 }
 
 function holdExpanded() {
@@ -101,90 +130,214 @@ watch(() => props.total, (total, previous) => {
 </script>
 
 <style scoped>
-.floating-pagination {
+/* 核心定位 */
+.premium-pagination {
   position: fixed;
   z-index: 70;
-  bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px));
+  bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
   left: 50%;
-  width: max-content;
-  color: var(--c-text);
   transform: translateX(-50%);
+  color: var(--c-text);
+  /* 使用贝塞尔曲线让整体位移更具弹簧感 */
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.pagination-halo {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 96px;
-  height: 46px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--c-primary) 28%, transparent);
-  filter: blur(17px);
-  opacity: .62;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  transition: opacity .38s ease, transform .42s cubic-bezier(.16, 1, .3, 1);
-}
-
-.pagination-surface {
-  position: relative;
+/* 玻璃态微质感容器 */
+.pagination-glass-surface {
   display: flex;
-  height: 42px;
+  align-items: center;
+  height: 48px;
+  padding: 4px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--ld-bg-card, #ffffff) 85%, transparent);
+  backdrop-filter: blur(24px) saturate(1.2);
+  /* 多层阴影：环境光边缘 + 核心投影 + 漫反射 */
+  box-shadow: 
+    0 0 0 1px color-mix(in srgb, var(--c-text) 4%, transparent),
+    0 12px 32px -4px color-mix(in srgb, var(--ld-shadow, #000) 12%, transparent),
+    0 4px 12px -2px color-mix(in srgb, var(--ld-shadow, #000) 8%, transparent);
+  transition: box-shadow 0.4s ease, background-color 0.4s ease;
+}
+
+/* 悬浮状态下的光泽提升 */
+.premium-pagination:hover .pagination-glass-surface {
+  background: color-mix(in srgb, var(--ld-bg-card, #ffffff) 92%, transparent);
+  box-shadow: 
+    0 0 0 1px color-mix(in srgb, var(--c-text) 6%, transparent),
+    0 16px 40px -4px color-mix(in srgb, var(--ld-shadow, #000) 16%, transparent),
+    0 6px 16px -2px color-mix(in srgb, var(--ld-shadow, #000) 10%, transparent);
+}
+
+/* 触发按钮 */
+.action-toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--c-primary);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.3s ease;
+}
+
+.action-toggle:hover {
+  transform: scale(1.06);
+}
+
+.action-toggle:active {
+  transform: scale(0.94);
+}
+
+.toggle-icon {
+  font-size: 1.1rem;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.is-collapsed .toggle-icon {
+  transform: rotate(-180deg);
+}
+
+/* === 核心动画技巧：Grid 展开 === */
+.expandable-track {
+  display: grid;
+  grid-template-columns: 1fr;
+  transition: grid-template-columns 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.is-collapsed .expandable-track {
+  grid-template-columns: 0fr;
+}
+
+.track-inner {
+  display: flex;
   align-items: center;
   overflow: hidden;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--ld-bg-card) 92%, transparent);
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--ld-shadow) 74%, transparent), inset 0 1px rgb(255 255 255 / .28);
-  backdrop-filter: blur(16px) saturate(1.15);
-  transition: border-radius .35s ease, box-shadow .35s ease;
+  gap: 16px;
+  padding: 0 12px 0 16px;
+  white-space: nowrap; /* 防止动画过程中文字换行 */
+  opacity: 1;
+  /* 展开时：透明度稍稍延后，等待容器撑开 */
+  transition: opacity 0.4s ease 0.1s, padding 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.pagination-toggle,
-.page-step {
+.is-collapsed .track-inner {
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  /* 收起时：瞬间透明，避免挤压特效 */
+  transition: opacity 0.2s ease 0s, padding 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 文本与标签 */
+.eyebrow-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--c-text-3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* 控制组背景槽 */
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in srgb, var(--c-text) 4%, transparent);
+  padding: 3px;
+  border-radius: 18px;
+}
+
+.step-btn {
   display: grid;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
   place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.25s ease;
 }
 
-.pagination-toggle {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  border-radius: 12px;
-  background: var(--c-primary);
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--c-primary) 32%, transparent);
-  color: #fff;
-  font-size: 1rem;
-  transition: transform .3s cubic-bezier(.16, 1, .3, 1), border-radius .35s ease, background-color .25s ease;
+.step-btn:hover:not(:disabled) {
+  background: var(--ld-bg-card, #ffffff);
+  color: var(--c-primary);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--ld-shadow, #000) 8%, transparent);
 }
 
-.pagination-toggle:hover { transform: rotate(-7deg) scale(1.04); }
-.pagination-details { display:flex; width:146px; height:100%; min-width:146px; align-items:center; gap:11px; overflow:hidden; padding:0 10px 0 8px; opacity:1; transform:translateX(0); transition:width .42s cubic-bezier(.16, 1, .3, 1),min-width .42s cubic-bezier(.16, 1, .3, 1),padding .42s cubic-bezier(.16, 1, .3, 1),opacity .2s ease,transform .36s cubic-bezier(.16, 1, .3, 1); }
-.pagination-eyebrow { color:var(--c-text-3); font-size:.49rem; font-weight:750; letter-spacing:.1em; white-space:nowrap; }
-.pagination-controls { display:flex; align-items:center; gap:3px; }
-.page-step { width:24px; height:24px; border-radius:8px; background:transparent; color:var(--c-text-2); font-size:.72rem; transition:background-color .2s ease,color .2s ease,transform .2s ease; }
-.page-step:hover:not(:disabled) { background:var(--c-primary-soft); color:var(--c-primary); transform:scale(1.08); }
-.page-step:disabled { cursor:default; opacity:.28; }
-.page-counter { display:flex; min-width:39px; align-items:center; justify-content:center; gap:4px; color:var(--c-text-3); font-family:var(--font-mono, var(--font-body)); font-size:.62rem; font-variant-numeric:tabular-nums; }
-.page-counter b { color:var(--c-primary); font-size:.8rem; }
-.page-counter i { display:block; width:8px; height:1px; background:currentColor; opacity:.48; }
-.is-comments .pagination-toggle { background:#5b8bdc; }
-.is-collapsed .pagination-halo { opacity:.38; transform:translate(-50%, -50%) scale(.72); }
-.is-collapsed .pagination-surface { border-radius:50%; box-shadow:0 8px 22px color-mix(in srgb, var(--ld-shadow) 70%, transparent); }
-.is-collapsed .pagination-toggle { border-radius:50%; }
-.is-collapsed .pagination-details { width:0; min-width:0; padding:0; opacity:0; pointer-events:none; transform:translateX(-8px); }
+.step-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 数字显示器 */
+.page-indicator {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  min-width: 42px;
+  gap: 3px;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.current-page {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.divider {
+  font-size: 0.7rem;
+  color: var(--c-text-3);
+  font-weight: 400;
+  transform: translateY(-1px);
+}
+
+.total-page {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--c-text-3);
+}
+
+/* 差异化主题支持 */
+.is-comments .action-toggle {
+  background: #5b8bdc;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .pagination-halo,.pagination-surface,.pagination-toggle,.pagination-details,.page-step { transition:none; }
+  .premium-pagination,
+  .pagination-glass-surface,
+  .action-toggle,
+  .expandable-track,
+  .track-inner,
+  .toggle-icon,
+  .step-btn {
+    transition: none !important;
+  }
 }
 
-@media (max-width:640px) {
-  .floating-pagination { bottom:max(12px, calc(env(safe-area-inset-bottom) + 8px)); }
-  .pagination-surface,.pagination-toggle { height:40px; }
-  .pagination-toggle { width:40px; flex-basis:40px; }
-  .pagination-details { width:134px; min-width:134px; gap:8px; }
-  .is-collapsed .pagination-details { width:0; min-width:0; }
+@media (max-width: 640px) {
+  .premium-pagination {
+    bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px));
+  }
+  .pagination-glass-surface {
+    height: 44px;
+  }
+  .action-toggle {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+  .track-inner {
+    gap: 12px;
+    padding: 0 8px 0 12px;
+  }
 }
 </style>
