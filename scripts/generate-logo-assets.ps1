@@ -20,19 +20,18 @@ function New-LogoBitmap([int]$size) {
   $scale = $size / 64.0
   $graphics.ScaleTransform($scale, $scale)
 
-  $backgroundPath = New-RoundedRectanglePath 2 2 60 60 14
-  $background = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#f8faf8'))
-  $border = [System.Drawing.Pen]::new([System.Drawing.ColorTranslator]::FromHtml('#dfe6e1'), 1)
-  $graphics.FillPath($background, $backgroundPath)
-  $graphics.DrawPath($border, $backgroundPath)
+  $brand = [System.Drawing.ColorTranslator]::FromHtml('#1a66ff')
 
-  $brand = [System.Drawing.ColorTranslator]::FromHtml('#586b61')
+  $framePath = New-RoundedRectanglePath 2.5 2.5 59 59 15
+  $frame = [System.Drawing.Pen]::new($brand, 2.4)
+  $graphics.DrawPath($frame, $framePath)
+
   $cornerPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(82, $brand), 2.8)
   $cornerPen.StartCap = $cornerPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
   $graphics.DrawLine($cornerPen, 15, 14, 15, 49)
   $graphics.DrawLine($cornerPen, 15, 49, 50, 49)
 
-  $windPen = [System.Drawing.Pen]::new($brand, 3.2)
+  $windPen = [System.Drawing.Pen]::new($brand, 3.4)
   $windPen.StartCap = $windPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
   $windOne = [System.Drawing.Drawing2D.GraphicsPath]::new()
   $windOne.StartFigure()
@@ -45,20 +44,20 @@ function New-LogoBitmap([int]$size) {
   $windTwo.StartFigure()
   $windTwo.AddBezier(44, 36, 51, 36, 55, 33, 55, 28)
   $graphics.DrawPath($windPen, $windTwo)
-  $windPen.Color = [System.Drawing.Color]::FromArgb(143, $brand)
+  $windPen.Color = [System.Drawing.Color]::FromArgb(138, $brand)
   $graphics.DrawLine($windPen, 17, 46, 42, 46)
   $windThree = [System.Drawing.Drawing2D.GraphicsPath]::new()
   $windThree.StartFigure()
   $windThree.AddBezier(42, 46, 48, 46, 51, 49, 51, 53)
   $graphics.DrawPath($windPen, $windThree)
 
-  $dotBorder = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#f8faf8'))
+  $dotBorder = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(204, [System.Drawing.Color]::White), 1.5)
   $dot = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#d89454'))
-  $graphics.FillEllipse($dotBorder, 10, 9, 10, 10)
   $graphics.FillEllipse($dot, 12, 11, 6, 6)
+  $graphics.DrawEllipse($dotBorder, 10.55, 9.55, 8.9, 8.9)
 
   $graphics.Dispose()
-  $backgroundPath.Dispose(); $background.Dispose(); $border.Dispose(); $cornerPen.Dispose(); $windPen.Dispose()
+  $framePath.Dispose(); $frame.Dispose(); $cornerPen.Dispose(); $windPen.Dispose()
   $windOne.Dispose(); $windTwo.Dispose(); $windThree.Dispose(); $dotBorder.Dispose(); $dot.Dispose()
   return $bitmap
 }
