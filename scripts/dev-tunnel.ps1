@@ -11,7 +11,19 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $backendEnv = Join-Path $repoRoot 'backend/.env.tunnel'
 $sshTarget = "$SshUser@$SshHost"
-$sshArgs = @('-i', $KeyPath, '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30')
+$sshArgs = @(
+  '-i', $KeyPath,
+  '-o', 'BatchMode=yes',
+  '-o', 'ExitOnForwardFailure=yes',
+  '-o', 'ServerAliveInterval=30',
+  '-o', 'ConnectTimeout=10',
+  '-o', 'ConnectionAttempts=1'
+)
+
+function Write-TunnelLog {
+  param([string]$Message)
+  [Console]::Error.WriteLine("[$([DateTime]::Now.ToString('HH:mm:ss'))] $Message")
+}
 
 function Read-DotEnvValues {
   param([string]$Path)
@@ -42,12 +54,18 @@ if (-not (Test-Path -LiteralPath $KeyPath)) {
 }
 
 if (-not $SkipSetup) {
-  & ssh @sshArgs $sshTarget "cd '$RemoteAppPath' && bash ./scripts/setup-dev-data.sh"
-  if ($LASTEXITCODE -ne 0) { throw 'Remote development data setup failed.' }
+  Write-TunnelLog 'Running remote development data setup...'
+  & ssh @sshArgs $SshTarget "cd '$RemoteAppPath' && bash ./scripts/setup-dev-data.sh"
+  $setupExit = $LASTEXITCODE
+  Write-TunnelLog "Remote development data setup finished (exit=$setupExit)."
+  if ($setupExit -ne 0) { throw 'Remote development data setup failed.' }
 }
 
-$remoteEnv = & ssh @sshArgs $sshTarget "cat /srv/corner/dev-data/.env"
-if ($LASTEXITCODE -ne 0 -or -not $remoteEnv) {
+Write-TunnelLog 'Reading remote development data configuration...'
+$remoteEnv = & ssh @sshArgs $SshTarget "cat /srv/corner/dev-data/.env"
+$readExit = $LASTEXITCODE
+Write-TunnelLog "Read remote configuration (exit=$readExit, lines=$($remoteEnv.Count))."
+if ($readExit -ne 0 -or -not $remoteEnv) {
   throw 'Unable to read the remote development data configuration.'
 }
 
@@ -86,6 +104,7 @@ $lines = @(
   'PORT=4000'
 )
 [System.IO.File]::WriteAllLines($backendEnv, $lines, [System.Text.UTF8Encoding]::new($false))
+Write-TunnelLog "Wrote $($lines.Count) configuration lines to backend/.env.tunnel."
 
 Write-Host 'Tunnel configuration written to backend/.env.tunnel (credentials are not printed).'
 Write-Host 'Keep this terminal open. In another terminal run:'
@@ -94,5 +113,6 @@ Write-Host '  npm run tunnel:init   # first use only'
 Write-Host '  npm run start:dev:tunnel'
 Write-Host 'Then run the frontend with: cd frontend; npm run dev'
 
-& ssh @sshArgs '-N' '-L' '15432:127.0.0.1:15432' '-L' '16379:127.0.0.1:16379' $sshTarget
+Write-TunnelLog 'Starting SSH tunnel (PostgreSQL 15432, Redis 16379)...'
+& ssh @sshArgs '-N' '-L' '15432:127.0.0.1:15432' '-L' '16379:127.0.0.1:16379' $SshTarget
 exit $LASTEXITCODE

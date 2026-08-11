@@ -147,6 +147,23 @@ function Wait-ForPorts {
   return $ready
 }
 
+function Stop-OrphanDevProcesses {
+  $candidates = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    $line = [string]$_.CommandLine
+    ($_.Name -match '^powershell(?:[.]exe)?$' -and $line.IndexOf($tunnelScript, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) -or
+    ($_.Name -match '^ssh(?:[.]exe)?$' -and
+      $line -match '15432:127[.]0[.]0[.]1:15432' -and
+      $line -match '16379:127[.]0[.]0[.]1:16379' -and
+      $line.IndexOf($SshHost, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+  })
+
+  foreach ($candidate in $candidates) {
+    if ([int]$candidate.ProcessId -eq $PID) { continue }
+    Write-Host "Cleaning up orphaned dev process PID $($candidate.ProcessId) ($($candidate.Name))..."
+    Stop-ProcessTree -ProcessId ([int]$candidate.ProcessId)
+  }
+}
+
 if ($Stop) {
   Set-Content -LiteralPath $stopSignal -Value 'stop' -Encoding ascii
   Stop-ProjectPortListeners -Ports $managedPorts
@@ -155,6 +172,7 @@ if ($Stop) {
 }
 
 Remove-Item -LiteralPath $stopSignal -Force -ErrorAction SilentlyContinue
+Stop-OrphanDevProcesses
 foreach ($logFile in $logFiles.Values) {
   Set-Content -LiteralPath $logFile -Value '' -Encoding utf8
 }
@@ -191,7 +209,10 @@ try {
 
   $tunnelReady = Wait-ForPorts -Ports @(15432, 16379) -Deadline (Get-Date).AddMinutes(2) -Processes @($tunnel)
   if (-not $tunnelReady -or -not (Test-Path -LiteralPath $backendEnv)) {
-    throw "SSH tunnel failed or timed out.$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.tunnelErr)"
+    $processState = if ($tunnel.HasExited) { "exited (code $($tunnel.ExitCode))" } else { 'still running' }
+    $listeners = Get-PortListeners -Ports @(15432, 16379)
+    $listenerInfo = if ($listeners) { ($listeners | ForEach-Object { "$($_.LocalPort) (PID $($_.OwningProcess))" }) -join ', ' } else { 'none' }
+    throw "SSH tunnel failed or timed out.$([Environment]::NewLine)Tunnel process: $processState.$([Environment]::NewLine)Local listeners: $listenerInfo.$([Environment]::NewLine)--- stderr ---$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.tunnelErr)$([Environment]::NewLine)--- stdout ---$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.tunnelOut)"
   }
 
   $npmPath = (Get-Command npm.cmd -ErrorAction Stop).Source

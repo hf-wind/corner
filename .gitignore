@@ -2,6 +2,7 @@ node_modules/
 dist/
 .output/
 .nuxt/
+.opencode/
 frontend/localhost/
 frontend/127.0.0.1/
 .env
