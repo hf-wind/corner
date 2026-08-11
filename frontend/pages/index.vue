@@ -68,12 +68,12 @@
       </div>
     </section>
 
-    <aside class="visitor-signal" aria-label="公开记忆数量">
-      <small>PUBLIC MEMORIES</small>
+    <aside class="visitor-signal" aria-label="到访人数">
+      <small>TRAVELERS VISITED</small>
       <strong>{{
-        graph.nodes.length ? formatNumber(graph.nodes.length) : "—"
+        totalVisitors != null ? formatNumber(totalVisitors) : "—"
       }}</strong>
-      <span>枚公开记忆在这里发光</span>
+      <span>位旅人曾途经这座角落</span>
     </aside>
 
     <div v-if="sceneFailed" class="scene-fallback" aria-hidden="true">
@@ -83,6 +83,8 @@
 </template>
 
 <script setup lang="ts">
+import { useVisitor } from "~/composables/useVisitor";
+
 definePageMeta({ layout: "welcome" });
 
 type GraphNode = {
@@ -98,11 +100,13 @@ const api = useApi();
 const { mediaUrl } = useMediaUrl();
 const { siteTitle, loadSiteSettings } = useSiteSettings();
 const { navigating, navigate } = useCosmicNavigation();
+const { fetchWall } = useVisitor();
 const graph = reactive<{
   nodes: GraphNode[];
   relations: any[];
   graphVersion: string;
 }>({ nodes: [], relations: [], graphVersion: "" });
+const totalVisitors = ref<number | null>(null);
 const sceneReady = ref(false);
 const sceneFailed = ref(false);
 const graphLoaded = ref(false);
@@ -121,6 +125,9 @@ onMounted(async () => {
     api
       .get<any>("/memories/graph", { view: "constellation", limit: 320 })
       .then((result) => Object.assign(graph, result)),
+    fetchWall().then(
+      (wall) => (totalVisitors.value = wall?.totalVisitors ?? null),
+    ),
   ]);
   graphLoaded.value = true;
 });

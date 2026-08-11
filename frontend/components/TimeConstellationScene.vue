@@ -219,20 +219,19 @@ function yearOf(node: MemoryNode) {
   return Number.isNaN(date.getTime()) ? null : date.getFullYear()
 }
 
-function buildPosition(node: MemoryNode, years: number[]) {
+function buildPosition(node: MemoryNode, years: number[], ringSize: number, slot: number) {
   const random = randomFrom(Number(node.coordinateSeed) || hash(node.id))
   const date = node.occurredAt ? new Date(node.occurredAt) : null
   const year = date && !Number.isNaN(date.getTime()) ? date.getFullYear() : null
   const ringIndex = year == null ? years.length : Math.max(0, years.indexOf(year))
-  const radius = 46 + ringIndex * 26
-  const month = date && !Number.isNaN(date.getTime()) ? date.getMonth() : Math.floor(random() * 12)
-  const day = date && !Number.isNaN(date.getTime()) ? date.getDate() : 1
-  const angle = (month / 12 + day / 372) * Math.PI * 2 - Math.PI / 2 + (random() - .5) * .12
-  const cluster = node.type === 'photo' || node.type === 'album' ? (random() - .5) * 9 : 0
+  const radius = 46 + ringIndex * 26 + (random() - .5) * 12
+  const angle = ringSize > 1
+    ? (slot / ringSize) * Math.PI * 2 + (random() - .5) * (Math.PI * 2 / ringSize) * .45
+    : random() * Math.PI * 2
   return new THREE.Vector3(
-    Math.cos(angle) * (radius + cluster),
-    (typeLevels[node.type] || 0) + (random() - .5) * 10,
-    Math.sin(angle) * (radius + cluster) * .66,
+    Math.cos(angle) * radius,
+    (typeLevels[node.type] || 0) + (random() - .5) * 16,
+    Math.sin(angle) * radius * .66,
   )
 }
 
@@ -1501,24 +1500,6 @@ function addImageSprite(node: MemoryNode, group: THREE.Group) {
   }, undefined, () => undefined)
 }
 
-function addRelations() {
-  if (!scene) return
-  const routeIds = new Set(props.routeNodeIds)
-  for (const relation of props.relations.slice(0, lowQuality ? 300 : 900)) {
-    const from = nodePositions.get(relation.sourceId)
-    const to = nodePositions.get(relation.targetId)
-    if (!from || !to) continue
-    const midpoint = from.clone().add(to).multiplyScalar(.5)
-    midpoint.y += Math.min(18, from.distanceTo(to) * .08)
-    const curve = new THREE.QuadraticBezierCurve3(from, midpoint, to)
-    const geometry = track(new THREE.BufferGeometry().setFromPoints(curve.getPoints(lowQuality ? 8 : 18)))
-    const routed = routeIds.has(relation.sourceId) && routeIds.has(relation.targetId)
-    const color = relation.type === 'same_place' ? 0x64d8ef : relation.type === 'same_album' ? 0x72b9ff : routed ? 0xa9d7ff : 0x4d7fa8
-    const material = track(new THREE.LineBasicMaterial({ color, transparent: true, opacity: routed ? .75 : .17 + Math.min(.2, Number(relation.weight || 0) * .16), blending: THREE.AdditiveBlending }))
-    scene.add(new THREE.Line(geometry, material))
-  }
-}
-
 function addMeteor() {
   if (!scene || reducedMotion.value) return
   const latest = [...props.nodes].filter(node => node.occurredAt).sort((a, b) => new Date(b.occurredAt!).getTime() - new Date(a.occurredAt!).getTime())[0]
@@ -1588,13 +1569,23 @@ function buildScene() {
     for (let index = 0; index < 3; index++) addOrbit(46 + index * 28, null)
   }
   addCosmicBodies()
+  const ringNodes = new Map<number, MemoryNode[]>()
   for (const node of props.nodes) {
-    nodeLookup.set(node.id, node)
-    const position = buildPosition(node, years)
-    nodePositions.set(node.id, position)
-    addNode(node, position)
+    const year = yearOf(node)
+    const ringIndex = year == null ? years.length : Math.max(0, years.indexOf(year))
+    const group = ringNodes.get(ringIndex)
+    if (group) group.push(node)
+    else ringNodes.set(ringIndex, [node])
   }
-  addRelations()
+  for (const [ringIndex, group] of ringNodes) {
+    group.sort((a, b) => (Number(a.coordinateSeed) || hash(a.id)) - (Number(b.coordinateSeed) || hash(b.id)))
+    group.forEach((node, slot) => {
+      nodeLookup.set(node.id, node)
+      const position = buildPosition(node, years, group.length, slot)
+      nodePositions.set(node.id, position)
+      addNode(node, position)
+    })
+  }
   addMeteor()
   applySelection(false)
 }
