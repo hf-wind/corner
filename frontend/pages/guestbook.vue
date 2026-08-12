@@ -313,7 +313,7 @@ const {
   fetchMessages,
   sendMessage,
   throwBottle,
-  fishBottle,
+  fishBottleById,
   peekBottles: fetchPeek,
 } = useVisitor();
 const toast = useToast();
@@ -504,7 +504,12 @@ async function doFish() {
   fishing.value = true;
   caughtBottle.value = null;
   try {
-    const result = await fishBottle();
+    const target = peekBottles.value[0];
+    if (!target) {
+      toast.info("海面还很平静");
+      return;
+    }
+    const result = await fishBottleById(target.id);
     caughtBottle.value = result?.bottle ?? null;
     toast.success(`捞起了一只来自「${result?.bottle?.nickname ?? "远方"}」的瓶子`);
     celebrate(result?.unlocked);

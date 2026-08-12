@@ -66,10 +66,13 @@ export function useVisitor() {
     api.get<any>("/visitor/messages", { type: "message", page });
   const sendMessage = (content: string) =>
     api.post<any>("/visitor/messages", { content });
-  const throwBottle = (content: string) =>
-    api.post<any>("/visitor/bottles", { content });
-  const fishBottle = () => api.post<any>("/visitor/bottles/fish");
-  const peekBottles = (limit = 3) =>
+  const throwBottle = (content: string, parentId?: string) =>
+    api.post<any>("/visitor/bottles", { content, parentId });
+  const fishBottleById = (id: string) =>
+    api.post<any>(`/visitor/bottles/${id}/fish`);
+  const replyBottle = (id: string, content: string) =>
+    api.post<any>(`/visitor/bottles/${id}/reply`, { content });
+  const peekBottles = (limit = 8) =>
     api.get<any>("/visitor/bottles/peek", { limit });
 
   return {
@@ -86,7 +89,8 @@ export function useVisitor() {
     fetchMessages,
     sendMessage,
     throwBottle,
-    fishBottle,
+    fishBottleById,
+    replyBottle,
     peekBottles,
   };
 }
