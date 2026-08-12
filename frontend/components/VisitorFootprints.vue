@@ -206,7 +206,7 @@ onMounted(() => load());
 .fp-item {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
   padding: 7px 8px;
   border-radius: 10px;
@@ -251,20 +251,18 @@ onMounted(() => load());
 .fp-line {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: baseline;
+  flex-wrap: wrap;
   gap: 5px;
   margin: 0;
   color: var(--c-text-3);
   font-size: 0.58rem;
 }
 .fp-line strong {
-  overflow: hidden;
-  max-width: 72px;
   color: var(--c-text);
   font-size: 0.68rem;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .fp-sep {
   width: 3px;
@@ -275,17 +273,14 @@ onMounted(() => load());
   opacity: 0.55;
 }
 .fp-action-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .fp-target {
-  overflow: hidden;
   margin: 0;
   color: var(--c-text-2);
   font-size: 0.6rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 .fp-time {
   flex: 0 0 auto;

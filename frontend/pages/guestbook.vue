@@ -17,7 +17,6 @@
         label="时光留言板统计"
         :items="[
           { icon: 'ph:users-three-bold', value: wall.todayVisitors, label: '今日访客' },
-          { icon: 'solar:bottle-outline', value: wall.bottleCount, label: '漂流瓶' },
           { icon: 'ph:footprints-bold', value: wall.totalVisits, label: '累计足迹' },
         ]"
       />
@@ -40,11 +39,10 @@
           role="tab"
           :aria-selected="activeTab === 'bottles'"
           :class="{ active: activeTab === 'bottles' }"
-          @click="activeTab = 'bottles'"
+          @click="switchTab('bottles')"
         >
           <Icon name="solar:bottle-outline" />
           漂流瓶
-          <span class="tab-count">{{ wall?.bottleCount ?? 0 }}</span>
         </button>
       </div>
 
@@ -64,8 +62,22 @@
         <div v-else class="msg-masonry content-reveal">
           <article v-for="msg in messages" :key="msg.id" class="msg-card">
             <header class="msg-head">
-              <span class="msg-avatar" :class="{ 'is-user': !!msg.userId }">
-                <Icon :name="msg.userId ? 'ph:user-bold' : 'ph:face-mask-bold'" />
+              <span
+                class="msg-avatar"
+                :class="{ 'is-user': !!msg.userId, 'guest-char': !msg.userId && !!msg.visitorIdHash }"
+                :style="!msg.userId && msg.visitorIdHash ? visitorAvatarStyle(msg) : undefined"
+              >
+                <img
+                  v-if="msg.userId && !avatarErrors.has(msg.id)"
+                  :src="mediaUrl(msg.user?.avatar)"
+                  class="msg-avatar-img"
+                  alt=""
+                  loading="lazy"
+                  @error="onAvatarError(msg.id)"
+                />
+                <Icon v-else-if="msg.userId" name="ph:user-bold" />
+                <template v-else-if="msg.visitorIdHash">{{ (msg.nickname || "访").trim().charAt(0) }}</template>
+                <Icon v-else name="ph:face-mask-bold" />
               </span>
               <div class="msg-meta">
                 <span class="msg-name-row">
@@ -131,7 +143,7 @@
 
       <!-- ========== 漂流瓶 ========== -->
       <section v-show="activeTab === 'bottles'" class="bottles-pane">
-        <div class="sea-card content-reveal">
+        <div class="sea-card content-reveal" ref="seaCardRef">
           <SeaScene
             ref="seaRef"
             class="sea-scene-wrap"
@@ -147,7 +159,7 @@
           </div>
 
           <Transition name="bottle-pop">
-            <div v-if="caughtBottle" class="bottle-caught">
+            <div v-if="caughtBottle" class="bottle-caught" ref="caughtRef">
               <div class="caught-head">
                 <span class="caught-seal"><Icon name="ph:anchor-fill" /></span>
                 <div class="caught-title">
@@ -165,12 +177,12 @@
                 </li>
               </ol>
               <div class="caught-actions">
-                <button v-if="isLoggedIn && caughtBottle.canReply" type="button" class="caught-action reply" @click="replyDialogOpen = true">
+                <button v-if="canReply" type="button" class="caught-action reply" @click="replyDialogOpen = true">
                   <Icon name="ph:envelope-simple-bold" />回复这位旅人
                 </button>
-                <a v-else-if="!isLoggedIn" class="caught-action reply-link" href="/login" @click.prevent="goLogin">
+                <button v-else-if="!isLoggedIn" type="button" class="caught-action reply-link" @click="openIdentityForReply">
                   <Icon name="ph:envelope-simple-bold" />登录后可回复漂流瓶主人
-                </a>
+                </button>
                 <button v-if="!relayMode" type="button" class="caught-action relay" @click="relayMode = true">
                   <Icon name="ph:paper-plane-tilt-bold" />留一句话，让瓶子继续漂流
                 </button>
@@ -256,7 +268,14 @@
       <section class="right-card my-card">
         <span class="aside-kicker">MY TIME · 我的时光</span>
         <div class="my-avatar" :class="{ 'is-user': isLoggedIn }">
-          <Icon v-if="isLoggedIn" name="ph:user-bold" />
+          <img
+            v-if="isLoggedIn && user?.avatar && !myAvatarError"
+            :src="mediaUrl(user.avatar)"
+            class="my-avatar-img"
+            alt=""
+            @error="myAvatarError = true"
+          />
+          <Icon v-else-if="isLoggedIn" name="ph:user-bold" />
           <Icon v-else-if="nickname" name="ph:feather-bold" />
           <Icon v-else name="ph:user-fill" />
         </div>
@@ -266,7 +285,6 @@
         <p v-else class="my-sub">还没起名，起个名字开启旅程吧</p>
         <div class="my-stats">
           <div><strong>{{ me?.messageCount ?? 0 }}</strong><span>留言</span></div>
-          <div><strong>{{ me?.bottleCount ?? 0 }}</strong><span>投瓶</span></div>
           <div><strong>{{ me?.caughtCount ?? 0 }}</strong><span>捞瓶</span></div>
         </div>
         <button v-if="isLoggedIn" type="button" class="my-rename primary" @click="toProfile">
@@ -299,8 +317,10 @@
       :visible="nameModalVisible"
       :initial="nickname"
       :initial-email="email"
+      :pending-hint="pendingHint"
       @close="nameModalVisible = false"
       @confirm="handleNameConfirm"
+      @authenticated="handleAuthenticated"
     />
 
     <a-modal
@@ -343,6 +363,7 @@ const {
 } = useVisitor();
 const toast = useToast();
 const { isLoggedIn, user } = useAuth();
+const { mediaUrl } = useMediaUrl();
 
 const composerName = computed(() =>
   isLoggedIn.value ? user.value?.username || "" : nickname.value,
@@ -370,6 +391,8 @@ const caughtBottle = ref<any>(null);
 const peekBottles = ref<any[]>([]);
 
 const seaRef = ref<InstanceType<any> | null>(null);
+const seaCardRef = ref<HTMLElement | null>(null);
+const caughtRef = ref<HTMLElement | null>(null);
 const relayMode = ref(false);
 const relayText = ref("");
 const relaySending = ref(false);
@@ -378,8 +401,77 @@ const replyText = ref("");
 const replySending = ref(false);
 const chainReversed = computed(() => [...(caughtBottle.value?.chain ?? [])].reverse());
 
+const canReply = computed(() => {
+  const bottle = caughtBottle.value;
+  if (!isLoggedIn.value || !bottle) return false;
+  if (bottle.ownerUserId) return bottle.ownerUserId !== user.value?.id;
+  return !!bottle.canReply;
+});
+
+const avatarErrors = ref<Set<string>>(new Set());
+const myAvatarError = ref(false);
+
+function onAvatarError(id: string) {
+  if (avatarErrors.value.has(id)) return;
+  avatarErrors.value = new Set([...avatarErrors.value, id]);
+}
+
+function visitorAvatarStyle(msg: any): Record<string, string> {
+  const seed = String(msg.visitorIdHash || msg.nickname || "guest");
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const hue = hash % 360;
+  const sat = 50 + (hash % 3) * 10;
+  const light = 66 + ((hash >>> 4) % 3) * 6;
+  return {
+    background: `linear-gradient(145deg, hsl(${hue} ${sat}% ${light + 5}%), hsl(${hue} ${sat - 13}% ${light - 8}%))`,
+    color: `hsl(${hue} 48% 22%)`,
+  };
+}
+
+function scrollToEl(el: HTMLElement | null | undefined) {
+  if (!el) return;
+  const container = document.querySelector<HTMLElement>(".main-content");
+  if (!container) return;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const top =
+    el.getBoundingClientRect().top -
+    container.getBoundingClientRect().top +
+    container.scrollTop -
+    18;
+  container.scrollTo({ top, behavior: reduced ? "auto" : "smooth" });
+}
+
+async function switchTab(tab: "messages" | "bottles") {
+  activeTab.value = tab;
+  if (tab !== "bottles") return;
+  await nextTick();
+  scrollToEl(seaCardRef.value);
+}
+
+function openIdentityForReply() {
+  pendingAction.value = {
+    fn: async () => {
+      await refreshMe();
+      await nextTick();
+      if (canReply.value) {
+        replyDialogOpen.value = true;
+        scrollToEl(caughtRef.value);
+      }
+    },
+    hint: "回复漂流瓶主人",
+  };
+  nameModalVisible.value = true;
+}
+
 const nameModalVisible = ref(false);
-const pendingAction = ref<null | (() => Promise<void>)>(null);
+type PendingAction = { fn: () => Promise<void>; hint: string };
+const pendingAction = ref<null | PendingAction>(null);
+const pendingHint = computed(() =>
+  pendingAction.value ? `正在继续：${pendingAction.value.hint}` : "",
+);
 
 const BADGES = [
   { code: "first_visit", icon: "ph:star-four-fill", title: "初识之旅", description: "第一次踏上这座角落" },
@@ -420,20 +512,44 @@ function askName(rename = false) {
 }
 
 async function handleNameConfirm(name: string, mail: string) {
-  const result = await identify(name, mail);
-  await refreshMe();
-  toast.success(`你好，${name}`);
-  celebrate(result?.unlocked);
+  try {
+    const result = await identify(name, mail);
+    await refreshMe();
+    toast.success(`你好，${name}`);
+    celebrate(result?.unlocked);
+  } catch (err: any) {
+    toast.error(err?.message || "署名失败，请稍后再试");
+    nameModalVisible.value = false;
+    return;
+  }
   const action = pendingAction.value;
   pendingAction.value = null;
-  if (action) await action();
+  if (action) {
+    try {
+      await action.fn();
+    } catch {
+      /* action 内部已提示错误 */
+    }
+  }
+  nameModalVisible.value = false;
 }
 
-function requireName(action: () => Promise<void>): boolean {
+function requireName(action: () => Promise<void>, hint: string): boolean {
   if (isLoggedIn.value || nickname.value) return true;
-  pendingAction.value = action;
+  pendingAction.value = { fn: action, hint };
   nameModalVisible.value = true;
   return false;
+}
+
+async function handleAuthenticated() {
+  const action = pendingAction.value;
+  pendingAction.value = null;
+  try {
+    if (action) await action.fn();
+  } catch {
+    /* action 内部已提示错误 */
+  }
+  nameModalVisible.value = false;
 }
 
 function toProfile() {
@@ -477,23 +593,27 @@ async function submitMessage() {
     toast.warning("先写下一句话再投入时光吧");
     return;
   }
-  if (!requireName(() => doSendMessage(text))) return;
+  if (!requireName(() => doSendMessage(text), "留言将通过 AI 审核后上墙")) return;
   await doSendMessage(text);
 }
 
 async function doSendMessage(text: string) {
   sendingMessage.value = true;
+  const infoToast = toast.info("已提交，AI 审核中…");
   try {
     const result = await sendMessage(text);
     composerText.value = "";
     if (result?.review && !result.review.approved) {
+      toast.dismiss(infoToast);
       toast.error(`留言未通过审核：${result.review.reason}`);
       return;
     }
+    if (result?.review) toast.dismiss(infoToast);
     toast.success("留言已通过审核，展示在时光墙上");
     celebrate(result?.unlocked);
     await Promise.all([loadMessages(true), refreshWall(), refreshMe()]);
   } catch (err: any) {
+    toast.dismiss(infoToast);
     toast.error(err?.message || "留言失败，请稍后再试");
   } finally {
     sendingMessage.value = false;
@@ -506,23 +626,30 @@ async function submitBottle() {
     toast.warning("先写下一封信再投入海面吧");
     return;
   }
-  if (!requireName(() => doThrowBottle(text))) return;
+  if (!requireName(() => doThrowBottle(text), "瓶子将通过 AI 审核后投入时光海")) return;
   await doThrowBottle(text);
 }
 
 async function doThrowBottle(text: string) {
   sendingBottle.value = true;
+  const infoToast = toast.info("已提交，AI 正在审核瓶子…");
   try {
     const result = await throwBottle(text);
     bottleText.value = "";
     if (result?.review && !result.review.approved) {
+      toast.dismiss(infoToast);
       toast.error(`瓶子未能漂远：${result.review.reason}`);
       return;
     }
+    if (result?.review) toast.dismiss(infoToast);
     toast.success("瓶子已通过审核，漂向时光海等待有缘人");
     celebrate(result?.unlocked);
+    seaRef.value?.launch();
     await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
+    await nextTick();
+    scrollToEl(seaCardRef.value);
   } catch (err: any) {
+    toast.dismiss(infoToast);
     toast.error(err?.message || "投瓶失败，请稍后再试");
   } finally {
     sendingBottle.value = false;
@@ -530,7 +657,7 @@ async function doThrowBottle(text: string) {
 }
 
 async function onFishBottle(bottle: { id: string }) {
-  if (!requireName(() => doFishBottle(bottle))) return;
+  if (!requireName(() => doFishBottle(bottle), "正在为你捞起这只瓶子")) return;
   await doFishBottle(bottle);
 }
 
@@ -546,6 +673,8 @@ async function doFishBottle(bottle: { id: string }) {
     toast.success(`捞起了一封来自「${result?.bottle?.nickname ?? "远方"}」的信`);
     celebrate(result?.unlocked);
     await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
+    await nextTick();
+    scrollToEl(caughtRef.value);
   } catch (err: any) {
     toast.info(err?.message || "这只瓶子似乎已经漂走了");
     await refreshPeek();
@@ -604,10 +733,6 @@ async function submitReply() {
   } finally {
     replySending.value = false;
   }
-}
-
-function goLogin() {
-  navigateTo("/login");
 }
 
 async function refreshWall() {
@@ -797,6 +922,7 @@ useHead({ title: "时光留言板" });
   animation: card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .msg-card:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 24%, var(--border));
   box-shadow: 0 16px 36px color-mix(in srgb, var(--ld-shadow) 50%, transparent);
   transform: translateY(-2px);
 }
@@ -1399,7 +1525,7 @@ useHead({ title: "时光留言板" });
 .my-stats {
   display: grid;
   width: 100%;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   margin: 13px 0;
   padding: 10px 0;

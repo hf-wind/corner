@@ -301,7 +301,7 @@ onUnmounted(() => {
 .activity-list a {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 5px 6px;
   border-radius: 9px;
@@ -330,22 +330,21 @@ onUnmounted(() => {
   gap: 1px;
 }
 .activity-copy small {
-  overflow: hidden;
   color: var(--c-text-3);
   font-size: 0.48rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 .activity-copy strong {
-  overflow: hidden;
   color: var(--c-text);
   font-size: 0.66rem;
   font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 .activity-list time {
   flex: 0 0 auto;
+  margin-top: 2px;
   color: var(--c-text-3);
   font-family: var(--font-mono);
   font-size: 0.48rem;

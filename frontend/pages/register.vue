@@ -19,7 +19,7 @@
 
     <div class="login-card">
       <div class="login-header">
-        <img class="login-avatar" :src="avatarImg" alt="avatar">
+        <img class="login-avatar" src="/logo.png" alt="风隅随笔站点标志">
         <div class="login-title">创建账号</div>
         <div class="login-subtitle">加入我们，开始评论互动</div>
       </div>
@@ -59,7 +59,7 @@
 
       <div class="login-footer">
         <span>已有账号？</span>
-        <NuxtLink to="/login" class="login-footer-link">去登录</NuxtLink>
+        <NuxtLink :to="authSwitchTarget('/login')" class="login-footer-link">去登录</NuxtLink>
       </div>
     </div>
   </div>
@@ -67,10 +67,9 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: false })
-import avatarImg from '~/assets/images/avatar.jpg'
-
 const api = useApi()
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 const { theme, setTheme } = useTheme()
 const email = ref('')
@@ -85,6 +84,16 @@ const cooldown = ref(0)
 const turnstileToken = ref('')
 const turnstileWidget = ref<{ reset: () => void; waitForToken: (timeoutMs?: number) => Promise<string> } | null>(null)
 let cooldownTimer: NodeJS.Timeout | null = null
+
+function safeRedirect() {
+  const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  return target.startsWith('/') && !target.startsWith('//') ? target : ''
+}
+
+function authSwitchTarget(path: string) {
+  const redirect = safeRedirect()
+  return redirect ? { path, query: { redirect } } : path
+}
 
 async function resolveTurnstile() {
   if (!import.meta.env.PROD) return turnstileToken.value
@@ -154,7 +163,7 @@ async function handleRegister() {
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
     toast.success('注册成功，欢迎加入！')
-    router.push(panelHome())
+    router.push(safeRedirect() || panelHome())
   } catch (e: any) {
     toast.error(e?.message || '注册失败，请检查邮箱是否已被注册')
     turnstileWidget.value?.reset()
@@ -290,7 +299,7 @@ async function handleRegister() {
 .login-avatar {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: 26%;
   object-fit: cover;
   border: 3px solid var(--c-primary);
   box-shadow: 0 0 0 6px var(--c-primary-soft);

@@ -19,7 +19,7 @@
 
     <div class="login-card">
       <div class="login-header">
-        <img class="login-avatar" :src="avatarImg" alt="avatar">
+        <img class="login-avatar" src="/logo.png" alt="风隅随笔站点标志">
         <div class="login-title">欢迎回来</div>
         <div class="login-subtitle">登录你的账号</div>
       </div>
@@ -64,7 +64,7 @@
 
       <div class="login-footer">
         <span>没有账号？</span>
-        <NuxtLink to="/register" class="login-footer-link">去注册</NuxtLink>
+        <NuxtLink :to="authSwitchTarget('/register')" class="login-footer-link">去注册</NuxtLink>
       </div>
     </div>
   </div>
@@ -72,10 +72,9 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: false })
-import avatarImg from '~/assets/images/avatar.jpg'
-
 const api = useApi()
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 const { theme, setTheme } = useTheme()
 const loginType = ref<'password' | 'code'>('password')
@@ -90,6 +89,16 @@ const cooldown = ref(0)
 const turnstileToken = ref('')
 const turnstileWidget = ref<{ reset: () => void; waitForToken: (timeoutMs?: number) => Promise<string> } | null>(null)
 let cooldownTimer: NodeJS.Timeout | null = null
+
+function safeRedirect() {
+  const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  return target.startsWith('/') && !target.startsWith('//') ? target : ''
+}
+
+function authSwitchTarget(path: string) {
+  const redirect = safeRedirect()
+  return redirect ? { path, query: { redirect } } : path
+}
 
 async function resolveTurnstile() {
   if (!import.meta.env.PROD) return turnstileToken.value
@@ -156,7 +165,7 @@ async function handleLogin() {
     const { setSession, panelHome } = useAuth()
     setSession(res.access_token, res.user || {})
     toast.success('登录成功')
-    router.push(panelHome())
+    router.push(safeRedirect() || panelHome())
   } catch (e: any) {
     toast.error(e?.message || '登录失败，请检查邮箱和密码')
     turnstileWidget.value?.reset()
@@ -293,7 +302,7 @@ async function handleLogin() {
 .login-avatar {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: 26%;
   object-fit: cover;
   border: 3px solid var(--c-primary);
   box-shadow: 0 0 0 6px var(--c-primary-soft);

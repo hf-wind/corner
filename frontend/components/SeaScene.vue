@@ -759,6 +759,7 @@ function disposeGl() {
 // =====================================================================
 let ctx: CanvasRenderingContext2D | null = null;
 let rafId = 0;
+let canvasResizeObserver: ResizeObserver | null = null;
 const particles: Array<{ x: number; y: number; vx: number; vy: number; life: number; size: number }> = [];
 
 function resizeCanvas() {
@@ -766,8 +767,8 @@ function resizeCanvas() {
   const canvas = canvasRef.value;
   if (!root || !canvas) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = root.clientWidth * dpr;
-  canvas.height = root.clientHeight * dpr;
+  canvas.width = Math.max(1, root.clientWidth * dpr);
+  canvas.height = Math.max(1, root.clientHeight * dpr);
   ctx = canvas.getContext("2d");
   if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
@@ -778,6 +779,47 @@ function drawFrame(t: number) {
   const w = canvas.width / Math.min(window.devicePixelRatio || 1, 2);
   const h = canvas.height / Math.min(window.devicePixelRatio || 1, 2);
   ctx.clearRect(0, 0, w, h);
+  const kind = weatherKind.value;
+  const sky = SKY_THEME[kind] ?? SKY_THEME.unknown;
+  const skyGradient = ctx.createLinearGradient(0, 0, 0, h);
+  skyGradient.addColorStop(0, sky.top);
+  skyGradient.addColorStop(0.68, sky.bot);
+  skyGradient.addColorStop(1, "#8dc8e8");
+  ctx.fillStyle = skyGradient;
+  ctx.fillRect(0, 0, w, h);
+  const seaGradient = ctx.createLinearGradient(0, h * 0.22, 0, h * 0.86);
+  seaGradient.addColorStop(0, "rgba(45,135,205,.12)");
+  seaGradient.addColorStop(1, "rgba(4,55,126,.38)");
+  ctx.fillStyle = seaGradient;
+  ctx.fillRect(0, h * 0.22, w, h * 0.64);
+  const sandTop = h * 0.79;
+  const sandGradient = ctx.createLinearGradient(0, sandTop, 0, h);
+  sandGradient.addColorStop(0, "#f4e1b8");
+  sandGradient.addColorStop(1, "#c99761");
+  ctx.fillStyle = sandGradient;
+  ctx.beginPath();
+  ctx.moveTo(0, sandTop + 8);
+  ctx.quadraticCurveTo(w * 0.24, sandTop - 8, w * 0.5, sandTop + 6);
+  ctx.quadraticCurveTo(w * 0.76, sandTop + 18, w, sandTop - 2);
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,.82)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, sandTop + 2);
+  ctx.quadraticCurveTo(w * 0.24, sandTop - 14, w * 0.5, sandTop);
+  ctx.quadraticCurveTo(w * 0.76, sandTop + 14, w, sandTop - 8);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(117,77,48,.2)";
+  for (let i = 0; i < 18; i += 1) {
+    const px = (i * 83 + 17) % w;
+    const py = sandTop + 16 + ((i * 29) % Math.max(18, h - sandTop - 18));
+    ctx.beginPath();
+    ctx.ellipse(px, py, 1.6 + (i % 3), 0.7 + (i % 2) * 0.5, i * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.globalCompositeOperation = "lighter";
   const waveColors = ["rgba(120,180,255,.16)", "rgba(170,215,255,.10)", "rgba(255,255,255,.06)"];
   for (let layer = 0; layer < 3; layer++) {
@@ -974,11 +1016,11 @@ function launch(cb?: () => void) {
   else canvasLaunch(cb);
 }
 
-const { weatherKind } = useWeather({ autoRefresh: false });
+const { weatherKind } = useWeather();
 
 watch(weatherKind, (kind) => {
   if (mode.value === "gl") updateWeatherVisual(kind);
-});
+}, { immediate: true });
 
 function resizeGl() {
   const root = rootRef.value;
@@ -1006,9 +1048,14 @@ onMounted(() => {
   reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (initGl()) {
     mode.value = "gl";
+    updateWeatherVisual(weatherKind.value);
     window.addEventListener("resize", resizeGl);
   } else {
-    resizeCanvas();
+    void nextTick().then(() => resizeCanvas());
+    if (typeof ResizeObserver !== "undefined" && rootRef.value) {
+      canvasResizeObserver = new ResizeObserver(() => resizeCanvas());
+      canvasResizeObserver.observe(rootRef.value);
+    }
     window.addEventListener("resize", resizeCanvas);
     if (!reduceMotion) rafId = requestAnimationFrame(loop);
     void nextTick().then(animateBottles);
@@ -1019,6 +1066,8 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(rafId);
   window.removeEventListener("resize", resizeCanvas);
   window.removeEventListener("resize", resizeGl);
+  canvasResizeObserver?.disconnect();
+  canvasResizeObserver = null;
   floatTweens.forEach((t) => t.kill());
   floatTweens = [];
   disposeGl();
