@@ -857,9 +857,12 @@ model VisitorMessage {
   rejectReason   String?   @map("reject_reason") @db.Text
   caughtByIdHash String?   @map("caught_by_id_hash") @db.VarChar(64)
   caughtAt       DateTime? @map("caught_at")
+  chainId        String?   @map("chain_id") @db.Uuid
+  parentId       String?   @map("parent_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  @@index([chainId, createdAt])
   @@index([status, createdAt])
   @@index([type, status, createdAt])
   @@index([caughtByIdHash, caughtAt])
