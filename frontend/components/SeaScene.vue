@@ -33,7 +33,7 @@
           <path d="M29 30h6M29 34h6" stroke="rgba(140,110,80,.8)" stroke-width="1.2" stroke-linecap="round" />
           <path d="M28 22a10 10 0 0 1 8 0" stroke="rgba(255,255,255,.25)" fill="none" stroke-width="1.2" />
         </svg>
-        <i class="bottle-initial">{{ b.nicknameFirstChar }}</i>
+        <i class="bottle-initial">{{ b.chainLength }}段</i>
         <span class="bottle-hint">捞起这只</span>
       </button>
     </div>
@@ -199,6 +199,7 @@ function startFloat(el: HTMLElement, seed: number) {
     rotation: baseRot,
     transformOrigin: "50% 85%",
   });
+  if (reduceMotion) return;
   const durY = 1.9 + rand() * 1.5;
   const durX = 4 + rand() * 3;
   const ampY = 5 + rand() * 5;
@@ -242,6 +243,10 @@ function onClickBottle(b: PeekBottle) {
   if (props.disabled || launching) return;
   const el = rootRef.value?.querySelector<HTMLElement>(`.sea-bottle-item[data-id="${b.id}"]`);
   if (!el) return;
+  if (reduceMotion) {
+    emit("fish", b);
+    return;
+  }
   launching = true;
   const rect = el.getBoundingClientRect();
   const rootRect = rootRef.value!.getBoundingClientRect();
@@ -251,8 +256,12 @@ function onClickBottle(b: PeekBottle) {
       launching = false;
       floatTweens.forEach((t) => t.kill());
       floatTweens = [];
-      gsap.set(el, { clearProps: "all" });
-      el.classList.remove("is-animated");
+      rootRef.value
+        ?.querySelectorAll<HTMLElement>(".sea-bottle-item")
+        .forEach((item) => {
+          item.classList.remove("is-animated");
+          gsap.set(item, { clearProps: "transform" });
+        });
       void nextTick().then(animateBottles);
       emit("fish", b);
     },
@@ -298,7 +307,7 @@ function launch(cb?: () => void) {
     .add(() => burst(w * 0.52, h * 0.6, 26), 1.26)
     .to(el, { opacity: 0, duration: 0.18 }, 1.26)
     .to(el, { opacity: 1, duration: 0.4 }, 1.5)
-    .to(el, { x: `${targetX}%`, y: `${targetY}%`, duration: 1.1, ease: "power2.out" }, 1.62);
+    .to(el, { x: w * (targetX / 100), y: h * (targetY / 100), duration: 1.1, ease: "power2.out" }, 1.62);
 }
 
 defineExpose({ launch });
@@ -395,18 +404,21 @@ onBeforeUnmount(() => {
 }
 .bottle-initial {
   position: absolute;
-  right: -5px;
+  right: -8px;
   bottom: 2px;
   display: grid;
-  width: 16px;
-  height: 16px;
+  min-width: 18px;
+  height: 14px;
+  padding: 0 4px;
   border: 2px solid rgb(10 24 46 / 85%);
-  border-radius: 50%;
+  border-radius: 999px;
   background: #ffd9a0;
   color: #5a3d1a;
-  font-size: 0.44rem;
+  font-size: 0.4rem;
   font-style: normal;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
   place-items: center;
 }
 .bottle-hint {
