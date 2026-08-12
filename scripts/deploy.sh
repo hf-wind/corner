@@ -16,6 +16,9 @@ docker compose up -d --remove-orphans --wait
 docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile
 docker compose up -d --force-recreate --no-deps caddy
 docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
+if docker compose exec -T postgres pg_isready >/dev/null 2>&1; then
+  docker compose run --rm backend node dist/scripts/seed-bottles.js || true
+fi
 curl --fail --silent --show-error \
   --retry 24 \
   --retry-delay 5 \
