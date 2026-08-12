@@ -282,6 +282,32 @@ describe('VisitorService', () => {
       );
     });
 
+    it('竞态：updateMany 返回 count 0 时拒绝', async () => {
+      const visitorProfileFindUnique = jest.fn();
+      const prisma = makePrisma({
+        visitorMessage: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'b1',
+            type: 'bottle',
+            status: 'approved',
+            userId: 'user-2',
+            visitorIdHash: 'h-owner',
+          }),
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          findMany: jest.fn(),
+        },
+        visitorProfile: { findUnique: visitorProfileFindUnique },
+      });
+      const service = makeService(prisma);
+
+      await expect(service.fishBottle(req, actor, null, 'b1')).rejects.toThrow(
+        '已经被别人捞走了',
+      );
+      expect(prisma.visitorMessage.findMany).not.toHaveBeenCalled();
+      expect(visitorProfileFindUnique).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalled();
+    });
+
     it('捞起后通知瓶主（登录用户）', async () => {
       const prisma = makePrisma({
         visitorMessage: {
@@ -387,6 +413,9 @@ describe('VisitorService', () => {
           parentId: 'b1',
         }),
       });
+      expect(prisma.visitorMessage.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ type: 'bottle' }) }),
+      );
       expect(prisma.visitorMessage.update).not.toHaveBeenCalled();
     });
 
@@ -564,6 +593,40 @@ describe('VisitorService', () => {
         chainLength: 2,
       });
       expect(result[0]).not.toHaveProperty('content');
+      expect(prisma.visitorMessage.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ type: 'bottle' }) }),
+      );
+    });
+
+    it('排除自己：excludeVisitorHash/excludeUserId 透传', async () => {
+      const candidates = [
+        { id: 'b1', parentId: null, chainId: 'chain-1', nickname: '阿风' },
+        { id: 'b2', parentId: 'b1', chainId: 'chain-1', nickname: '旅人甲' },
+        { id: 'b3', parentId: null, chainId: 'chain-3', nickname: '阿花' },
+      ];
+      const prisma = {
+        visitorMessage: {
+          findMany: jest.fn().mockResolvedValueOnce(candidates),
+          groupBy: jest.fn().mockResolvedValue([
+            { chainId: 'chain-1', _count: { _all: 2 } },
+            { chainId: 'chain-3', _count: { _all: 1 } },
+          ]),
+        },
+        visitorProfile: { findUnique: jest.fn() },
+        user: { findUnique: jest.fn(), findMany: jest.fn() },
+        visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
+        visitorVisit: { findMany: jest.fn() },
+      } as any;
+      const service = makeService(prisma);
+
+      const result = await service.peekBottles(8, 'h-visitor', 'user-1');
+
+      expect(prisma.visitorMessage.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ NOT: expect.anything() }),
+        }),
+      );
+      expect(result.map((b) => b.id)).toEqual(['b2', 'b3']);
     });
   });
 });
