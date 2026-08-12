@@ -50,95 +50,7 @@
 </template>
 
 <script setup lang="ts">
-type WeatherData = {
-  temperature: number
-  feelsLike: number
-  condition: string
-  icon: string
-  city: string
-  humidity: number
-  windDirection: string
-  windScale: string
-  stale?: boolean
-}
-
-const api = useApi()
-const weather = ref<WeatherData>({
-  temperature: 0,
-  feelsLike: 0,
-  condition: '天气加载中',
-  icon: '0',
-  city: '绍兴',
-  humidity: 0,
-  windDirection: '微风',
-  windScale: '0级',
-})
-let refreshTimer: ReturnType<typeof setInterval>
-let idleHandle: number | null = null
-const loading = ref(true)
-let fetchedAt = 0
-
-const ICON_KIND: Array<[string, number[]]> = [
-  ['sunny', [0]],
-  ['cloudy', [1, 2]],
-  ['overcast', [3]],
-  ['fog', [45, 48]],
-  ['rain', [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82]],
-  ['snow', [71, 73, 75, 77, 85, 86]],
-  ['storm', [95, 96, 99]],
-]
-
-const iconMap: Record<string, string> = {
-  sunny: 'ph:sun-bold',
-  cloudy: 'ph:cloud-sun-bold',
-  overcast: 'ph:cloud-bold',
-  rain: 'ph:cloud-rain-bold',
-  storm: 'ph:cloud-lightning-bold',
-  snow: 'ph:snowflake-bold',
-  fog: 'ph:cloud-fog-bold',
-  unknown: 'ph:wind-bold',
-}
-
-const weatherKind = computed(() => {
-  const code = Number.parseInt(weather.value.icon, 10)
-  const match = ICON_KIND.find(([, codes]) => codes.includes(code))
-  return match?.[0] ?? 'unknown'
-})
-const weatherIcon = computed(() => iconMap[weatherKind.value])
-
-async function loadWeather() {
-  try {
-    weather.value = await api.get<WeatherData>('/weather')
-    fetchedAt = Date.now()
-  } catch {
-    weather.value.condition = '风来得有些慢'
-  } finally {
-    loading.value = false
-  }
-}
-
-function onVisibilityChange() {
-  if (!document.hidden && Date.now() - fetchedAt > 10 * 60_000) void loadWeather()
-}
-
-onMounted(() => {
-  refreshTimer = setInterval(() => void loadWeather(), 15 * 60_000)
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  if ('requestIdleCallback' in window) {
-    idleHandle = window.requestIdleCallback(() => void loadWeather(), { timeout: 1200 })
-  } else {
-    idleHandle = window.setTimeout(() => void loadWeather(), 180)
-  }
-})
-
-onUnmounted(() => {
-  clearInterval(refreshTimer)
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-  if (idleHandle !== null) {
-    if ('cancelIdleCallback' in window) window.cancelIdleCallback(idleHandle)
-    else window.clearTimeout(idleHandle)
-  }
-})
+const { weather, loading, weatherKind, weatherIcon } = useWeather()
 </script>
 
 <style scoped>
@@ -154,13 +66,12 @@ onUnmounted(() => {
   border: 1px solid color-mix(in srgb, #ffffff 22%, transparent);
   border-radius: 18px;
   background: var(--wx-bg);
-  box-shadow: 0 12px 30px color-mix(in srgb, #1d4e9e 30%, transparent);
+  /* box-shadow: 0 12px 30px color-mix(in srgb, #1d4e9e 30%, transparent); */
   color: var(--wx-ink);
   isolation: isolate;
   transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 .weather-card:hover {
-  box-shadow: 0 16px 38px color-mix(in srgb, #1d4e9e 40%, transparent);
   transform: translateY(-2px);
 }
 
@@ -177,13 +88,13 @@ onUnmounted(() => {
 }
 
 /* ===== 天气氛围 ===== */
-.weather-sunny { --wx-bg: linear-gradient(155deg, #ffb35c, #f78b3d 58%, #e06b2c); box-shadow: 0 12px 30px color-mix(in srgb, #d96a22 34%, transparent); }
-.weather-cloudy { --wx-bg: linear-gradient(155deg, #8db8e8, #5f8fcb 60%, #4773ae); box-shadow: 0 12px 30px color-mix(in srgb, #3f6ba6 32%, transparent); }
-.weather-overcast { --wx-bg: linear-gradient(155deg, #7d93ac, #5b7089 60%, #41556c); box-shadow: 0 12px 30px color-mix(in srgb, #3a4d63 34%, transparent); }
-.weather-rain { --wx-bg: linear-gradient(155deg, #4f8fd6, #31599e 60%, #243f7d); box-shadow: 0 12px 30px color-mix(in srgb, #26498a 34%, transparent); }
-.weather-storm { --wx-bg: linear-gradient(155deg, #6d5bbf, #45327e 62%, #2f2058); box-shadow: 0 12px 30px color-mix(in srgb, #3b2a6d 36%, transparent); }
-.weather-snow { --wx-bg: linear-gradient(155deg, #a8c8ec, #7fa2cc 60%, #6488b5); box-shadow: 0 12px 30px color-mix(in srgb, #5b7ea9 32%, transparent); }
-.weather-fog { --wx-bg: linear-gradient(155deg, #9aa7b5, #758392 62%, #5c6977); box-shadow: 0 12px 30px color-mix(in srgb, #55626f 32%, transparent); }
+.weather-sunny { --wx-bg: linear-gradient(155deg, #ffb35c, #f78b3d 58%, #e06b2c);  }
+.weather-cloudy { --wx-bg: linear-gradient(155deg, #8db8e8, #5f8fcb 60%, #4773ae); }
+.weather-overcast { --wx-bg: linear-gradient(155deg, #7d93ac, #5b7089 60%, #41556c);  }
+.weather-rain { --wx-bg: linear-gradient(155deg, #4f8fd6, #31599e 60%, #243f7d);  }
+.weather-storm { --wx-bg: linear-gradient(155deg, #6d5bbf, #45327e 62%, #2f2058);  }
+.weather-snow { --wx-bg: linear-gradient(155deg, #a8c8ec, #7fa2cc 60%, #6488b5);  }
+.weather-fog { --wx-bg: linear-gradient(155deg, #9aa7b5, #758392 62%, #5c6977);  }
 
 .weather-head {
   display: flex;
