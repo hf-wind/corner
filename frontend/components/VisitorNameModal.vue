@@ -2,53 +2,219 @@
   <Teleport to="body">
     <Transition name="visitor-name">
       <div v-if="visible" class="visitor-name-overlay" role="presentation" @click.self="close">
-        <section class="visitor-name-card" role="dialog" aria-modal="true" aria-label="给自己起一个名字">
+        <section class="visitor-name-card" role="dialog" aria-modal="true" aria-label="身份认证">
           <div class="vn-art" aria-hidden="true">
             <span class="vn-orb" /><span class="vn-ring ring-a" /><span class="vn-ring ring-b" />
             <span class="vn-star star-a" /><span class="vn-star star-b" />
           </div>
-          <h2>在这座角落留下名字</h2>
-          <p>留言与漂流瓶需要署名。名字会随足迹出现在时光留言板与访客记录里。</p>
-          <div class="vn-input-wrap">
-            <input
-              v-model="name"
-              :maxlength="20"
-              class="vn-input"
-              placeholder="给自己起一个名字"
-              :aria-label="'名字，' + name.length + ' / 20 字'"
-              @keydown.enter="submit"
-              @input="trimGuard"
-            />
-            <span class="vn-count">{{ name.length }}/20</span>
-          </div>
-          <div class="vn-email-wrap">
-            <input
-              v-model="mail"
-              :maxlength="255"
-              type="email"
-              class="vn-input"
-              placeholder="邮箱（可选）"
-              aria-label="邮箱（可选）"
-              @keydown.enter="submit"
-            />
-            <span class="vn-email-note">
-              <Icon name="ph:envelope-simple-bold" />
-              选填：会随你投出的漂流瓶一起漂向远方，捞到瓶子的旅人可用它联系你（交友、交流都行）。不会展示在留言板等公开位置，也不会被用于其他用途。
-            </span>
-          </div>
-          <div v-if="error" class="vn-error">{{ error }}</div>
-          <div class="vn-register-tip">
-            <Icon name="ph:sparkle-bold" />
-            <p>注册账号可获得 100% 沉浸漂流体验：瓶子被捞起、被回复时实时通知，还能拥有固定联系方式。</p>
-            <button type="button" class="vn-register-btn" @click="goRegister">
-              注册账号 <Icon name="ph:arrow-up-right-bold" />
+
+          <div class="vn-tabs" role="tablist" aria-label="选择身份方式">
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="mode === 'guest'"
+              :class="{ active: mode === 'guest' }"
+              :disabled="submitting"
+              @click="switchMode('guest')"
+            >
+              <Icon name="ph:face-mask-bold" />访客署名
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="mode === 'login'"
+              :class="{ active: mode === 'login' }"
+              :disabled="submitting"
+              @click="switchMode('login')"
+            >
+              <Icon name="ph:sign-in-bold" />登录
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="mode === 'register'"
+              :class="{ active: mode === 'register' }"
+              :disabled="submitting"
+              @click="switchMode('register')"
+            >
+              <Icon name="ph:user-plus-bold" />注册
             </button>
           </div>
+
+          <template v-if="mode === 'guest'">
+            <h2>在这座角落留下名字</h2>
+            <p>留言与漂流瓶需要署名。名字会随足迹出现在时光留言板与访客记录里。</p>
+            <div class="vn-input-wrap">
+              <input
+                v-model="name"
+                :maxlength="20"
+                class="vn-input"
+                placeholder="给自己起一个名字"
+                :aria-label="'名字，' + name.length + ' / 20 字'"
+                :disabled="submitting"
+                @keydown.enter="submit"
+                @input="trimGuard"
+              />
+              <span class="vn-count">{{ name.length }}/20</span>
+            </div>
+            <div class="vn-email-wrap">
+              <input
+                v-model="mail"
+                :maxlength="255"
+                type="email"
+                class="vn-input"
+                placeholder="邮箱（可选）"
+                aria-label="邮箱（可选）"
+                :disabled="submitting"
+                @keydown.enter="submit"
+              />
+              <span class="vn-email-note">
+                <Icon name="ph:envelope-simple-bold" />
+                选填：会随你投出的漂流瓶一起漂向远方，捞到瓶子的旅人可用它联系你。不会展示在公开位置。
+              </span>
+            </div>
+          </template>
+
+          <template v-else-if="mode === 'login'">
+            <h2>欢迎回来</h2>
+            <p>登录后可以回复漂流瓶主人，还能收到瓶子被捞起、被回复的实时通知。</p>
+            <div class="vn-email-wrap">
+              <input
+                v-model="email"
+                type="email"
+                class="vn-input"
+                placeholder="邮箱"
+                aria-label="邮箱"
+                :disabled="submitting"
+                @keydown.enter="submit"
+              />
+            </div>
+            <div class="vn-mode-row" v-if="loginType === 'code'">
+              <span class="vn-mode-note"><Icon name="ph:info-bold" />验证码将发送至该邮箱</span>
+            </div>
+            <div v-if="loginType === 'password'" class="vn-email-wrap">
+              <input
+                v-model="password"
+                type="password"
+                class="vn-input"
+                placeholder="密码"
+                aria-label="密码"
+                :disabled="submitting"
+                @keydown.enter="submit"
+              />
+            </div>
+            <div v-else class="vn-email-wrap">
+              <div class="vn-code-row">
+                <input
+                  v-model="code"
+                  type="text"
+                  maxlength="6"
+                  class="vn-input"
+                  placeholder="6 位验证码"
+                  aria-label="验证码"
+                  :disabled="submitting"
+                  @keydown.enter="submit"
+                />
+                <button
+                  type="button"
+                  class="vn-sendcode"
+                  :disabled="cooldown > 0 || sendingCode || submitting"
+                  @click="sendCode('login')"
+                >
+                  {{ sendingCode ? '验证中…' : cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
+                </button>
+              </div>
+            </div>
+            <div class="vn-switch-row">
+              <button type="button" class="vn-link-btn" :disabled="submitting" @click="loginType = loginType === 'password' ? 'code' : 'password'">
+                {{ loginType === 'password' ? '用验证码登录' : '用密码登录' }}
+              </button>
+              <button type="button" class="vn-link-btn" :disabled="submitting" @click="switchMode('register')">
+                没有账号？去注册
+              </button>
+            </div>
+          </template>
+
+          <template v-else>
+            <h2>创建账号</h2>
+            <p>注册后可回复漂流瓶主人、收到站内通知，拥有固定的旅人身份与头像。</p>
+            <div class="vn-email-wrap">
+              <input
+                v-model="email"
+                type="email"
+                class="vn-input"
+                placeholder="邮箱"
+                aria-label="邮箱"
+                :disabled="submitting"
+                @keydown.enter="submit"
+              />
+            </div>
+            <div class="vn-email-wrap">
+              <div class="vn-code-row">
+                <input
+                  v-model="code"
+                  type="text"
+                  maxlength="6"
+                  class="vn-input"
+                  placeholder="6 位验证码"
+                  aria-label="验证码"
+                  :disabled="submitting"
+                  @keydown.enter="submit"
+                />
+                <button
+                  type="button"
+                  class="vn-sendcode"
+                  :disabled="cooldown > 0 || sendingCode || submitting"
+                  @click="sendCode('register')"
+                >
+                  {{ sendingCode ? '验证中…' : cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
+                </button>
+              </div>
+            </div>
+            <div class="vn-email-wrap">
+              <input
+                v-model="password"
+                type="password"
+                minlength="6"
+                class="vn-input"
+                placeholder="至少 6 位密码"
+                aria-label="密码"
+                :disabled="submitting"
+                @keydown.enter="submit"
+              />
+            </div>
+            <div class="vn-email-wrap">
+              <input
+                v-model="confirmPassword"
+                type="password"
+                minlength="6"
+                class="vn-input"
+                placeholder="再次输入密码"
+                aria-label="确认密码"
+                :disabled="submitting"
+                @keydown.enter="submit"
+              />
+            </div>
+            <div class="vn-switch-row">
+              <button type="button" class="vn-link-btn" :disabled="submitting" @click="switchMode('login')">
+                已有账号？去登录
+              </button>
+            </div>
+          </template>
+
+          <TurnstileWidget ref="turnstileWidget" v-model="turnstileToken" />
+          <div v-if="error" class="vn-error">{{ error }}</div>
+          <div v-if="pendingHint" class="vn-pending">
+            <Icon name="ph:sparkle-bold" />{{ pendingHint }}
+          </div>
           <div class="vn-actions">
-            <button type="button" class="vn-skip" @click="close">稍后再说</button>
+            <button type="button" class="vn-skip" :disabled="submitting" @click="close">稍后再说</button>
             <button type="button" class="vn-submit" :disabled="submitting" @click="submit">
-              <Icon :name="submitting ? 'ph:circle-notch-bold' : 'ph:feather-bold'" :spin="submitting" />
-              {{ submitting ? '起名中…' : '开始旅程' }}
+              <Icon
+                :name="submitting ? 'ph:circle-notch-bold' : submitIcon"
+                :spin="submitting"
+              />
+              {{ submitting ? submitLoadingText : submitText }}
             </button>
           </div>
         </section>
@@ -63,33 +229,89 @@ const props = withDefaults(
     visible: boolean
     initial?: string
     initialEmail?: string
+    pendingHint?: string
   }>(),
-  { initial: '', initialEmail: '' },
+  { initial: '', initialEmail: '', pendingHint: '' },
 )
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'confirm', name: string, email: string): void
+  (e: 'authenticated'): void
 }>()
 
+const api = useApi()
+const toast = useToast()
+const { setSession } = useAuth()
+
+const mode = ref<'guest' | 'login' | 'register'>('guest')
+const loginType = ref<'password' | 'code'>('password')
 const name = ref(props.initial)
 const mail = ref('')
+const email = ref('')
+const password = ref('')
+const confirmPassword = ref('')
+const code = ref('')
 const submitting = ref(false)
+const sendingCode = ref(false)
+const cooldown = ref(0)
 const error = ref('')
+const turnstileToken = ref('')
+const turnstileWidget = ref<{ reset: () => void; waitForToken: (timeoutMs?: number) => Promise<string> } | null>(null)
+let cooldownTimer: ReturnType<typeof setInterval> | null = null
+
+const submitText = computed(() => {
+  if (mode.value === 'guest') return '开始旅程'
+  if (mode.value === 'login') return '登录'
+  return '注册'
+})
+const submitLoadingText = computed(() => {
+  if (submitting.value && props.pendingHint) return '正在继续…'
+  if (mode.value === 'guest') return '起名中…'
+  if (mode.value === 'login') return '登录中…'
+  return '注册中…'
+})
+const submitIcon = computed(() => {
+  if (mode.value === 'guest') return 'ph:feather-bold'
+  if (mode.value === 'login') return 'ph:sign-in-bold'
+  return 'ph:user-plus-bold'
+})
 
 watch(
   () => props.visible,
   (open) => {
-    if (open) {
-      name.value = props.initial
-      mail.value = props.initialEmail
+    if (!open) {
+      submitting.value = false
       error.value = ''
-      nextTick(() => {
-        document.querySelector<HTMLInputElement>('.vn-input')?.focus()
-        document.querySelector<HTMLInputElement>('.vn-input')?.select()
-      })
+      resetTurnstile()
+      return
     }
+    name.value = props.initial
+    mail.value = props.initialEmail
+    error.value = ''
+    nextTick(() => {
+      const card = document.querySelector<HTMLDivElement>('.visitor-name-card')
+      const input = document.querySelector<HTMLInputElement>('.visitor-name-card .vn-input')
+      input?.focus()
+      if (mode.value === 'guest') input?.select()
+      card?.scrollTo({ top: 0 })
+    })
   },
 )
+
+function switchMode(next: 'guest' | 'login' | 'register') {
+  if (submitting.value) return
+  mode.value = next
+  error.value = ''
+  resetTurnstile()
+  nextTick(() => {
+    document.querySelector<HTMLInputElement>('.visitor-name-card .vn-input')?.focus()
+  })
+}
+
+function resetTurnstile() {
+  turnstileToken.value = ''
+  turnstileWidget.value?.reset()
+}
 
 function trimGuard() {
   name.value = name.value.replace(/\s{2,}/g, ' ').slice(0, 20)
@@ -100,32 +322,150 @@ function close() {
   emit('close')
 }
 
-function goRegister() {
-  emit('close')
-  navigateTo('/register')
+async function resolveTurnstile(): Promise<string> {
+  if (!import.meta.env.PROD && !turnstileToken.value) return 'local-dev'
+  const token = turnstileToken.value || (await turnstileWidget.value?.waitForToken(3500)) || ''
+  if (token) {
+    turnstileToken.value = token
+    return token
+  }
+  toast.warning('请先完成人机验证')
+  return ''
 }
 
-async function submit() {
+async function sendCode(type: 'login' | 'register') {
+  const clean = email.value.trim()
+  if (!clean) {
+    toast.warning('请先输入邮箱')
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+    toast.warning('邮箱格式好像不太对')
+    return
+  }
+  sendingCode.value = true
+  const token = await resolveTurnstile()
+  if (!token) {
+    sendingCode.value = false
+    return
+  }
+  error.value = ''
+  try {
+    await api.post('/auth/send-code', { email: clean, type, turnstileToken: token })
+    toast.success('验证码已发送，请查收邮箱')
+    cooldown.value = 60
+    if (cooldownTimer) clearInterval(cooldownTimer)
+    cooldownTimer = setInterval(() => {
+      cooldown.value -= 1
+      if (cooldown.value <= 0 && cooldownTimer) {
+        clearInterval(cooldownTimer)
+        cooldownTimer = null
+      }
+    }, 1000)
+  } catch (err: any) {
+    error.value = err?.message || '发送验证码失败，请稍后再试'
+  } finally {
+    sendingCode.value = false
+    resetTurnstile()
+  }
+}
+
+async function submitGuest(): Promise<boolean> {
   const clean = name.value.trim()
   if (!clean) {
     error.value = '名字不能为空，哪怕是代号也好。'
-    return
+    return false
   }
   const cleanMail = mail.value.trim()
   if (cleanMail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanMail)) {
     error.value = '邮箱格式好像不太对，检查一下？'
-    return
+    return false
   }
-  submitting.value = true
-  error.value = ''
+  emit('confirm', clean, cleanMail)
+  return true
+}
+
+async function submitLogin(): Promise<boolean> {
+  const clean = email.value.trim()
+  if (!clean) {
+    error.value = '请输入邮箱'
+    return false
+  }
+  if (loginType.value === 'password') {
+    if (!password.value) {
+      error.value = '请输入密码'
+      return false
+    }
+  } else if (!code.value || code.value.length !== 6) {
+    error.value = '请输入 6 位验证码'
+    return false
+  }
+  const token = await resolveTurnstile()
+  if (!token) return false
+  const payload: Record<string, string> = { email: clean, turnstileToken: token }
+  if (loginType.value === 'password') payload.password = password.value
+  else payload.code = code.value
   try {
-    await emit('confirm', clean, cleanMail)
-    emit('close')
+    const res = await api.post<{ access_token: string; user: Record<string, unknown> }>('/auth/login', payload)
+    setSession(res.access_token, res.user as any)
+    toast.success('登录成功')
+    emit('authenticated')
+    return true
   } catch (err: any) {
-    error.value = err?.message || '起名失败，请稍后再试。'
-  } finally {
-    submitting.value = false
+    error.value = err?.message || '登录失败，请检查邮箱和密码'
+    resetTurnstile()
+    return false
   }
+}
+
+async function submitRegister(): Promise<boolean> {
+  const clean = email.value.trim()
+  if (!clean) {
+    error.value = '请输入邮箱'
+    return false
+  }
+  if (!code.value || code.value.length !== 6) {
+    error.value = '请输入 6 位验证码'
+    return false
+  }
+  if (!password.value || password.value.length < 6) {
+    error.value = '密码至少需要 6 位'
+    return false
+  }
+  if (password.value !== confirmPassword.value) {
+    error.value = '两次输入的密码不一致'
+    return false
+  }
+  const token = await resolveTurnstile()
+  if (!token) return false
+  try {
+    const res = await api.post<{ access_token: string; user: Record<string, unknown> }>('/auth/register', {
+      email: clean,
+      password: password.value,
+      code: code.value,
+      turnstileToken: token,
+    })
+    setSession(res.access_token, res.user as any)
+    toast.success('注册成功，欢迎加入！')
+    emit('authenticated')
+    return true
+  } catch (err: any) {
+    error.value = err?.message || '注册失败，请检查邮箱是否已被注册'
+    resetTurnstile()
+    return false
+  }
+}
+
+async function submit() {
+  if (submitting.value) return
+  error.value = ''
+  let ok = false
+  if (mode.value === 'guest') ok = await submitGuest()
+  else if (mode.value === 'login') ok = await submitLogin()
+  else ok = await submitRegister()
+  if (!ok) return
+  // 保持加载态：由父组件执行挂起动作后主动关闭（visible 变 false）
+  submitting.value = true
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -133,7 +473,10 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => document.addEventListener('keydown', onKeydown))
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown)
+  if (cooldownTimer) clearInterval(cooldownTimer)
+})
 </script>
 
 <style scoped>
@@ -150,21 +493,23 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 }
 .visitor-name-card {
   position: relative;
-  width: min(390px, calc(100vw - 36px));
-  padding: 34px 30px 24px;
-  overflow: hidden;
+  width: min(396px, calc(100vw - 36px));
+  max-height: min(660px, calc(100vh - 36px));
+  padding: 26px 28px 24px;
+  overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
   border-radius: 22px;
   background: linear-gradient(160deg, var(--ld-bg-card), color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft)));
   box-shadow: 0 26px 74px color-mix(in srgb, var(--ld-shadow) 74%, transparent);
   text-align: center;
   animation: vn-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  scrollbar-width: thin;
 }
 .vn-art {
   position: relative;
-  width: 88px;
-  height: 88px;
-  margin: 0 auto 18px;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 14px;
   border-radius: 50%;
   background: radial-gradient(circle at 32% 28%, var(--c-primary-soft), color-mix(in srgb, var(--c-primary) 24%, transparent));
   box-shadow: inset 0 0 22px color-mix(in srgb, var(--c-primary) 10%, transparent), 0 12px 30px color-mix(in srgb, var(--c-primary) 16%, transparent);
@@ -173,8 +518,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: radial-gradient(circle at 32% 28%, var(--c-primary), color-mix(in srgb, var(--c-primary) 55%, transparent));
   box-shadow: 0 0 20px color-mix(in srgb, var(--c-primary) 42%, transparent);
@@ -182,13 +527,13 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 }
 .vn-ring {
   position: absolute;
-  inset: 8px;
+  inset: 7px;
   border: 1px dashed color-mix(in srgb, var(--c-primary) 34%, transparent);
   border-radius: 50%;
   animation: vn-spin 14s linear infinite;
 }
 .vn-ring.ring-b {
-  inset: 18px;
+  inset: 15px;
   border-style: solid;
   border-color: color-mix(in srgb, var(--c-primary) 20%, transparent);
   animation-direction: reverse;
@@ -196,15 +541,51 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 }
 .vn-star {
   position: absolute;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--c-primary);
   box-shadow: 0 0 10px color-mix(in srgb, var(--c-primary) 60%, transparent);
   animation: vn-pulse 3.4s ease-in-out infinite;
 }
-.vn-star.star-a { top: 10px; right: 14px; }
-.vn-star.star-b { bottom: 16px; left: 12px; width: 5px; height: 5px; animation-delay: -1.4s; }
+.vn-star.star-a { top: 9px; right: 12px; }
+.vn-star.star-b { bottom: 14px; left: 10px; width: 4px; height: 4px; animation-delay: -1.4s; }
+
+/* ===== Tabs ===== */
+.vn-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 13px;
+  background: var(--c-bg-1);
+}
+.vn-tabs button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--c-text-2);
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.vn-tabs button > svg { font-size: 0.8rem; }
+.vn-tabs button.active {
+  background: var(--c-primary);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--c-primary) 30%, transparent);
+  color: #fff;
+}
+.vn-tabs button:disabled { cursor: not-allowed; opacity: 0.7; }
+
 .visitor-name-card h2 {
   margin: 0 0 8px;
   color: var(--c-text);
@@ -213,8 +594,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   letter-spacing: 0.02em;
 }
 .visitor-name-card > p {
-  margin: 0 auto 20px;
-  max-width: 290px;
+  margin: 0 auto 18px;
+  max-width: 310px;
   color: var(--c-text-2);
   font-size: 0.68rem;
   line-height: 1.7;
@@ -244,8 +625,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 }
 .vn-input {
   width: 100%;
-  height: 44px;
-  padding: 0 46px 0 15px;
+  height: 42px;
+  padding: 0 13px 0 15px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 32%, var(--border));
   border-radius: 13px;
   background: var(--c-bg-1);
@@ -260,6 +641,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   border-color: var(--c-primary);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 12%, transparent);
 }
+.vn-input:disabled { opacity: 0.7; }
 .vn-count {
   position: absolute;
   top: 50%;
@@ -269,48 +651,89 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   font-size: 0.56rem;
   transform: translateY(-50%);
 }
-.vn-error {
+.vn-mode-row {
   margin-top: 8px;
-  color: #d65463;
-  font-size: 0.62rem;
+  text-align: left;
 }
-.vn-register-tip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-top: 16px;
-  padding: 12px 14px;
-  border: 1px dashed color-mix(in srgb, var(--c-primary) 38%, var(--border));
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--c-primary-soft) 40%, var(--ld-bg-card));
-  text-align: center;
-}
-.vn-register-tip > svg { color: var(--c-primary); font-size: 0.95rem; }
-.vn-register-tip p { margin: 0; color: var(--c-text-2); font-size: 0.6rem; line-height: 1.65; }
-.vn-register-btn {
+.vn-mode-note {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 2px;
-  padding: 6px 14px;
+  color: var(--c-text-3);
+  font-size: 0.56rem;
+}
+.vn-code-row {
+  display: flex;
+  gap: 8px;
+}
+.vn-code-row .vn-input {
+  flex: 1;
+  padding-right: 13px;
+}
+.vn-sendcode {
+  flex: 0 0 auto;
+  height: 42px;
+  padding: 0 13px;
   border: 1px solid var(--c-primary);
-  border-radius: 999px;
+  border-radius: 13px;
   background: var(--c-primary);
   color: #fff;
   font: inherit;
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
-.vn-register-btn:hover { box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 30%, transparent); transform: translateY(-1px); }
+.vn-sendcode:hover:not(:disabled) { transform: translateY(-1px); }
+.vn-sendcode:disabled { cursor: not-allowed; opacity: 0.6; }
+.vn-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+.vn-link-btn {
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-primary);
+  font: inherit;
+  font-size: 0.6rem;
+  cursor: pointer;
+}
+.vn-link-btn:hover { text-decoration: underline; }
+.vn-link-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.vn-error {
+  margin-top: 9px;
+  color: #d65463;
+  font-size: 0.62rem;
+  line-height: 1.5;
+}
+.vn-pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px dashed color-mix(in srgb, var(--c-primary) 38%, var(--border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--c-primary-soft) 46%, var(--ld-bg-card));
+  color: var(--c-primary);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+.vn-pending > svg { font-size: 0.8rem; }
+
 .vn-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 9px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 .vn-actions button {
   display: inline-flex;
@@ -331,6 +754,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   background: transparent;
   color: var(--c-text-3);
 }
+.vn-skip:disabled { cursor: not-allowed; opacity: 0.6; }
 .vn-submit {
   border: 1px solid var(--c-primary);
   background: var(--c-primary);
