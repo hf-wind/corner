@@ -259,6 +259,26 @@ const turnstileToken = ref('')
 const turnstileWidget = ref<{ reset: () => void; waitForToken: (timeoutMs?: number) => Promise<string> } | null>(null)
 let cooldownTimer: ReturnType<typeof setInterval> | null = null
 
+let completionDeadline = 0
+let completionTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearCompletionTimer() {
+  if (completionTimer) clearTimeout(completionTimer)
+  completionTimer = null
+}
+
+function armCompletionDeadline() {
+  completionDeadline = Date.now() + 45_000
+  clearCompletionTimer()
+  completionTimer = setTimeout(() => {
+    completionTimer = null
+    if (props.visible && Date.now() >= completionDeadline) {
+      submitting.value = false
+      error.value = '操作似乎没有完成，请重试或稍后再说'
+    }
+  }, 45_000)
+}
+
 const submitText = computed(() => {
   if (mode.value === 'guest') return '开始旅程'
   if (mode.value === 'login') return '登录'
@@ -283,6 +303,16 @@ watch(
       submitting.value = false
       error.value = ''
       resetTurnstile()
+      clearCompletionTimer()
+      password.value = ''
+      confirmPassword.value = ''
+      code.value = ''
+      email.value = ''
+      cooldown.value = 0
+      if (cooldownTimer) {
+        clearInterval(cooldownTimer)
+        cooldownTimer = null
+      }
       return
     }
     name.value = props.initial
@@ -334,6 +364,7 @@ async function resolveTurnstile(): Promise<string> {
 }
 
 async function sendCode(type: 'login' | 'register') {
+  clearCompletionTimer()
   const clean = email.value.trim()
   if (!clean) {
     toast.warning('请先输入邮箱')
@@ -391,6 +422,10 @@ async function submitLogin(): Promise<boolean> {
     error.value = '请输入邮箱'
     return false
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+    error.value = '邮箱格式好像不太对，检查一下？'
+    return false
+  }
   if (loginType.value === 'password') {
     if (!password.value) {
       error.value = '请输入密码'
@@ -422,6 +457,10 @@ async function submitRegister(): Promise<boolean> {
   const clean = email.value.trim()
   if (!clean) {
     error.value = '请输入邮箱'
+    return false
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+    error.value = '邮箱格式好像不太对，检查一下？'
     return false
   }
   if (!code.value || code.value.length !== 6) {
@@ -458,14 +497,19 @@ async function submitRegister(): Promise<boolean> {
 
 async function submit() {
   if (submitting.value) return
+  submitting.value = true
   error.value = ''
   let ok = false
   if (mode.value === 'guest') ok = await submitGuest()
   else if (mode.value === 'login') ok = await submitLogin()
   else ok = await submitRegister()
-  if (!ok) return
-  // 保持加载态：由父组件执行挂起动作后主动关闭（visible 变 false）
-  submitting.value = true
+  if (!ok) {
+    submitting.value = false
+    return
+  }
+  // 保持加载态：由父组件执行挂起动作后主动关闭（visible 变 false）；
+  // 超时未关闭则恢复可操作状态，避免假死
+  armCompletionDeadline()
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -476,6 +520,7 @@ onMounted(() => document.addEventListener('keydown', onKeydown))
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   if (cooldownTimer) clearInterval(cooldownTimer)
+  clearCompletionTimer()
 })
 </script>
 
