@@ -936,11 +936,19 @@ useHead({ title: "时光留言板" });
   width: 30px;
   height: 30px;
   flex: 0 0 30px;
+  overflow: hidden;
   border-radius: 50%;
   background: linear-gradient(145deg, var(--c-primary-soft), color-mix(in srgb, var(--c-primary) 14%, var(--ld-bg-card)));
   color: color-mix(in srgb, var(--c-primary) 82%, var(--c-text-2));
   font-size: 0.86rem;
   place-items: center;
+}
+.msg-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 .msg-avatar.is-user {
   background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary) 18%, var(--ld-bg-card)), color-mix(in srgb, var(--c-primary) 30%, var(--ld-bg-card)));
@@ -1496,6 +1504,7 @@ useHead({ title: "时光留言板" });
   width: 58px;
   height: 58px;
   margin: 14px 0 10px;
+  overflow: hidden;
   border: 4px solid var(--ld-bg-card);
   border-radius: 50%;
   background: linear-gradient(145deg, var(--c-primary), color-mix(in srgb, var(--c-primary) 52%, #4a5bd0));
@@ -1503,6 +1512,13 @@ useHead({ title: "时光留言板" });
   color: #fff;
   font-size: 1.5rem;
   place-items: center;
+}
+.my-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 .my-avatar.is-user {
   background: linear-gradient(145deg, #3a63c9, color-mix(in srgb, var(--c-primary) 40%, #243a75));
