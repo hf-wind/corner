@@ -620,7 +620,7 @@ async function refreshWall() {
 
 async function refreshPeek() {
   try {
-    const data = await fetchPeek(3);
+    const data = await fetchPeek();
     peekBottles.value = Array.isArray(data) ? data : [];
   } catch {
     peekBottles.value = [];
