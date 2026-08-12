@@ -19,6 +19,7 @@ import { OptionalReasonDto } from '../../common/dto/request-body.dto';
 import {
   CreateVisitorBottleDto,
   CreateVisitorMessageDto,
+  ReplyVisitorBottleDto,
   SetVisitorNicknameDto,
   TrackVisitDto,
 } from './dto/create-visitor-message.dto';
@@ -100,15 +101,17 @@ export class VisitorController {
       actor,
       visitorIdHash,
       dto.content,
+      dto.parentId,
     );
   }
 
   @UseGuards(OptionalJwtAuthGuard)
-  @Post('bottles/fish')
+  @Post('bottles/:id/fish')
   @HttpCode(200)
   async fishBottle(
     @Req() req: { ip: string; user?: { id?: string; username?: string } },
     @Headers('x-visitor-id') visitorId: string,
+    @Param('id') id: string,
   ) {
     const actor: VisitorActor = req.user?.id
       ? { userId: req.user.id, username: req.user.username ?? '' }
@@ -118,12 +121,49 @@ export class VisitorController {
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
       visitorIdHash,
+      id,
     );
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('bottles/:id/reply')
+  @HttpCode(200)
+  async replyBottle(
+    @Req() req: { ip: string; user?: { id?: string; username?: string } },
+    @Headers('x-visitor-id') visitorId: string,
+    @Param('id') id: string,
+    @Body() dto: ReplyVisitorBottleDto,
+  ) {
+    const actor: VisitorActor = req.user?.id
+      ? { userId: req.user.id, username: req.user.username ?? '' }
+      : null;
+    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
+    return this.visitorService.replyBottle(
+      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
+      actor,
+      visitorIdHash,
+      id,
+      dto.content,
+    );
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('bottles/peek')
-  async peekBottles(@Query('limit') limit = '3') {
-    return this.visitorService.peekBottles(Math.min(6, Math.max(1, Number(limit) || 3)));
+  async peekBottles(
+    @Query('limit') limit = '8',
+    @Req() req: {
+      headers?: { 'x-visitor-id'?: string | string[] | undefined };
+      user?: { id?: string };
+    },
+  ) {
+    const raw = req.headers?.['x-visitor-id'];
+    const visitorId = Array.isArray(raw) ? raw[0] : raw;
+    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId ?? '');
+    return this.visitorService.peekBottles(
+      Math.min(8, Math.max(1, Number(limit) || 8)),
+      visitorIdHash,
+      req.user?.id ?? null,
+    );
   }
 
   @Get('wall')

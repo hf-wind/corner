@@ -23,6 +23,17 @@ export class CreateVisitorBottleDto {
   @MinLength(1)
   @MaxLength(VISITOR_BOTTLE_MAX_LENGTH)
   content: string;
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+}
+
+export class ReplyVisitorBottleDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(VISITOR_BOTTLE_MAX_LENGTH)
+  content: string;
 }
 
 export class SetVisitorNicknameDto {
