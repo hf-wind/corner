@@ -629,4 +629,80 @@ describe('VisitorService', () => {
       expect(result.map((b) => b.id)).toEqual(['b2', 'b3']);
     });
   });
+
+  describe('listMessages — 身份字段', () => {
+    it('返回 userId / visitorIdHash / user.avatar 供前端识别身份', async () => {
+      const findMany = jest.fn().mockResolvedValue([
+        {
+          id: 'm1',
+          content: '你好',
+          nickname: '张三',
+          createdAt: new Date('2026-08-01'),
+          userId: 'u1',
+          visitorIdHash: 'h1',
+          user: { id: 'u1', username: '张三', avatar: '/uploads/avatar/a.webp' },
+        },
+        {
+          id: 'm2',
+          content: '再见',
+          nickname: '李四',
+          createdAt: new Date('2026-08-02'),
+          userId: null,
+          visitorIdHash: 'h2',
+          user: null,
+        },
+      ]);
+      const count = jest.fn().mockResolvedValue(2);
+      const prisma = {
+        visitorMessage: { findMany, count },
+      } as any;
+      const service = makeService(prisma);
+
+      const result = await service.listMessages('message', 1);
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            userId: true,
+            visitorIdHash: true,
+          }),
+        }),
+      );
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            user: expect.objectContaining({ select: expect.objectContaining({ avatar: true }) }),
+          }),
+        }),
+      );
+      expect(result.items[0]).toMatchObject({
+        userId: 'u1',
+        visitorIdHash: 'h1',
+        user: { avatar: '/uploads/avatar/a.webp' },
+      });
+      expect(result.items[1]).toMatchObject({ userId: null, visitorIdHash: 'h2', user: null });
+      expect(result.total).toBe(2);
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('bottle 分页参数透传', async () => {
+      const findMany = jest.fn().mockResolvedValue([]);
+      const count = jest.fn().mockResolvedValue(30);
+      const prisma = {
+        visitorMessage: { findMany, count },
+      } as any;
+      const service = makeService(prisma);
+
+      const result = await service.listMessages('bottle', 2, 10);
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ type: 'bottle', status: 'approved' }),
+          skip: 10,
+          take: 10,
+        }),
+      );
+      expect(result).toMatchObject({ page: 2, pageSize: 10, hasMore: true });
+    });
+  });
 });

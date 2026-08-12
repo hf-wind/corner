@@ -482,6 +482,13 @@ export class VisitorService {
           content: true,
           nickname: true,
           createdAt: true,
+          userId: true,
+          visitorIdHash: true,
+        },
+        include: {
+          user: {
+            select: { id: true, username: true, avatar: true },
+          },
         },
       }),
       this.prisma.visitorMessage.count({ where }),
