@@ -456,7 +456,7 @@ export class VisitorService {
     const chains = chainIds.length
       ? await this.prisma.visitorMessage.groupBy({
           by: ['chainId'],
-          where: { chainId: { in: chainIds } },
+          where: { chainId: { in: chainIds }, type: 'bottle' },
           _count: { _all: true },
         })
       : [];
