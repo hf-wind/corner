@@ -538,6 +538,8 @@ async function doFishBottle(bottle: { id: string }) {
   fishing.value = true;
   caughtBottle.value = null;
   relayMode.value = false;
+  relayText.value = "";
+  replyText.value = "";
   try {
     const result = await fishBottleById(bottle.id);
     caughtBottle.value = result?.bottle ?? null;
@@ -590,12 +592,12 @@ async function submitReply() {
   replySending.value = true;
   try {
     const result = await replyBottle(caughtBottle.value.id, text);
-    replyDialogOpen.value = false;
-    replyText.value = "";
     if (result?.review && !result.review.approved) {
       toast.error(`回复未通过审核：${result.review.reason}`);
       return;
     }
+    replyDialogOpen.value = false;
+    replyText.value = "";
     toast.success("回复已送达瓶主，祝你们有缘");
   } catch (err: any) {
     toast.error(err?.message || "回复失败，请稍后再试");
