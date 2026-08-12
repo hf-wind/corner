@@ -12,10 +12,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { NotificationService } from '../notification/notification.service';
 import {
+  BOTTLE_CHAIN_MAX,
   BOTTLE_RATE_LIMIT_PER_DAY,
   FISH_RATE_LIMIT_PER_DAY,
   IDENTIFY_RATE_LIMIT_PER_DAY,
   MESSAGE_RATE_LIMIT_PER_DAY,
+  REPLY_RATE_LIMIT_PER_DAY,
   VISITOR_ACHIEVEMENTS,
 } from './visitor.constants';
 
@@ -172,6 +174,8 @@ export class VisitorService {
     visitorIdHash: string | null,
     type: 'message' | 'bottle',
     content: string,
+    chainId: string | null = null,
+    parentId: string | null = null,
   ) {
     let profile: { nickname: string; visitorIdHash: string; isBanned: boolean } | null = null;
     if (actor) {
@@ -212,6 +216,8 @@ export class VisitorService {
         status,
         aiReview: status === 'rejected' ? review.reason : null,
         aiReviewResult: review.approved ? 'approved' : 'rejected',
+        chainId,
+        parentId,
       },
     });
 
@@ -260,42 +266,59 @@ export class VisitorService {
     actor: VisitorActor,
     visitorIdHash: string | null,
     content: string,
+    parentId?: string,
   ) {
-    return this.createMessage(req, actor, visitorIdHash, 'bottle', content);
+    let chainId: string | null = null;
+    if (parentId) {
+      const parent = await this.prisma.visitorMessage.findUnique({ where: { id: parentId } });
+      if (!parent || parent.type !== 'bottle') {
+        throw new BadRequestException('接力的瓶子不存在');
+      }
+      if (parent.status !== 'caught') {
+        throw new BadRequestException('只能接力一只刚捞起的瓶子');
+      }
+      const chainRoot = parent.chainId ?? parent.id;
+      const depth = await this.prisma.visitorMessage.count({ where: { chainId: chainRoot } });
+      if (depth >= BOTTLE_CHAIN_MAX) {
+        throw new BadRequestException('这封信已经漂了太久，让它在此安歇吧');
+      }
+      chainId = chainRoot;
+    }
+    return this.createMessage(req, actor, visitorIdHash, 'bottle', content, chainId, parentId ?? null);
   }
 
-  async fishBottle(req: VisitorRequest, actor: VisitorActor, visitorIdHash: string | null) {
+  async fishBottle(
+    req: VisitorRequest,
+    actor: VisitorActor,
+    visitorIdHash: string | null,
+    bottleId: string,
+  ) {
     await this.checkRateLimit(req, 'fish', FISH_RATE_LIMIT_PER_DAY);
-    const where: Record<string, unknown> = {
-      type: 'bottle',
-      status: 'approved',
-    };
-    if (actor) {
-      where.NOT = [{ userId: actor.userId }];
-    } else {
-      if (!visitorIdHash) {
-        throw new UnauthorizedException('缺少访客标识');
-      }
-      where.NOT = [{ visitorIdHash }];
+    const bottle = await this.prisma.visitorMessage.findUnique({ where: { id: bottleId } });
+    if (!bottle || bottle.type !== 'bottle' || bottle.status !== 'approved') {
+      throw new NotFoundException('这只瓶子已经被别人捞走了');
     }
-    const total = await this.prisma.visitorMessage.count({ where });
-    if (total < 1) {
-      throw new NotFoundException('海面还很平静，暂时没有可捞起的瓶子');
+    if (actor && bottle.userId === actor.userId) {
+      throw new BadRequestException('不能捞起自己投的瓶子');
     }
-    const skip = Math.max(0, total - 30);
-    const pool = await this.prisma.visitorMessage.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 30,
-      skip,
+    if (!actor && visitorIdHash && bottle.visitorIdHash === visitorIdHash) {
+      throw new BadRequestException('不能捞起自己投的瓶子');
+    }
+    const updated = await this.prisma.visitorMessage.updateMany({
+      where: { id: bottle.id, status: 'approved' },
+      data: {
+        status: 'caught',
+        caughtByIdHash: visitorIdHash ?? undefined,
+        caughtAt: new Date(),
+      },
     });
-    if (pool.length === 0) {
-      throw new NotFoundException('海面还很平静，暂时没有可捞起的瓶子');
+    if (updated.count === 0) {
+      throw new NotFoundException('这只瓶子已经被别人捞走了');
     }
-    const bottle = pool[Math.floor(Math.random() * pool.length)];
-    await this.prisma.visitorMessage.update({
-      where: { id: bottle.id },
-      data: { status: 'caught', caughtByIdHash: visitorIdHash ?? undefined, caughtAt: new Date() },
+    const chainRows = await this.prisma.visitorMessage.findMany({
+      where: { chainId: bottle.chainId ?? bottle.id },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, nickname: true, content: true, createdAt: true },
     });
     let contactEmail: string | null = null;
     if (bottle.userId) {
@@ -311,33 +334,129 @@ export class VisitorService {
       });
       contactEmail = owner?.email ?? null;
     }
+    if (bottle.userId) {
+      try {
+        await this.notificationService.create(bottle.userId, {
+          type: 'guestbook',
+          title: '你的漂流瓶被捞起了',
+          content: `有人从时光海捞起了你投下的瓶子，去看看吧`,
+          link: '/guestbook',
+        });
+      } catch (error) {
+        this.logger.warn(`捞起通知发送失败: ${(error as Error).message}`);
+      }
+    }
     const unlocked = visitorIdHash ? await this.syncAchievements(visitorIdHash) : [];
+    const ownerUserId = bottle.userId ?? null;
     return {
       bottle: {
         id: bottle.id,
-        content: bottle.content,
+        chain: chainRows,
         nickname: bottle.nickname,
         createdAt: bottle.createdAt,
         contactEmail,
+        ownerUserId,
+        canReply: !!bottle.userId && (!actor || bottle.userId !== actor.userId),
       },
       unlocked,
     };
   }
 
-  async peekBottles(limit = 3) {
-    const bottles = await this.prisma.visitorMessage.findMany({
-      where: { type: 'bottle', status: { in: ['approved', 'caught'] } },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        content: true,
-        nickname: true,
-        status: true,
-        createdAt: true,
+  async replyBottle(
+    req: VisitorRequest,
+    actor: VisitorActor,
+    visitorIdHash: string | null,
+    bottleId: string,
+    content: string,
+  ) {
+    if (!actor?.userId) {
+      throw new UnauthorizedException('请先登录后再回复漂流瓶主人');
+    }
+    const bottle = await this.prisma.visitorMessage.findUnique({ where: { id: bottleId } });
+    if (!bottle || bottle.type !== 'bottle') {
+      throw new NotFoundException('瓶子不存在');
+    }
+    if (bottle.status !== 'caught') {
+      throw new BadRequestException('只能回复一只你捞起的瓶子');
+    }
+    if (!bottle.userId) {
+      throw new BadRequestException('这只瓶子的主人还没有账号，暂时无法回复');
+    }
+    if (bottle.userId === actor.userId) {
+      throw new BadRequestException('不能回复自己投的瓶子');
+    }
+    await this.checkRateLimit(req, 'reply', REPLY_RATE_LIMIT_PER_DAY);
+    const clean = content.trim();
+    if (!clean) {
+      throw new BadRequestException('回复内容不能为空');
+    }
+    const review = await this.aiService.moderateComment(clean);
+    const record = await this.prisma.visitorMessage.create({
+      data: {
+        type: 'reply',
+        content: clean,
+        nickname: actor.username.slice(0, 20),
+        userId: actor.userId,
+        visitorIdHash,
+        status: review.approved ? 'approved' : 'rejected',
+        aiReview: review.approved ? null : review.reason,
+        aiReviewResult: review.approved ? 'approved' : 'rejected',
+        chainId: bottle.chainId ?? bottle.id,
+        parentId: bottle.id,
       },
     });
-    return bottles;
+    if (review.approved) {
+      try {
+        await this.notificationService.create(bottle.userId, {
+          type: 'guestbook',
+          title: '有人回复了你的漂流瓶',
+          content: `${actor.username}：${clean}`,
+          link: '/guestbook',
+        });
+      } catch (error) {
+        this.logger.warn(`回复通知发送失败: ${(error as Error).message}`);
+      }
+    }
+    return { ok: true, record, review };
+  }
+
+  async peekBottles(
+    limit = 8,
+    excludeVisitorHash: string | null = null,
+    excludeUserId: string | null = null,
+  ) {
+    const where: Record<string, unknown> = { type: 'bottle', status: 'approved' };
+    const not: Record<string, unknown>[] = [];
+    if (excludeVisitorHash) not.push({ visitorIdHash: excludeVisitorHash });
+    if (excludeUserId) not.push({ userId: excludeUserId });
+    if (not.length > 0) where.NOT = not;
+    const candidates = await this.prisma.visitorMessage.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+      select: { id: true, parentId: true, chainId: true, nickname: true },
+    });
+    const referenced = new Set(
+      candidates.filter((c) => c.parentId).map((c) => c.parentId as string),
+    );
+    const tails = candidates.filter((c) => !referenced.has(c.id));
+    const chainIds = tails
+      .map((t) => t.chainId ?? t.id)
+      .filter((id): id is string => !!id);
+    const chains = chainIds.length
+      ? await this.prisma.visitorMessage.groupBy({
+          by: ['chainId'],
+          where: { chainId: { in: chainIds } },
+          _count: { _all: true },
+        })
+      : [];
+    const depthByChain = new Map(chains.map((c) => [c.chainId, c._count._all]));
+    return tails.slice(0, limit).map((t) => ({
+      id: t.id,
+      nicknameFirstChar: t.nickname.slice(0, 1),
+      chainLength: depthByChain.get(t.chainId ?? t.id) ?? 1,
+      seed: [...t.id].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 997, 7),
+    }));
   }
 
   async listMessages(type: 'message' | 'bottle', page: number, pageSize = 20) {
