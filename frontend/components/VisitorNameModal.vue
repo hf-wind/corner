@@ -37,6 +37,13 @@
             </span>
           </div>
           <div v-if="error" class="vn-error">{{ error }}</div>
+          <div class="vn-register-tip">
+            <Icon name="ph:sparkle-bold" />
+            <p>注册账号可获得 100% 沉浸漂流体验：瓶子被捞起、被回复时实时通知，还能拥有固定联系方式。</p>
+            <button type="button" class="vn-register-btn" @click="goRegister">
+              注册账号 <Icon name="ph:arrow-up-right-bold" />
+            </button>
+          </div>
           <div class="vn-actions">
             <button type="button" class="vn-skip" @click="close">稍后再说</button>
             <button type="button" class="vn-submit" :disabled="submitting" @click="submit">
@@ -91,6 +98,11 @@ function trimGuard() {
 function close() {
   if (submitting.value) return
   emit('close')
+}
+
+function goRegister() {
+  emit('close')
+  navigateTo('/register')
 }
 
 async function submit() {
@@ -262,6 +274,37 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   color: #d65463;
   font-size: 0.62rem;
 }
+.vn-register-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px dashed color-mix(in srgb, var(--c-primary) 38%, var(--border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--c-primary-soft) 40%, var(--ld-bg-card));
+  text-align: center;
+}
+.vn-register-tip > svg { color: var(--c-primary); font-size: 0.95rem; }
+.vn-register-tip p { margin: 0; color: var(--c-text-2); font-size: 0.6rem; line-height: 1.65; }
+.vn-register-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 6px 14px;
+  border: 1px solid var(--c-primary);
+  border-radius: 999px;
+  background: var(--c-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.vn-register-btn:hover { box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 30%, transparent); transform: translateY(-1px); }
 .vn-actions {
   display: flex;
   align-items: center;
