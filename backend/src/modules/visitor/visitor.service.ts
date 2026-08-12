@@ -287,7 +287,7 @@ export class VisitorService {
       }
       const chainRoot = parent.chainId ?? parent.id;
       const depth = await this.prisma.visitorMessage.count({
-        where: { chainId: chainRoot, type: 'bottle' },
+        where: { chainId: chainRoot, type: 'bottle', status: { in: ['approved', 'caught'] } },
       });
       if (depth >= BOTTLE_CHAIN_MAX) {
         throw new BadRequestException('这封信已经漂了太久，让它在此安歇吧');
@@ -326,7 +326,7 @@ export class VisitorService {
       throw new NotFoundException('这只瓶子已经被别人捞走了');
     }
     const chainRows = await this.prisma.visitorMessage.findMany({
-      where: { chainId: bottle.chainId ?? bottle.id, type: 'bottle' },
+      where: { chainId: bottle.chainId ?? bottle.id, type: 'bottle', status: { in: ['approved', 'caught'] } },
       orderBy: { createdAt: 'asc' },
       select: { id: true, nickname: true, content: true, createdAt: true },
     });
