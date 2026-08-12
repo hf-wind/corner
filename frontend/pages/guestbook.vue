@@ -132,16 +132,13 @@
       <!-- ========== 漂流瓶 ========== -->
       <section v-show="activeTab === 'bottles'" class="bottles-pane">
         <div class="sea-card content-reveal">
-          <div class="sea" aria-hidden="true">
-            <span class="sea-glow" />
-            <span class="sea-ring ring-1" /><span class="sea-ring ring-2" /><span class="sea-ring ring-3" />
-            <span class="sea-sheen" />
-            <span class="sea-moon" />
-            <span class="sea-bottle" :class="{ 'sea-bottle-caught': !!caughtBottle }">
-              <Icon name="solar:bottle-bold" />
-            </span>
-            <span v-for="n in 5" :key="n" class="sea-star" :class="`star-${n}`" />
-          </div>
+          <SeaScene
+            ref="seaRef"
+            class="sea-scene-wrap"
+            :bottles="peekBottles"
+            :disabled="fishing"
+            @fish="onFishBottle"
+          />
 
           <div class="sea-copy">
             <span class="sea-kicker">THE TIME SEA · 时光海</span>
@@ -151,35 +148,48 @@
 
           <Transition name="bottle-pop">
             <div v-if="caughtBottle" class="bottle-caught">
-              <span class="caught-seal"><Icon name="ph:anchor-fill" /></span>
-              <div class="caught-copy">
-                <span class="caught-meta">{{ caughtBottle.nickname }} · {{ dateLabel(caughtBottle.createdAt) }} 投入</span>
-                <p>「{{ caughtBottle.content }}」</p>
-                <a
-                  v-if="caughtBottle.contactEmail"
-                  class="caught-mail"
-                  :href="`mailto:${caughtBottle.contactEmail}`"
-                >
-                  <Icon name="ph:envelope-simple-bold" />
-                  想认识这位旅人？给他写封信 → {{ caughtBottle.contactEmail }}
-                </a>
+              <div class="caught-head">
+                <span class="caught-seal"><Icon name="ph:anchor-fill" /></span>
+                <div class="caught-title">
+                  <strong>一封漂了 {{ caughtBottle.chain?.length ?? 1 }} 段的信</strong>
+                  <span class="caught-meta">来自「{{ caughtBottle.nickname }}」 · {{ dateLabel(caughtBottle.createdAt) }} 投入</span>
+                </div>
               </div>
+              <ol class="chain-list">
+                <li v-for="(seg, i) in chainReversed" :key="seg.id" class="chain-seg">
+                  <span class="chain-tag">{{ i === 0 ? '最新' : `第 ${(caughtBottle?.chain?.length ?? 1) - i} 段` }}</span>
+                  <div class="chain-body">
+                    <span class="chain-meta">{{ seg.nickname }} · {{ msgRelativeTime(seg.createdAt) }}</span>
+                    <p>{{ seg.content }}</p>
+                  </div>
+                </li>
+              </ol>
+              <div class="caught-actions">
+                <button v-if="isLoggedIn && caughtBottle.canReply" type="button" class="caught-action reply" @click="replyDialogOpen = true">
+                  <Icon name="ph:envelope-simple-bold" />回复这位旅人
+                </button>
+                <a v-else-if="!isLoggedIn" class="caught-action reply-link" href="/login" @click.prevent="goLogin">
+                  <Icon name="ph:envelope-simple-bold" />登录后可回复漂流瓶主人
+                </a>
+                <button v-if="!relayMode" type="button" class="caught-action relay" @click="relayMode = true">
+                  <Icon name="ph:paper-plane-tilt-bold" />留一句话，让瓶子继续漂流
+                </button>
+              </div>
+              <div v-if="relayMode" class="relay-box">
+                <textarea v-model="relayText" class="composer-input" :maxlength="120" rows="3" placeholder="写一段接力的话，塞进瓶子里…" />
+                <div class="relay-foot">
+                  <span class="composer-count">{{ relayText.length }}/120</span>
+                  <button type="button" class="composer-submit sea-submit" :disabled="relaySending" @click="submitRelay">
+                    <Icon :name="relaySending ? 'ph:circle-notch-bold' : 'solar:bottle-outline'" :spin="relaySending" />
+                    {{ relaySending ? '瓶子审核中…' : '投入时光海' }}
+                  </button>
+                </div>
+              </div>
+              <a v-if="caughtBottle.contactEmail && !caughtBottle.canReply" class="caught-mail" :href="`mailto:${caughtBottle.contactEmail}`">
+                <Icon name="ph:envelope-simple-bold" />想认识这位旅人？给他写封信 → {{ caughtBottle.contactEmail }}
+              </a>
             </div>
           </Transition>
-
-          <button type="button" class="fish-btn" :disabled="fishing" @click="fish">
-            <Icon :name="fishing ? 'ph:circle-notch-bold' : 'ph:anchor-bold'" :spin="fishing" />
-            {{ fishing ? '正在浮出水面…' : '捞起一只瓶子' }}
-          </button>
-
-          <div v-if="peekBottles.length" class="sea-peek">
-            <span class="peek-label">海面上漂浮着最近的信</span>
-            <div class="peek-row">
-              <span v-for="bottle in peekBottles" :key="bottle.id" class="peek-bottle" :title="bottle.content">
-                <Icon name="solar:bottle-bold" /><i>{{ bottle.nickname.slice(0, 1) }}</i>
-              </span>
-            </div>
-          </div>
         </div>
 
         <div class="composer bottle-composer content-reveal">
@@ -292,6 +302,20 @@
       @close="nameModalVisible = false"
       @confirm="handleNameConfirm"
     />
+
+    <a-modal
+      v-model:open="replyDialogOpen"
+      title="回复漂流瓶主人"
+      :ok-text="replySending ? '发送中…' : '发送回复'"
+      :ok-button-props="{ disabled: !replyText.trim() || replySending }"
+      :cancel-text="'取消'"
+      @ok="submitReply"
+    >
+      <p style="margin:0 0 10px;color:var(--c-text-2);font-size:.68rem;">
+        回复会通过站内通知送达「{{ caughtBottle?.nickname }}」，内容经过 AI 审核。
+      </p>
+      <a-textarea v-model:value="replyText" :maxlength="120" :rows="4" placeholder="写几句想对这位旅人说的话…" />
+    </a-modal>
   </div>
 </template>
 
@@ -314,6 +338,7 @@ const {
   sendMessage,
   throwBottle,
   fishBottleById,
+  replyBottle,
   peekBottles: fetchPeek,
 } = useVisitor();
 const toast = useToast();
@@ -343,6 +368,15 @@ const sendingBottle = ref(false);
 const fishing = ref(false);
 const caughtBottle = ref<any>(null);
 const peekBottles = ref<any[]>([]);
+
+const seaRef = ref<InstanceType<any> | null>(null);
+const relayMode = ref(false);
+const relayText = ref("");
+const relaySending = ref(false);
+const replyDialogOpen = ref(false);
+const replyText = ref("");
+const replySending = ref(false);
+const chainReversed = computed(() => [...(caughtBottle.value?.chain ?? [])].reverse());
 
 const nameModalVisible = ref(false);
 const pendingAction = ref<null | (() => Promise<void>)>(null);
@@ -495,30 +529,83 @@ async function doThrowBottle(text: string) {
   }
 }
 
-async function fish() {
-  if (!requireName(() => doFish())) return;
-  await doFish();
+async function onFishBottle(bottle: { id: string }) {
+  if (!requireName(() => doFishBottle(bottle))) return;
+  await doFishBottle(bottle);
 }
 
-async function doFish() {
+async function doFishBottle(bottle: { id: string }) {
   fishing.value = true;
   caughtBottle.value = null;
+  relayMode.value = false;
   try {
-    const target = peekBottles.value[0];
-    if (!target) {
-      toast.info("海面还很平静");
-      return;
-    }
-    const result = await fishBottleById(target.id);
+    const result = await fishBottleById(bottle.id);
     caughtBottle.value = result?.bottle ?? null;
-    toast.success(`捞起了一只来自「${result?.bottle?.nickname ?? "远方"}」的瓶子`);
+    toast.success(`捞起了一封来自「${result?.bottle?.nickname ?? "远方"}」的信`);
     celebrate(result?.unlocked);
     await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
   } catch (err: any) {
-    toast.info(err?.message || "海面还很平静");
+    toast.info(err?.message || "这只瓶子似乎已经漂走了");
+    await refreshPeek();
   } finally {
     fishing.value = false;
   }
+}
+
+async function submitRelay() {
+  const text = relayText.value.trim();
+  if (!text) {
+    toast.warning("先写一段话再投入海面吧");
+    return;
+  }
+  if (!caughtBottle.value) return;
+  relaySending.value = true;
+  try {
+    const result = await throwBottle(text, caughtBottle.value.id);
+    relayText.value = "";
+    relayMode.value = false;
+    if (result?.review && !result.review.approved) {
+      toast.error(`瓶子未能漂远：${result.review.reason}`);
+      return;
+    }
+    toast.success("接力瓶已投入时光海，等待下一个有缘人");
+    celebrate(result?.unlocked);
+    caughtBottle.value = null;
+    seaRef.value?.launch();
+    await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
+  } catch (err: any) {
+    toast.error(err?.message || "投瓶失败，请稍后再试");
+  } finally {
+    relaySending.value = false;
+  }
+}
+
+async function submitReply() {
+  const text = replyText.value.trim();
+  if (!text) {
+    toast.warning("先写下想说的话吧");
+    return;
+  }
+  if (!caughtBottle.value) return;
+  replySending.value = true;
+  try {
+    const result = await replyBottle(caughtBottle.value.id, text);
+    replyDialogOpen.value = false;
+    replyText.value = "";
+    if (result?.review && !result.review.approved) {
+      toast.error(`回复未通过审核：${result.review.reason}`);
+      return;
+    }
+    toast.success("回复已送达瓶主，祝你们有缘");
+  } catch (err: any) {
+    toast.error(err?.message || "回复失败，请稍后再试");
+  } finally {
+    replySending.value = false;
+  }
+}
+
+function goLogin() {
+  navigateTo("/login");
 }
 
 async function refreshWall() {
@@ -1022,131 +1109,6 @@ useHead({ title: "时光留言板" });
   pointer-events: none;
 }
 
-.sea {
-  position: relative;
-  width: 190px;
-  height: 190px;
-  margin-bottom: 22px;
-  border-radius: 50%;
-  background:
-    radial-gradient(120% 120% at 32% 26%, hsl(217deg 78% 64%), hsl(220deg 88% 42%) 46%, hsl(221deg 92% 26%) 78%, hsl(223deg 96% 15%));
-  box-shadow:
-    inset 0 -14px 34px rgb(4 12 32 / 48%),
-    inset 0 10px 24px rgb(255 255 255 / 14%),
-    0 18px 44px color-mix(in srgb, var(--c-primary) 22%, transparent);
-  isolation: isolate;
-}
-.sea-glow {
-  position: absolute;
-  z-index: -1;
-  inset: -16px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 26%, transparent), transparent 66%);
-  filter: blur(6px);
-}
-.sea-moon {
-  position: absolute;
-  top: 16%;
-  left: 22%;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 36% 32%, #fff, #cfe3ff 58%, rgb(207 227 255 / 22%) 100%);
-  box-shadow: 0 0 22px rgb(214 235 255 / 68%);
-}
-.sea-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-}
-.sea-ring.ring-1 {
-  inset: 18px;
-  animation: sea-spin 22s linear infinite;
-}
-.sea-ring.ring-1::before,
-.sea-ring.ring-1::after {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgb(214 236 255 / 85%);
-  box-shadow: 0 0 10px rgb(190 220 255 / 75%);
-  content: "";
-}
-.sea-ring.ring-1::before { top: 10px; left: 18px; }
-.sea-ring.ring-1::after { right: 6px; bottom: 30px; }
-.sea-ring.ring-2 {
-  inset: 34px;
-  border-style: dashed;
-  animation: sea-spin 15s linear infinite reverse;
-}
-.sea-ring.ring-3 {
-  inset: 52px;
-  border-color: rgb(255 255 255 / 10%);
-  animation: sea-breathe 5s ease-in-out infinite;
-}
-.sea-sheen {
-  position: absolute;
-  top: 34%;
-  left: 14%;
-  width: 44%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 60%), transparent);
-  transform: rotate(-12deg);
-  animation: sea-sheen-move 4.6s ease-in-out infinite;
-}
-.sea-bottle {
-  position: absolute;
-  z-index: 2;
-  bottom: 24%;
-  left: 50%;
-  display: grid;
-  width: 46px;
-  height: 56px;
-  border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: 13px 13px 17px 17px;
-  background: linear-gradient(165deg, rgb(255 255 255 / 30%), rgb(255 255 255 / 8%) 55%, rgb(0 0 0 / 10%));
-  box-shadow: 0 10px 22px rgb(0 6 24 / 34%);
-  color: rgb(255 255 255 / 92%);
-  font-size: 1.35rem;
-  place-items: center;
-  transform: translateX(-50%) rotate(6deg);
-  animation: bottle-float 4.4s ease-in-out infinite;
-  transition: opacity 0.3s ease;
-}
-.sea-bottle::after {
-  position: absolute;
-  top: -7px;
-  left: 50%;
-  width: 12px;
-  height: 8px;
-  border: 1px solid rgb(255 255 255 / 26%);
-  border-radius: 3px 3px 7px 7px;
-  background: rgb(255 255 255 / 22%);
-  content: "";
-  transform: translateX(-50%);
-}
-.sea-bottle-caught {
-  opacity: 0.25;
-}
-.sea-star {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 70%);
-  box-shadow: 0 0 8px rgb(255 255 255 / 55%);
-  animation: sea-star-blink 3.6s ease-in-out infinite;
-}
-.sea-star.star-1 { top: 14%; right: 24%; }
-.sea-star.star-2 { top: 30%; right: 13%; width: 3px; height: 3px; animation-delay: -1s; }
-.sea-star.star-3 { top: 46%; left: 12%; animation-delay: -1.9s; }
-.sea-star.star-4 { bottom: 26%; right: 20%; animation-delay: -2.6s; }
-.sea-star.star-5 { bottom: 40%; left: 20%; width: 3px; height: 3px; animation-delay: -3.1s; }
-
 .sea-copy {
   position: relative;
   z-index: 1;
@@ -1172,41 +1134,12 @@ useHead({ title: "时光留言板" });
   line-height: 1.75;
 }
 
-.fish-btn {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  height: 42px;
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-  padding: 0 24px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 44%, var(--border));
-  border-radius: 999px;
-  background: linear-gradient(145deg, var(--c-primary-soft), color-mix(in srgb, var(--c-primary) 20%, var(--ld-bg-card)));
-  color: var(--c-primary);
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-}
-.fish-btn:hover:not(:disabled) {
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--c-primary) 28%, transparent);
-  transform: translateY(-2px);
-}
-.fish-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-}
-
 .bottle-caught {
   position: relative;
   z-index: 1;
   display: flex;
   width: min(480px, 100%);
-  align-items: flex-start;
-  gap: 13px;
+  flex-direction: column;
   margin-top: 20px;
   padding: 16px 18px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 24%, var(--border));
@@ -1227,21 +1160,11 @@ useHead({ title: "时光留言板" });
   font-size: 1rem;
   place-items: center;
 }
-.caught-copy {
-  min-width: 0;
-}
 .caught-meta {
   display: block;
   color: var(--c-text-3);
   font-size: 0.56rem;
   letter-spacing: 0.04em;
-}
-.caught-copy p {
-  margin: 7px 0 0;
-  color: var(--c-text);
-  font-size: 0.78rem;
-  line-height: 1.8;
-  overflow-wrap: break-word;
 }
 .caught-mail {
   display: inline-flex;
@@ -1279,68 +1202,24 @@ useHead({ title: "时光留言板" });
   transform: translateY(-10px) scale(0.98);
 }
 
-.sea-peek {
-  position: relative;
-  z-index: 1;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px dashed color-mix(in srgb, var(--border) 78%, transparent);
-}
-.peek-label {
-  display: block;
-  margin-bottom: 10px;
-  color: var(--c-text-3);
-  font-size: 0.54rem;
-  letter-spacing: 0.1em;
-}
-.peek-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-}
-.peek-bottle {
-  position: relative;
-  display: grid;
-  width: 34px;
-  height: 40px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border));
-  border-radius: 9px 9px 12px 12px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--c-primary-soft) 80%, var(--ld-bg-card)), var(--ld-bg-card));
-  box-shadow: 0 7px 16px color-mix(in srgb, var(--ld-shadow) 32%, transparent);
-  color: var(--c-primary);
-  font-size: 0.9rem;
-  cursor: default;
-  place-items: center;
-  transition: transform 0.24s var(--ui-ease-out), box-shadow 0.24s ease;
-  animation: peek-bob 3.8s ease-in-out infinite;
-}
-.peek-bottle:nth-child(2) {
-  animation-delay: -1.2s;
-}
-.peek-bottle:nth-child(3) {
-  animation-delay: -2.4s;
-}
-.peek-bottle:hover {
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--ld-shadow) 48%, transparent);
-  transform: translateY(-4px);
-}
-.peek-bottle i {
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  display: grid;
-  width: 15px;
-  height: 15px;
-  border: 2px solid var(--ld-bg-card);
-  border-radius: 50%;
-  background: var(--c-primary);
-  color: #fff;
-  font-size: 0.44rem;
-  font-style: normal;
-  font-weight: 700;
-  place-items: center;
-}
+.sea-scene-wrap { margin-bottom: 2px; }
+.caught-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.caught-title { display: flex; flex-direction: column; gap: 3px; }
+.caught-title strong { color: var(--c-text); font-size: 0.8rem; }
+.chain-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
+.chain-seg { display: flex; gap: 9px; align-items: flex-start; }
+.chain-tag { flex: 0 0 auto; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--c-primary) 14%, transparent); color: var(--c-primary); font-size: 0.52rem; font-weight: 700; }
+.chain-body { min-width: 0; flex: 1; padding: 8px 11px; border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 11px; background: var(--ld-bg-card); }
+.chain-meta { color: var(--c-text-3); font-size: 0.54rem; }
+.chain-body p { margin: 4px 0 0; color: var(--c-text); font-size: 0.74rem; line-height: 1.7; overflow-wrap: break-word; }
+.caught-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.caught-action { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 0.64rem; font-weight: 700; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease; text-decoration: none; }
+.caught-action:hover { transform: translateY(-1px); }
+.caught-action.reply { border: 1px solid var(--c-primary); background: linear-gradient(145deg, hsl(215deg 92% 58%), hsl(222deg 92% 44%)); color: #fff; box-shadow: 0 7px 18px color-mix(in srgb, hsl(220deg 90% 50%) 34%, transparent); }
+.caught-action.reply-link { border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border)); background: var(--ld-bg-card); color: var(--c-primary); }
+.caught-action.relay { border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border)); background: color-mix(in srgb, var(--c-primary-soft) 50%, var(--ld-bg-card)); color: var(--c-primary); }
+.relay-box { margin-top: 13px; padding-top: 13px; border-top: 1px dashed color-mix(in srgb, var(--border) 78%, transparent); }
+.relay-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }
 .sea-submit {
   background: linear-gradient(145deg, hsl(215deg 92% 58%), hsl(222deg 92% 44%));
   border-color: transparent;
@@ -1608,28 +1487,6 @@ useHead({ title: "时光留言板" });
 }
 
 /* ===== 动画 ===== */
-@keyframes sea-spin {
-  to { transform: translate(-50%, -50%) rotate(360deg); }
-}
-@keyframes sea-breathe {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
-  50% { transform: translate(-50%, -50%) scale(1.14); opacity: 1; }
-}
-@keyframes sea-sheen-move {
-  0%, 100% { opacity: 0.3; transform: translateX(-4px) rotate(-12deg); }
-  50% { opacity: 0.9; transform: translateX(6px) rotate(-12deg); }
-}
-@keyframes sea-star-blink {
-  50% { opacity: 0.2; }
-}
-@keyframes bottle-float {
-  0%, 100% { transform: translateX(-50%) rotate(6deg) translateY(0); }
-  50% { transform: translateX(-50%) rotate(9deg) translateY(-7px); }
-}
-@keyframes peek-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-}
 @keyframes badge-orbit {
   to { transform: rotate(360deg); }
 }
@@ -1664,10 +1521,6 @@ useHead({ title: "时光留言板" });
     flex-direction: column;
     gap: 6px;
   }
-  .sea {
-    width: 160px;
-    height: 160px;
-  }
   .sea-card {
     padding: 26px 18px 22px;
   }
@@ -1701,11 +1554,6 @@ useHead({ title: "时光留言板" });
     animation: none;
     transition: none;
   }
-  .sea-ring,
-  .sea-sheen,
-  .sea-bottle,
-  .sea-star,
-  .peek-bottle,
   .badge-icon::after {
     animation: none;
   }
