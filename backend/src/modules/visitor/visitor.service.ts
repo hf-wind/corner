@@ -484,8 +484,6 @@ export class VisitorService {
           createdAt: true,
           userId: true,
           visitorIdHash: true,
-        },
-        include: {
           user: {
             select: { id: true, username: true, avatar: true },
           },

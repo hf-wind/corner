@@ -665,12 +665,6 @@ describe('VisitorService', () => {
           select: expect.objectContaining({
             userId: true,
             visitorIdHash: true,
-          }),
-        }),
-      );
-      expect(findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: expect.objectContaining({
             user: expect.objectContaining({ select: expect.objectContaining({ avatar: true }) }),
           }),
         }),

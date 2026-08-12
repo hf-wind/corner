@@ -1,0 +1,1 @@
+-- 关联 VisitorMessage.user -> User（关系虚拟层，user_id 列已由 20260811130500_add_visitor_message_user 创建）
