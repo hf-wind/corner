@@ -35,6 +35,7 @@ import { RssModule } from './modules/rss/rss.module';
 import { MemoryGraphModule } from './modules/memory-graph/memory-graph.module';
 import { JourneyModule } from './modules/journey/journey.module';
 import { VisitorModule } from './modules/visitor/visitor.module';
+import { GeoModule } from './modules/geo/geo.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { VisitorModule } from './modules/visitor/visitor.module';
     JourneyModule,
     RssModule,
     VisitorModule,
+    GeoModule,
   ],
   controllers: [AppController],
   providers: [
