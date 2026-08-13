@@ -1,5 +1,9 @@
 import { createHash } from 'crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { toGcj02 } from '../../common/location/coordinates';
 import { RedisService } from '../../common/redis/redis.service';
 import { AlbumService } from '../album/album.service';
@@ -44,12 +48,19 @@ export class MemoryMapService {
     const cached = await this.redis.getJson<any>(cacheKey).catch(() => null);
     if (cached) return cached;
 
-    const viewportPoints = (await this.allPoints())
-      .filter((point) => this.matches(point, normalized, false));
-    const places = [...new Map(viewportPoints
-      .filter((point) => point.placeSlug)
-      .map((point) => [point.placeSlug!, { slug: point.placeSlug!, name: point.placeName }])).values()]
-      .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+    const viewportPoints = (await this.allPoints()).filter((point) =>
+      this.matches(point, normalized, false),
+    );
+    const places = [
+      ...new Map(
+        viewportPoints
+          .filter((point) => point.placeSlug)
+          .map((point) => [
+            point.placeSlug!,
+            { slug: point.placeSlug!, name: point.placeName },
+          ]),
+      ).values(),
+    ].sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
     const points = normalized.place
       ? viewportPoints.filter((point) => point.placeSlug === normalized.place)
       : viewportPoints;
@@ -72,7 +83,9 @@ export class MemoryMapService {
   }
 
   async findPlace(slug: string) {
-    const points = (await this.allPoints()).filter((point) => point.placeSlug === slug);
+    const points = (await this.allPoints()).filter(
+      (point) => point.placeSlug === slug,
+    );
     if (!points.length) throw new NotFoundException('地点不存在或暂无公开记忆');
     const first = points[0];
     return {
@@ -87,24 +100,37 @@ export class MemoryMapService {
         precision: first.precision,
       },
       articles: [],
-      moments: points.filter((item) => item.type === 'moment').map((item) => this.toMemory(item)),
-      photos: points.filter((item) => item.type === 'photo').map((item) => this.toMemory(item)),
-      albums: points.filter((item) => item.type === 'album').map((item) => this.toMemory(item)),
+      moments: points
+        .filter((item) => item.type === 'moment')
+        .map((item) => this.toMemory(item)),
+      photos: points
+        .filter((item) => item.type === 'photo')
+        .map((item) => this.toMemory(item)),
+      albums: points
+        .filter((item) => item.type === 'album')
+        .map((item) => this.toMemory(item)),
     };
   }
 
   private async allPoints(): Promise<MapPoint[]> {
     const version = await this.redis.cacheVersion().catch(() => '1');
     const cacheKey = `corner:memory-map:v2:${version}:public-points`;
-    const cached = await this.redis.getJson<MapPoint[]>(cacheKey).catch(() => null);
+    const cached = await this.redis
+      .getJson<MapPoint[]>(cacheKey)
+      .catch(() => null);
     if (cached) return cached;
-    const memories = (await Promise.all([
-      this.moments.findPublicMapMemories(),
-      this.albums.findPublicMapMemories(),
-    ])).flat();
+    const memories = (
+      await Promise.all([
+        this.moments.findPublicMapMemories(),
+        this.albums.findPublicMapMemories(),
+      ])
+    ).flat();
     const points = memories.map((memory) => {
       const location = memory.publicLocation;
-      const mapLocation = toGcj02(Number(location.longitude), Number(location.latitude));
+      const mapLocation = toGcj02(
+        Number(location.longitude),
+        Number(location.latitude),
+      );
       return {
         ...memory,
         longitude: mapLocation.longitude,
@@ -137,27 +163,50 @@ export class MemoryMapService {
   }
 
   private validateBounds(query: MemoryMapQueryDto) {
-    if (query.south >= query.north) throw new BadRequestException('地图南北边界无效');
-    if (query.west === query.east) throw new BadRequestException('地图东西边界无效');
+    if (query.south >= query.north)
+      throw new BadRequestException('地图南北边界无效');
+    if (query.west === query.east)
+      throw new BadRequestException('地图东西边界无效');
   }
 
-  private matches(point: MapPoint, query: ReturnType<MemoryMapService['normalizeQuery']>, includePlace = true) {
-    const longitudeMatches = query.west < query.east
-      ? point.longitude >= query.west && point.longitude <= query.east
-      : point.longitude >= query.west || point.longitude <= query.east;
-    if (!longitudeMatches || point.latitude < query.south || point.latitude > query.north) return false;
+  private matches(
+    point: MapPoint,
+    query: ReturnType<MemoryMapService['normalizeQuery']>,
+    includePlace = true,
+  ) {
+    const longitudeMatches =
+      query.west < query.east
+        ? point.longitude >= query.west && point.longitude <= query.east
+        : point.longitude >= query.west || point.longitude <= query.east;
+    if (
+      !longitudeMatches ||
+      point.latitude < query.south ||
+      point.latitude > query.north
+    )
+      return false;
     if (!query.types.includes(point.type)) return false;
-    if (includePlace && query.place && point.placeSlug !== query.place) return false;
+    if (includePlace && query.place && point.placeSlug !== query.place)
+      return false;
     if (query.year) {
       const date = point.occurredAt ? new Date(point.occurredAt) : null;
-      if (!date || Number.isNaN(date.getTime()) || date.getUTCFullYear() !== query.year) return false;
+      if (
+        !date ||
+        Number.isNaN(date.getTime()) ||
+        date.getUTCFullYear() !== query.year
+      )
+        return false;
     }
     return true;
   }
 
-  private cluster(points: MapPoint[], zoom: number): Array<MapCluster | MapItem> {
+  private cluster(
+    points: MapPoint[],
+    zoom: number,
+  ): Array<MapCluster | MapItem> {
     if (zoom >= 15) return points.map((point) => this.toMemory(point));
-    const cellDegrees = 360 / (256 * 2 ** Math.max(1, Math.floor(zoom))) * (zoom < 7 ? 110 : zoom < 11 ? 72 : 44);
+    const cellDegrees =
+      (360 / (256 * 2 ** Math.max(1, Math.floor(zoom)))) *
+      (zoom < 7 ? 110 : zoom < 11 ? 72 : 44);
     const cells = new Map<string, MapPoint[]>();
     for (const point of points) {
       const key = `${Math.floor(point.longitude / cellDegrees)}:${Math.floor(point.latitude / cellDegrees)}`;
@@ -172,8 +221,10 @@ export class MemoryMapService {
       return {
         id: `cluster:${zoom}:${key}`,
         kind: 'cluster' as const,
-        longitude: longitudes.reduce((sum, value) => sum + value, 0) / cell.length,
-        latitude: latitudes.reduce((sum, value) => sum + value, 0) / cell.length,
+        longitude:
+          longitudes.reduce((sum, value) => sum + value, 0) / cell.length,
+        latitude:
+          latitudes.reduce((sum, value) => sum + value, 0) / cell.length,
         count: cell.length,
         types: {
           moment: cell.filter((item) => item.type === 'moment').length,

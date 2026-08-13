@@ -40,10 +40,11 @@ export function useVisitor() {
     return generated;
   };
 
-  const identify = async (name: string, mail?: string) => {
+  const identify = async (name: string, mail?: string, turnstileToken?: string) => {
     const result = await api.post<any>("/visitor/identify", {
       nickname: name,
       email: mail || undefined,
+      turnstileToken,
     });
     setNickname(result?.nickname ?? name);
     if (result?.email) setEmail(result.email);

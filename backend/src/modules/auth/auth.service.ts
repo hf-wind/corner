@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -22,7 +27,10 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
-  async sendVerificationCode(email: string, type: 'register' | 'login' | 'change_password') {
+  async sendVerificationCode(
+    email: string,
+    type: 'register' | 'login' | 'change_password',
+  ) {
     if (type === 'register') {
       const existing = await this.prisma.user.findUnique({ where: { email } });
       if (existing) throw new ConflictException('该邮箱已被注册');
@@ -44,10 +52,16 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const validCode = await this.emailService.verifyCode(dto.email, dto.code, 'register');
+    const validCode = await this.emailService.verifyCode(
+      dto.email,
+      dto.code,
+      'register',
+    );
     if (!validCode) throw new BadRequestException('验证码无效或已过期');
 
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) throw new ConflictException('Email already exists');
 
     const username = await this.generateUsername(dto.email);
@@ -67,12 +81,18 @@ export class AuthService {
   }
 
   async login(dto: LoginDto & { code?: string }) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (!user) throw new UnauthorizedException('Invalid credentials');
     if (!user.isActive) throw new UnauthorizedException('账号已被禁用');
 
     if (dto.code) {
-      const valid = await this.emailService.verifyCode(dto.email, dto.code, 'login');
+      const valid = await this.emailService.verifyCode(
+        dto.email,
+        dto.code,
+        'login',
+      );
       if (!valid) throw new BadRequestException('验证码无效或已过期');
     } else if (dto.password) {
       const valid = await bcrypt.compare(dto.password, user.passwordHash);
@@ -100,8 +120,17 @@ export class AuthService {
     return user;
   }
 
-  async changePassword(userId: string, email: string, newPassword: string, code: string) {
-    const valid = await this.emailService.verifyCode(email, code, 'change_password');
+  async changePassword(
+    userId: string,
+    email: string,
+    newPassword: string,
+    code: string,
+  ) {
+    const valid = await this.emailService.verifyCode(
+      email,
+      code,
+      'change_password',
+    );
     if (!valid) throw new BadRequestException('验证码无效或已过期');
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
@@ -117,13 +146,17 @@ export class AuthService {
     let base = email.split('@')[0].replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
     if (!base) base = 'user';
 
-    const exists = await this.prisma.user.findUnique({ where: { username: base } });
+    const exists = await this.prisma.user.findUnique({
+      where: { username: base },
+    });
     if (!exists) return base;
 
     for (let i = 0; i < 10; i++) {
       const suffix = Math.random().toString(36).substring(2, 5);
       const candidate = `${base}_${suffix}`;
-      const taken = await this.prisma.user.findUnique({ where: { username: candidate } });
+      const taken = await this.prisma.user.findUnique({
+        where: { username: candidate },
+      });
       if (!taken) return candidate;
     }
 

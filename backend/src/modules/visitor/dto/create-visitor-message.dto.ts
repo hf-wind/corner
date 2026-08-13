@@ -46,6 +46,11 @@ export class SetVisitorNicknameDto {
   @IsEmail()
   @MaxLength(255)
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  turnstileToken?: string;
 }
 
 export class TrackVisitDto {

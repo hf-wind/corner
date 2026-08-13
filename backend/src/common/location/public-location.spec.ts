@@ -15,11 +15,13 @@ const place: PlaceSnapshot = {
 
 describe('buildPublicLocation', () => {
   it('returns no location clues for a private place', () => {
-    expect(buildPublicLocation({
-      place,
-      visibility: 'private',
-      precision: 'place',
-    })).toBeNull();
+    expect(
+      buildPublicLocation({
+        place,
+        visibility: 'private',
+        precision: 'place',
+      }),
+    ).toBeNull();
   });
 
   it('returns stable reduced coordinates for a blurred place', () => {
@@ -28,27 +30,35 @@ describe('buildPublicLocation', () => {
       visibility: 'blurred',
       precision: 'place',
     });
-    expect(result).toMatchObject({ name: place.name, slug: place.slug, precision: 'place' });
+    expect(result).toMatchObject({
+      name: place.name,
+      slug: place.slug,
+      precision: 'place',
+    });
     expect(result?.latitude).not.toBe(place.latitude);
     expect(result?.longitude).not.toBe(place.longitude);
     expect(result).not.toHaveProperty('address');
   });
 
   it('does not expose exact coordinates without confirmation', () => {
-    expect(buildPublicLocation({
-      place,
-      visibility: 'public',
-      precision: 'exact',
-    })).toBeNull();
+    expect(
+      buildPublicLocation({
+        place,
+        visibility: 'public',
+        precision: 'exact',
+      }),
+    ).toBeNull();
   });
 
   it('returns exact coordinates only after confirmation', () => {
-    expect(buildPublicLocation({
-      place,
-      visibility: 'public',
-      precision: 'exact',
-      exactConfirmedAt: '2026-07-30T12:00:00.000Z',
-    })).toMatchObject({
+    expect(
+      buildPublicLocation({
+        place,
+        visibility: 'public',
+        precision: 'exact',
+        exactConfirmedAt: '2026-07-30T12:00:00.000Z',
+      }),
+    ).toMatchObject({
       name: place.name,
       slug: place.slug,
       latitude: place.latitude,

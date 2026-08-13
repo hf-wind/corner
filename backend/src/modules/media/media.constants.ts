@@ -1,10 +1,10 @@
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException } from '@nestjs/common';
 
 export type MediaFolderDef = {
-  key: string
-  label: string
-  preset: boolean
-}
+  key: string;
+  label: string;
+  preset: boolean;
+};
 
 /** System preset folders used by different upload scenarios */
 export const PRESET_FOLDERS: MediaFolderDef[] = [
@@ -18,25 +18,35 @@ export const PRESET_FOLDERS: MediaFolderDef[] = [
   { key: 'about', label: '关于', preset: true },
   { key: 'audio', label: '音频', preset: true },
   { key: 'general', label: '通用', preset: true },
-]
+];
 
-export const PRESET_FOLDER_KEYS = PRESET_FOLDERS.map((f) => f.key)
+export const PRESET_FOLDER_KEYS = PRESET_FOLDERS.map((f) => f.key);
 
 export function sanitizeFolder(input?: string | null): string {
-  const raw = (input || 'general').trim().toLowerCase().replace(/\\/g, '/')
+  const raw = (input || 'general').trim().toLowerCase().replace(/\\/g, '/');
   if (raw.startsWith('/') || raw.endsWith('/') || raw.includes('..')) {
-    throw new BadRequestException('媒体文件夹路径无效')
+    throw new BadRequestException('媒体文件夹路径无效');
   }
-  const segments = raw.split('/')
-  if (segments.some(segment => !segment || !/^[a-z0-9_\-\u4e00-\u9fa5]+$/i.test(segment))) {
-    throw new BadRequestException('媒体文件夹名称只能包含中英文、数字、下划线和连字符')
+  const segments = raw.split('/');
+  if (
+    segments.some(
+      (segment) => !segment || !/^[a-z0-9_\-\u4e00-\u9fa5]+$/i.test(segment),
+    )
+  ) {
+    throw new BadRequestException(
+      '媒体文件夹名称只能包含中英文、数字、下划线和连字符',
+    );
   }
   if (segments.length > 1) {
-    const [namespace, id, ...rest] = segments
-    if (namespace !== 'article' || rest.length || !/^[0-9a-f-]{36}$/.test(id || '')) {
-      throw new BadRequestException('仅文章媒体支持二级文件夹')
+    const [namespace, id, ...rest] = segments;
+    if (
+      namespace !== 'article' ||
+      rest.length ||
+      !/^[0-9a-f-]{36}$/.test(id || '')
+    ) {
+      throw new BadRequestException('仅文章媒体支持二级文件夹');
     }
   }
-  const cleaned = segments.join('/').slice(0, 100)
-  return cleaned || 'general'
+  const cleaned = segments.join('/').slice(0, 100);
+  return cleaned || 'general';
 }

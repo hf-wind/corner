@@ -15,7 +15,9 @@ export class RedisService implements OnModuleDestroy {
       enableReadyCheck: true,
       retryStrategy: (attempt) => Math.min(attempt * 200, 3000),
     });
-    this.client.on('error', (error) => this.logger.error(`Redis connection error: ${error.message}`));
+    this.client.on('error', (error) =>
+      this.logger.error(`Redis connection error: ${error.message}`),
+    );
   }
 
   async getJson<T>(key: string): Promise<T | null> {
@@ -29,9 +31,20 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
-  async setJson(key: string, value: unknown, ttlSeconds: number): Promise<void> {
-    const jitter = Math.floor(Math.random() * Math.max(2, Math.floor(ttlSeconds * 0.1)));
-    await this.client.set(key, JSON.stringify(value), 'EX', ttlSeconds + jitter);
+  async setJson(
+    key: string,
+    value: unknown,
+    ttlSeconds: number,
+  ): Promise<void> {
+    const jitter = Math.floor(
+      Math.random() * Math.max(2, Math.floor(ttlSeconds * 0.1)),
+    );
+    await this.client.set(
+      key,
+      JSON.stringify(value),
+      'EX',
+      ttlSeconds + jitter,
+    );
   }
 
   async cacheVersion(): Promise<string> {

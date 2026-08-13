@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Logger, Sse, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  Logger,
+  Sse,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtService } from '@nestjs/jwt';
 import { Observable } from 'rxjs';
@@ -32,16 +44,27 @@ export class NotificationController {
       const subscription = subject.subscribe({
         next: (event) => observer.next({ data: event }),
         error: (err) => {
-          this.logger.warn(`SSE event stream failed for user ${userId}: ${String(err)}`);
+          this.logger.warn(
+            `SSE event stream failed for user ${userId}: ${String(err)}`,
+          );
           observer.complete();
         },
       });
 
-      void this.notificationService.getUnreadCount(userId)
-        .then(({ count }) => observer.next({ data: { type: 'unread-count', data: { count } } }))
-        .catch((error) => this.logger.warn(`SSE unread count failed for user ${userId}: ${String(error)}`));
+      void this.notificationService
+        .getUnreadCount(userId)
+        .then(({ count }) =>
+          observer.next({ data: { type: 'unread-count', data: { count } } }),
+        )
+        .catch((error) =>
+          this.logger.warn(
+            `SSE unread count failed for user ${userId}: ${String(error)}`,
+          ),
+        );
       const heartbeat = setInterval(() => {
-        observer.next({ data: { type: 'heartbeat', data: { at: new Date().toISOString() } } });
+        observer.next({
+          data: { type: 'heartbeat', data: { at: new Date().toISOString() } },
+        });
       }, 25_000);
 
       return () => {
@@ -54,7 +77,11 @@ export class NotificationController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get()
-  findAll(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string) {
+  findAll(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     return this.notificationService.findAll(
       req.user.id,
       page ? parseInt(page) : 1,

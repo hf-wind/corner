@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
@@ -10,7 +14,14 @@ export class UserService {
   async findAll() {
     return this.prisma.user.findMany({
       where: { isActive: true },
-      select: { id: true, username: true, avatar: true, bio: true, role: true, createdAt: true },
+      select: {
+        id: true,
+        username: true,
+        avatar: true,
+        bio: true,
+        role: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -65,14 +76,18 @@ export class UserService {
     const target = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!target) throw new NotFoundException('User not found');
 
-    const removesAdminAccess = target.role === 'admin'
-      && (dto.role === 'user' || dto.isActive === false);
+    const removesAdminAccess =
+      target.role === 'admin' &&
+      (dto.role === 'user' || dto.isActive === false);
     if (actorId === userId && removesAdminAccess) {
       throw new BadRequestException('不能禁用或降级当前登录的管理员');
     }
     if (removesAdminAccess) {
-      const activeAdmins = await this.prisma.user.count({ where: { role: 'admin', isActive: true } });
-      if (activeAdmins <= 1) throw new BadRequestException('至少需要保留一个启用的管理员');
+      const activeAdmins = await this.prisma.user.count({
+        where: { role: 'admin', isActive: true },
+      });
+      if (activeAdmins <= 1)
+        throw new BadRequestException('至少需要保留一个启用的管理员');
     }
 
     return this.prisma.user.update({
@@ -112,13 +127,18 @@ export class UserService {
     return user;
   }
 
-  async update(id: string, data: { avatar?: string; bio?: string; username?: string }) {
+  async update(
+    id: string,
+    data: { avatar?: string; bio?: string; username?: string },
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     const safeData = {
       ...(data.avatar !== undefined ? { avatar: data.avatar } : {}),
       ...(data.bio !== undefined ? { bio: data.bio } : {}),
-      ...(data.username !== undefined ? { username: data.username.trim() } : {}),
+      ...(data.username !== undefined
+        ? { username: data.username.trim() }
+        : {}),
     };
     return this.prisma.user.update({
       where: { id },

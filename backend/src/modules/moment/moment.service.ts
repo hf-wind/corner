@@ -315,7 +315,7 @@ export class MomentService {
       data: {
         status: 'published',
         needsPublish: false,
-        publishedSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+        publishedSnapshot: snapshot,
         publishedAt: existing.publishedAt ?? new Date(),
       },
       include: this.buildInclude(),

@@ -4,11 +4,26 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 const postSelect = {
-  id: true, title: true, slug: true, excerpt: true,
-  coverImage: true, status: true, featured: true,
-  publishedAt: true, createdAt: true, viewCount: true,
-  category: { select: { id: true, name: true, slug: true, icon: true, color: true } },
-  tags: { include: { tag: { select: { id: true, name: true, slug: true, icon: true, color: true } } } },
+  id: true,
+  title: true,
+  slug: true,
+  excerpt: true,
+  coverImage: true,
+  status: true,
+  featured: true,
+  publishedAt: true,
+  createdAt: true,
+  viewCount: true,
+  category: {
+    select: { id: true, name: true, slug: true, icon: true, color: true },
+  },
+  tags: {
+    include: {
+      tag: {
+        select: { id: true, name: true, slug: true, icon: true, color: true },
+      },
+    },
+  },
 };
 
 @Injectable()
@@ -47,8 +62,14 @@ export class CategoryService {
       this.prisma.post.count({ where }),
     ]);
     return {
-      items: items.map((p: any) => ({ ...p, tags: p.tags?.map((pt: any) => pt.tag) ?? [] })),
-      total, page, limit, totalPages: Math.ceil(total / limit),
+      items: items.map((p: any) => ({
+        ...p,
+        tags: p.tags?.map((pt: any) => pt.tag) ?? [],
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 

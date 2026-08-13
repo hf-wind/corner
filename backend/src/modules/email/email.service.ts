@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,18 +54,27 @@ export class EmailService {
   }
 
   async getEmailConfig() {
-    const [enabled, host, port, secure, user, pass, fromName, fromAddress, siteUrl] =
-      await Promise.all([
-        this.settings.get('email_enabled'),
-        this.settings.get('email_smtp_host'),
-        this.settings.get('email_smtp_port'),
-        this.settings.get('email_smtp_secure'),
-        this.settings.get('email_smtp_user'),
-        this.settings.get('email_smtp_pass'),
-        this.settings.get('email_from_name'),
-        this.settings.get('email_from_address'),
-        this.settings.get('site_url'),
-      ]);
+    const [
+      enabled,
+      host,
+      port,
+      secure,
+      user,
+      pass,
+      fromName,
+      fromAddress,
+      siteUrl,
+    ] = await Promise.all([
+      this.settings.get('email_enabled'),
+      this.settings.get('email_smtp_host'),
+      this.settings.get('email_smtp_port'),
+      this.settings.get('email_smtp_secure'),
+      this.settings.get('email_smtp_user'),
+      this.settings.get('email_smtp_pass'),
+      this.settings.get('email_from_name'),
+      this.settings.get('email_from_address'),
+      this.settings.get('site_url'),
+    ]);
 
     return {
       enabled: enabled ?? true,
@@ -69,13 +84,15 @@ export class EmailService {
       user: user ?? process.env.EMAIL_SMTP_USER ?? '1833079849@qq.com',
       pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
       fromName: fromName ?? process.env.EMAIL_FROM_NAME ?? '风隅随笔',
-      fromAddress: fromAddress ?? process.env.EMAIL_FROM_ADDRESS ?? '1833079849@qq.com',
+      fromAddress:
+        fromAddress ?? process.env.EMAIL_FROM_ADDRESS ?? '1833079849@qq.com',
       siteUrl: (siteUrl as string) || 'https://corner.ink',
     };
   }
 
   async generateVerificationCode(): Promise<string> {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
+    const chars =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
     let code = '';
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -105,7 +122,10 @@ export class EmailService {
     });
 
     if (recentCode) {
-      throw new HttpException('验证码已发送，请 60 秒后再试', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        '验证码已发送，请 60 秒后再试',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     const code = await this.generateVerificationCode();
@@ -120,13 +140,14 @@ export class EmailService {
       },
     });
 
-    const typeText = type === 'register'
-      ? '注册'
-      : type === 'login'
-        ? '登录'
-        : type === 'friend_remove'
-          ? '移除友链'
-          : '修改密码';
+    const typeText =
+      type === 'register'
+        ? '注册'
+        : type === 'login'
+          ? '登录'
+          : type === 'friend_remove'
+            ? '移除友链'
+            : '修改密码';
     const html = this.getVerificationCodeTemplate(code, typeText);
 
     const job = await this.verificationQueue.add(
@@ -149,8 +170,12 @@ export class EmailService {
     try {
       await job.finished();
     } catch (error) {
-      await this.prisma.verificationCode.delete({ where: { id: verification.id } }).catch(() => undefined);
-      this.logger.error(`验证码邮件发送失败: ${email}: ${(error as Error).message}`);
+      await this.prisma.verificationCode
+        .delete({ where: { id: verification.id } })
+        .catch(() => undefined);
+      this.logger.error(
+        `验证码邮件发送失败: ${email}: ${(error as Error).message}`,
+      );
       throw new ServiceUnavailableException('验证码邮件发送失败，请稍后重试');
     }
 
@@ -247,7 +272,10 @@ export class EmailService {
     link: string;
   }): Promise<void> {
     const config = await this.getEmailConfig();
-    const html = this.getCommentModerationTemplate({ ...data, siteUrl: config.siteUrl });
+    const html = this.getCommentModerationTemplate({
+      ...data,
+      siteUrl: config.siteUrl,
+    });
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
@@ -341,10 +369,11 @@ export class EmailService {
     const tokenized = String(text || '').replace(
       /(?:◆emoji:([^◆]+)◆|\[\[emoji:([^\]|]+)(?:\|([^\]]*))?\]\])/g,
       (_, oldSource, source, label) => {
-        const index = emojis.push({
-          source: String(oldSource || source || '').trim(),
-          label: String(label || '表情').trim(),
-        }) - 1;
+        const index =
+          emojis.push({
+            source: String(oldSource || source || '').trim(),
+            label: String(label || '表情').trim(),
+          }) - 1;
         return `EMAIL_EMOJI_${index}`;
       },
     );
@@ -353,11 +382,17 @@ export class EmailService {
       .replace(/\n/g, '<br>')
       .replace(/EMAIL_EMOJI_(\d+)/g, (_, rawIndex) => {
         const emoji = emojis[Number(rawIndex)];
-        return emoji ? this.renderEmailEmoji(emoji.source, emoji.label, siteUrl) : '';
+        return emoji
+          ? this.renderEmailEmoji(emoji.source, emoji.label, siteUrl)
+          : '';
       });
   }
 
-  private renderEmailEmoji(source: string, label: string, siteUrl: string): string {
+  private renderEmailEmoji(
+    source: string,
+    label: string,
+    siteUrl: string,
+  ): string {
     const original = this.unwrapEmojiProxy(source);
     const twemoji = this.twemojiCharacter(original);
     if (twemoji) return this.escapeHtml(twemoji);
@@ -366,7 +401,11 @@ export class EmailService {
     let imageUrl = source;
     try {
       const remote = new URL(original);
-      if (['cdn.jsdelivr.net', 'koishi.js.org'].includes(remote.hostname.toLowerCase())) {
+      if (
+        ['cdn.jsdelivr.net', 'koishi.js.org'].includes(
+          remote.hostname.toLowerCase(),
+        )
+      ) {
         imageUrl = `${baseUrl}/api/emoji-packs/asset?url=${encodeURIComponent(remote.toString())}`;
       }
     } catch {
@@ -379,7 +418,10 @@ export class EmailService {
   private unwrapEmojiProxy(source: string): string {
     if (!source.startsWith('/api/emoji-packs/asset')) return source;
     try {
-      return new URL(source, 'https://corner.local').searchParams.get('url') || source;
+      return (
+        new URL(source, 'https://corner.local').searchParams.get('url') ||
+        source
+      );
     } catch {
       return source;
     }
@@ -387,23 +429,31 @@ export class EmailService {
 
   private twemojiCharacter(source: string): string {
     if (!/twemoji/i.test(source)) return '';
-    const codepoints = source.match(/\/([0-9a-f]+(?:-[0-9a-f]+)*)\.(?:png|svg)(?:\?|$)/i)?.[1];
+    const codepoints = source.match(
+      /\/([0-9a-f]+(?:-[0-9a-f]+)*)\.(?:png|svg)(?:\?|$)/i,
+    )?.[1];
     if (!codepoints) return '';
     try {
-      return String.fromCodePoint(...codepoints.split('-').map((value) => Number.parseInt(value, 16)));
+      return String.fromCodePoint(
+        ...codepoints.split('-').map((value) => Number.parseInt(value, 16)),
+      );
     } catch {
       return '';
     }
   }
 
   private escapeHtml(value: string): string {
-    return String(value).replace(/[&<>"']/g, (character) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    })[character] || character);
+    return String(value).replace(
+      /[&<>"']/g,
+      (character) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[character] || character,
+    );
   }
 
   private getVerificationCodeTemplate(code: string, type: string): string {

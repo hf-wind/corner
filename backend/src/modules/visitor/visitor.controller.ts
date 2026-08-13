@@ -14,6 +14,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { TurnstileService } from '../auth/turnstile.service';
 import { VisitorService, VisitorActor } from './visitor.service';
 import { OptionalReasonDto } from '../../common/dto/request-body.dto';
 import {
@@ -26,7 +27,10 @@ import {
 
 @Controller('visitor')
 export class VisitorController {
-  constructor(private readonly visitorService: VisitorService) {}
+  constructor(
+    private readonly visitorService: VisitorService,
+    private readonly turnstile: TurnstileService,
+  ) {}
 
   @Get('new-id')
   newVisitorId() {
@@ -40,6 +44,7 @@ export class VisitorController {
     @Headers('x-visitor-id') visitorId: string,
     @Body() dto: SetVisitorNicknameDto,
   ) {
+    await this.turnstile.verify(dto.turnstileToken, req.ip);
     const hash = this.visitorService.resolveVisitorId({
       headers: { 'x-visitor-id': visitorId },
       ip: req.ip,

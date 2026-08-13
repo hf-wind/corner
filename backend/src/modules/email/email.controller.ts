@@ -1,7 +1,23 @@
-import { Controller, Post, Get, Put, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { EmailService } from './email.service';
-import { IsBoolean, IsEmail, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
@@ -83,7 +99,11 @@ export class EmailController {
   @Put('config')
   async updateConfig(@Body() dto: UpdateEmailConfigDto) {
     for (const [key, value] of Object.entries(dto)) {
-      if (value === undefined || (key === 'email_smtp_pass' && !String(value).trim())) continue;
+      if (
+        value === undefined ||
+        (key === 'email_smtp_pass' && !String(value).trim())
+      )
+        continue;
       await this.email.updateConfigValue(key, value);
     }
     this.email.resetTransporter();

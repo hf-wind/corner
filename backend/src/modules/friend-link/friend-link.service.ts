@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { AiService } from '../ai/ai.service';
@@ -97,7 +102,10 @@ export class FriendLinkService {
       siteAvatar: this.optionalUrl(dto.siteAvatar, '站点头像'),
       siteDescription: this.stringValue(dto.siteDescription),
       siteRssUrl: this.optionalUrl(dto.siteRssUrl, 'RSS 地址'),
-      contactEmail: this.requiredString(dto.contactEmail, '联系邮箱不能为空').toLowerCase(),
+      contactEmail: this.requiredString(
+        dto.contactEmail,
+        '联系邮箱不能为空',
+      ).toLowerCase(),
       friendPageUrl: this.validUrl(dto.friendPageUrl, '友链页面地址'),
     };
 
@@ -108,10 +116,14 @@ export class FriendLinkService {
       },
     });
     if (existing) {
-      throw new BadRequestException('该站点已有待处理或已通过的友链申请，请勿重复提交');
+      throw new BadRequestException(
+        '该站点已有待处理或已通过的友链申请，请勿重复提交',
+      );
     }
 
-    const application = await this.prisma.friendApplication.create({ data: applicationData });
+    const application = await this.prisma.friendApplication.create({
+      data: applicationData,
+    });
     await this.notifyAdmins(
       '新的友链申请',
       `${application.siteName} 提交了友链申请，等待审核。`,
@@ -127,7 +139,11 @@ export class FriendLinkService {
     };
   }
 
-  async getApplications(query: { page?: number; limit?: number; status?: string }) {
+  async getApplications(query: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
     const where = query.status ? { status: query.status } : {};
@@ -144,7 +160,9 @@ export class FriendLinkService {
   }
 
   async getApplication(id: string) {
-    const application = await this.prisma.friendApplication.findUnique({ where: { id } });
+    const application = await this.prisma.friendApplication.findUnique({
+      where: { id },
+    });
     if (!application) throw new NotFoundException('友链申请不存在');
     return application;
   }
@@ -171,7 +189,9 @@ export class FriendLinkService {
   async rejectApplication(id: string, reason?: string) {
     const application = await this.getApplication(id);
     if (application.status === 'approved') {
-      throw new BadRequestException('已通过的申请不能直接拒绝，请先在友链管理中移除链接');
+      throw new BadRequestException(
+        '已通过的申请不能直接拒绝，请先在友链管理中移除链接',
+      );
     }
 
     const rejectReason = this.stringValue(reason) || '管理员审核未通过';
@@ -194,18 +214,27 @@ export class FriendLinkService {
   }
 
   async sendRemoveCode(email: string) {
-    return this.emailService.sendVerificationCode(email.toLowerCase(), 'friend_remove');
+    return this.emailService.sendVerificationCode(
+      email.toLowerCase(),
+      'friend_remove',
+    );
   }
 
   async verifyAndRemove(email: string, code: string) {
     const normalizedEmail = email.toLowerCase();
-    const verified = await this.emailService.verifyCode(normalizedEmail, code, 'friend_remove');
+    const verified = await this.emailService.verifyCode(
+      normalizedEmail,
+      code,
+      'friend_remove',
+    );
     if (!verified) {
       throw new BadRequestException('验证码无效或已过期');
     }
 
     const friends = await this.loadFriends();
-    const index = friends.findIndex((friend) => friend.contactEmail?.toLowerCase() === normalizedEmail);
+    const index = friends.findIndex(
+      (friend) => friend.contactEmail?.toLowerCase() === normalizedEmail,
+    );
     if (index === -1) {
       throw new NotFoundException('未找到该邮箱对应的友链');
     }
@@ -260,10 +289,16 @@ export class FriendLinkService {
       if (review.approved) {
         await this.addToFriends(updated);
         await this.sendApplicationResultEmail(updated, true);
-        await this.notifyAdmins('友链申请已自动通过', `${updated.siteName} 已通过 AI 审核并加入友链列表。`);
+        await this.notifyAdmins(
+          '友链申请已自动通过',
+          `${updated.siteName} 已通过 AI 审核并加入友链列表。`,
+        );
       } else {
         await this.sendApplicationResultEmail(updated, false, review.reason);
-        await this.notifyAdmins('友链申请未通过', `${updated.siteName} 未通过 AI 审核：${review.reason}`);
+        await this.notifyAdmins(
+          '友链申请未通过',
+          `${updated.siteName} 未通过 AI 审核：${review.reason}`,
+        );
       }
     } catch (error) {
       this.logger.error(`AI 友链审核失败: ${error}`);
@@ -288,7 +323,9 @@ export class FriendLinkService {
     friendPageUrl?: string | null;
   }) {
     const friends = await this.loadFriends();
-    const found = friends.findIndex((friend) => friend.url === application.siteUrl);
+    const found = friends.findIndex(
+      (friend) => friend.url === application.siteUrl,
+    );
     const link: FriendLink = {
       name: application.siteName,
       url: application.siteUrl,
@@ -327,7 +364,9 @@ export class FriendLinkService {
       name,
       url,
       avatar: this.stringValue(input.avatar || input.siteAvatar),
-      description: this.stringValue(input.description || input.siteDescription || input.desc),
+      description: this.stringValue(
+        input.description || input.siteDescription || input.desc,
+      ),
       rssUrl: this.stringValue(input.rssUrl || input.siteRssUrl),
       webmasterName: this.stringValue(input.webmasterName),
       contactEmail: this.stringValue(input.contactEmail),
@@ -406,18 +445,26 @@ export class FriendLinkService {
     const body = approved
       ? `我们已将 <strong>${this.escapeHtml(application.siteName)}</strong> 添加到友链列表。`
       : `很抱歉，本次申请未能通过。${reason ? `<br><br>原因：${this.escapeHtml(reason)}` : ''}`;
-    return this.emailShell(site.name, title, `
+    return this.emailShell(
+      site.name,
+      title,
+      `
       <p>您好：</p>
       <p>${body}</p>
       <p>站点：<a href="${this.escapeHtml(application.siteUrl)}">${this.escapeHtml(application.siteUrl)}</a></p>
-    `);
+    `,
+    );
   }
 
   private removeEmailTemplate(site: SiteInfo, link: FriendLink) {
-    return this.emailShell(site.name, '友链已移除', `
+    return this.emailShell(
+      site.name,
+      '友链已移除',
+      `
       <p>您好：</p>
       <p>友链 <strong>${this.escapeHtml(link.name)}</strong> 已按邮箱验证请求从列表中移除。</p>
-    `);
+    `,
+    );
   }
 
   private emailShell(siteName: string, title: string, content: string) {
@@ -448,7 +495,8 @@ export class FriendLinkService {
           signal: AbortSignal.timeout(8000),
           headers: {
             Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.2',
-            'User-Agent': 'FengyuFriendLinkInspector/1.0 (+public-site-metadata)',
+            'User-Agent':
+              'FengyuFriendLinkInspector/1.0 (+public-site-metadata)',
           },
         });
       } catch (error) {
@@ -463,11 +511,16 @@ export class FriendLinkService {
         continue;
       }
       if (!response.ok) {
-        throw new BadRequestException(`站点访问失败（HTTP ${response.status}）`);
+        throw new BadRequestException(
+          `站点访问失败（HTTP ${response.status}）`,
+        );
       }
 
       const contentType = response.headers.get('content-type') || '';
-      if (contentType && !/(?:text\/html|application\/xhtml\+xml)/i.test(contentType)) {
+      if (
+        contentType &&
+        !/(?:text\/html|application\/xhtml\+xml)/i.test(contentType)
+      ) {
         throw new BadRequestException('该地址返回的不是网页内容');
       }
       if (!response.body) throw new BadRequestException('站点没有返回网页内容');
@@ -489,13 +542,20 @@ export class FriendLinkService {
       }
 
       const bytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
-      const headerCharset = contentType.match(/charset\s*=\s*["']?([^;\s"']+)/i)?.[1];
+      const headerCharset = contentType.match(
+        /charset\s*=\s*["']?([^;\s"']+)/i,
+      )?.[1];
       const headerText = bytes.subarray(0, 8192).toString('latin1');
-      const metaCharset = headerText.match(/<meta[^>]+charset\s*=\s*["']?([^\s"'/>]+)/i)?.[1]
-        || headerText.match(/<meta[^>]+content=["'][^"']*charset=([^\s;"']+)/i)?.[1];
+      const metaCharset =
+        headerText.match(/<meta[^>]+charset\s*=\s*["']?([^\s"'/>]+)/i)?.[1] ||
+        headerText.match(
+          /<meta[^>]+content=["'][^"']*charset=([^\s;"']+)/i,
+        )?.[1];
       let html = '';
       try {
-        html = new TextDecoder(headerCharset || metaCharset || 'utf-8').decode(bytes);
+        html = new TextDecoder(headerCharset || metaCharset || 'utf-8').decode(
+          bytes,
+        );
       } catch {
         html = new TextDecoder('utf-8').decode(bytes);
       }
@@ -507,19 +567,28 @@ export class FriendLinkService {
 
   private async assertPublicUrl(value: string) {
     const url = new URL(value);
-    if (url.username || url.password) throw new BadRequestException('站点地址不能包含账号信息');
+    if (url.username || url.password)
+      throw new BadRequestException('站点地址不能包含账号信息');
     if (url.port && !['80', '443'].includes(url.port)) {
       throw new BadRequestException('站点地址仅支持标准 HTTP/HTTPS 端口');
     }
     const hostname = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-    if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+    if (
+      !hostname ||
+      hostname === 'localhost' ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local')
+    ) {
       throw new BadRequestException('仅支持可公开访问的站点地址');
     }
 
     const addresses = isIP(hostname)
       ? [{ address: hostname }]
       : await lookup(hostname, { all: true, verbatim: true }).catch(() => []);
-    if (!addresses.length || addresses.some(({ address }) => this.isPrivateAddress(address))) {
+    if (
+      !addresses.length ||
+      addresses.some(({ address }) => this.isPrivateAddress(address))
+    ) {
       throw new BadRequestException('仅支持可公开访问的站点地址');
     }
   }
@@ -528,26 +597,30 @@ export class FriendLinkService {
     const address = value.toLowerCase().split('%')[0];
     if (isIP(address) === 4) {
       const [a, b] = address.split('.').map(Number);
-      return a === 0
-        || a === 10
-        || a === 127
-        || (a === 100 && b >= 64 && b <= 127)
-        || (a === 169 && b === 254)
-        || (a === 172 && b >= 16 && b <= 31)
-        || (a === 192 && b === 168)
-        || (a === 198 && (b === 18 || b === 19))
-        || a >= 224;
+      return (
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 198 && (b === 18 || b === 19)) ||
+        a >= 224
+      );
     }
     if (isIP(address) === 6) {
       const mapped = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
       if (mapped) return this.isPrivateAddress(mapped);
-      return address === '::'
-        || address === '::1'
-        || address.startsWith('::ffff:')
-        || address.startsWith('fc')
-        || address.startsWith('fd')
-        || /^fe[89ab]/.test(address)
-        || address.startsWith('ff');
+      return (
+        address === '::' ||
+        address === '::1' ||
+        address.startsWith('::ffff:') ||
+        address.startsWith('fc') ||
+        address.startsWith('fd') ||
+        /^fe[89ab]/.test(address) ||
+        address.startsWith('ff')
+      );
     }
     return true;
   }
@@ -559,17 +632,43 @@ export class FriendLinkService {
     const links = linkTags.map((tag) => this.htmlAttributes(tag));
     const metaValue = (...keys: string[]) => {
       const wanted = keys.map((key) => key.toLowerCase());
-      const found = metas.find((meta) => wanted.includes((meta.property || meta.name || '').toLowerCase()));
+      const found = metas.find((meta) =>
+        wanted.includes((meta.property || meta.name || '').toLowerCase()),
+      );
       return this.cleanHtmlText(found?.content || '');
     };
-    const title = this.cleanHtmlText(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '');
-    const icon = links.find((link) => /(?:^|\s)(?:apple-touch-icon|icon|shortcut icon)(?:\s|$)/i.test(link.rel || '') && link.href);
-    const feed = links.find((link) => /alternate/i.test(link.rel || '') && /application\/(?:rss|atom)\+xml/i.test(link.type || '') && link.href);
-    const socialImage = metaValue('og:image', 'twitter:image', 'twitter:image:src');
+    const title = this.cleanHtmlText(
+      html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '',
+    );
+    const icon = links.find(
+      (link) =>
+        /(?:^|\s)(?:apple-touch-icon|icon|shortcut icon)(?:\s|$)/i.test(
+          link.rel || '',
+        ) && link.href,
+    );
+    const feed = links.find(
+      (link) =>
+        /alternate/i.test(link.rel || '') &&
+        /application\/(?:rss|atom)\+xml/i.test(link.type || '') &&
+        link.href,
+    );
+    const socialImage = metaValue(
+      'og:image',
+      'twitter:image',
+      'twitter:image:src',
+    );
 
     return {
-      name: metaValue('og:site_name', 'application-name', 'og:title', 'twitter:title') || title,
-      description: (metaValue('description', 'og:description', 'twitter:description') || '').slice(0, 500),
+      name:
+        metaValue(
+          'og:site_name',
+          'application-name',
+          'og:title',
+          'twitter:title',
+        ) || title,
+      description: (
+        metaValue('description', 'og:description', 'twitter:description') || ''
+      ).slice(0, 500),
       avatar: this.absoluteHttpUrl(icon?.href || socialImage, baseUrl),
       rssUrl: this.absoluteHttpUrl(feed?.href || '', baseUrl),
       friendPageUrl: this.findFriendPage(html, baseUrl),
@@ -578,11 +677,14 @@ export class FriendLinkService {
 
   private htmlAttributes(tag: string) {
     const result: Record<string, string> = {};
-    const pattern = /([^\s=<>`]+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+    const pattern =
+      /([^\s=<>`]+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
     for (const match of tag.matchAll(pattern)) {
       const key = match[1].replace(/^</, '').toLowerCase();
       if (['meta', 'link', 'a'].includes(key)) continue;
-      result[key] = this.decodeHtmlEntities(match[2] ?? match[3] ?? match[4] ?? '');
+      result[key] = this.decodeHtmlEntities(
+        match[2] ?? match[3] ?? match[4] ?? '',
+      );
     }
     return result;
   }
@@ -597,7 +699,12 @@ export class FriendLinkService {
       if (!candidate) continue;
       const url = new URL(candidate);
       if (url.origin !== base.origin) continue;
-      if (/(?:友链|友情链接|朋友|邻居|friend\s*links?|blogroll)/i.test(`${text} ${url.pathname}`)) return candidate;
+      if (
+        /(?:友链|友情链接|朋友|邻居|friend\s*links?|blogroll)/i.test(
+          `${text} ${url.pathname}`,
+        )
+      )
+        return candidate;
     }
     return '';
   }
@@ -613,16 +720,28 @@ export class FriendLinkService {
   }
 
   private cleanHtmlText(value: string) {
-    return this.decodeHtmlEntities(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    return this.decodeHtmlEntities(value.replace(/<[^>]+>/g, ' '))
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private decodeHtmlEntities(value: string) {
-    const named: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ' };
-    return value.replace(/&(?:#(\d+)|#x([\da-f]+)|([a-z]+));/gi, (_, decimal, hexadecimal, name) => {
-      if (decimal) return String.fromCodePoint(Number(decimal));
-      if (hexadecimal) return String.fromCodePoint(parseInt(hexadecimal, 16));
-      return named[String(name).toLowerCase()] ?? `&${name};`;
-    });
+    const named: Record<string, string> = {
+      amp: '&',
+      quot: '"',
+      apos: "'",
+      lt: '<',
+      gt: '>',
+      nbsp: ' ',
+    };
+    return value.replace(
+      /&(?:#(\d+)|#x([\da-f]+)|([a-z]+));/gi,
+      (_, decimal, hexadecimal, name) => {
+        if (decimal) return String.fromCodePoint(Number(decimal));
+        if (hexadecimal) return String.fromCodePoint(parseInt(hexadecimal, 16));
+        return named[String(name).toLowerCase()] ?? `&${name};`;
+      },
+    );
   }
 
   private parseValue(value: unknown): unknown {
@@ -637,7 +756,7 @@ export class FriendLinkService {
   private parseObject(value: unknown): Record<string, unknown> {
     const parsed = this.parseValue(value);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
+      ? (parsed as Record<string, unknown>)
       : {};
   }
 
@@ -659,7 +778,8 @@ export class FriendLinkService {
   private optionalEmail(value: unknown) {
     const text = this.stringValue(value).toLowerCase();
     if (!text) return '';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) throw new BadRequestException('联系邮箱格式不正确');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text))
+      throw new BadRequestException('联系邮箱格式不正确');
     return text;
   }
 
@@ -667,7 +787,8 @@ export class FriendLinkService {
     const text = this.requiredString(value, `${label}不能为空`);
     try {
       const url = new URL(text);
-      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('protocol');
+      if (!['http:', 'https:'].includes(url.protocol))
+        throw new Error('protocol');
       return url.toString();
     } catch {
       throw new BadRequestException(`${label}必须是 http 或 https 地址`);
@@ -675,12 +796,16 @@ export class FriendLinkService {
   }
 
   private escapeHtml(value: string) {
-    return String(value).replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    })[char] || char);
+    return String(value).replace(
+      /[&<>"']/g,
+      (char) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[char] || char,
+    );
   }
 }

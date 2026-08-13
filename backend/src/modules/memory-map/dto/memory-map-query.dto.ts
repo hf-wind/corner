@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class MemoryMapQueryDto {
   @IsNumber() @Min(-180) @Max(180) @Type(() => Number) west!: number;
@@ -9,6 +16,11 @@ export class MemoryMapQueryDto {
   @IsNumber() @Min(1) @Max(20) @Type(() => Number) zoom!: number;
 
   @IsOptional() @IsString() types?: string;
-  @IsOptional() @IsInt() @Min(1900) @Max(3000) @Type(() => Number) year?: number;
+  @IsOptional()
+  @IsInt()
+  @Min(1900)
+  @Max(3000)
+  @Type(() => Number)
+  year?: number;
   @IsOptional() @IsString() place?: string;
 }

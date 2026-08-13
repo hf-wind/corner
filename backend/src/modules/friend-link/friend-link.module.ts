@@ -8,7 +8,13 @@ import { NotificationModule } from '../notification/notification.module';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
-  imports: [PrismaModule, SettingsModule, EmailModule, NotificationModule, AiModule],
+  imports: [
+    PrismaModule,
+    SettingsModule,
+    EmailModule,
+    NotificationModule,
+    AiModule,
+  ],
   controllers: [FriendLinkController],
   providers: [FriendLinkService],
   exports: [FriendLinkService],

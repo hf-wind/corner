@@ -144,7 +144,8 @@ describe('MemoryGraphService', () => {
   }
 
   it('rebuilds idempotently with stable IDs and excludes private place nodes', async () => {
-    const { service, createdNodeIds, createdRelationIds, coordinateSeeds } = setup();
+    const { service, createdNodeIds, createdRelationIds, coordinateSeeds } =
+      setup();
     const first = await service.rebuild();
     const second = await service.rebuild();
 
@@ -164,7 +165,9 @@ describe('MemoryGraphService', () => {
     ]);
     expect(createdNodeIds).not.toContain('place:secret-place');
     expect(coordinateSeeds.length).toBeGreaterThan(0);
-    expect(coordinateSeeds.every((seed) => seed >= 0 && seed <= 2147483647)).toBe(true);
+    expect(
+      coordinateSeeds.every((seed) => seed >= 0 && seed <= 2147483647),
+    ).toBe(true);
     const relationsPerRebuild = createdRelationIds.length / 2;
     expect(createdRelationIds.slice(0, relationsPerRebuild)).toEqual(
       createdRelationIds.slice(relationsPerRebuild),

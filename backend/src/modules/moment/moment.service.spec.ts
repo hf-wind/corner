@@ -46,9 +46,16 @@ describe('MomentService public location boundaries', () => {
     updatedAt: new Date(),
     author: { id: 'author-id', username: 'admin', avatar: null },
     place: {
-      id: '9ff36ed1-cf10-43e8-9c67-17967a676202', name: '工作稿地点', slug: 'working-place',
-      address: '工作稿地址', city: '绍兴市', province: '浙江省', country: '中国',
-      latitude: 30.1, longitude: 120.6, type: 'poi',
+      id: '9ff36ed1-cf10-43e8-9c67-17967a676202',
+      name: '工作稿地点',
+      slug: 'working-place',
+      address: '工作稿地址',
+      city: '绍兴市',
+      province: '浙江省',
+      country: '中国',
+      latitude: 30.1,
+      longitude: 120.6,
+      type: 'poi',
     },
     _count: { comments: 0 },
     likes: [],
@@ -67,9 +74,11 @@ describe('MomentService public location boundaries', () => {
   it('ignores an unauthenticated admin-style status query', async () => {
     const { service, prisma } = createService();
     const result = await service.findAll({ status: 'all' }, undefined, false);
-    expect(prisma.moment.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { status: 'published' },
-    }));
+    expect(prisma.moment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: 'published' },
+      }),
+    );
     expect(result.items).toHaveLength(1);
   });
 
@@ -92,7 +101,11 @@ describe('MomentService public location boundaries', () => {
     const prisma = {
       moment: {
         findUnique: jest.fn().mockResolvedValue(publishedMoment),
-        update: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ ...publishedMoment, ...data })),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }: any) =>
+            Promise.resolve({ ...publishedMoment, ...data }),
+          ),
       },
       place: {
         findUnique: jest.fn().mockResolvedValue(publishedMoment.place),
@@ -101,8 +114,10 @@ describe('MomentService public location boundaries', () => {
     const service = new MomentService(prisma, {} as any);
     const result = await service.update(publishedMoment.slug, {});
     expect(result.needsPublish).toBe(true);
-    expect(prisma.moment.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ needsPublish: true }),
-    }));
+    expect(prisma.moment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ needsPublish: true }),
+      }),
+    );
   });
 });

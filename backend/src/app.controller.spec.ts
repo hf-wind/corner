@@ -16,7 +16,10 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return health status', () => {
-      expect(appController.health()).toEqual({ status: 'ok', timestamp: expect.any(String) });
+      expect(appController.health()).toEqual({
+        status: 'ok',
+        timestamp: expect.any(String),
+      });
     });
   });
 });

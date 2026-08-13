@@ -37,7 +37,9 @@ function rounded(value: number, digits: number) {
   return Number(value.toFixed(digits));
 }
 
-export function buildPublicLocation(input: LocationInput): PublicLocation | null {
+export function buildPublicLocation(
+  input: LocationInput,
+): PublicLocation | null {
   const { place, visibility, precision, exactConfirmedAt } = input;
   if (!place || visibility === 'private') return null;
 

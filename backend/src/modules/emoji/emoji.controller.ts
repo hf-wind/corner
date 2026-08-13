@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Res, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Res,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { EmojiService } from './emoji.service';
@@ -17,25 +30,41 @@ export class EmojiController {
   async asset(@Query('url') url: string, @Res() res: Response) {
     if (!url) throw new BadRequestException('缺少表情资源地址');
     let remote: URL;
-    try { remote = new URL(url); } catch { throw new BadRequestException('表情资源地址无效'); }
+    try {
+      remote = new URL(url);
+    } catch {
+      throw new BadRequestException('表情资源地址无效');
+    }
     const allowedHosts = new Set(['koishi.js.org', 'cdn.jsdelivr.net']);
-    if (remote.protocol !== 'https:' || !allowedHosts.has(remote.hostname.toLowerCase())) {
+    if (
+      remote.protocol !== 'https:' ||
+      !allowedHosts.has(remote.hostname.toLowerCase())
+    ) {
       throw new BadRequestException('不支持的表情资源地址');
     }
     try {
       const response = await fetch(remote, {
-        headers: { 'User-Agent': 'CornerEmojiProxy/1.0', Referer: `https://${remote.hostname}/` },
+        headers: {
+          'User-Agent': 'CornerEmojiProxy/1.0',
+          Referer: `https://${remote.hostname}/`,
+        },
         signal: AbortSignal.timeout(10000),
       });
       if (!response.ok) throw new Error(`upstream ${response.status}`);
       const contentType = response.headers.get('content-type') || 'image/gif';
-      if (!contentType.toLowerCase().startsWith('image/')) throw new Error('upstream content is not an image');
+      if (!contentType.toLowerCase().startsWith('image/'))
+        throw new Error('upstream content is not an image');
       const data = Buffer.from(await response.arrayBuffer());
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+      res.setHeader(
+        'Cache-Control',
+        'public, max-age=86400, stale-while-revalidate=604800',
+      );
       res.send(data);
     } catch (error) {
-      throw new ServiceUnavailableException(`表情资源暂时不可用: ${error instanceof Error ? error.message : 'upstream error'}`);
+      throw new ServiceUnavailableException(
+        `表情资源暂时不可用: ${error instanceof Error ? error.message : 'upstream error'}`,
+      );
     }
   }
 
@@ -57,7 +86,11 @@ export class EmojiController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.emoji.getPackItems(id, page ? parseInt(page) : 1, limit ? parseInt(limit) : 48);
+    return this.emoji.getPackItems(
+      id,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 48,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

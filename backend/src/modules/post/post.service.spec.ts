@@ -2,11 +2,26 @@ import { PostService } from './post.service';
 
 describe('PostService view counting', () => {
   const post = {
-    id: 'post-id', title: 'Post', slug: 'post', content: '', excerpt: null,
-    coverImage: null, authorId: 'author-id', categoryId: null, status: 'published',
-    viewCount: 7, likeCount: 0, featured: false, needsPublish: false,
-    publishedSnapshot: null, publishedAt: new Date(), createdAt: new Date(), updatedAt: new Date(),
-    author: { id: 'author-id', username: 'admin', avatar: null }, category: null, tags: [],
+    id: 'post-id',
+    title: 'Post',
+    slug: 'post',
+    content: '',
+    excerpt: null,
+    coverImage: null,
+    authorId: 'author-id',
+    categoryId: null,
+    status: 'published',
+    viewCount: 7,
+    likeCount: 0,
+    featured: false,
+    needsPublish: false,
+    publishedSnapshot: null,
+    publishedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    author: { id: 'author-id', username: 'admin', avatar: null },
+    category: null,
+    tags: [],
     _count: { comments: 0 },
   };
 
@@ -18,30 +33,46 @@ describe('PostService view counting', () => {
       },
       visitStat: { create: visitCreate },
     } as any;
-    prisma.$transaction = jest.fn((callback: (client: any) => unknown) => callback(prisma));
+    prisma.$transaction = jest.fn((callback: (client: any) => unknown) =>
+      callback(prisma),
+    );
     return { service: new PostService(prisma), prisma };
   }
 
   it('increments only after a new daily visitor record is created', async () => {
-    const { service, prisma } = createService(jest.fn().mockResolvedValue({ id: 'visit-id' }));
-    const result = await service.findBySlug('post', { ip: '203.0.113.2', userAgent: 'Mozilla/5.0' });
+    const { service, prisma } = createService(
+      jest.fn().mockResolvedValue({ id: 'visit-id' }),
+    );
+    const result = await service.findBySlug('post', {
+      ip: '203.0.113.2',
+      userAgent: 'Mozilla/5.0',
+    });
     expect(result.viewCount).toBe(8);
     expect(prisma.post.update).toHaveBeenCalledWith({
-      where: { id: post.id }, data: { viewCount: { increment: 1 } },
+      where: { id: post.id },
+      data: { viewCount: { increment: 1 } },
     });
   });
 
   it('does not increment a duplicate daily visit', async () => {
     const duplicate = Object.assign(new Error('duplicate'), { code: 'P2002' });
-    const { service, prisma } = createService(jest.fn().mockRejectedValue(duplicate));
-    const result = await service.findBySlug('post', { ip: '203.0.113.2', userAgent: 'Mozilla/5.0' });
+    const { service, prisma } = createService(
+      jest.fn().mockRejectedValue(duplicate),
+    );
+    const result = await service.findBySlug('post', {
+      ip: '203.0.113.2',
+      userAgent: 'Mozilla/5.0',
+    });
     expect(result.viewCount).toBe(7);
     expect(prisma.post.update).not.toHaveBeenCalled();
   });
 
   it('does not count crawlers', async () => {
     const { service, prisma } = createService(jest.fn());
-    const result = await service.findBySlug('post', { ip: '203.0.113.2', userAgent: 'Googlebot/2.1' });
+    const result = await service.findBySlug('post', {
+      ip: '203.0.113.2',
+      userAgent: 'Googlebot/2.1',
+    });
     expect(result.viewCount).toBe(7);
     expect(prisma.visitStat.create).not.toHaveBeenCalled();
   });
@@ -59,9 +90,13 @@ describe('PostService article cleanup', () => {
     };
     const prisma = {
       post: { findUnique: jest.fn().mockResolvedValue({ id: 'post-id' }) },
-      $transaction: jest.fn((callback: (client: any) => unknown) => callback(tx)),
+      $transaction: jest.fn((callback: (client: any) => unknown) =>
+        callback(tx),
+      ),
     } as any;
-    const media = { removeFolder: jest.fn().mockResolvedValue(undefined) } as any;
+    const media = {
+      removeFolder: jest.fn().mockResolvedValue(undefined),
+    } as any;
     const memoryGraph = { scheduleRebuild: jest.fn() } as any;
     const service = new PostService(prisma, media, memoryGraph);
 
@@ -70,10 +105,18 @@ describe('PostService article cleanup', () => {
     expect(tx.commentLike.deleteMany).toHaveBeenCalledWith({
       where: { comment: { postId: 'post-id' } },
     });
-    expect(tx.comment.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
-    expect(tx.postTag.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
-    expect(tx.visitStat.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
-    expect(tx.emailLog.deleteMany).toHaveBeenCalledWith({ where: { postId: 'post-id' } });
+    expect(tx.comment.deleteMany).toHaveBeenCalledWith({
+      where: { postId: 'post-id' },
+    });
+    expect(tx.postTag.deleteMany).toHaveBeenCalledWith({
+      where: { postId: 'post-id' },
+    });
+    expect(tx.visitStat.deleteMany).toHaveBeenCalledWith({
+      where: { postId: 'post-id' },
+    });
+    expect(tx.emailLog.deleteMany).toHaveBeenCalledWith({
+      where: { postId: 'post-id' },
+    });
     expect(tx.post.delete).toHaveBeenCalledWith({ where: { id: 'post-id' } });
     expect(media.removeFolder).toHaveBeenCalledWith('article/post-id');
     expect(memoryGraph.scheduleRebuild).toHaveBeenCalledTimes(1);
@@ -85,12 +128,14 @@ describe('PostService article cleanup', () => {
     } as any;
     const service = new PostService(prisma);
 
-    await service.findAll({} as any);
+    await service.findAll({});
 
-    expect(prisma.post.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      select: expect.objectContaining({
-        _count: { select: { comments: { where: { status: 'approved' } } } },
+    expect(prisma.post.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          _count: { select: { comments: { where: { status: 'approved' } } } },
+        }),
       }),
-    }));
+    );
   });
 });

@@ -45,7 +45,7 @@ export class MusicService {
 
   async getConfig(): Promise<MusicConfig & { apiConfigured: boolean }> {
     const all = await this.settings.findAll();
-    const cfg = { ...MUSIC_DEFAULTS } as MusicConfig;
+    const cfg = { ...MUSIC_DEFAULTS };
 
     for (const key of MUSIC_SETTING_KEYS) {
       if (all[key] === undefined || all[key] === null) continue;
@@ -219,15 +219,23 @@ export class MusicService {
       create: {
         userId,
         trackKey,
-        name: String(dto.name || '').trim().slice(0, 255),
-        artist: String(dto.artist || '未知音乐人').trim().slice(0, 255),
+        name: String(dto.name || '')
+          .trim()
+          .slice(0, 255),
+        artist: String(dto.artist || '未知音乐人')
+          .trim()
+          .slice(0, 255),
         sourceUrl,
         picUrl: picUrl || null,
         lrc: dto.lrc ? String(dto.lrc).slice(0, 200000) : null,
       },
       update: {
-        name: String(dto.name || '').trim().slice(0, 255),
-        artist: String(dto.artist || '未知音乐人').trim().slice(0, 255),
+        name: String(dto.name || '')
+          .trim()
+          .slice(0, 255),
+        artist: String(dto.artist || '未知音乐人')
+          .trim()
+          .slice(0, 255),
         picUrl: picUrl || null,
         lrc: dto.lrc ? String(dto.lrc).slice(0, 200000) : null,
       },
@@ -376,8 +384,12 @@ export class MusicService {
       if (required) throw new BadRequestException('歌曲地址无效');
       return '';
     }
-    if (!parsed.pathname.endsWith('/api/music/proxy') && !parsed.pathname.endsWith('/music/proxy')) {
-      if (required) throw new BadRequestException('歌曲地址不是受信任的媒体地址');
+    if (
+      !parsed.pathname.endsWith('/api/music/proxy') &&
+      !parsed.pathname.endsWith('/music/proxy')
+    ) {
+      if (required)
+        throw new BadRequestException('歌曲地址不是受信任的媒体地址');
       return '';
     }
     const url = parsed.searchParams.get('url') || '';
@@ -588,9 +600,7 @@ export class MusicService {
           }))
           .filter((v) => v.id)
           .sort((a, b) => a.sort - b.sort || a.originalIndex - b.originalIndex)
-          .map(
-            ({ originalIndex: _originalIndex, ...playlist }) => playlist,
-          ) as MusicPlaylistSource[];
+          .map(({ originalIndex: _originalIndex, ...playlist }) => playlist);
       }
       if (typeof value === 'string') {
         try {

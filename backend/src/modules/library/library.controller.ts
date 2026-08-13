@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -19,7 +29,14 @@ export class LibraryController {
     @Query('search') search?: string,
     @Query('sort') sort?: string,
   ) {
-    return this.library.findAll({ page, limit, type, search, sort, admin: false });
+    return this.library.findAll({
+      page,
+      limit,
+      type,
+      search,
+      sort,
+      admin: false,
+    });
   }
 
   @Get('meta')
@@ -38,7 +55,15 @@ export class LibraryController {
     @Query('search') search?: string,
     @Query('needsPublish') needsPublish?: string,
   ) {
-    return this.library.findAll({ page, limit, type, status, search, needsPublish: needsPublish === 'true', admin: true });
+    return this.library.findAll({
+      page,
+      limit,
+      type,
+      status,
+      search,
+      needsPublish: needsPublish === 'true',
+      admin: true,
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

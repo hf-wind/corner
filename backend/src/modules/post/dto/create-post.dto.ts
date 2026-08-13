@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsArray, IsBoolean, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsBoolean,
+  MaxLength,
+} from 'class-validator';
 import { SpacetimeDto } from '../../../common/location/spacetime.dto';
 
 export class CreatePostDto extends SpacetimeDto {

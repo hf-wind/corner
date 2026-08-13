@@ -85,7 +85,10 @@ export class MusicController {
       const value = upstream.headers.get(name);
       if (value) res.setHeader(name, value);
     }
-    res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
+    res.setHeader(
+      'Cache-Control',
+      'public, max-age=21600, stale-while-revalidate=86400',
+    );
     if (!upstream.body) {
       req.off('aborted', abortUpstream);
       res.off('close', abortUpstream);

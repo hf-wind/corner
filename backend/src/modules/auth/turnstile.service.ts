@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 type TurnstileResponse = {
   success?: boolean;
@@ -25,22 +30,36 @@ export class TurnstileService {
 
     let result: TurnstileResponse;
     try {
-      const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-        signal: AbortSignal.timeout(6000),
-      });
+      const response = await fetch(
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+          signal: AbortSignal.timeout(6000),
+        },
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      result = await response.json() as TurnstileResponse;
+      result = (await response.json()) as TurnstileResponse;
     } catch (error) {
-      this.logger.warn(`Turnstile verification request failed: ${(error as Error).message}`);
-      throw new ServiceUnavailableException('人机验证服务暂时不可用，请稍后重试');
+      this.logger.warn(
+        `Turnstile verification request failed: ${(error as Error).message}`,
+      );
+      throw new ServiceUnavailableException(
+        '人机验证服务暂时不可用，请稍后重试',
+      );
     }
 
-    const expectedHostname = (process.env.TURNSTILE_HOSTNAME || 'corner.ink').trim().toLowerCase();
-    if (!result.success || (expectedHostname && result.hostname?.toLowerCase() !== expectedHostname)) {
-      this.logger.warn(`Turnstile rejected request: ${(result['error-codes'] || []).join(',') || 'hostname mismatch'}`);
+    const expectedHostname = (process.env.TURNSTILE_HOSTNAME || 'corner.ink')
+      .trim()
+      .toLowerCase();
+    if (
+      !result.success ||
+      (expectedHostname && result.hostname?.toLowerCase() !== expectedHostname)
+    ) {
+      this.logger.warn(
+        `Turnstile rejected request: ${(result['error-codes'] || []).join(',') || 'hostname mismatch'}`,
+      );
       throw new BadRequestException('人机验证失败，请刷新后重试');
     }
   }

@@ -36,6 +36,8 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
+type AiRequest = Request & { user?: { id?: string } };
+
 @Controller('ai')
 export class AiController {
   constructor(
@@ -43,8 +45,8 @@ export class AiController {
     private aiNative: AiNativeService,
   ) {}
 
-  private chatActor(req: Request): AiChatActor {
-    const userId = (req.user as { id?: string } | undefined)?.id;
+  private chatActor(req: AiRequest): AiChatActor {
+    const userId = req.user?.id;
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     if (userId) return { userId, ip };
 
@@ -97,7 +99,11 @@ export class AiController {
     const actor = this.chatActor(req);
     const result = await this.ai.petChat(actor, dto.message, dto.article);
     const recommendations = this.shouldRecommend(dto.message)
-      ? await this.aiNative.search(dto.message, this.recommendationTypes(dto.article?.type, dto.message), 2)
+      ? await this.aiNative.search(
+          dto.message,
+          this.recommendationTypes(dto.article?.type, dto.message),
+          2,
+        )
       : [];
     await this.aiNative
       .track(
@@ -155,7 +161,11 @@ export class AiController {
         },
       );
       const recommendations = this.shouldRecommend(dto.message)
-        ? await this.aiNative.search(dto.message, this.recommendationTypes(dto.article?.type, dto.message), 2)
+        ? await this.aiNative.search(
+            dto.message,
+            this.recommendationTypes(dto.article?.type, dto.message),
+            2,
+          )
         : [];
       await this.aiNative
         .track(
@@ -207,7 +217,9 @@ export class AiController {
   }
 
   private shouldRecommend(query: string) {
-    return /(推荐|找一|找个|看看|探索|类似|下一篇|哪本|哪部|相册|书影|歌|音乐|内容)/u.test(query);
+    return /(推荐|找一|找个|看看|探索|类似|下一篇|哪本|哪部|相册|书影|歌|音乐|内容)/u.test(
+      query,
+    );
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -218,7 +230,11 @@ export class AiController {
 
   @Get('search')
   search(@Query('q') query = '', @Query('limit') limit?: string) {
-    return this.aiNative.search(String(query || ''), [], limit ? Number(limit) : 12);
+    return this.aiNative.search(
+      String(query || ''),
+      [],
+      limit ? Number(limit) : 12,
+    );
   }
 
   @UseGuards(OptionalJwtAuthGuard)

@@ -3,7 +3,14 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { IsEmail, IsString, IsIn, MinLength, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsIn,
+  MinLength,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 import { TurnstileService } from './turnstile.service';
 
 class SendCodeDto {
@@ -63,6 +70,11 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   @Post('change-password')
   changePassword(@Req() req: any, @Body() dto: ChangePasswordDto) {
-    return this.auth.changePassword(req.user.id, req.user.email, dto.newPassword, dto.code);
+    return this.auth.changePassword(
+      req.user.id,
+      req.user.email,
+      dto.newPassword,
+      dto.code,
+    );
   }
 }

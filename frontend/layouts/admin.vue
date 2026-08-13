@@ -212,13 +212,14 @@ onUnmounted(() => {
     z-index: 11001;
     width: min(82vw, 300px);
     height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
     padding-top: max(58px, calc(env(safe-area-inset-top) + 54px));
     background: var(--c-bg);
     box-shadow: 18px 0 48px rgb(0 0 0 / 18%);
     transform: translate3d(-105%, 0, 0);
     visibility: hidden;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     overscroll-behavior-y: contain;
     transition:
       transform 0.24s ease,
@@ -232,21 +233,31 @@ onUnmounted(() => {
 
   .sidebar-shell :deep(.sidebar-left) {
     width: 100%;
-    height: auto;
-    min-height: 100%;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
     padding-top: 4px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
-    overflow: visible;
+    overflow: hidden;
   }
 
   .sidebar-shell :deep(.sidebar-scroll) {
-    flex: 0 0 auto;
-    overflow: visible;
-    padding-right: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 2px;
   }
 
   .sidebar-shell :deep(.sidebar-bottom) {
-    margin-top: auto;
+    max-height: 38%;
+    margin-top: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-shell :deep(.sidebar-bottom-scroll) {
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .admin-main {

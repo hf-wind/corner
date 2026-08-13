@@ -272,19 +272,105 @@ const navItems = computed(() => {
 });
 
 type NavGroup = { key: string; label: string; items: typeof siteNav };
-const expandedGroups = ref<Record<string, boolean>>({ primary: true, explore: true, connect: true, manage: true });
+const expandedGroups = ref<Record<string, boolean>>({
+  articles: true,
+  taxonomy: true,
+  timeline: true,
+  community: true,
+  overview: true,
+  content: true,
+  engagement: true,
+  intelligence: true,
+  system: true,
+  account: true,
+});
 const navGroups = computed<NavGroup[]>(() => {
   const items = navItems.value;
   if (isPanel.value) {
-    return [{ key: 'manage', label: '内容管理', items }];
+    if (!isUserAdmin.value) {
+      return [{ key: "account", label: "个人中心", items }];
+    }
+    const select = (paths: string[]) =>
+      items.filter((item) => paths.includes(item.to));
+    return [
+      {
+        key: "overview",
+        label: "总览",
+        items: select(["/admin", "/admin/analytics"]),
+      },
+      {
+        key: "content",
+        label: "内容与媒体",
+        items: select([
+          "/admin/posts",
+          "/admin/moments",
+          "/admin/library",
+          "/admin/albums",
+          "/admin/memory-graph",
+          "/admin/categories",
+          "/admin/tags",
+          "/admin/media",
+        ]),
+      },
+      {
+        key: "engagement",
+        label: "互动与用户",
+        items: select([
+          "/admin/comments",
+          "/admin/users",
+          "/admin/visitor",
+          "/admin/friends",
+          "/admin/friend-applications",
+        ]),
+      },
+      {
+        key: "intelligence",
+        label: "智能与通知",
+        items: select([
+          "/admin/ai",
+          "/admin/ai-native",
+          "/admin/email",
+          "/admin/emoji",
+        ]),
+      },
+      {
+        key: "system",
+        label: "系统与账户",
+        items: select([
+          "/admin/about",
+          "/admin/settings",
+          "/admin/info",
+          "/admin/profile",
+          "/admin/messages",
+        ]),
+      },
+    ].filter((group) => group.items.length);
   }
-  const primary = items.filter((item) => ['/home', '/archive'].includes(item.to));
-  const explore = items.filter((item) => ['/category', '/tags', '/library', '/moments', '/time/map', '/time/constellation', '/albums', '/stories'].includes(item.to));
-  const connect = items.filter((item) => ['/guestbook', '/friends', '/about'].includes(item.to));
+  const select = (paths: string[]) => items.filter((item) => paths.includes(item.to));
   return [
-    { key: 'primary', label: '开始', items: primary },
-    { key: 'explore', label: '探索', items: explore },
-    { key: 'connect', label: '相遇', items: connect },
+    { key: "articles", label: "文章", items: select(["/home"]) },
+    {
+      key: "taxonomy",
+      label: "文章索引",
+      items: select(["/archive", "/category", "/tags"]),
+    },
+    {
+      key: "timeline",
+      label: "时光收藏",
+      items: select([
+        "/moments",
+        "/library",
+        "/albums",
+        "/time/map",
+        "/time/constellation",
+        "/stories",
+      ]),
+    },
+    {
+      key: "community",
+      label: "相遇",
+      items: select(["/guestbook", "/friends", "/about"]),
+    },
   ].filter((group) => group.items.length);
 });
 

@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -32,7 +43,13 @@ export class AlbumController {
     @Query('search') search?: string,
     @Query('needsPublish') needsPublish?: string,
   ) {
-    return this.album.findAdmin({ page, limit, status, search, needsPublish: needsPublish === 'true' });
+    return this.album.findAdmin({
+      page,
+      limit,
+      status,
+      search,
+      needsPublish: needsPublish === 'true',
+    });
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

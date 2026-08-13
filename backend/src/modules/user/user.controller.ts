@@ -1,4 +1,13 @@
-import { Controller, Get, Put, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -28,7 +37,11 @@ export class UserController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Put('admin/:id')
-  adminUpdate(@Req() req: any, @Param('id') id: string, @Body() dto: AdminUpdateUserDto) {
+  adminUpdate(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: AdminUpdateUserDto,
+  ) {
     return this.user.adminUpdate(req.user.id, id, dto);
   }
 

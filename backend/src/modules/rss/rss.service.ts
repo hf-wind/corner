@@ -11,24 +11,44 @@ export class RssService {
   ) {}
 
   async render() {
-    const [posts, moments, titleSetting, descriptionSetting, urlSetting] = await Promise.all([
-      this.prisma.post.findMany({
-        where: { status: 'published' },
-        select: { title: true, slug: true, excerpt: true, content: true, publishedSnapshot: true, publishedAt: true, updatedAt: true },
-        orderBy: { publishedAt: 'desc' },
-        take: 30,
-      }),
-      this.prisma.moment.findMany({
-        where: { status: 'published' },
-        select: { title: true, slug: true, excerpt: true, content: true, publishedSnapshot: true, publishedAt: true, updatedAt: true },
-        orderBy: { publishedAt: 'desc' },
-        take: 30,
-      }),
-      this.settings.get('site_title'),
-      this.settings.get('site_description'),
-      this.settings.get('site_url'),
-    ]);
-    const siteUrl = String(urlSetting || 'https://corner.ink').replace(/\/$/, '');
+    const [posts, moments, titleSetting, descriptionSetting, urlSetting] =
+      await Promise.all([
+        this.prisma.post.findMany({
+          where: { status: 'published' },
+          select: {
+            title: true,
+            slug: true,
+            excerpt: true,
+            content: true,
+            publishedSnapshot: true,
+            publishedAt: true,
+            updatedAt: true,
+          },
+          orderBy: { publishedAt: 'desc' },
+          take: 30,
+        }),
+        this.prisma.moment.findMany({
+          where: { status: 'published' },
+          select: {
+            title: true,
+            slug: true,
+            excerpt: true,
+            content: true,
+            publishedSnapshot: true,
+            publishedAt: true,
+            updatedAt: true,
+          },
+          orderBy: { publishedAt: 'desc' },
+          take: 30,
+        }),
+        this.settings.get('site_title'),
+        this.settings.get('site_description'),
+        this.settings.get('site_url'),
+      ]);
+    const siteUrl = String(urlSetting || 'https://corner.ink').replace(
+      /\/$/,
+      '',
+    );
     const title = String(titleSetting || '风隅随笔');
     const description = String(descriptionSetting || '听风于隅，漫写人间');
     const items = [
@@ -56,22 +76,37 @@ export class RssService {
           id: `moment:${slug}`,
         };
       }),
-    ].sort((left, right) => this.timestamp(right.publishedAt || right.updatedAt) - this.timestamp(left.publishedAt || left.updatedAt)).slice(0, 40);
+    ]
+      .sort(
+        (left, right) =>
+          this.timestamp(right.publishedAt || right.updatedAt) -
+          this.timestamp(left.publishedAt || left.updatedAt),
+      )
+      .slice(0, 40);
 
-    const itemXml = items.map((item) => {
-      const date = item.publishedAt || item.updatedAt;
-      const summary = String(item.excerpt || this.plainText(item.content)).slice(0, 500);
-      return `<item><title>${this.escape(item.title)}</title><link>${this.escape(item.url)}</link><guid isPermaLink="false">${this.escape(item.id)}</guid><pubDate>${new Date(date).toUTCString()}</pubDate><description>${this.cdata(summary)}</description></item>`;
-    }).join('');
-    const lastBuildDate = items[0]?.publishedAt || items[0]?.updatedAt || new Date();
+    const itemXml = items
+      .map((item) => {
+        const date = item.publishedAt || item.updatedAt;
+        const summary = String(
+          item.excerpt || this.plainText(item.content),
+        ).slice(0, 500);
+        return `<item><title>${this.escape(item.title)}</title><link>${this.escape(item.url)}</link><guid isPermaLink="false">${this.escape(item.id)}</guid><pubDate>${new Date(date).toUTCString()}</pubDate><description>${this.cdata(summary)}</description></item>`;
+      })
+      .join('');
+    const lastBuildDate =
+      items[0]?.publishedAt || items[0]?.updatedAt || new Date();
     return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>${this.escape(title)}</title><link>${this.escape(siteUrl)}</link><description>${this.escape(description)}</description><language>zh-CN</language><lastBuildDate>${new Date(lastBuildDate).toUTCString()}</lastBuildDate><atom:link href="${this.escape(siteUrl)}/rss.xml" rel="self" type="application/rss+xml"/>${itemXml}</channel></rss>`;
   }
 
-  private timestamp(value: Date | null) { return value ? new Date(value).getTime() : 0; }
+  private timestamp(value: Date | null) {
+    return value ? new Date(value).getTime() : 0;
+  }
   private postSnapshot(value: Prisma.JsonValue | null) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-    const snapshot = value as Prisma.JsonObject;
-    if (typeof snapshot.title !== 'string' || typeof snapshot.slug !== 'string') return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return null;
+    const snapshot = value;
+    if (typeof snapshot.title !== 'string' || typeof snapshot.slug !== 'string')
+      return null;
     return {
       title: snapshot.title,
       slug: snapshot.slug,
@@ -79,7 +114,28 @@ export class RssService {
       content: typeof snapshot.content === 'string' ? snapshot.content : '',
     };
   }
-  private plainText(value: string) { return String(value || '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/<[^>]+>/g, '').replace(/[#>*_`~\[\]]/g, '').replace(/\s+/g, ' ').trim(); }
-  private escape(value: unknown) { return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character] || character); }
-  private cdata(value: string) { return `<![CDATA[${value.replace(/\]\]>/g, ']]]]><![CDATA[>')}]]>`; }
+  private plainText(value: string) {
+    return String(value || '')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/[#>*_`~\[\]]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  private escape(value: unknown) {
+    return String(value ?? '').replace(
+      /[&<>"']/g,
+      (character) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&apos;',
+        })[character] || character,
+    );
+  }
+  private cdata(value: string) {
+    return `<![CDATA[${value.replace(/\]\]>/g, ']]]]><![CDATA[>')}]]>`;
+  }
 }

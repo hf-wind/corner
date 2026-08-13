@@ -17,33 +17,49 @@ describe('AlbumService public mapping', () => {
       place: null,
       coverMedia: null,
       author: { id: 'user-1', username: 'admin', avatar: null },
-      items: [{
-        id: 'item-1',
-        sort: 0,
-        caption: '照片',
-        happenedAt: null,
-        locationVisibility: 'private',
-        locationPrecision: 'exact',
-        locationExactConfirmedAt: null,
-        place: null,
-        moment: null,
-        media: {
-          id: 'media-1',
-          path: '/uploads/album/photo.webp',
-          originalPath: '/uploads/album/original/photo.jpg',
-          metadata: {
-            rawExif: { GPSInfo: { GPSLatitude: [30, 0, 0] } },
-            latitude: 30,
-            longitude: 120,
-            confirmedPlace: { id: 'place-1', name: '私密地点', slug: 'private-place', latitude: 30, longitude: 120, type: 'poi' },
+      items: [
+        {
+          id: 'item-1',
+          sort: 0,
+          caption: '照片',
+          happenedAt: null,
+          locationVisibility: 'private',
+          locationPrecision: 'exact',
+          locationExactConfirmedAt: null,
+          place: null,
+          moment: null,
+          media: {
+            id: 'media-1',
+            path: '/uploads/album/photo.webp',
+            originalPath: '/uploads/album/original/photo.jpg',
+            metadata: {
+              rawExif: { GPSInfo: { GPSLatitude: [30, 0, 0] } },
+              latitude: 30,
+              longitude: 120,
+              confirmedPlace: {
+                id: 'place-1',
+                name: '私密地点',
+                slug: 'private-place',
+                latitude: 30,
+                longitude: 120,
+                type: 'poi',
+              },
+            },
           },
         },
-      }],
+      ],
     };
 
     const result = (service as any).formatPublic(album, true);
-    expect(result.items[0]).toEqual(expect.objectContaining({ publicLocation: null }));
-    expect(result.items[0].media).toEqual({ id: 'media-1', path: '/uploads/album/photo.webp', width: undefined, height: undefined });
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({ publicLocation: null }),
+    );
+    expect(result.items[0].media).toEqual({
+      id: 'media-1',
+      path: '/uploads/album/photo.webp',
+      width: undefined,
+      height: undefined,
+    });
     expect(JSON.stringify(result)).not.toContain('originalPath');
     expect(JSON.stringify(result)).not.toContain('rawExif');
     expect(JSON.stringify(result)).not.toContain('私密地点');

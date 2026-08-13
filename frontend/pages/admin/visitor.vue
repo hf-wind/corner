@@ -372,7 +372,7 @@ function handleBan(record: any, ban: boolean) {
 .table-toolbar { margin-bottom: 12px; }
 .list-card { border-radius: 8px; }
 .content-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.content-cell span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.content-cell span {  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .content-ellipsis { display: block; }
 .content-cell .is-caught { color: var(--c-text-3); }
 .type-tag { flex: 0 0 auto; }

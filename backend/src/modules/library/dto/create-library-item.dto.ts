@@ -36,7 +36,8 @@ export class CreateLibraryItemDto extends SpacetimeDto {
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) cast?: string[];
 
-  @IsOptional() @IsIn(['draft', 'published']) publishStatus?: 'draft' | 'published';
+  @IsOptional() @IsIn(['draft', 'published']) publishStatus?:
+    'draft' | 'published';
   @IsOptional() @IsString() @MaxLength(30) progressStatus?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(10) rating?: number;
   @IsOptional() @IsInt() @Min(1) rank?: number;

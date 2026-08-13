@@ -1,5 +1,11 @@
 import { createHash } from 'crypto';
-import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import {
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  NestInterceptor,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Observable, of } from 'rxjs';
 import { catchError, finalize, mergeMap, tap } from 'rxjs/operators';
@@ -36,7 +42,9 @@ export class HttpCacheInterceptor implements NestInterceptor {
       void (async () => {
         try {
           const version = await this.redis.cacheVersion();
-          const digest = createHash('sha256').update(request.originalUrl).digest('hex');
+          const digest = createHash('sha256')
+            .update(request.originalUrl)
+            .digest('hex');
           const key = `corner:http-cache:${version}:${digest}`;
           const cached = await this.redis.getJson<unknown>(key);
           if (cached !== null) {
@@ -48,7 +56,8 @@ export class HttpCacheInterceptor implements NestInterceptor {
           }
 
           const lockKey = `${key}:lock`;
-          const ownsLock = (await this.redis.client.set(lockKey, '1', 'EX', 5, 'NX')) === 'OK';
+          const ownsLock =
+            (await this.redis.client.set(lockKey, '1', 'EX', 5, 'NX')) === 'OK';
           if (!ownsLock) {
             await new Promise((resolve) => setTimeout(resolve, 75));
             const filled = await this.redis.getJson<unknown>(key);
@@ -62,23 +71,30 @@ export class HttpCacheInterceptor implements NestInterceptor {
           }
 
           response.setHeader('X-Cache', 'MISS');
-          next.handle().pipe(
-            mergeMap((data) => {
-              this.applyEtag(response, data);
-              void this.redis.setJson(key, data, this.ttlFor(request.path)).catch((error: Error) => {
-                this.logger.warn(`Cache write failed: ${error.message}`);
-              });
-              return of(data);
-            }),
-            catchError((error) => {
-              throw error;
-            }),
-            finalize(() => {
-              if (ownsLock) void this.redis.client.del(lockKey);
-            }),
-          ).subscribe(subscriber);
+          next
+            .handle()
+            .pipe(
+              mergeMap((data) => {
+                this.applyEtag(response, data);
+                void this.redis
+                  .setJson(key, data, this.ttlFor(request.path))
+                  .catch((error: Error) => {
+                    this.logger.warn(`Cache write failed: ${error.message}`);
+                  });
+                return of(data);
+              }),
+              catchError((error) => {
+                throw error;
+              }),
+              finalize(() => {
+                if (ownsLock) void this.redis.client.del(lockKey);
+              }),
+            )
+            .subscribe(subscriber);
         } catch (error) {
-          this.logger.warn(`Cache read failed, bypassing: ${(error as Error).message}`);
+          this.logger.warn(
+            `Cache read failed, bypassing: ${(error as Error).message}`,
+          );
           response.setHeader('X-Cache', 'BYPASS');
           next.handle().subscribe(subscriber);
         }
@@ -96,7 +112,8 @@ export class HttpCacheInterceptor implements NestInterceptor {
     if (/\/(?:admin)(?:\/|$)/.test(path)) return false;
     if (/\/(?:users|media|email)(?:\/|$)/.test(path)) return false;
     if (path.endsWith('/stream')) return false;
-    if (request.query.refresh === '1' || request.query.refresh === 'true') return false;
+    if (request.query.refresh === '1' || request.query.refresh === 'true')
+      return false;
 
     // These detail handlers update view counters or include user-specific state.
     if (/\/posts\/[^/]+$/.test(path)) return false;
@@ -111,8 +128,12 @@ export class HttpCacheInterceptor implements NestInterceptor {
 
   private ttlFor(path: string): number {
     if (/\/memories\/(?:map|places)(?:\/|$)/.test(path)) return 120;
-    if (/\/(?:settings|categories|tags|emoji-packs)(?:\/|$)/.test(path)) return 600;
-    if (/\/(?:posts|moments|library|comments|moment-comments)(?:\/|$)/.test(path)) return 120;
+    if (/\/(?:settings|categories|tags|emoji-packs)(?:\/|$)/.test(path))
+      return 600;
+    if (
+      /\/(?:posts|moments|library|comments|moment-comments)(?:\/|$)/.test(path)
+    )
+      return 120;
     return 60;
   }
 

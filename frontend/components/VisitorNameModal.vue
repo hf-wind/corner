@@ -77,7 +77,7 @@
 
           <template v-else-if="mode === 'login'">
             <h2>欢迎回来</h2>
-            <p>登录后可以回复漂流瓶主人，还能收到瓶子被捞起、被回复的实时通知。</p>
+            <p>登录后可以给瓶主回信，还能实时收到瓶子被捞起、被回复的通知。</p>
             <div class="vn-email-wrap">
               <input
                 v-model="email"
@@ -137,7 +137,7 @@
 
           <template v-else>
             <h2>创建账号</h2>
-            <p>注册后可回复漂流瓶主人、收到站内通知，拥有固定的旅人身份与头像。</p>
+            <p>注册后可以给瓶主回信、收到站内通知，拥有固定的旅人身份与头像。</p>
             <div class="vn-email-wrap">
               <input
                 v-model="email"
@@ -235,7 +235,7 @@ const props = withDefaults(
 )
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'confirm', name: string, email: string): void
+  (e: 'confirm', name: string, email: string, turnstileToken: string): void
   (e: 'authenticated'): void
 }>()
 
@@ -412,7 +412,9 @@ async function submitGuest(): Promise<boolean> {
     error.value = '邮箱格式好像不太对，检查一下？'
     return false
   }
-  emit('confirm', clean, cleanMail)
+  const token = await resolveTurnstile()
+  if (!token) return false
+  emit('confirm', clean, cleanMail, token)
   return true
 }
 

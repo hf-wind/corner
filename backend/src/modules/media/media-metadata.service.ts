@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,11 +25,19 @@ export class MediaMetadataService {
     return media;
   }
 
-  async confirm(mediaId: string, input: { capturedAt?: string | null; placeId?: string | null }) {
-    const media = await this.prisma.media.findUnique({ where: { id: mediaId } });
+  async confirm(
+    mediaId: string,
+    input: { capturedAt?: string | null; placeId?: string | null },
+  ) {
+    const media = await this.prisma.media.findUnique({
+      where: { id: mediaId },
+    });
     if (!media) throw new NotFoundException('Media not found');
     if (input.placeId) {
-      const place = await this.prisma.place.findUnique({ where: { id: input.placeId }, select: { id: true } });
+      const place = await this.prisma.place.findUnique({
+        where: { id: input.placeId },
+        select: { id: true },
+      });
       if (!place) throw new BadRequestException('地点不存在');
     }
     return this.prisma.mediaMetadata.upsert({
@@ -33,11 +45,15 @@ export class MediaMetadataService {
       create: {
         mediaId,
         status: 'completed',
-        confirmedCapturedAt: input.capturedAt ? new Date(input.capturedAt) : null,
+        confirmedCapturedAt: input.capturedAt
+          ? new Date(input.capturedAt)
+          : null,
         confirmedPlaceId: input.placeId || null,
       },
       update: {
-        confirmedCapturedAt: input.capturedAt ? new Date(input.capturedAt) : null,
+        confirmedCapturedAt: input.capturedAt
+          ? new Date(input.capturedAt)
+          : null,
         confirmedPlaceId: input.placeId || null,
       },
       include: { confirmedPlace: true },
@@ -45,14 +61,20 @@ export class MediaMetadataService {
   }
 
   async retry(mediaId: string) {
-    const media = await this.prisma.media.findUnique({ where: { id: mediaId } });
+    const media = await this.prisma.media.findUnique({
+      where: { id: mediaId },
+    });
     if (!media) throw new NotFoundException('Media not found');
     await this.prisma.mediaMetadata.upsert({
       where: { mediaId },
       create: { mediaId },
       update: { status: 'pending', error: null, processedAt: null },
     });
-    await this.metadataQueue.add('extract', { mediaId }, { attempts: 3, removeOnComplete: true });
+    await this.metadataQueue.add(
+      'extract',
+      { mediaId },
+      { attempts: 3, removeOnComplete: true },
+    );
     return { queued: true };
   }
 }

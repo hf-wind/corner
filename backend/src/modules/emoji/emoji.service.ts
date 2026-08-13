@@ -21,7 +21,10 @@ export class EmojiService {
       },
       orderBy: { sort: 'asc' },
     });
-    return packs.map((pack) => ({ ...pack, items: pack.items.map((item) => this.presentItem(item)) }));
+    return packs.map((pack) => ({
+      ...pack,
+      items: pack.items.map((item) => this.presentItem(item)),
+    }));
   }
 
   async getPackItems(id: string, page = 1, limit = 48) {
@@ -37,7 +40,12 @@ export class EmojiService {
       }),
       this.prisma.emojiItem.count({ where: { packId: id } }),
     ]);
-    return { items: items.map((item) => this.presentItem(item)), total, page: safePage, totalPages: Math.ceil(total / safeLimit) };
+    return {
+      items: items.map((item) => this.presentItem(item)),
+      total,
+      page: safePage,
+      totalPages: Math.ceil(total / safeLimit),
+    };
   }
 
   async getPack(id: string) {

@@ -1,5 +1,5 @@
 <template>
-  <div class="home-sidebar" :class="{ ready: !loading }">
+  <div class="home-sidebar ready">
     <WeatherClock />
     <section
       class="side-card overview-card"
@@ -29,34 +29,14 @@
       </div>
     </section>
 
-    <section v-if="latestActivity.length" class="side-card activity-card" aria-labelledby="home-latest-title">
-      <div class="side-card-head">
-        <span id="home-latest-title"><Icon name="ph:activity-bold" /> 最新动态</span>
-        <span class="live-badge" role="status" title="实时更新" aria-label="实时更新"><i class="live-dot" aria-hidden="true" /></span>
-      </div>
-      <div class="activity-list">
-        <NuxtLink v-for="item in latestActivity" :key="`${item.type}:${item.id}`" :to="item.href">
-          <span class="overview-icon" :class="`activity-${item.type}`"><Icon :name="item.icon" /></span>
-          <span class="activity-copy"><small>{{ item.label }}</small><strong>{{ item.title }}</strong></span>
-          <time v-if="item.timestamp" :title="formatTime(item.timestamp)">{{ fromNowText(item.timestamp) }}</time>
-        </NuxtLink>
-      </div>
-    </section>
+    <VisitorFootprints />
   </div>
 </template>
 
 <script setup lang="ts">
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-import "dayjs/locale/zh-cn";
-
-dayjs.extend(relativeTime);
-dayjs.locale("zh-cn");
-
 const api = useApi();
 const loading = ref(true);
 const stats = ref({ posts: 0, comments: 0, views: 0 });
-const latestActivity = ref<Array<{ id: string; type: string; label: string; title: string; href: string; icon: string; timestamp?: string | null }>>([]);
 let idleHandle: number | null = null;
 
 const overviewItems = computed(() => [
@@ -69,17 +49,6 @@ const overviewItems = computed(() => [
   { label: "翻阅", value: stats.value.views, icon: "ph:book-open-text-bold" },
 ]);
 
-const TYPE_ICONS: Record<string, string> = {
-  post: "ph:article-bold",
-  moment: "ph:sparkle-bold",
-  album: "ph:images-square-bold",
-  library: "ph:books-bold",
-  comment: "ph:chat-circle-bold",
-  guestbook: "ph:note-pencil-bold",
-  like: "ph:heart-bold",
-  footprint: "ph:footprints-bold",
-};
-
 function compactNumber(value: number) {
   return new Intl.NumberFormat("zh-CN", {
     notation: "compact",
@@ -87,25 +56,10 @@ function compactNumber(value: number) {
   }).format(value || 0);
 }
 
-function fromNowText(time: string) {
-  return dayjs(time).fromNow();
-}
-
-function formatTime(time: string) {
-  return dayjs(time).format("YYYY-MM-DD HH:mm");
-}
-
 async function loadSidebar() {
   try {
-    const [overview, activities] = await Promise.all([
-      api.get<any>("/stats/overview"),
-      api.get<any[]>("/stats/activities", { limit: 5 }),
-    ]);
+    const overview = await api.get<any>("/stats/overview");
     stats.value = { ...stats.value, ...(overview || {}) };
-    latestActivity.value = (activities ?? []).map((item) => ({
-      ...item,
-      icon: TYPE_ICONS[item.type] ?? "ph:activity-bold",
-    }));
   } catch {
     // Sidebar content is supplementary; keep the page usable when it fails.
   } finally {
@@ -138,25 +92,30 @@ onUnmounted(() => {
   contain: layout paint;
 }
 
-.side-card {
+.side-card,
+.footprints {
   position: relative;
+  opacity: 0;
+  transform: translate3d(10px, 0, 0);
+}
+
+.side-card {
   padding: 12px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
   border-radius: 16px;
   background: color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft));
-  opacity: 0;
-  transform: translate3d(10px, 0, 0);
 }
 
-.home-sidebar.ready .side-card {
+.home-sidebar.ready .side-card,
+.home-sidebar.ready .footprints {
   animation: side-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.home-sidebar.ready .side-card:nth-of-type(2) {
+.home-sidebar.ready .side-card {
   animation-delay: 55ms;
 }
-.home-sidebar.ready .side-card:nth-of-type(3) {
+.home-sidebar.ready .footprints {
   animation-delay: 110ms;
 }
 
@@ -193,40 +152,6 @@ onUnmounted(() => {
 
 .side-card-head a:hover {
   color: var(--c-primary);
-}
-.live-badge {
-  display: grid;
-  width: 16px;
-  height: 16px;
-  place-items: center;
-}
-.live-dot {
-  position: relative;
-  display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--c-primary);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--c-primary) 60%, transparent);
-}
-.live-dot::after {
-  position: absolute;
-  inset: -3px;
-  border: 1px solid var(--c-primary);
-  border-radius: 50%;
-  content: "";
-  animation: live-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-@keyframes live-ping {
-  0% {
-    transform: scale(0.55);
-    opacity: 0.8;
-  }
-  70%,
-  100% {
-    transform: scale(1.8);
-    opacity: 0;
-  }
 }
 
 .overview-grid {
@@ -294,97 +219,12 @@ onUnmounted(() => {
   display: none;
 }
 
-.activity-list {
-  display: grid;
-  gap: 2px;
-}
-.activity-list a {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 5px 6px;
-  border-radius: 9px;
-  color: inherit;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
-.activity-list a:hover {
-  background: color-mix(in srgb, var(--c-primary-soft) 46%, transparent);
-}
-.activity-list .overview-icon {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  border-color: color-mix(in srgb, var(--act, var(--c-primary)) 16%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--act, var(--c-primary)) 9%, var(--ld-bg-card));
-  color: var(--act, var(--c-primary));
-  font-size: 0.85rem;
-}
-.activity-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 1px;
-}
-.activity-copy small {
-  color: var(--c-text-3);
-  font-size: 0.48rem;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-.activity-copy strong {
-  color: var(--c-text);
-  font-size: 0.66rem;
-  font-weight: 650;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-.activity-list time {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: 0.48rem;
-  white-space: nowrap;
-}
-.activity-post {
-  --act: #4f8ff7;
-}
-.activity-moment {
-  --act: #f0a04b;
-}
-.activity-album {
-  --act: #34a06e;
-}
-.activity-library {
-  --act: #7a56d6;
-}
-.activity-comment {
-  --act: #4f8ff7;
-}
-.activity-guestbook {
-  --act: #e2703a;
-}
-.activity-like {
-  --act: #e0446c;
-}
-.activity-footprint {
-  --act: #2f9d6b;
-}
 @media (prefers-reduced-motion: reduce) {
-  .home-sidebar.ready .side-card {
+  .home-sidebar.ready .side-card,
+  .home-sidebar.ready .footprints {
     animation: none;
     opacity: 1;
     transform: none;
-  }
-  .live-dot::after {
-    animation: none;
-  }
-  .activity-list a {
-    transition: none;
   }
 }
 </style>

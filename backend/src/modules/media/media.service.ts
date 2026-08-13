@@ -1,16 +1,41 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
-import { PRESET_FOLDERS, PRESET_FOLDER_KEYS, sanitizeFolder } from './media.constants';
+import {
+  PRESET_FOLDERS,
+  PRESET_FOLDER_KEYS,
+  sanitizeFolder,
+} from './media.constants';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 
 const mimeTypeMap: Record<string, string[]> = {
-  image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'],
+  image: [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+  ],
   video: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
   audio: [
     'audio/mpeg',
@@ -30,7 +55,14 @@ const mimeTypeMap: Record<string, string[]> = {
 
 const UPLOAD_ROOT = join(process.cwd(), 'uploads');
 const CUSTOM_FOLDERS_KEY = 'media_custom_folders';
-const HIDDEN_LEGACY_FOLDERS = new Set(['emoji-cache', '相册', 'video', 'document', 'story', 'place']);
+const HIDDEN_LEGACY_FOLDERS = new Set([
+  'emoji-cache',
+  '相册',
+  'video',
+  'document',
+  'story',
+  'place',
+]);
 
 @Injectable()
 export class MediaService implements OnModuleInit {
@@ -98,7 +130,12 @@ export class MediaService implements OnModuleInit {
     let fsKeys: string[] = [];
     if (existsSync(UPLOAD_ROOT)) {
       fsKeys = readdirSync(UPLOAD_ROOT, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && d.name !== 'original' && !HIDDEN_LEGACY_FOLDERS.has(d.name))
+        .filter(
+          (d) =>
+            d.isDirectory() &&
+            d.name !== 'original' &&
+            !HIDDEN_LEGACY_FOLDERS.has(d.name),
+        )
         .map((d) => d.name);
     }
 
@@ -119,16 +156,22 @@ export class MediaService implements OnModuleInit {
           select: { id: true, title: true },
         })
       : [];
-    const titleById = new Map(articleTitles.map((post) => [post.id, post.title]));
+    const titleById = new Map(
+      articleTitles.map((post) => [post.id, post.title]),
+    );
 
     return Array.from(allKeys).map((key) => {
       const preset = PRESET_FOLDERS.find((f) => f.key === key);
-      const articleId = key.startsWith('article/') ? key.slice('article/'.length) : '';
+      const articleId = key.startsWith('article/')
+        ? key.slice('article/'.length)
+        : '';
       return {
         key,
-        label: preset?.label || (articleId
-          ? `文章 / ${titleById.get(articleId) || articleId.slice(0, 8)}`
-          : key),
+        label:
+          preset?.label ||
+          (articleId
+            ? `文章 / ${titleById.get(articleId) || articleId.slice(0, 8)}`
+            : key),
         preset: !!preset || Boolean(articleId),
       };
     });
@@ -150,36 +193,63 @@ export class MediaService implements OnModuleInit {
   }
 
   private async getCustomFolders(): Promise<string[]> {
-    const row = await this.prisma.setting.findUnique({ where: { key: CUSTOM_FOLDERS_KEY } });
+    const row = await this.prisma.setting.findUnique({
+      where: { key: CUSTOM_FOLDERS_KEY },
+    });
     if (!row?.value) return [];
-    if (Array.isArray(row.value)) return [...new Set(row.value.map(String).filter((value) => !HIDDEN_LEGACY_FOLDERS.has(value)))];
+    if (Array.isArray(row.value))
+      return [
+        ...new Set(
+          row.value
+            .map(String)
+            .filter((value) => !HIDDEN_LEGACY_FOLDERS.has(value)),
+        ),
+      ];
     return [];
   }
 
   private async mergeLegacyAlbumFolder() {
-    const legacy = await this.prisma.media.findMany({ where: { folder: '相册' }, select: { id: true } });
-    if (legacy.length) await this.batchMove(legacy.map((item) => item.id), 'album');
+    const legacy = await this.prisma.media.findMany({
+      where: { folder: '相册' },
+      select: { id: true },
+    });
+    if (legacy.length)
+      await this.batchMove(
+        legacy.map((item) => item.id),
+        'album',
+      );
 
     const custom = await this.getCustomFolders();
-    const row = await this.prisma.setting.findUnique({ where: { key: CUSTOM_FOLDERS_KEY } });
+    const row = await this.prisma.setting.findUnique({
+      where: { key: CUSTOM_FOLDERS_KEY },
+    });
     if (row && JSON.stringify(row.value) !== JSON.stringify(custom)) {
-      await this.prisma.setting.update({ where: { key: CUSTOM_FOLDERS_KEY }, data: { value: custom } });
+      await this.prisma.setting.update({
+        where: { key: CUSTOM_FOLDERS_KEY },
+        data: { value: custom },
+      });
     }
 
     const legacyDirectory = join(UPLOAD_ROOT, '相册');
-    if (existsSync(legacyDirectory)) rmSync(legacyDirectory, { recursive: true, force: true });
+    if (existsSync(legacyDirectory))
+      rmSync(legacyDirectory, { recursive: true, force: true });
   }
 
   private removeLegacyCache() {
     const cacheDirectory = join(UPLOAD_ROOT, 'emoji-cache');
-    if (existsSync(cacheDirectory)) rmSync(cacheDirectory, { recursive: true, force: true });
+    if (existsSync(cacheDirectory))
+      rmSync(cacheDirectory, { recursive: true, force: true });
   }
 
   async createFolder(name: string) {
     const key = sanitizeFolder(name);
     if (PRESET_FOLDER_KEYS.includes(key)) {
       this.ensureFolderDirs(key);
-      return { key, label: PRESET_FOLDERS.find((f) => f.key === key)?.label || key, preset: true };
+      return {
+        key,
+        label: PRESET_FOLDERS.find((f) => f.key === key)?.label || key,
+        preset: true,
+      };
     }
     this.ensureFolderDirs(key);
     const custom = await this.getCustomFolders();
@@ -198,7 +268,9 @@ export class MediaService implements OnModuleInit {
     const folder = sanitizeFolder(targetFolder);
     this.ensureFolderDirs(folder);
 
-    const items = await this.prisma.media.findMany({ where: { id: { in: ids } } });
+    const items = await this.prisma.media.findMany({
+      where: { id: { in: ids } },
+    });
     if (!items.length) throw new NotFoundException('No media found');
 
     const updated: any[] = [];
@@ -211,16 +283,27 @@ export class MediaService implements OnModuleInit {
       const oldPath = join(process.cwd(), item.path.replace(/^\//, ''));
       const newPath = join(UPLOAD_ROOT, folder, item.filename);
       if (existsSync(oldPath)) {
-        try { renameSync(oldPath, newPath); } catch { /* skip */ }
+        try {
+          renameSync(oldPath, newPath);
+        } catch {
+          /* skip */
+        }
       }
 
       let origRel: string | null = null;
       if (item.originalPath) {
-        const oldOrig = join(process.cwd(), item.originalPath.replace(/^\//, ''));
+        const oldOrig = join(
+          process.cwd(),
+          item.originalPath.replace(/^\//, ''),
+        );
         const origName = item.originalPath.split('/').pop() || item.filename;
         const newOrig = join(UPLOAD_ROOT, folder, 'original', origName);
         if (existsSync(oldOrig)) {
-          try { renameSync(oldOrig, newOrig); } catch { /* skip */ }
+          try {
+            renameSync(oldOrig, newOrig);
+          } catch {
+            /* skip */
+          }
         }
         origRel = `/uploads/${folder}/original/${origName}`;
       }
@@ -241,24 +324,41 @@ export class MediaService implements OnModuleInit {
   async batchRemove(ids: string[]) {
     const items = await this.prisma.media.findMany({
       where: { id: { in: ids } },
-      include: { _count: { select: { albumItems: true, albumCovers: true, placeCovers: true } } },
+      include: {
+        _count: {
+          select: { albumItems: true, albumCovers: true, placeCovers: true },
+        },
+      },
     });
     if (!items.length) throw new NotFoundException('No media found');
-    const referenced = items.filter((item) => item._count.albumItems || item._count.albumCovers || item._count.placeCovers);
+    const referenced = items.filter(
+      (item) =>
+        item._count.albumItems ||
+        item._count.albumCovers ||
+        item._count.placeCovers,
+    );
     if (referenced.length) {
-      throw new BadRequestException(`有 ${referenced.length} 张图片正在被相册或地点引用，请先移除引用`);
+      throw new BadRequestException(
+        `有 ${referenced.length} 张图片正在被相册或地点引用，请先移除引用`,
+      );
     }
 
     for (const item of items) {
       const candidates = [
         join(process.cwd(), item.path.replace(/^\//, '')),
-        item.originalPath ? join(process.cwd(), item.originalPath.replace(/^\//, '')) : '',
+        item.originalPath
+          ? join(process.cwd(), item.originalPath.replace(/^\//, ''))
+          : '',
         join(UPLOAD_ROOT, item.filename),
         item.folder ? join(UPLOAD_ROOT, item.folder, item.filename) : '',
       ].filter(Boolean);
       for (const p of candidates) {
         if (p && existsSync(p)) {
-          try { unlinkSync(p); } catch { /* ignore */ }
+          try {
+            unlinkSync(p);
+          } catch {
+            /* ignore */
+          }
         }
       }
     }
@@ -273,8 +373,12 @@ export class MediaService implements OnModuleInit {
 
     switch (mode) {
       case 'original': {
-        const base = extname(originalName) ? originalName.replace(extname(originalName), '') : originalName;
-        const safe = base.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_').slice(0, 80);
+        const base = extname(originalName)
+          ? originalName.replace(extname(originalName), '')
+          : originalName;
+        const safe = base
+          .replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_')
+          .slice(0, 80);
         return `${safe}_${ts}`;
       }
       case 'uuid':
@@ -308,10 +412,14 @@ export class MediaService implements OnModuleInit {
       throw new BadRequestException(`下载图片失败 (${res.status})`);
     }
 
-    const contentType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const contentType = (res.headers.get('content-type') || '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length) throw new BadRequestException('图片内容为空');
-    if (buf.length > 15 * 1024 * 1024) throw new BadRequestException('图片过大');
+    if (buf.length > 15 * 1024 * 1024)
+      throw new BadRequestException('图片过大');
 
     let mime = contentType;
     if (!mime.startsWith('image/')) {
@@ -319,7 +427,10 @@ export class MediaService implements OnModuleInit {
       if (magic[0] === 0xff && magic[1] === 0xd8) mime = 'image/jpeg';
       else if (magic[0] === 0x89 && magic[1] === 0x50) mime = 'image/png';
       else if (magic[0] === 0x47 && magic[1] === 0x49) mime = 'image/gif';
-      else if (magic.toString('ascii', 0, 4) === 'RIFF' && magic.toString('ascii', 8, 12) === 'WEBP') {
+      else if (
+        magic.toString('ascii', 0, 4) === 'RIFF' &&
+        magic.toString('ascii', 8, 12) === 'WEBP'
+      ) {
         mime = 'image/webp';
       } else {
         throw new BadRequestException('URL 不是有效图片');
@@ -330,7 +441,9 @@ export class MediaService implements OnModuleInit {
     const nameFromUrl = src.split('?')[0].split('/').pop() || `wallpaper${ext}`;
     const file = {
       buffer: buf,
-      originalname: nameFromUrl.includes('.') ? nameFromUrl : `${nameFromUrl}${ext}`,
+      originalname: nameFromUrl.includes('.')
+        ? nameFromUrl
+        : `${nameFromUrl}${ext}`,
       mimetype: mime,
       size: buf.length,
     } as Express.Multer.File;
@@ -338,7 +451,12 @@ export class MediaService implements OnModuleInit {
     return this.create(file, userId, folderInput, false);
   }
 
-  async create(file: Express.Multer.File, userId?: string, folderInput?: string, compressAnimated?: boolean) {
+  async create(
+    file: Express.Multer.File,
+    userId?: string,
+    folderInput?: string,
+    compressAnimated?: boolean,
+  ) {
     if (!file?.buffer?.length && !(file as any)?.path) {
       throw new BadRequestException('No file uploaded');
     }
@@ -350,7 +468,9 @@ export class MediaService implements OnModuleInit {
     const originalName = file.originalname
       ? Buffer.from(file.originalname, 'binary').toString('utf-8')
       : 'file';
-    const ext = (extname(originalName) || '').toLowerCase() || this.extFromMime(file.mimetype);
+    const ext =
+      (extname(originalName) || '').toLowerCase() ||
+      this.extFromMime(file.mimetype);
     const nameBase = await this.generateNameBase(originalName);
     const buffer = file.buffer?.length
       ? file.buffer
@@ -377,7 +497,9 @@ export class MediaService implements OnModuleInit {
 
       const webpName = `${nameBase}.webp`;
       const webpFs = join(UPLOAD_ROOT, folder, webpName);
-      const webpBuf = await sharp(buffer, { animated: true }).webp({ quality: 80 }).toBuffer();
+      const webpBuf = await sharp(buffer, { animated: true })
+        .webp({ quality: 80 })
+        .toBuffer();
       writeFileSync(webpFs, webpBuf);
 
       filename = webpName;
@@ -408,7 +530,11 @@ export class MediaService implements OnModuleInit {
 
     // cleanup multer disk temp if any
     if ((file as any).path && existsSync((file as any).path)) {
-      try { unlinkSync((file as any).path); } catch { /* ignore */ }
+      try {
+        unlinkSync((file as any).path);
+      } catch {
+        /* ignore */
+      }
     }
 
     const created = await this.prisma.media.create({
@@ -425,16 +551,27 @@ export class MediaService implements OnModuleInit {
     });
     if (isRasterImage) {
       await this.prisma.mediaMetadata.create({ data: { mediaId: created.id } });
-      void this.metadataQueue.add('extract', { mediaId: created.id }, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: true,
-      }).catch(async (error: Error) => {
-        await this.prisma.mediaMetadata.update({
-          where: { mediaId: created.id },
-          data: { status: 'failed', error: `无法加入 EXIF 队列：${error.message}` },
-        }).catch(() => undefined);
-      });
+      void this.metadataQueue
+        .add(
+          'extract',
+          { mediaId: created.id },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 2000 },
+            removeOnComplete: true,
+          },
+        )
+        .catch(async (error: Error) => {
+          await this.prisma.mediaMetadata
+            .update({
+              where: { mediaId: created.id },
+              data: {
+                status: 'failed',
+                error: `无法加入 EXIF 队列：${error.message}`,
+              },
+            })
+            .catch(() => undefined);
+        });
     }
     return created;
   }
@@ -443,22 +580,34 @@ export class MediaService implements OnModuleInit {
     let pipeline = sharp(buffer).rotate();
 
     if (folder === 'avatar') {
-      pipeline = pipeline.resize(512, 512, { fit: 'cover', position: 'centre' });
+      pipeline = pipeline.resize(512, 512, {
+        fit: 'cover',
+        position: 'centre',
+      });
       return pipeline.webp({ quality: 85 }).toBuffer();
     }
 
     if (folder === 'cover') {
-      pipeline = pipeline.resize(1920, 1080, { fit: 'inside', withoutEnlargement: true });
+      pipeline = pipeline.resize(1920, 1080, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
       return pipeline.webp({ quality: 82 }).toBuffer();
     }
 
     if (folder === 'emoji') {
-      pipeline = pipeline.resize(160, 160, { fit: 'inside', withoutEnlargement: true });
+      pipeline = pipeline.resize(160, 160, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
       return pipeline.webp({ quality: 80 }).toBuffer();
     }
 
     // article / general
-    pipeline = pipeline.resize(2560, 2560, { fit: 'inside', withoutEnlargement: true });
+    pipeline = pipeline.resize(2560, 2560, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
     return pipeline.webp({ quality: 80 }).toBuffer();
   }
 
@@ -483,23 +632,37 @@ export class MediaService implements OnModuleInit {
   async remove(id: string) {
     const media = await this.prisma.media.findUnique({
       where: { id },
-      include: { _count: { select: { albumItems: true, albumCovers: true, placeCovers: true } } },
+      include: {
+        _count: {
+          select: { albumItems: true, albumCovers: true, placeCovers: true },
+        },
+      },
     });
     if (!media) throw new NotFoundException('Media not found');
-    if (media._count.albumItems || media._count.albumCovers || media._count.placeCovers) {
+    if (
+      media._count.albumItems ||
+      media._count.albumCovers ||
+      media._count.placeCovers
+    ) {
       throw new BadRequestException('图片正在被相册或地点引用，请先移除引用');
     }
 
     const candidates = [
       join(process.cwd(), media.path.replace(/^\//, '')),
-      media.originalPath ? join(process.cwd(), media.originalPath.replace(/^\//, '')) : '',
+      media.originalPath
+        ? join(process.cwd(), media.originalPath.replace(/^\//, ''))
+        : '',
       join(UPLOAD_ROOT, media.filename),
       media.folder ? join(UPLOAD_ROOT, media.folder, media.filename) : '',
     ].filter(Boolean);
 
     for (const p of candidates) {
       if (p && existsSync(p)) {
-        try { unlinkSync(p); } catch { /* ignore */ }
+        try {
+          unlinkSync(p);
+        } catch {
+          /* ignore */
+        }
       }
     }
 

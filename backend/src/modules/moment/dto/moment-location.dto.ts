@@ -1,4 +1,10 @@
-import { IsBoolean, IsDateString, IsIn, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsOptional,
+  IsUUID,
+} from 'class-validator';
 
 export class MomentLocationDto {
   @IsOptional()

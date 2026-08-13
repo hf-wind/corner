@@ -1,23 +1,21 @@
 <template>
-  <div class="page-layout">
+  <div class="page-layout" :class="{ 'home-ready': homeReady }">
     <main class="main-content">
-      <div class="featured-module-slot">
+      <div class="featured-module-slot home-module" style="--home-enter-order: 0">
         <FeaturedSwiper />
       </div>
-      <div class="discovery-module-slot">
+      <div class="discovery-module-slot home-module" style="--home-enter-order: 1">
         <AiDiscoveryPanel />
       </div>
 
-      <div class="section-title">· 最新文章</div>
+      <div class="section-title home-module" style="--home-enter-order: 2">· 最新文章</div>
 
       <div
-        class="article-list-wrap"
+        class="article-list-wrap home-module"
+        style="--home-enter-order: 3"
         :class="{ refreshing, 'content-reveal': !loading }"
         aria-live="polite"
       >
-        <div v-if="loading" class="article-skeleton" aria-label="正在加载文章">
-          <span v-for="index in 3" :key="index" />
-        </div>
         <div v-if="refreshing" class="article-refresh-bar"><span /></div>
         <div v-if="!loading && !articles.length" class="article-empty">
           <Icon name="ph:article-bold" />
@@ -67,8 +65,10 @@ const refreshing = ref(false);
 const page = ref(1);
 const totalPages = ref(1);
 const showPet = ref(false);
+const homeReady = ref(false);
 let requestId = 0;
 let petIdleHandle: number | undefined;
+let enterFrame = 0;
 
 async function loadArticles() {
   const id = ++requestId;
@@ -144,6 +144,9 @@ async function restoreScroll() {
 }
 
 onMounted(() => {
+  enterFrame = window.requestAnimationFrame(() => {
+    homeReady.value = true;
+  });
   loadArticles().then(restoreScroll);
   const schedule =
     window.requestIdleCallback ||
@@ -157,6 +160,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  window.cancelAnimationFrame(enterFrame);
   if (petIdleHandle === undefined) return;
   if (window.cancelIdleCallback) window.cancelIdleCallback(petIdleHandle);
   else window.clearTimeout(petIdleHandle);
@@ -189,6 +193,16 @@ onUnmounted(() => {
   min-height: 96px;
 }
 
+.home-module {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+}
+
+.home-ready .home-module {
+  animation: home-module-enter 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--home-enter-order, 0) * 70ms);
+}
+
 .section-title {
   font-size: 0.75rem;
   color: var(--c-text-2);
@@ -209,31 +223,24 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 12px;
   position: relative;
+  perspective: 900px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .article-list:has(:deep(.article-card:hover)) :deep(.article-card:not(:hover)) {
+    filter: saturate(0.94);
+  }
+
+  .article-list :deep(.article-card:hover + .article-card),
+  .article-list :deep(.article-card:has(+ .article-card:hover)) {
+    transform: translate3d(0, 3px, -8px) scale(0.996);
+    filter: saturate(0.98);
+  }
 }
 
 .article-list-wrap {
   position: relative;
   min-height: 372px;
-}
-
-.article-skeleton {
-  display: grid;
-  gap: 12px;
-}
-
-.article-skeleton span {
-  display: block;
-  height: 110px;
-  border: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
-  border-radius: 10px;
-  background: linear-gradient(
-    100deg,
-    var(--ld-bg-card) 24%,
-    color-mix(in srgb, var(--c-primary-soft) 52%, var(--ld-bg-card)) 38%,
-    var(--ld-bg-card) 52%
-  );
-  background-size: 240% 100%;
-  animation: article-skeleton-shimmer 1.25s ease-in-out infinite;
 }
 
 .article-list-wrap.refreshing .article-list {
@@ -289,18 +296,16 @@ onUnmounted(() => {
   }
 }
 
-@keyframes article-skeleton-shimmer {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
+@keyframes home-module-enter {
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @media (max-width: 640px) {
   .featured-module-slot { min-height: 206px; }
   .discovery-module-slot { min-height: 96px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .article-skeleton span { animation: none; }
 }
 
 .sidebar-right {
@@ -314,8 +319,19 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .home-module {
+    opacity: 1;
+    transform: none;
+  }
+  .home-ready .home-module {
+    animation: none;
+  }
   .article-refresh-bar span {
     animation: none;
+  }
+  .article-list :deep(.article-card) {
+    transform: none !important;
+    filter: none !important;
   }
 }
 

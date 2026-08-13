@@ -9,7 +9,10 @@ export class NotificationService {
     private sse: NotificationSseService,
   ) {}
 
-  async create(userId: string, data: { type: string; title: string; content?: string; link?: string }) {
+  async create(
+    userId: string,
+    data: { type: string; title: string; content?: string; link?: string },
+  ) {
     const notification = await this.prisma.notification.create({
       data: {
         userId,

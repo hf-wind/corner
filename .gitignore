@@ -17,4 +17,3 @@ backups/
 .codex-dev/
 backend/.prisma-tmp/
 docs/superpowers/plans/2026-07-25-friend-link-application.md
-docs/superpowers/specs/

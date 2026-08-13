@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { RedisService } from '../../common/redis/redis.service';
 
 type WeatherSnapshot = {
@@ -26,7 +30,8 @@ export class WeatherService {
   constructor(private readonly redis: RedisService) {}
 
   async getWeather(): Promise<WeatherSnapshot> {
-    if (this.memoryCache && Date.now() < this.memoryExpiresAt) return this.memoryCache;
+    if (this.memoryCache && Date.now() < this.memoryExpiresAt)
+      return this.memoryCache;
 
     const cached = await this.withCacheDeadline(
       this.redis.getJson<WeatherSnapshot>(this.cacheKey),
@@ -40,10 +45,13 @@ export class WeatherService {
     try {
       const snapshot = await this.fetchOpenMeteo();
       this.remember(snapshot);
-      await this.withCacheDeadline(Promise.all([
-        this.redis.setJson(this.cacheKey, snapshot, 15 * 60),
-        this.redis.setJson(this.staleCacheKey, snapshot, 24 * 60 * 60),
-      ]), undefined);
+      await this.withCacheDeadline(
+        Promise.all([
+          this.redis.setJson(this.cacheKey, snapshot, 15 * 60),
+          this.redis.setJson(this.staleCacheKey, snapshot, 24 * 60 * 60),
+        ]),
+        undefined,
+      );
       return snapshot;
     } catch (error) {
       this.logger.warn(`Open-Meteo 请求失败: ${(error as Error).message}`);
@@ -62,7 +70,10 @@ export class WeatherService {
     this.memoryExpiresAt = Date.now() + 5 * 60 * 1000;
   }
 
-  private async withCacheDeadline<T>(operation: Promise<T>, fallback: T): Promise<T> {
+  private async withCacheDeadline<T>(
+    operation: Promise<T>,
+    fallback: T,
+  ): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([
@@ -81,7 +92,9 @@ export class WeatherService {
 
   private async fetchOpenMeteo(): Promise<WeatherSnapshot> {
     const latitude = String(process.env.WEATHER_LATITUDE || '30.0024').trim();
-    const longitude = String(process.env.WEATHER_LONGITUDE || '120.5781').trim();
+    const longitude = String(
+      process.env.WEATHER_LONGITUDE || '120.5781',
+    ).trim();
     const city = String(process.env.WEATHER_CITY || '绍兴').trim();
     const url =
       'https://api.open-meteo.com/v1/forecast' +
@@ -156,8 +169,17 @@ function wmoCondition(code: number): string {
 }
 
 function windDirectionLabel(degrees: number): string {
-  const sectors = ['北风', '东北风', '东风', '东南风', '南风', '西南风', '西风', '西北风'];
-  const index = Math.round(((degrees % 360) + 360) % 360 / 45) % 8;
+  const sectors = [
+    '北风',
+    '东北风',
+    '东风',
+    '东南风',
+    '南风',
+    '西南风',
+    '西风',
+    '西北风',
+  ];
+  const index = Math.round((((degrees % 360) + 360) % 360) / 45) % 8;
   return sectors[index];
 }
 

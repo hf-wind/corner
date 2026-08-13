@@ -13,11 +13,11 @@ import { TurnstileService } from './turnstile.service';
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'corner-dev-secret',
       signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any },
-    } as any),
+    }),
     EmailModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, TurnstileService],
-  exports: [AuthService],
+  exports: [AuthService, TurnstileService],
 })
 export class AuthModule {}

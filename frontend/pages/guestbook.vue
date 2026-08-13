@@ -320,7 +320,6 @@
         </div>
       </section>
 
-      <VisitorFootprints />
     </aside>
 
     <VisitorNameModal
@@ -560,9 +559,9 @@ function askName(rename = false) {
   if (rename) pendingAction.value = null;
 }
 
-async function handleNameConfirm(name: string, mail: string) {
+async function handleNameConfirm(name: string, mail: string, turnstileToken: string) {
   try {
-    const result = await identify(name, mail);
+    const result = await identify(name, mail, turnstileToken);
     await refreshMe();
     toast.success(`你好，${name}`);
     celebrate(result?.unlocked);

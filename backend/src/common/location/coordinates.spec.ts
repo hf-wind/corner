@@ -9,6 +9,9 @@ describe('coordinate helpers', () => {
   });
 
   it('keeps WGS84 input unchanged', () => {
-    expect(toWgs84(120.5, 30, 'wgs84')).toEqual({ longitude: 120.5, latitude: 30 });
+    expect(toWgs84(120.5, 30, 'wgs84')).toEqual({
+      longitude: 120.5,
+      latitude: 30,
+    });
   });
 });

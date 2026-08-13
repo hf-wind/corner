@@ -108,15 +108,17 @@ function prefetchArticle() {
   color: inherit;
   contain: layout paint;
   transform: translateZ(0);
+  transform-origin: center bottom;
   will-change: transform;
-  transition: transform 0.48s cubic-bezier(.16, 1, .3, 1), background-color 0.28s ease, box-shadow 0.48s cubic-bezier(.16, 1, .3, 1);
-  animation: article-card-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--article-index, 0) * 36ms);
+  transition: transform 0.56s cubic-bezier(.16, 1, .3, 1), background-color 0.28s ease, box-shadow 0.56s cubic-bezier(.16, 1, .3, 1), filter .42s ease;
+  animation: article-card-enter 0.54s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--article-index, 0) * 44ms);
 }
 .article-card:hover {
   background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-primary-soft));
-  box-shadow: 0 16px 34px color-mix(in srgb, var(--ld-shadow) 70%, transparent);
-  transform: translate3d(0, -5px, 0);
+  box-shadow: 0 18px 38px color-mix(in srgb, var(--ld-shadow) 72%, transparent);
+  transform: translate3d(0, -9px, 18px) rotateX(1.2deg) scale(1.006);
+  filter: saturate(1.03);
 }
 .article-card:active { transform: translate3d(0, -1px, 0) scale(.995); transition-duration: .12s; }
 

@@ -1,4 +1,9 @@
-import { Process, Processor, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
+import {
+  Process,
+  Processor,
+  OnQueueFailed,
+  OnQueueCompleted,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,7 +45,10 @@ export class EmailVerificationProcessor {
       port: (port as number) || 465,
       secure: secure !== false,
       auth: {
-        user: (user as string) || process.env.EMAIL_SMTP_USER || '1833079849@qq.com',
+        user:
+          (user as string) ||
+          process.env.EMAIL_SMTP_USER ||
+          '1833079849@qq.com',
         pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
       },
     });
@@ -132,7 +140,10 @@ export class EmailNotificationProcessor {
       port: (port as number) || 465,
       secure: secure !== false,
       auth: {
-        user: (user as string) || process.env.EMAIL_SMTP_USER || '1833079849@qq.com',
+        user:
+          (user as string) ||
+          process.env.EMAIL_SMTP_USER ||
+          '1833079849@qq.com',
         pass: (pass as string) || process.env.EMAIL_SMTP_PASS || '',
       },
     });

@@ -366,7 +366,7 @@ export class PlaceService {
     } catch {
       throw new ServiceUnavailableException('暂时无法连接高德地点服务');
     }
-    const payload = (await response.json()) as any;
+    const payload = await response.json();
     if (!response.ok || payload.status !== '1') {
       throw new ServiceUnavailableException(
         payload.info || '高德地点服务返回异常',

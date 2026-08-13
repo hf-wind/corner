@@ -1,4 +1,12 @@
-import { IsOptional, IsString, IsInt, Min, IsBoolean, Max, MaxLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  IsBoolean,
+  Max,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PostQueryDto {
@@ -50,5 +58,4 @@ export class PostQueryDto {
   @IsBoolean()
   @Type(() => Boolean)
   needsPublish?: boolean;
-
 }
