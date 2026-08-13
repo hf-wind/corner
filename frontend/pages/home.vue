@@ -8,7 +8,12 @@
         <AiDiscoveryPanel />
       </div>
 
-      <div class="section-title home-module" style="--home-enter-order: 2">· 最新文章</div>
+      <SectionHead
+        class="home-module latest-head"
+        style="--home-enter-order: 2"
+        kicker="LATEST"
+        title="最新文章"
+      />
 
       <div
         class="article-list-wrap home-module"
@@ -58,6 +63,7 @@ const AiPet = defineAsyncComponent(() => import("~/components/AiPet.vue"));
 const FeaturedSwiper = defineAsyncComponent(() => import("~/components/FeaturedSwiper.vue"));
 const AiDiscoveryPanel = defineAsyncComponent(() => import("~/components/AiDiscoveryPanel.vue"));
 const HomeSidebar = defineAsyncComponent(() => import("~/components/HomeSidebar.vue"));
+import SectionHead from "~/components/SectionHead.vue";
 const api = useApi();
 const articles = ref<any[]>([]);
 const loading = ref(true);
@@ -117,7 +123,7 @@ async function changePage() {
   await loadArticles();
   await nextTick();
   const main = document.querySelector<HTMLElement>(".main-content");
-  const list = document.querySelector<HTMLElement>(".section-title");
+  const list = document.querySelector<HTMLElement>(".latest-head");
   if (!main || !list) return;
   const top = Math.max(0, list.offsetTop - 18);
   main.scrollTo({
@@ -203,14 +209,6 @@ onUnmounted(() => {
   animation-delay: calc(var(--home-enter-order, 0) * 70ms);
 }
 
-.section-title {
-  font-size: 0.75rem;
-  color: var(--c-text-2);
-  letter-spacing: 0.12em;
-  margin-bottom: 10px;
-  padding-left: 4px;
-}
-
 .loading-tip {
   text-align: center;
   color: var(--c-text-2);
@@ -223,19 +221,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 12px;
   position: relative;
-  perspective: 900px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .article-list:has(:deep(.article-card:hover)) :deep(.article-card:not(:hover)) {
-    filter: saturate(0.94);
-  }
-
-  .article-list :deep(.article-card:hover + .article-card),
-  .article-list :deep(.article-card:has(+ .article-card:hover)) {
-    transform: translate3d(0, 3px, -8px) scale(0.996);
-    filter: saturate(0.98);
-  }
 }
 
 .article-list-wrap {

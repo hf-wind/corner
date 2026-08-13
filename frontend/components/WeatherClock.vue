@@ -20,29 +20,34 @@
     </div>
 
     <header class="weather-head">
-      <span class="weather-city"><Icon name="ph:map-pin-bold" /> {{ weather.city }}</span>
+      <span class="weather-kicker">此刻天气</span>
       <span class="weather-status">
         <Icon :name="weather.stale ? 'ph:cloud-arrow-down-bold' : 'ph:pulse-bold'" />
         {{ weather.stale ? '缓存' : '实时' }}
       </span>
     </header>
 
-    <div class="wx-dial">
-      <div class="wx-orb">
-        <span class="wx-promp" aria-hidden="true" />
+    <div class="weather-primary">
+      <div class="weather-symbol">
         <Transition name="wx-swap" mode="out-in">
           <Icon v-if="loading" key="loading" name="ph:planet-bold" />
           <Icon v-else :key="weatherIcon" :name="weatherIcon" />
         </Transition>
       </div>
       <Transition name="wx-swap" mode="out-in">
-        <div v-if="loading" key="loading" class="wx-main">
-          <p class="wx-temp">--<i>°C</i></p>
-          <p class="wx-cond">望风而行…</p>
+        <div v-if="loading" key="loading" class="weather-reading">
+          <p class="weather-temp">--<i>°</i></p>
+          <div class="weather-copy">
+            <strong>望风而行…</strong>
+            <span><Icon name="ph:map-pin-bold" /> {{ weather.city }}</span>
+          </div>
         </div>
-        <div v-else key="weather" class="wx-main">
-          <p class="wx-temp">{{ weather.temperature }}<i>°C</i></p>
-          <p class="wx-cond">{{ weather.condition }}</p>
+        <div v-else key="weather" class="weather-reading">
+          <p class="weather-temp">{{ weather.temperature }}<i>°</i></p>
+          <div class="weather-copy">
+            <strong>{{ weather.condition }}</strong>
+            <span><Icon name="ph:map-pin-bold" /> {{ weather.city }}</span>
+          </div>
         </div>
       </Transition>
     </div>
@@ -105,56 +110,42 @@ function flakeStyle(n: number) {
 
 <style scoped>
 .weather-card {
-  --wx-bg: linear-gradient(160deg, #8fa8c8, #6d84a8 55%, #54698c);
-  --wx-ink: #fff;
-  --wx-sizing: 0.99;
+  --wx-bg: #667991;
+  --wx-accent: #d9e4ef;
   position: relative;
   display: flex;
+  min-height: 150px;
   flex-direction: column;
-  padding: 13px 15px 12px;
+  padding: 15px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
-  border-radius: 20px;
-  background: linear-gradient(160deg, #8fa8c8, #6d84a8 55%, #54698c);
-  color: var(--wx-ink);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 14px;
+  background: var(--wx-bg);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 38%, transparent);
+  color: #fff;
   isolation: isolate;
-  transform: scale(var(--wx-sizing));
-  transition: box-shadow 0.36s ease, transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), filter 0.36s ease;
+  transition: background-color .65s ease, box-shadow .35s ease, transform .35s cubic-bezier(.16, 1, .3, 1);
+}
+.weather-card:hover {
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--ld-shadow) 54%, transparent);
 }
 .weather-card::before {
   position: absolute;
   z-index: 2;
-  top: 0;
-  left: 14%;
-  right: 14%;
-  height: 1px;
-  border-radius: 99px;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 52%), transparent);
-  content: "";
-  pointer-events: none;
-}
-.weather-card::after {
-  position: absolute;
-  z-index: 0;
   inset: 0;
-  background: var(--wx-bg);
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 22%);
   content: "";
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.85s ease;
-}
-.weather-card:not(.is-loading)::after {
-  opacity: 1;
 }
 
-/* ===== 天气氛围 ===== */
-.weather-sunny { --wx-bg: linear-gradient(160deg, #ffd08a, #f7a44b 46%, #e0712f); }
-.weather-cloudy { --wx-bg: linear-gradient(160deg, #9cc0ec, #6d96d0 55%, #4f7ab8); }
-.weather-overcast { --wx-bg: linear-gradient(160deg, #8b9cb4, #68788f 58%, #4b5a70); }
-.weather-rain { --wx-bg: linear-gradient(160deg, #5d9be0, #3a6cb8 55%, #274d91); }
-.weather-snow { --wx-bg: linear-gradient(160deg, #c3d9f4, #9db9dd 55%, #7e9cc6); }
-.weather-storm { --wx-bg: linear-gradient(160deg, #7a6ad1, #4f3f9e 58%, #352a74); }
-.weather-fog { --wx-bg: linear-gradient(160deg, #aab6c4, #8392a6 58%, #64738a); }
+.weather-sunny { --wx-bg: #d8863f; --wx-accent: #ffe4a6; }
+.weather-cloudy { --wx-bg: #5d83ad; --wx-accent: #d7e8f8; }
+.weather-overcast { --wx-bg: #647386; --wx-accent: #dce2e8; }
+.weather-rain { --wx-bg: #416c9c; --wx-accent: #c4e5ff; }
+.weather-snow { --wx-bg: #7695b5; --wx-accent: #f4fbff; }
+.weather-storm { --wx-bg: #554b82; --wx-accent: #f3da82; }
+.weather-fog { --wx-bg: #77838e; --wx-accent: #edf1f3; }
 
 .wx-scene {
   position: absolute;
@@ -166,8 +157,10 @@ function flakeStyle(n: number) {
 
 .wx-rays {
   position: absolute;
-  inset: -46px;
-  border-radius: 50%;
+  top: -130px;
+  right: -130px;
+  width: 300px;
+  height: 300px;
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
@@ -196,9 +189,8 @@ function flakeStyle(n: number) {
     transparent 333deg,
     transparent 360deg
   );
-  -webkit-mask: radial-gradient(circle, transparent 42%, #000 78%);
-  mask: radial-gradient(circle, transparent 42%, #000 78%);
-  animation: wx-spin 26s linear infinite, wx-scene-in 0.6s ease-out both;
+  opacity: .45;
+  animation: wx-spin 30s linear infinite, wx-scene-in .6s ease-out both;
 }
 
 .wx-cloud {
@@ -313,11 +305,10 @@ function flakeStyle(n: number) {
 .wx-veil {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgb(255 255 255 / 9%), transparent 34%, transparent 72%, rgb(3 14 32 / 13%));
+  background: linear-gradient(135deg, rgb(255 255 255 / 12%), transparent 42%, rgb(7 16 30 / 12%));
   pointer-events: none;
 }
 
-/* ===== 头部 ===== */
 .weather-head {
   position: relative;
   z-index: 3;
@@ -326,145 +317,130 @@ function flakeStyle(n: number) {
   justify-content: space-between;
   gap: 8px;
 }
-.weather-city {
+.weather-kicker {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: .62rem;
+  font-weight: 750;
+  letter-spacing: .12em;
+  opacity: .82;
   text-shadow: 0 1px 8px rgb(0 0 0 / 12%);
-}
-.weather-city > svg {
-  font-size: 0.72rem;
-  opacity: 0.9;
 }
 .weather-status {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 7px;
   border-radius: 999px;
   background: rgb(255 255 255 / 15%);
-  font-size: 0.5rem;
+  font-size: .52rem;
   font-weight: 600;
   letter-spacing: 0.06em;
 }
 
-/* ===== 中央罗盘 ===== */
-.wx-dial {
+.weather-primary {
   position: relative;
   z-index: 3;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 9px 0 7px;
+  gap: 12px;
+  flex: 1;
+  padding: 15px 0 12px;
 }
-.wx-orb {
+.weather-symbol {
   position: relative;
   display: grid;
-  width: 64px;
-  height: 64px;
-  border: 1px solid rgb(255 255 255 / 34%);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 26%, rgb(255 255 255 / 24%), transparent 52%),
-    rgb(255 255 255 / 13%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 34%), 0 10px 24px rgb(6 22 48 / 16%);
-  color: #fff;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 11%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%);
+  color: var(--wx-accent);
   font-size: 1.85rem;
+  backdrop-filter: blur(8px);
   place-items: center;
 }
-.wx-orb > svg {
+.weather-symbol > svg {
   filter: drop-shadow(0 2px 8px rgb(0 0 0 / 18%));
 }
-.is-loading .wx-orb > svg {
+.is-loading .weather-symbol > svg {
   animation: wx-orbit 5s linear infinite;
 }
-.wx-promp {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 88px;
-  height: 88px;
-  border: 1px dashed rgb(255 255 255 / 32%);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  animation: wx-promp-rotate 22s linear infinite;
-  pointer-events: none;
-}
-.wx-promp::after {
-  position: absolute;
-  top: -3px;
-  left: 50%;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 82%);
-  box-shadow: 0 0 8px rgb(255 255 255 / 70%);
-  content: "";
-}
-
-.wx-main {
+.weather-reading {
   display: flex;
-  flex-direction: column;
+  min-width: 0;
   align-items: center;
-  margin-top: 4px;
+  gap: 9px;
 }
-.wx-temp {
+.weather-temp {
   margin: 0;
   font-family: var(--font-accent);
-  font-size: 2.3rem;
-  font-weight: 750;
-  line-height: 1.05;
+  font-size: 2.7rem;
+  font-weight: 760;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 14px rgb(0 0 0 / 16%);
+  text-shadow: 0 2px 14px rgb(0 0 0 / 14%);
 }
-.wx-temp i {
-  font-size: 1.05rem;
+.weather-temp i {
+  font-size: 1.25rem;
   font-style: normal;
   font-weight: 500;
-  opacity: 0.88;
+  vertical-align: top;
+  opacity: .82;
 }
-.wx-cond {
-  margin: 1px 0 0;
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  opacity: 0.9;
+.weather-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.weather-copy strong {
+  overflow: hidden;
+  font-size: .76rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.weather-copy span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .56rem;
+  opacity: .72;
 }
 
-/* ===== 指标 ===== */
 .weather-metrics {
   position: relative;
   z-index: 3;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding-top: 10px;
+  gap: 5px;
+  padding-top: 9px;
   border-top: 1px solid rgb(255 255 255 / 18%);
 }
 .w-metric {
-  display: flex;
+  display: grid;
   min-width: 0;
-  flex-direction: column;
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  gap: 3px;
-  text-align: center;
+  gap: 1px 5px;
+  text-align: left;
 }
 .w-metric > svg {
-  font-size: 0.8rem;
+  grid-row: 1 / 3;
+  font-size: .88rem;
   opacity: 0.85;
 }
 .w-metric span {
-  font-size: 0.5rem;
-  letter-spacing: 0.08em;
-  opacity: 0.78;
+  font-size: .48rem;
+  opacity: .66;
 }
 .w-metric strong {
   max-width: 100%;
   overflow: hidden;
-  font-size: 0.6rem;
+  font-size: .55rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
@@ -487,7 +463,6 @@ function flakeStyle(n: number) {
   flex: 0 0 auto;
 }
 
-/* ===== 过渡动画 ===== */
 .wx-swap-enter-active,
 .wx-swap-leave-active,
 .wx-num-enter-active,
@@ -523,11 +498,6 @@ function flakeStyle(n: number) {
 @keyframes wx-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-@keyframes wx-promp-rotate {
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
   }
 }
 @keyframes wx-orbit {
@@ -593,11 +563,7 @@ function flakeStyle(n: number) {
   .weather-card {
     transition: none;
   }
-  .weather-card::after {
-    transition: none;
-  }
-  .is-loading .wx-orb > svg,
-  .wx-promp,
+  .is-loading .weather-symbol > svg,
   .wx-rays {
     animation: none;
   }

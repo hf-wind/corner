@@ -2,7 +2,7 @@
   <section class="discovery-entry" aria-labelledby="ai-discovery-title">
     <button
       type="button"
-      class="discovery-trigger"
+      class="discovery-trigger ui-hover-surface"
       :aria-expanded="panelOpen"
       @click="openPanel"
     >
@@ -340,15 +340,6 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
   color: inherit;
   cursor: pointer;
   text-align: left;
-  transition:
-    border-color 0.25s ease,
-    box-shadow 0.35s ease,
-    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.discovery-trigger:hover {
-  box-shadow: 0 16px 34px
-    color-mix(in srgb, var(--c-primary) 12%, var(--ld-shadow));
-  transform: translateY(-3px);
 }
 .trigger-mark,
 .panel-symbol {

@@ -182,11 +182,40 @@ html.theme-switching :where(
   .article-main,
   .sidebar-right,
   .admin-main,
-  .article-card,
   .stat-item,
   .ant-card
 ) {
   transition: background-color 0.24s ease, border-color 0.24s ease, color 0.24s ease !important;
+}
+
+.ui-hover-surface {
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 0.61, 0.36, 1), background-color 0.24s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-hover-surface.ui-hover-surface:hover {
+    box-shadow: 0 20px 40px color-mix(in srgb, var(--ld-shadow) 64%, transparent), 0 6px 16px color-mix(in srgb, var(--ld-shadow) 34%, transparent);
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+html.theme-switching .ui-hover-surface {
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1), background-color 0.24s ease, border-color 0.24s ease, color 0.24s ease, box-shadow 0.24s ease !important;
+}
+
+html.theme-switching .article-card .cover-shade {
+  transition: background-color 0.24s ease, box-shadow 0.24s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-hover-surface {
+    transition: background-color 0.24s ease, box-shadow 0.24s ease;
+  }
+
+  .ui-hover-surface:hover {
+    transform: none;
+  }
 }
 
 body,
