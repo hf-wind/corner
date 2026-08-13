@@ -182,7 +182,6 @@
           `discovery-${activeDiscovery.id}`,
           { 'is-closing': discoveryClosing, 'is-immersive': immersiveMode },
         ]"
-        :style="{ '--discovery-accent': activeDiscovery.accent }"
         role="dialog"
         :aria-label="`${activeDiscovery.title}遥测档案`"
       >
@@ -1380,13 +1379,13 @@ useHead({ title: "时光星图" });
   overflow-x: hidden;
   overflow-y: auto;
   padding: 25px 25px 23px 30px;
-  border: 1px solid rgb(125 204 246 / 0.18);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 28%, var(--border));
   border-radius: 24px 24px 24px 10px;
-  background: linear-gradient(145deg, rgb(7 25 48 / 0.76), rgb(2 10 25 / 0.88));
+  background: color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft));
   box-shadow:
     0 24px 70px rgb(0 0 0 / 0.42),
     inset 0 1px rgb(191 226 255 / 0.08);
-  backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(1.08);
   transform: translateY(-50%);
 }
 .popup-rail {
@@ -1407,7 +1406,7 @@ useHead({ title: "时光星图" });
   width: 1px;
   background: linear-gradient(
     transparent,
-    rgb(104 203 246 / 0.46),
+    color-mix(in srgb, var(--c-primary) 46%, transparent),
     transparent
   );
   content: "";
@@ -1417,15 +1416,15 @@ useHead({ title: "时光星图" });
   position: relative;
   width: 6px;
   height: 6px;
-  border: 1px solid #79d7f7;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 72%, var(--border));
   border-radius: 50%;
-  background: #0b2842;
-  box-shadow: 0 0 12px #63c8ef;
+  background: var(--c-primary-soft);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c-primary) 64%, transparent);
 }
 .popup-rail i {
-  border-color: #9e8cff;
-  background: #28204a;
-  box-shadow: 0 0 12px #8b7dff;
+  border-color: color-mix(in srgb, var(--c-primary) 48%, var(--border));
+  background: var(--c-bg-1);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c-primary) 44%, transparent);
 }
 .popup-glow {
   position: absolute;
@@ -1434,7 +1433,11 @@ useHead({ title: "时光星图" });
   right: -74px;
   width: 240px;
   height: 190px;
-  background: radial-gradient(circle, rgb(61 156 235 / 0.22), transparent 68%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--c-primary) 22%, transparent),
+    transparent 68%
+  );
   pointer-events: none;
 }
 .popup-close {
@@ -1445,10 +1448,10 @@ useHead({ title: "时光星图" });
   display: grid;
   width: 28px;
   height: 28px;
-  border: 1px solid rgb(125 191 242 / 0.18);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 24%, var(--border));
   border-radius: 50%;
-  background: rgb(5 17 33 / 0.36);
-  color: #dcebfa;
+  background: var(--c-bg-1);
+  color: var(--c-text-2);
   cursor: pointer;
   place-items: center;
   transition:
@@ -1457,8 +1460,8 @@ useHead({ title: "时光星图" });
     transform 0.25s ease;
 }
 .popup-close:hover {
-  border-color: rgb(129 207 255 / 0.5);
-  background: rgb(38 104 158 / 0.28);
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
   transform: rotate(8deg);
 }
 .popup-identity {
@@ -1467,23 +1470,23 @@ useHead({ title: "时光星图" });
   align-items: center;
   gap: 9px;
   padding-right: 32px;
-  color: #8ad9fc;
+  color: var(--c-primary);
 }
 .popup-identity > span {
   display: grid;
   width: 32px;
   height: 32px;
   flex: none;
-  border: 1px solid rgb(105 208 240 / 0.34);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border));
   border-radius: 50%;
-  background: rgb(55 139 211 / 0.14);
+  background: var(--c-primary-soft);
   box-shadow:
-    inset 0 0 16px rgb(71 162 235 / 0.1),
-    0 0 24px rgb(61 143 210 / 0.1);
+    inset 0 0 16px color-mix(in srgb, var(--c-primary) 10%, transparent),
+    0 0 24px color-mix(in srgb, var(--c-primary) 10%, transparent);
   place-items: center;
 }
 .popup-identity small {
-  color: #84a9c4;
+  color: var(--c-text-3);
   font-size: 0.57rem;
   letter-spacing: 0.04em;
 }
@@ -1492,9 +1495,9 @@ useHead({ title: "时光星图" });
   margin-top: 17px;
   aspect-ratio: 1.85;
   overflow: hidden;
-  border: 1px solid rgb(128 189 235 / 0.12);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
   border-radius: 14px 14px 14px 4px;
-  background: #071323;
+  background: var(--c-bg-1);
 }
 .popup-image img {
   width: 100%;
@@ -1504,7 +1507,7 @@ useHead({ title: "时光星图" });
 .memory-popup h2 {
   margin: 18px 0 8px;
   padding-right: 8px;
-  color: #f3f8fd;
+  color: var(--c-text);
   font-size: 1.2rem;
   line-height: 1.35;
   letter-spacing: 0;
@@ -1512,7 +1515,7 @@ useHead({ title: "时光星图" });
 }
 .memory-popup > p {
   margin: 0;
-  color: #90aabf;
+  color: var(--c-text-2);
   font-size: 0.7rem;
   line-height: 1.8;
 }
@@ -1523,10 +1526,10 @@ useHead({ title: "时光星图" });
   justify-content: space-between;
   margin-top: 16px;
   padding: 0 12px;
-  border: 1px solid rgb(94 193 238 / 0.3);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 30%, var(--border));
   border-radius: 999px;
-  background: rgb(56 137 204 / 0.08);
-  color: #9edcff;
+  background: color-mix(in srgb, var(--c-primary) 8%, transparent);
+  color: var(--c-primary);
   font-size: 0.64rem;
   text-decoration: none;
   transition:
@@ -1535,25 +1538,25 @@ useHead({ title: "时光星图" });
     transform 0.2s ease;
 }
 .memory-popup > a:hover {
-  border-color: rgb(111 210 255 / 0.62);
-  background: rgb(56 137 204 / 0.16);
+  border-color: color-mix(in srgb, var(--c-primary) 62%, var(--border));
+  background: color-mix(in srgb, var(--c-primary) 16%, transparent);
   transform: translateX(2px);
 }
 .memory-popup section {
   margin-top: 19px;
   padding-top: 14px;
-  border-top: 1px solid rgb(100 164 219 / 0.13);
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 .memory-popup h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin: 0 0 3px;
-  color: #dcebf7;
+  color: var(--c-text);
   font-size: 0.65rem;
 }
 .memory-popup h3 small {
-  color: #577994;
+  color: var(--c-text-3);
   font-size: 0.5rem;
   font-weight: 400;
 }
@@ -1564,15 +1567,15 @@ useHead({ title: "时光星图" });
   gap: 2px 10px;
   padding: 9px 0;
   border: 0;
-  border-bottom: 1px solid rgb(92 151 201 / 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
   background: none;
-  color: #d7e6f1;
+  color: var(--c-text);
   cursor: pointer;
   text-align: left;
 }
 .memory-popup section button > span {
   grid-column: 1;
-  color: #669fc4;
+  color: var(--c-primary);
   font-size: 0.5rem;
 }
 .memory-popup section button > b {
@@ -1586,11 +1589,11 @@ useHead({ title: "时光星图" });
   grid-column: 2;
   grid-row: 1/3;
   align-self: center;
-  color: #6f94b0;
+  color: var(--c-text-3);
   font-size: 0.48rem;
 }
 .discovery-popup {
-  --discovery-accent: #72d9ff;
+  --discovery-accent: var(--c-primary);
   position: absolute;
   z-index: 20;
   top: 50%;
@@ -1602,12 +1605,12 @@ useHead({ title: "时光星图" });
   padding: 24px;
   overflow-x: hidden;
   overflow-y: auto;
-  border: 1px solid color-mix(in srgb, var(--discovery-accent) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 30%, var(--border));
   border-radius: 8px;
-  background: linear-gradient(155deg, rgb(7 21 38 / 0.94), rgb(2 8 19 / 0.97));
+  background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-primary-soft));
   box-shadow:
     0 28px 90px rgb(0 0 0 / 0.52),
-    inset 0 1px rgb(225 244 255 / 0.06);
+    inset 0 1px color-mix(in srgb, var(--c-primary) 10%, transparent);
   backdrop-filter: blur(24px) saturate(1.12);
   transform: translateY(-50%);
   transition:
@@ -1731,7 +1734,7 @@ useHead({ title: "时光星图" });
     color-mix(in srgb, var(--discovery-accent) 16%, transparent),
     color-mix(in srgb, var(--discovery-accent) 8%, transparent)
   );
-  color: #d9effa;
+  color: var(--c-text);
   cursor: pointer;
   font: inherit;
   font-size: 0.55rem;
@@ -1750,7 +1753,7 @@ useHead({ title: "时光星图" });
   transform: translateY(-1px);
 }
 .immersive-actions small {
-  color: color-mix(in srgb, var(--discovery-accent) 62%, #607588);
+  color: color-mix(in srgb, var(--c-primary) 62%, var(--c-text-3));
   font-size: 0.42rem;
   letter-spacing: 0.12em;
 }
@@ -1771,14 +1774,10 @@ useHead({ title: "时光星图" });
   pointer-events: none;
 }
 .discovery-black-hole {
-  background: linear-gradient(
-    150deg,
-    rgb(24 13 15 / 0.96),
-    rgb(3 6 12 / 0.98) 72%
-  );
+  background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-primary-soft));
   box-shadow:
     0 30px 100px rgb(0 0 0 / 0.7),
-    inset 0 0 70px rgb(128 37 12 / 0.08);
+    inset 0 0 70px color-mix(in srgb, var(--c-primary) 8%, transparent);
 }
 .discovery-identity {
   display: grid;
@@ -1806,14 +1805,14 @@ useHead({ title: "时光星图" });
 }
 .discovery-identity small {
   overflow: hidden;
-  color: color-mix(in srgb, var(--discovery-accent) 78%, #7d94a6);
+  color: color-mix(in srgb, var(--c-primary) 78%, var(--c-text-3));
   font-size: 0.48rem;
   letter-spacing: 0.08em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .discovery-identity b {
-  color: #c7d7e2;
+  color: var(--c-text);
   font-size: 0.58rem;
   font-weight: 560;
 }
@@ -1821,7 +1820,7 @@ useHead({ title: "时光星图" });
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #688196;
+  color: var(--c-text-3);
   font-size: 0.47rem;
   font-style: normal;
   white-space: nowrap;
@@ -1830,8 +1829,8 @@ useHead({ title: "时光星图" });
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #5ee2bb;
-  box-shadow: 0 0 9px #43cba6;
+  background: var(--c-primary);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--c-primary) 72%, transparent);
 }
 .discovery-title {
   display: flex;
@@ -1843,19 +1842,19 @@ useHead({ title: "时光星图" });
 .discovery-title h2 {
   min-width: 0;
   margin: 0;
-  color: #f1f7fb;
+  color: var(--c-text);
   font-size: 1.48rem;
   line-height: 1.15;
   letter-spacing: 0;
 }
 .discovery-title > span {
   flex: none;
-  color: #667f94;
+  color: var(--c-text-3);
   font-size: 0.5rem;
 }
 .discovery-details > p {
   margin: 10px 0 0;
-  color: #8fa5b5;
+  color: var(--c-text-2);
   font-size: 0.68rem;
   line-height: 1.8;
 }
@@ -1863,8 +1862,8 @@ useHead({ title: "时光星图" });
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 19px;
-  border-top: 1px solid rgb(133 172 199 / 0.13);
-  border-bottom: 1px solid rgb(133 172 199 / 0.13);
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 .telemetry-grid > div {
   display: flex;
@@ -1875,15 +1874,15 @@ useHead({ title: "时光星图" });
 }
 .telemetry-grid > div:nth-child(even) {
   padding-left: 12px;
-  border-left: 1px solid rgb(133 172 199 / 0.11);
+  border-left: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
 }
 .telemetry-grid small {
-  color: #607b90;
+  color: var(--c-text-3);
   font-size: 0.46rem;
 }
 .telemetry-grid strong {
   overflow: hidden;
-  color: #d4e2eb;
+  color: var(--c-text);
   font-size: 0.62rem;
   font-weight: 620;
   text-overflow: ellipsis;
@@ -1904,23 +1903,23 @@ useHead({ title: "时光星图" });
   gap: 12px;
 }
 .discovery-signal small {
-  color: color-mix(in srgb, var(--discovery-accent) 78%, #8399a9);
+  color: color-mix(in srgb, var(--c-primary) 78%, var(--c-text-3));
   font-size: 0.49rem;
   letter-spacing: 0.06em;
 }
 .discovery-signal time {
-  color: #526b7e;
+  color: var(--c-text-3);
   font-size: 0.47rem;
   font-variant-numeric: tabular-nums;
 }
 .discovery-signal strong {
-  color: #c9d9e4;
+  color: var(--c-text);
   font-size: 0.62rem;
   font-weight: 560;
   line-height: 1.65;
 }
 .discovery-signal > span {
-  color: #526a7c;
+  color: var(--c-text-3);
   font-size: 0.46rem;
   line-height: 1.55;
 }
@@ -1941,7 +1940,7 @@ useHead({ title: "时光星图" });
   border: 1px solid color-mix(in srgb, var(--discovery-accent) 30%, transparent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--discovery-accent) 8%, transparent);
-  color: #bcd2df;
+  color: var(--c-text-2);
   cursor: pointer;
   font: inherit;
   font-size: 0.58rem;
@@ -1955,7 +1954,7 @@ useHead({ title: "时光星图" });
 .discovery-commands button.active {
   border-color: color-mix(in srgb, var(--discovery-accent) 62%, transparent);
   background: color-mix(in srgb, var(--discovery-accent) 16%, transparent);
-  color: #effaff;
+  color: var(--c-text);
   transform: translateY(-1px);
 }
 .discovery-commands button:focus-visible {
@@ -1975,7 +1974,7 @@ useHead({ title: "时光星图" });
 }
 .signal button:focus-visible,
 .popup-close:focus-visible {
-  outline: 2px solid #4a9fe6;
+  outline: 2px solid var(--c-primary);
   outline-offset: 3px;
 }
 @keyframes loading-spin {

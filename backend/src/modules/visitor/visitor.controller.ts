@@ -40,19 +40,36 @@ export class VisitorController {
     @Headers('x-visitor-id') visitorId: string,
     @Body() dto: SetVisitorNicknameDto,
   ) {
-    const hash = this.visitorService.resolveVisitorId({ headers: { 'x-visitor-id': visitorId }, ip: req.ip });
-    return this.visitorService.identify({ headers: { 'x-visitor-id': visitorId }, ip: req.ip }, hash, dto.nickname, dto.email);
+    const hash = this.visitorService.resolveVisitorId({
+      headers: { 'x-visitor-id': visitorId },
+      ip: req.ip,
+    });
+    return this.visitorService.identify(
+      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
+      hash,
+      dto.nickname,
+      dto.email,
+    );
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('track')
   @HttpCode(200)
   async trackVisit(
-    @Req() req: { ip: string },
+    @Req() req: { ip: string; user?: { id?: string } },
     @Headers('x-visitor-id') visitorId: string,
     @Body() dto: TrackVisitDto,
   ) {
-    const hash = this.visitorService.resolveVisitorId({ headers: { 'x-visitor-id': visitorId }, ip: req.ip });
-    return this.visitorService.trackVisit({ headers: { 'x-visitor-id': visitorId }, ip: req.ip }, hash, dto);
+    const hash = this.visitorService.resolveVisitorId({
+      headers: { 'x-visitor-id': visitorId },
+      ip: req.ip,
+    });
+    return this.visitorService.trackVisit(
+      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
+      hash,
+      dto,
+      req.user?.id ?? null,
+    );
   }
 
   @Get('messages')
@@ -76,7 +93,8 @@ export class VisitorController {
     const actor: VisitorActor = req.user?.id
       ? { userId: req.user.id, username: req.user.username ?? '' }
       : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
+    const visitorIdHash =
+      this.visitorService.resolveVisitorIdOptional(visitorId);
     return this.visitorService.createMessageEntry(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
@@ -95,7 +113,8 @@ export class VisitorController {
     const actor: VisitorActor = req.user?.id
       ? { userId: req.user.id, username: req.user.username ?? '' }
       : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
+    const visitorIdHash =
+      this.visitorService.resolveVisitorIdOptional(visitorId);
     return this.visitorService.throwBottle(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
@@ -116,7 +135,8 @@ export class VisitorController {
     const actor: VisitorActor = req.user?.id
       ? { userId: req.user.id, username: req.user.username ?? '' }
       : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
+    const visitorIdHash =
+      this.visitorService.resolveVisitorIdOptional(visitorId);
     return this.visitorService.fishBottle(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
@@ -137,7 +157,8 @@ export class VisitorController {
     const actor: VisitorActor = req.user?.id
       ? { userId: req.user.id, username: req.user.username ?? '' }
       : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
+    const visitorIdHash =
+      this.visitorService.resolveVisitorIdOptional(visitorId);
     return this.visitorService.replyBottle(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
@@ -151,14 +172,17 @@ export class VisitorController {
   @Get('bottles/peek')
   async peekBottles(
     @Query('limit') limit = '8',
-    @Req() req: {
+    @Req()
+    req: {
       headers?: { 'x-visitor-id'?: string | string[] | undefined };
       user?: { id?: string };
     },
   ) {
     const raw = req.headers?.['x-visitor-id'];
     const visitorId = Array.isArray(raw) ? raw[0] : raw;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId ?? '');
+    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(
+      visitorId ?? '',
+    );
     return this.visitorService.peekBottles(
       Math.min(8, Math.max(1, Number(limit) || 8)),
       visitorIdHash,
@@ -173,7 +197,9 @@ export class VisitorController {
 
   @Get('me')
   async me(@Headers('x-visitor-id') visitorId: string) {
-    const hash = this.visitorService.resolveVisitorId({ headers: { 'x-visitor-id': visitorId } });
+    const hash = this.visitorService.resolveVisitorId({
+      headers: { 'x-visitor-id': visitorId },
+    });
     return this.visitorService.me(hash);
   }
 
@@ -216,10 +242,7 @@ export class VisitorController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Post('admin/messages/:id/reject')
-  async rejectMessage(
-    @Param('id') id: string,
-    @Body() dto: OptionalReasonDto,
-  ) {
+  async rejectMessage(@Param('id') id: string, @Body() dto: OptionalReasonDto) {
     return this.visitorService.reviewMessage(id, 'reject', dto?.reason);
   }
 
@@ -229,12 +252,14 @@ export class VisitorController {
   adminProfiles(
     @Query('keyword') keyword?: string,
     @Query('banned') banned?: string,
+    @Query('type') type?: 'user' | 'registered' | 'anonymous',
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.visitorService.adminProfiles({
       keyword,
       banned,
+      type,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });
@@ -254,4 +279,3 @@ export class VisitorController {
     return this.visitorService.setBan(id, false);
   }
 }
-

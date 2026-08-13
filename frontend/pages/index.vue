@@ -71,7 +71,7 @@
     <aside class="visitor-signal" aria-label="到访人数">
       <small>TRAVELERS VISITED</small>
       <strong>{{
-        totalVisitors != null ? formatNumber(totalVisitors) : "—"
+        graph.nodes.length || "—"
       }}</strong>
       <span>位旅人曾途经这座角落</span>
     </aside>
@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { useVisitor } from "~/composables/useVisitor";
+import { defineAsyncComponent } from "vue";
 
 definePageMeta({ layout: "welcome" });
 
@@ -97,16 +97,15 @@ type GraphNode = {
   image?: string | null;
 };
 const api = useApi();
+const TimeConstellationScene = defineAsyncComponent(() => import("~/components/TimeConstellationScene.vue"));
 const { mediaUrl } = useMediaUrl();
 const { siteTitle, loadSiteSettings } = useSiteSettings();
 const { navigating, navigate } = useCosmicNavigation();
-const { fetchWall } = useVisitor();
 const graph = reactive<{
   nodes: GraphNode[];
   relations: any[];
   graphVersion: string;
 }>({ nodes: [], relations: [], graphVersion: "" });
-const totalVisitors = ref<number | null>(null);
 const sceneReady = ref(false);
 const sceneFailed = ref(false);
 const graphLoaded = ref(false);
@@ -125,19 +124,10 @@ onMounted(async () => {
     api
       .get<any>("/memories/graph", { view: "constellation", limit: 320 })
       .then((result) => Object.assign(graph, result)),
-    fetchWall().then(
-      (wall) => (totalVisitors.value = wall?.totalVisitors ?? null),
-    ),
   ]);
   graphLoaded.value = true;
 });
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("zh-CN", {
-    notation: value >= 10000 ? "compact" : "standard",
-    maximumFractionDigits: 1,
-  }).format(value || 0);
-}
 function fallbackStar(index: number) {
   const seed = (index * 47) % 100;
   return {

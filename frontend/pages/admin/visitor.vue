@@ -63,7 +63,7 @@
                 <template v-if="column.key === 'content'">
                   <div class="content-cell">
                     <a-tag :color="record.type === 'bottle' ? 'blue' : 'cyan'" class="type-tag">{{ record.type === 'bottle' ? '漂流瓶' : '留言' }}</a-tag>
-                    <span :class="{ 'is-caught': record.status === 'caught' }">{{ record.content }}</span>
+                    <span class="content-ellipsis" :class="{ 'is-caught': record.status === 'caught' }">{{ record.content }}</span>
                   </div>
                 </template>
                 <template v-else-if="column.key === 'nickname'"><span class="nick-cell">{{ record.nickname || '无名旅人' }}</span></template>
@@ -76,11 +76,10 @@
                 </template>
                 <template v-else-if="column.key === 'status'">
                   <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
-                  <a-tooltip v-if="record.aiReview" :title="record.aiReview"><a-tag color="purple" class="ai-tag">AI</a-tag></a-tooltip>
-                  <a-tooltip v-if="record.rejectReason" :title="record.rejectReason"><a-tag color="red" class="ai-tag">拒因</a-tag></a-tooltip>
                 </template>
                 <template v-else-if="column.key === 'createdAt'">{{ formatTime(record.createdAt) }}</template>
                 <template v-else-if="column.key === 'actions'">
+                  <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
                   <a-button v-if="record.status !== 'approved' && record.status !== 'caught'" type="link" size="small" @click="handleApprove(record)">通过</a-button>
                   <a-button v-if="record.status !== 'rejected' && record.status !== 'caught'" type="link" size="small" danger @click="openReject(record)">拒绝</a-button>
                 </template>
@@ -94,6 +93,12 @@
         <div class="table-toolbar">
           <a-space>
             <a-input v-model:value="profileFilter.keyword" placeholder="搜索昵称" allow-clear style="width: 200px" @press-enter="loadProfiles(1)" @change="loadProfiles(1)" />
+            <a-select v-model:value="profileFilter.type" style="width: 140px" @change="loadProfiles(1)">
+              <a-select-option value="">全部身份</a-select-option>
+              <a-select-option value="user">登录用户</a-select-option>
+              <a-select-option value="registered">登记访客</a-select-option>
+              <a-select-option value="anonymous">未登记访客</a-select-option>
+            </a-select>
             <a-select v-model:value="profileFilter.banned" style="width: 120px" @change="loadProfiles(1)">
               <a-select-option value="">全部状态</a-select-option>
               <a-select-option value="false">正常</a-select-option>
@@ -117,7 +122,11 @@
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'nickname'">
                   <span class="nick-cell">{{ record.nickname || '无名旅人' }}</span>
+                  <a-tag :color="identityColor(record.identity)" class="identity-tag">{{ identityText(record.identity) }}</a-tag>
                   <a-tag v-if="record.isBanned" color="red" class="banned-tag">已封禁</a-tag>
+                </template>
+                <template v-else-if="column.key === 'region'">
+                  <span class="region-cell">{{ record.region || '未定位' }}</span>
                 </template>
                 <template v-else-if="column.key === 'counts'">
                   <span class="count-cell">访 {{ record.visitCount }} · 言 {{ record.messageCount }} · 瓶 {{ record.bottleCount }} · 捞 {{ record.caughtCount }}</span>
@@ -129,8 +138,10 @@
                   {{ formatTime(record.lastSeenAt) }}<span v-if="record.firstSeenAt" class="first-seen">初访 {{ formatTime(record.firstSeenAt) }}</span>
                 </template>
                 <template v-else-if="column.key === 'actions'">
-                  <a-button v-if="!record.isBanned" type="link" size="small" danger @click="handleBan(record, true)">封禁</a-button>
-                  <a-button v-else type="link" size="small" @click="handleBan(record, false)">解封</a-button>
+                  <template v-if="record.identity !== 'anonymous'">
+                    <a-button v-if="!record.isBanned" type="link" size="small" danger @click="handleBan(record, true)">封禁</a-button>
+                    <a-button v-else type="link" size="small" @click="handleBan(record, false)">解封</a-button>
+                  </template>
                 </template>
               </template>
             </a-table>
@@ -138,6 +149,25 @@
         </a-spin>
       </a-tab-pane>
     </a-tabs>
+
+    <a-modal
+      v-model:open="detailDialog.open"
+      :title="detailDialog.record ? (detailDialog.record.type === 'bottle' ? '漂流瓶详情' : '留言详情') : ''"
+      width="560px"
+      :footer="null"
+    >
+      <div v-if="detailDialog.record" class="detail-body">
+        <div class="detail-row"><span class="detail-label">类型</span><a-tag :color="detailDialog.record.type === 'bottle' ? 'blue' : 'cyan'">{{ detailDialog.record.type === 'bottle' ? '漂流瓶' : '留言' }}</a-tag></div>
+        <div class="detail-row detail-row-block"><span class="detail-label">内容</span><p class="detail-content">{{ detailDialog.record.content }}</p></div>
+        <div class="detail-row"><span class="detail-label">署名</span><span>{{ detailDialog.record.nickname || '无名旅人' }}</span></div>
+        <div class="detail-row"><span class="detail-label">账号</span><span v-if="detailDialog.record.account">{{ detailDialog.record.account.username }}<small v-if="detailDialog.record.account.email">（{{ detailDialog.record.account.email }}）</small></span><span v-else class="acct-guest">访客</span></div>
+        <div class="detail-row"><span class="detail-label">状态</span><a-tag :color="statusColor(detailDialog.record.status)">{{ statusText(detailDialog.record.status) }}</a-tag></div>
+        <div v-if="detailDialog.record.aiReview" class="detail-row"><span class="detail-label">AI 审核</span><span>{{ detailDialog.record.aiReview }}</span></div>
+        <div v-if="detailDialog.record.rejectReason" class="detail-row"><span class="detail-label">拒绝原因</span><span>{{ detailDialog.record.rejectReason }}</span></div>
+        <template v-if="detailDialog.record.status === 'caught'"><div class="detail-row"><span class="detail-label">捞起人</span><span>{{ detailDialog.record.catcher?.nickname || '未知旅人' }}</span></div><div class="detail-row"><span class="detail-label">捞起时间</span><span>{{ formatTime(detailDialog.record.caughtAt) }}</span></div></template>
+        <div class="detail-row"><span class="detail-label">提交时间</span><span>{{ formatTime(detailDialog.record.createdAt) }}</span></div>
+      </div>
+    </a-modal>
 
     <a-modal v-model:open="rejectDialog.open" title="拒绝这条内容" width="420px" @ok="confirmReject" @cancel="rejectDialog.open = false">
       <a-textarea v-model:value="rejectDialog.reason" placeholder="请输入拒绝理由" :rows="4" />
@@ -163,20 +193,21 @@ const messages = ref<any[]>([])
 const msgFilter = reactive({ type: '', status: '' })
 const msgPagination = reactive({ current: 1, pageSize: 20, total: 0, showSizeChanger: false })
 const msgColumns = [
-  { title: '内容', key: 'content', minWidth: 320 },
+  { title: '内容', key: 'content', minWidth: 280 },
   { title: '署名', key: 'nickname', width: 110 },
   { title: '账号', key: 'account', width: 150 },
   { title: '状态', key: 'status', width: 110 },
   { title: '时间', key: 'createdAt', width: 150 },
-  { title: '操作', key: 'actions', width: 130, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 170, fixed: 'right' as const },
 ]
 
 const loadingProfiles = ref(false)
 const profiles = ref<any[]>([])
-const profileFilter = reactive({ keyword: '', banned: '' })
+const profileFilter = reactive({ keyword: '', banned: '', type: '' })
 const profilePagination = reactive({ current: 1, pageSize: 20, total: 0, showSizeChanger: false })
 const profileColumns = [
   { title: '昵称', key: 'nickname', width: 160 },
+  { title: '地区', key: 'region', width: 130 },
   { title: '数据', key: 'counts', minWidth: 220 },
   { title: '成就', key: 'achievements', width: 90 },
   { title: '最近到访', key: 'lastSeen', width: 230 },
@@ -184,6 +215,7 @@ const profileColumns = [
 ]
 
 const rejectDialog = reactive({ open: false, record: null as any, reason: '' })
+const detailDialog = reactive({ open: false, record: null as any })
 
 onMounted(() => {
   void loadStats()
@@ -196,6 +228,16 @@ function statusColor(status: string) {
 }
 function statusText(status: string) {
   return status === 'approved' ? '已通过' : status === 'rejected' ? '已拒绝' : status === 'caught' ? '已捞起' : '待审核'
+}
+function identityText(identity?: string) {
+  return identity === 'user' ? '登录用户' : identity === 'registered' ? '登记访客' : '未登记'
+}
+function identityColor(identity?: string) {
+  return identity === 'user' ? 'green' : identity === 'registered' ? 'blue' : 'default'
+}
+function openDetail(record: any) {
+  detailDialog.record = record
+  detailDialog.open = true
 }
 function formatTime(value?: string) {
   return value ? String(value).slice(0, 16).replace('T', ' ') : ''
@@ -276,6 +318,7 @@ async function loadProfiles(page: number) {
     const params: Record<string, any> = { page, pageSize: profilePagination.pageSize }
     if (profileFilter.keyword.trim()) params.keyword = profileFilter.keyword.trim()
     if (profileFilter.banned !== '') params.banned = profileFilter.banned
+    if (profileFilter.type) params.type = profileFilter.type
     const res = await api.get<any>('/visitor/admin/profiles', params)
     profiles.value = res?.items ?? []
     profilePagination.total = res?.total ?? 0
@@ -330,6 +373,7 @@ function handleBan(record: any, ban: boolean) {
 .list-card { border-radius: 8px; }
 .content-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .content-cell span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.content-ellipsis { display: block; }
 .content-cell .is-caught { color: var(--c-text-3); }
 .type-tag { flex: 0 0 auto; }
 .nick-cell { color: var(--c-text); font-size: .78rem; }
@@ -339,8 +383,15 @@ function handleBan(record: any, ban: boolean) {
 .acct-tag { margin-right: 6px; }
 .ai-tag { margin-left: 4px; }
 .banned-tag { margin-left: 6px; }
+.identity-tag { margin-left: 6px; }
+.region-cell { color: var(--c-text-2); font-size: .7rem; }
 .count-cell { color: var(--c-text-2); font-size: .72rem; white-space: nowrap; }
 .first-seen { display: block; margin-top: 2px; color: var(--c-text-4); font-size: .6rem; }
+.detail-body { display: flex; flex-direction: column; gap: 12px; }
+.detail-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: start; gap: 12px; color: var(--c-text-2); font-size: .78rem; }
+.detail-row-block { grid-template-columns: 84px minmax(0, 1fr); }
+.detail-label { color: var(--c-text-3); font-size: .65rem; }
+.detail-content { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--c-bg-1); color: var(--c-text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
 
 @media (max-width: 900px) {
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

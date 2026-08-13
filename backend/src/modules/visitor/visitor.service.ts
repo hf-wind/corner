@@ -11,6 +11,7 @@ import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { NotificationService } from '../notification/notification.service';
+import { GeoService } from '../geo/geo.service';
 import { checkContentNonsense } from '../../common/content-filter/content-filter';
 import {
   BOTTLE_CHAIN_MAX,
@@ -50,6 +51,7 @@ export class VisitorService {
     private redis: RedisService,
     private aiService: AiService,
     private notificationService: NotificationService,
+    private geo?: GeoService,
   ) {}
 
   resolveVisitorId(req: VisitorRequest): string {
@@ -140,11 +142,20 @@ export class VisitorService {
     req: VisitorRequest,
     visitorIdHash: string,
     data: { pageType: string; targetTitle?: string; targetHref?: string },
+    userId?: string | null,
   ) {
     const profile = await this.prisma.visitorProfile.upsert({
       where: { visitorIdHash },
-      update: { lastSeenAt: new Date() },
-      create: { visitorIdHash, nickname: '无名旅人', ipHash: this.ipHash(req) },
+      update: {
+        lastSeenAt: new Date(),
+        ...(userId ? { userId } : {}),
+      },
+      create: {
+        visitorIdHash,
+        nickname: '无名旅人',
+        ipHash: this.ipHash(req),
+        ...(userId ? { userId } : {}),
+      },
     });
     if (profile.isBanned) {
       return { ok: false, reason: 'banned' };
@@ -155,7 +166,7 @@ export class VisitorService {
     const isNew = await this.redis.client.sadd(dedupKey, dedupMember);
     if (isNew) {
       await this.redis.client.expire(dedupKey, 7 * 24 * 3600);
-      await this.prisma.visitorVisit.create({
+      const created = await this.prisma.visitorVisit.create({
         data: {
           visitorIdHash,
           pageType: data.pageType,
@@ -163,6 +174,19 @@ export class VisitorService {
           targetHref: data.targetHref ?? null,
         },
       });
+      if (created.id && req.ip && this.geo) {
+        void this.geo
+          .locate(req.ip)
+          .then((info) =>
+            info
+              ? this.prisma.visitorVisit.update({
+                  where: { id: created.id },
+                  data: { region: info.label },
+                })
+              : null,
+          )
+          .catch(() => undefined);
+      }
     }
     const dayVisitKey = `corner:visitor:day-visit:${visitorIdHash}:${dayKey()}`;
     const firstToday = await this.redis.client.set(
@@ -180,7 +204,7 @@ export class VisitorService {
     }
 
     const unlocked = await this.syncAchievements(visitorIdHash);
-    return { ok: true, unlocked };
+    return { ok: true, unlocked, userBound: userId ?? null };
   }
 
   private async createMessage(
@@ -200,6 +224,13 @@ export class VisitorService {
     if (actor) {
       if (!actor.username.trim()) {
         throw new BadRequestException('登录账号缺少用户名');
+      }
+      const userRow = await this.prisma.user.findUnique({
+        where: { id: actor.userId },
+        select: { isActive: true },
+      });
+      if (userRow && !userRow.isActive) {
+        throw new ForbiddenException('该账号已被封禁');
       }
     } else {
       if (!visitorIdHash) {
@@ -289,7 +320,9 @@ export class VisitorService {
           title:
             status === 'approved'
               ? `你的${kindLabel}已通过审核`
-              : `你的${kindLabel}未通过审核`,
+              : status === 'pending'
+                ? `你的${kindLabel}已转人工审核`
+                : `你的${kindLabel}未通过审核`,
           content:
             status === 'approved'
               ? clean
@@ -703,6 +736,21 @@ export class VisitorService {
     const nicknameByHash = new Map(
       profiles.map((p) => [p.visitorIdHash, p.nickname]),
     );
+    const regionRows = await this.prisma.visitorVisit.findMany({
+      where: {
+        visitorIdHash: { in: hashes },
+        region: { not: null },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: { visitorIdHash: true, region: true },
+    });
+    const regionByHash = new Map<string, string>();
+    for (const row of regionRows) {
+      if (row.region && !regionByHash.has(row.visitorIdHash)) {
+        regionByHash.set(row.visitorIdHash, row.region);
+      }
+    }
 
     const items: Array<Record<string, unknown>> = [];
     const seen = new Set<string>();
@@ -716,6 +764,7 @@ export class VisitorService {
         pageType: row.pageType,
         targetTitle: row.targetTitle,
         targetHref: row.targetHref,
+        region: regionByHash.get(row.visitorIdHash) ?? null,
         time: row.createdAt,
       });
       if (items.length >= limit) break;
@@ -853,9 +902,26 @@ export class VisitorService {
         })
       : [];
     const userMap = new Map(users.map((u) => [u.id, u]));
+    const caughtHashes = [
+      ...new Set(
+        items.map((message) => message.caughtByIdHash).filter(Boolean) as string[],
+      ),
+    ];
+    const catchers = caughtHashes.length
+      ? await this.prisma.visitorProfile.findMany({
+          where: { visitorIdHash: { in: caughtHashes } },
+          select: { visitorIdHash: true, nickname: true },
+        })
+      : [];
+    const catcherMap = new Map(
+      catchers.map((catcher) => [catcher.visitorIdHash, catcher.nickname]),
+    );
     const decorated = items.map((m) => ({
       ...m,
       account: m.userId ? (userMap.get(m.userId) ?? null) : null,
+      catcher: m.caughtByIdHash
+        ? { nickname: catcherMap.get(m.caughtByIdHash) ?? null }
+        : null,
     }));
     return { items: decorated, total, page, pageSize };
   }
@@ -906,6 +972,7 @@ export class VisitorService {
   async adminProfiles(query: {
     keyword?: string;
     banned?: string;
+    type?: 'user' | 'registered' | 'anonymous';
     page?: number;
     pageSize?: number;
   }) {
@@ -915,6 +982,16 @@ export class VisitorService {
     }
     if (query.banned === 'true') where.isBanned = true;
     else if (query.banned === 'false') where.isBanned = false;
+    if (query.type === 'user') where.userId = { not: null };
+    else if (query.type === 'registered') {
+      where.userId = null;
+      where.nickname = query.keyword?.trim()
+        ? { contains: query.keyword.trim(), not: '无名旅人' }
+        : { not: '无名旅人' };
+    } else if (query.type === 'anonymous') {
+      where.userId = null;
+      where.nickname = '无名旅人';
+    }
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 20));
     const [items, total] = await Promise.all([
@@ -927,7 +1004,8 @@ export class VisitorService {
       this.prisma.visitorProfile.count({ where }),
     ]);
     const hashes = items.map((p) => p.visitorIdHash);
-    const [messageCounts, bottleCounts, caughtCounts, achievementCounts] =
+    const userIds = items.map((profile) => profile.userId).filter(Boolean) as string[];
+    const [messageCounts, bottleCounts, caughtCounts, achievementCounts, users, visits] =
       await Promise.all([
         this.prisma.visitorMessage.groupBy({
           by: ['visitorIdHash'],
@@ -957,6 +1035,23 @@ export class VisitorService {
           where: { visitorIdHash: { in: hashes } },
           _count: { _all: true },
         }),
+        userIds.length
+          ? this.prisma.user.findMany({
+              where: { id: { in: userIds } },
+              select: { id: true, username: true, email: true },
+            })
+          : [],
+        hashes.length
+          ? this.prisma.visitorVisit.findMany({
+              where: {
+                visitorIdHash: { in: hashes },
+                region: { not: null },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 100,
+              select: { visitorIdHash: true, region: true },
+            })
+          : [],
       ]);
     const countBy = (rows: Array<Record<string, unknown>>, key: string) =>
       new Map(
@@ -966,10 +1061,25 @@ export class VisitorService {
     const bottleMap = countBy(bottleCounts, 'visitorIdHash');
     const caughtMap = countBy(caughtCounts, 'caughtByIdHash');
     const achMap = countBy(achievementCounts, 'visitorIdHash');
+    const accountMap = new Map(users.map((user) => [user.id, user]));
+    const regionByHash = new Map<string, string>();
+    for (const visit of visits) {
+      if (visit.region && !regionByHash.has(visit.visitorIdHash)) {
+        regionByHash.set(visit.visitorIdHash, visit.region);
+      }
+    }
     return {
       items: items.map((p) => ({
         id: p.id,
         nickname: p.nickname,
+        userId: p.userId,
+        account: p.userId ? (accountMap.get(p.userId) ?? null) : null,
+        identity: p.userId
+          ? 'user'
+          : p.nickname === '无名旅人'
+            ? 'anonymous'
+            : 'registered',
+        region: regionByHash.get(p.visitorIdHash) ?? null,
         isBanned: p.isBanned,
         visitCount: p.visitCount,
         messageCount: messageMap.get(p.visitorIdHash) ?? 0,

@@ -29,18 +29,25 @@
       </div>
 
       <nav class="nav-menu">
-        <NuxtLink
-          v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          class="nav-item"
-          :class="{ active: isNavActive(item.to) }"
-          :title="collapsed ? item.label : undefined"
-        >
-          <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{
-            item.label
-          }}</span>
-        </NuxtLink>
+        <section v-for="group in navGroups" :key="group.key" class="nav-group" :class="{ 'is-open': isGroupOpen(group) }">
+          <button v-if="!collapsed" type="button" class="nav-group-toggle" :aria-expanded="isGroupOpen(group)" @click="toggleGroup(group.key)">
+            <span>{{ group.label }}</span><Icon name="ph:caret-down-bold" />
+          </button>
+          <div class="nav-group-items" :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }">
+            <div class="nav-group-inner">
+              <NuxtLink
+                v-for="item in group.items"
+                :key="item.to"
+                :to="item.to"
+                class="nav-item"
+                :class="{ active: isNavActive(item.to) }"
+                :title="collapsed ? item.label : undefined"
+              >
+                <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
+              </NuxtLink>
+            </div>
+          </div>
+        </section>
       </nav>
 
     </div>
@@ -264,6 +271,37 @@ const navItems = computed(() => {
   return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav;
 });
 
+type NavGroup = { key: string; label: string; items: typeof siteNav };
+const expandedGroups = ref<Record<string, boolean>>({ primary: true, explore: true, connect: true, manage: true });
+const navGroups = computed<NavGroup[]>(() => {
+  const items = navItems.value;
+  if (isPanel.value) {
+    return [{ key: 'manage', label: '内容管理', items }];
+  }
+  const primary = items.filter((item) => ['/home', '/archive'].includes(item.to));
+  const explore = items.filter((item) => ['/category', '/tags', '/library', '/moments', '/time/map', '/time/constellation', '/albums', '/stories'].includes(item.to));
+  const connect = items.filter((item) => ['/guestbook', '/friends', '/about'].includes(item.to));
+  return [
+    { key: 'primary', label: '开始', items: primary },
+    { key: 'explore', label: '探索', items: explore },
+    { key: 'connect', label: '相遇', items: connect },
+  ].filter((group) => group.items.length);
+});
+
+function isGroupOpen(group: NavGroup) {
+  return collapsed.value || expandedGroups.value[group.key] !== false;
+}
+function toggleGroup(key: string) {
+  expandedGroups.value[key] = !expandedGroups.value[key];
+}
+
+function expandActiveGroup() {
+  const activeGroup = navGroups.value.find((group) =>
+    group.items.some((item) => isNavActive(item.to)),
+  );
+  if (activeGroup) expandedGroups.value[activeGroup.key] = true;
+}
+
 const heroLink = computed(() => {
   if (!isPanel.value) return "/home";
   return panelHome();
@@ -316,12 +354,14 @@ async function handleLogout() {
 onMounted(() => {
   void loadSiteSettings();
   readStorage();
+  expandActiveGroup();
   if (isLoggedIn.value) refreshProfile();
 });
 watch(
   () => route.fullPath,
   () => {
     readStorage();
+    expandActiveGroup();
   },
 );
 </script>
@@ -605,6 +645,18 @@ watch(
   flex-direction: column;
   gap: 2px;
 }
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group + .nav-group { margin-top: 8px; }
+.nav-group-toggle {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 5px 10px;
+  border: 0; background: transparent; color: var(--c-text-3); cursor: pointer; font: inherit; font-size: .56rem; letter-spacing: .12em; text-align: left;
+}
+.nav-group-toggle svg { font-size: .62rem; transition: transform .36s cubic-bezier(.22,1,.36,1); }
+.nav-group.is-open .nav-group-toggle svg { transform: rotate(0deg); }
+.nav-group:not(.is-open) .nav-group-toggle svg { transform: rotate(-90deg); }
+.nav-group-items { display: grid; grid-template-rows: 1fr; overflow: hidden; transition: grid-template-rows .42s cubic-bezier(.22,1,.36,1), opacity .28s ease; }
+.nav-group-inner { min-height: 0; }
+.nav-group-items.is-collapsed-group { grid-template-rows: 0fr; opacity: 0; }
 
 .nav-item {
   display: flex;

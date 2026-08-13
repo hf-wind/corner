@@ -60,39 +60,41 @@
         </div>
 
         <div v-else class="msg-masonry content-reveal">
-          <article v-for="msg in messages" :key="msg.id" class="msg-card">
-            <header class="msg-head">
-              <span
-                class="msg-avatar"
-                :class="{ 'is-user': !!msg.userId, 'guest-char': !msg.userId && !!msg.visitorIdHash }"
-                :style="!msg.userId && msg.visitorIdHash ? visitorAvatarStyle(msg) : undefined"
-              >
-                <img
-                  v-if="msg.userId && !avatarErrors.has(msg.id)"
-                  :src="mediaUrl(msg.user?.avatar)"
-                  class="msg-avatar-img"
-                  alt=""
-                  loading="lazy"
-                  @error="onAvatarError(msg.id)"
-                />
-                <Icon v-else-if="msg.userId" name="ph:user-bold" />
-                <template v-else-if="msg.visitorIdHash">{{ (msg.nickname || "访").trim().charAt(0) }}</template>
-                <Icon v-else name="ph:face-mask-bold" />
-              </span>
-              <div class="msg-meta">
-                <span class="msg-name-row">
-                  <span class="msg-name">{{ msg.nickname }}</span>
-                  <span class="msg-role" :class="{ 'role-user': !!msg.userId, 'role-guest': !msg.userId }">
-                    <Icon :name="msg.userId ? 'ph:shield-check-bold' : 'ph:user-simple-bold'" />
-                    {{ msg.userId ? '登录' : '访客' }}
-                  </span>
+          <div v-for="(col, ci) in masonryColumns" :key="`col-${ci}`" class="msg-col">
+            <article v-for="msg in col" :key="msg.id" class="msg-card">
+              <header class="msg-head">
+                <span
+                  class="msg-avatar"
+                  :class="{ 'is-user': !!msg.userId, 'guest-char': !msg.userId && !!msg.visitorIdHash }"
+                  :style="!msg.userId && msg.visitorIdHash ? visitorAvatarStyle(msg) : undefined"
+                >
+                  <img
+                    v-if="msg.userId && !avatarErrors.has(msg.id)"
+                    :src="mediaUrl(msg.user?.avatar)"
+                    class="msg-avatar-img"
+                    alt=""
+                    loading="lazy"
+                    @error="onAvatarError(msg.id)"
+                  />
+                  <Icon v-else-if="msg.userId" name="ph:user-bold" />
+                  <template v-else-if="msg.visitorIdHash">{{ (msg.nickname || "访").trim().charAt(0) }}</template>
+                  <Icon v-else name="ph:face-mask-bold" />
                 </span>
-                <time class="msg-time">{{ msgRelativeTime(msg.createdAt) }}</time>
-              </div>
-              <span class="msg-pin" aria-hidden="true"><Icon name="ph:push-pin-simple-fill" /></span>
-            </header>
-            <p class="msg-content">{{ msg.content }}</p>
-          </article>
+                <div class="msg-meta">
+                  <span class="msg-name-row">
+                    <span class="msg-name">{{ msg.nickname }}</span>
+                    <span class="msg-role" :class="{ 'role-user': !!msg.userId, 'role-guest': !msg.userId }">
+                      <Icon :name="msg.userId ? 'ph:shield-check-bold' : 'ph:footprints-bold'" />
+                      {{ msg.userId ? '账号' : '访客' }}
+                    </span>
+                  </span>
+                  <time class="msg-time">{{ msgRelativeTime(msg.createdAt) }}</time>
+                </div>
+                <span class="msg-pin" aria-hidden="true"><Icon name="ph:push-pin-simple-fill" /></span>
+              </header>
+              <p class="msg-content">{{ msg.content }}</p>
+            </article>
+          </div>
         </div>
 
         <button
@@ -181,7 +183,7 @@
                   <Icon name="ph:envelope-simple-bold" />回复这位旅人
                 </button>
                 <button v-else-if="!isLoggedIn" type="button" class="caught-action reply-link" @click="openIdentityForReply">
-                  <Icon name="ph:envelope-simple-bold" />登录后可回复漂流瓶主人
+                  <Icon name="ph:envelope-simple-bold" />登录后可以回复这位旅人
                 </button>
                 <button v-if="!relayMode" type="button" class="caught-action relay" @click="relayMode = true">
                   <Icon name="ph:paper-plane-tilt-bold" />留一句话，让瓶子继续漂流
@@ -280,8 +282,16 @@
           <Icon v-else name="ph:user-fill" />
         </div>
         <h3>{{ displayName }}</h3>
-        <p v-if="isLoggedIn" class="my-sub">以账号身份留下的旅人 · <strong>第 {{ me?.visitCount ?? 0 }}</strong> 次光临</p>
-        <p v-else-if="nickname" class="my-sub">第 <strong>{{ me?.visitCount ?? 0 }}</strong> 次光临这座角落</p>
+        <p v-if="isLoggedIn" class="my-sub">
+          <template v-if="(me?.visitCount ?? 0) > 1">第 <strong>{{ me?.visitCount }}</strong> 次</template>
+          <template v-else>初次</template>
+          相伴这座角落
+        </p>
+        <p v-else-if="nickname" class="my-sub">
+          <template v-if="(me?.visitCount ?? 0) > 1">第 <strong>{{ me?.visitCount }}</strong> 次</template>
+          <template v-else>初次</template>
+          来到这座角落
+        </p>
         <p v-else class="my-sub">还没起名，起个名字开启旅程吧</p>
         <div class="my-stats">
           <div><strong>{{ me?.messageCount ?? 0 }}</strong><span>留言</span></div>
@@ -325,7 +335,7 @@
 
     <a-modal
       v-model:open="replyDialogOpen"
-      title="回复漂流瓶主人"
+      title="回复这位旅人"
       :ok-text="replySending ? '发送中…' : '发送回复'"
       :ok-button-props="{ disabled: !replyText.trim() || replySending }"
       :cancel-text="'取消'"
@@ -410,6 +420,45 @@ const canReply = computed(() => {
 
 const avatarErrors = ref<Set<string>>(new Set());
 const myAvatarError = ref(false);
+
+const columnCount = ref(3);
+
+function computeColumnCount() {
+  const w = window.innerWidth;
+  if (w <= 480) return 1;
+  if (w <= 700) return 2;
+  if (w <= 900) return 3;
+  if (w <= 1150) return 2;
+  return 3;
+}
+
+const masonryColumns = computed(() => {
+  const count = columnCount.value;
+  if (count <= 1) return [messages.value];
+  const cols: any[][] = Array.from({ length: count }, () => []);
+  const heights = new Array<number>(count).fill(0);
+  for (const msg of messages.value) {
+    const text = String(msg.content || "");
+    const estimate = Math.max(1.4, Math.ceil(text.length / 56) * 1.5 + 1.8);
+    const target = heights.indexOf(Math.min(...heights));
+    cols[target].push(msg);
+    heights[target] += estimate;
+  }
+  return cols;
+});
+
+function onResize() {
+  columnCount.value = computeColumnCount();
+}
+
+onMounted(() => {
+  columnCount.value = computeColumnCount();
+  window.addEventListener("resize", onResize, { passive: true });
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", onResize);
+});
 
 function onAvatarError(id: string) {
   if (avatarErrors.value.has(id)) return;
@@ -603,6 +652,11 @@ async function doSendMessage(text: string) {
   try {
     const result = await sendMessage(text);
     composerText.value = "";
+    if (result?.review?.pending) {
+      toast.dismiss(infoToast);
+      toast.warning("留言已提交，等待管理员审核后展示");
+      return;
+    }
     if (result?.review && !result.review.approved) {
       toast.dismiss(infoToast);
       toast.error(`留言未通过审核：${result.review.reason}`);
@@ -636,6 +690,11 @@ async function doThrowBottle(text: string) {
   try {
     const result = await throwBottle(text);
     bottleText.value = "";
+    if (result?.review?.pending) {
+      toast.dismiss(infoToast);
+      toast.warning("瓶子已提交，等待管理员审核后漂向时光海");
+      return;
+    }
     if (result?.review && !result.review.approved) {
       toast.dismiss(infoToast);
       toast.error(`瓶子未能漂远：${result.review.reason}`);
@@ -695,6 +754,10 @@ async function submitRelay() {
     const result = await throwBottle(text, caughtBottle.value.id);
     relayText.value = "";
     relayMode.value = false;
+    if (result?.review?.pending) {
+      toast.warning("接力瓶已提交，等待管理员审核后继续漂流");
+      return;
+    }
     if (result?.review && !result.review.approved) {
       toast.error(`瓶子未能漂远：${result.review.reason}`);
       return;
@@ -721,6 +784,10 @@ async function submitReply() {
   replySending.value = true;
   try {
     const result = await replyBottle(caughtBottle.value.id, text);
+    if (result?.review?.pending) {
+      toast.warning("回复已提交，等待管理员审核后送达");
+      return;
+    }
     if (result?.review && !result.review.approved) {
       toast.error(`回复未通过审核：${result.review.reason}`);
       return;
@@ -904,27 +971,77 @@ useHead({ title: "时光留言板" });
 
 /* ===== 留言墙 ===== */
 .msg-masonry {
-  column-gap: 13px;
-  column-count: 3;
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
   margin-bottom: 16px;
 }
+.msg-col {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 13px;
+}
 .msg-card {
-  display: inline-block;
+  position: relative;
+  display: block;
   width: 100%;
-  margin: 0 0 13px;
   padding: 16px 17px 15px;
-  break-inside: avoid;
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 64%, transparent);
   border-radius: 15px;
   background: linear-gradient(160deg, color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft)), var(--ld-bg-card));
   box-shadow: 0 6px 20px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
-  transition: transform 0.32s var(--ui-ease-out), box-shadow 0.32s ease;
+  transition: transform 0.36s var(--ui-ease-out), box-shadow 0.36s ease, border-color 0.3s ease;
   animation: card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+.msg-card::before {
+  position: absolute;
+  top: 0;
+  left: 14%;
+  right: 14%;
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c-primary) 52%, transparent), transparent);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.25);
+  transition: opacity 0.32s ease, transform 0.5s var(--ui-ease-out);
+  pointer-events: none;
+}
+.msg-card::after {
+  position: absolute;
+  top: -40%;
+  right: -34%;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 13%, transparent), transparent 68%);
+  content: "";
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.36s ease, transform 0.5s var(--ui-ease-out);
+  pointer-events: none;
+}
 .msg-card:hover {
-  border-color: color-mix(in srgb, var(--c-primary) 24%, var(--border));
-  box-shadow: 0 16px 36px color-mix(in srgb, var(--ld-shadow) 50%, transparent);
-  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--c-primary) 32%, var(--border));
+  box-shadow: 0 16px 38px color-mix(in srgb, var(--ld-shadow) 48%, transparent), 0 0 0 1px color-mix(in srgb, var(--c-primary) 9%, transparent);
+  /* transform: translateY(-5px); */
+}
+.msg-card:hover::before {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.msg-card:hover::after {
+  opacity: 1;
+  transform: scale(1);
+}
+.msg-card:hover .msg-avatar {
+  transform: scale(1.08);
+}
+.msg-card:hover .msg-name {
+  color: var(--c-primary);
 }
 .msg-head {
   display: flex;
@@ -942,6 +1059,7 @@ useHead({ title: "时光留言板" });
   color: color-mix(in srgb, var(--c-primary) 82%, var(--c-text-2));
   font-size: 0.86rem;
   place-items: center;
+  transition: transform 0.3s var(--ui-ease-out);
 }
 .msg-avatar-img {
   display: block;
@@ -1417,7 +1535,7 @@ useHead({ title: "时光留言板" });
 }
 .badge:hover {
   box-shadow: 0 14px 30px color-mix(in srgb, var(--ld-shadow) 44%, transparent);
-  transform: translateY(-2px);
+  /* transform: translateY(-2px); */
 }
 .badge-icon {
   position: relative;
@@ -1636,17 +1754,9 @@ useHead({ title: "时光留言板" });
 }
 
 /* ===== 响应式 ===== */
-@media (max-width: 1150px) {
-  .msg-masonry {
-    column-count: 2;
-  }
-}
 @media (max-width: 900px) {
   .sidebar-right {
     display: none;
-  }
-  .msg-masonry {
-    column-count: 3;
   }
 }
 @media (max-width: 700px) {
@@ -1654,11 +1764,10 @@ useHead({ title: "时光留言板" });
     padding: max(68px, calc(env(safe-area-inset-top) + 60px)) 16px 24px !important;
   }
   .msg-masonry {
-    column-count: 2;
-    column-gap: 10px;
+    gap: 10px;
   }
-  .msg-card {
-    margin-bottom: 10px;
+  .msg-col {
+    gap: 10px;
   }
   .composer-head {
     align-items: flex-start;
@@ -1680,9 +1789,6 @@ useHead({ title: "时光留言板" });
   }
 }
 @media (max-width: 480px) {
-  .msg-masonry {
-    column-count: 1;
-  }
   .badges-head {
     flex-direction: column;
     align-items: flex-start;

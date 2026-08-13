@@ -119,6 +119,31 @@ describe('VisitorService', () => {
       });
     });
 
+    it('登录通道：审核转人工时发送准确通知', async () => {
+      ai.moderateStrict.mockResolvedValueOnce({
+        approved: false,
+        reason: 'AI 审核暂不可用，已转人工审核',
+        pending: true,
+      });
+      const prisma = {
+        visitorProfile: { findUnique: jest.fn() },
+        visitorMessage: { create: jest.fn().mockResolvedValue({ id: 'm-pending' }) },
+        user: { findUnique: jest.fn(), findMany: jest.fn() },
+        visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
+        visitorVisit: { findMany: jest.fn() },
+      } as any;
+      const service = makeService(prisma);
+
+      await service.createMessageEntry(req, actor, null, '等待人工审核的留言');
+
+      expect(notifications.create).toHaveBeenCalledWith('user-1', {
+        type: 'guestbook',
+        title: '你的留言已转人工审核',
+        content: 'AI 审核暂不可用，已转人工审核',
+        link: '/guestbook',
+      });
+    });
+
     it('访客通道：不发送审核通知（仅访客提示）', async () => {
       const prisma = {
         visitorProfile: {
@@ -933,6 +958,112 @@ describe('VisitorService', () => {
         }),
       });
       expect(result.review.approved).toBe(false);
+    });
+  });
+
+  describe('trackVisit — 登录绑定与地区', () => {
+    it('绑定登录用户并在新访问创建后异步补写地区', async () => {
+      const visitorIdHash = hashOf('guest-1');
+      const visitUpdate = jest.fn().mockResolvedValue({});
+      const prisma = {
+        visitorProfile: {
+          upsert: jest.fn().mockResolvedValue({ isBanned: false }),
+          update: jest.fn().mockResolvedValue({}),
+          findUnique: jest.fn().mockResolvedValue({ nickname: '旅人', visitCount: 1 }),
+        },
+        visitorVisit: {
+          create: jest.fn().mockResolvedValue({ id: 'visit-1' }),
+          update: visitUpdate,
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        visitorAchievement: { findMany: jest.fn().mockResolvedValue([]), createMany: jest.fn() },
+        visitorMessage: { count: jest.fn().mockResolvedValue(0) },
+      } as any;
+      const redisTx = {
+        client: {
+          sadd: jest.fn().mockResolvedValue(1),
+          expire: jest.fn().mockResolvedValue(1),
+          set: jest.fn().mockResolvedValue('1'),
+        },
+      } as any;
+      const geo = {
+        locate: jest.fn().mockResolvedValue({
+          country: '中国',
+          regionName: '浙江省',
+          city: '杭州市',
+          label: '浙江 · 杭州',
+        }),
+      } as any;
+      const service = new VisitorService(prisma, redisTx, ai, notifications, geo);
+
+      const result = await service.trackVisit(req, visitorIdHash, { pageType: 'home' }, 'user-9');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(prisma.visitorProfile.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        where: { visitorIdHash },
+        update: expect.objectContaining({ userId: 'user-9' }),
+        create: expect.objectContaining({ userId: 'user-9' }),
+      }));
+      expect(result.userBound).toBe('user-9');
+      expect(visitUpdate).toHaveBeenCalledWith({
+        where: { id: 'visit-1' },
+        data: { region: '浙江 · 杭州' },
+      });
+    });
+  });
+
+  describe('后台管理 — 身份与详情', () => {
+    it('adminMessages 返回漂流瓶捞起者', async () => {
+      const prisma = {
+        visitorMessage: {
+          findMany: jest.fn().mockResolvedValue([{ id: 'm1', userId: null, caughtByIdHash: 'h2' }]),
+          count: jest.fn().mockResolvedValue(1),
+        },
+        visitorProfile: {
+          findMany: jest.fn().mockResolvedValue([{ visitorIdHash: 'h2', nickname: '拾光者' }]),
+        },
+      } as any;
+      const result = await makeService(prisma).adminMessages({});
+      expect(result.items[0].catcher).toEqual({ nickname: '拾光者' });
+    });
+
+    it('adminProfiles 按登录用户筛选并返回账号、身份和地区', async () => {
+      const now = new Date('2026-08-13T00:00:00Z');
+      const prisma = {
+        visitorProfile: {
+          findMany: jest.fn().mockResolvedValue([{
+            id: 'p1', visitorIdHash: 'h1', nickname: '阿风', userId: 'u1',
+            isBanned: false, firstSeenAt: now, lastSeenAt: now, visitCount: 1,
+          }]),
+          count: jest.fn().mockResolvedValue(1),
+        },
+        visitorMessage: { groupBy: jest.fn().mockResolvedValue([]) },
+        visitorAchievement: { groupBy: jest.fn().mockResolvedValue([]) },
+        visitorVisit: {
+          findMany: jest.fn().mockResolvedValue([{ visitorIdHash: 'h1', region: '浙江 · 杭州' }]),
+        },
+        user: {
+          findMany: jest.fn().mockResolvedValue([{ id: 'u1', username: 'afeng', email: 'a@b.c' }]),
+        },
+      } as any;
+
+      const result = await makeService(prisma).adminProfiles({ type: 'user' });
+
+      expect(prisma.visitorProfile.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ userId: { not: null } }),
+      }));
+      expect(result.items[0]).toMatchObject({
+        userId: 'u1', identity: 'user', account: { username: 'afeng' }, region: '浙江 · 杭州',
+      });
+    });
+
+    it('登录用户已被封禁时拒绝提交', async () => {
+      const prisma = {
+        user: { findUnique: jest.fn().mockResolvedValue({ isActive: false }) },
+        visitorProfile: { findUnique: jest.fn() },
+      } as any;
+      await expect(makeService(prisma).createMessageEntry(req, actor, null, '这是一条正常留言'))
+        .rejects.toThrow('该账号已被封禁');
     });
   });
 });

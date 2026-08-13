@@ -1,7 +1,7 @@
 <template>
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">
-      <Transition :name="isSpaceRoute ? undefined : 'route-page'" :mode="isSpaceRoute ? undefined : 'out-in'">
+      <Transition :name="isSpaceRoute ? undefined : 'route-page'">
         <component :is="Component" :key="viewRoute.path" />
       </Transition>
     </RouterView>
@@ -65,7 +65,13 @@ onMounted(() => {
     void refreshUnread()
   }
   const schedule = window.requestIdleCallback || ((callback: IdleRequestCallback) => window.setTimeout(callback, 800))
-  playerIdleHandle = schedule(() => { showPlayer.value = true }, { timeout: 1600 })
+  playerIdleHandle = schedule(() => {
+    if (route.meta.layout !== 'welcome' && route.meta.layout !== false && route.path !== '/') showPlayer.value = true
+  }, { timeout: 1600 })
+})
+
+watch(() => route.path, (path) => {
+  showPlayer.value = route.meta.layout !== 'welcome' && route.meta.layout !== false && path !== '/'
 })
 
 onUnmounted(() => {
@@ -143,6 +149,25 @@ html.space-pending body::after {
 .route-page-enter-active,
 .route-page-leave-active {
   will-change: opacity, transform;
+}
+
+.layout-page,
+.admin-main {
+  position: relative;
+}
+
+.route-page-leave-active {
+  position: absolute !important;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.route-page-enter-active {
+  position: relative;
+  z-index: 1;
 }
 
 .route-page-enter-active {

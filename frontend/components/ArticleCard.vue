@@ -1,5 +1,5 @@
 <template>
-  <NuxtLink :to="'/article/' + slug" class="article-card" @click="saveScroll">
+  <NuxtLink :to="'/article/' + slug" class="article-card" @mouseenter="prefetchArticle" @focus="prefetchArticle" @pointerdown="prefetchArticle" @click="saveScroll">
     <div class="card-cover">
       <img
         v-if="coverUrl"
@@ -86,6 +86,13 @@ const resolvedTags = computed(() => props.tagItems?.length
 function saveScroll() {
   const el = document.querySelector('.main-content')
   if (el) sessionStorage.setItem('home-scroll', String(el.scrollTop))
+}
+
+let articlePrefetched = false
+function prefetchArticle() {
+  if (articlePrefetched) return
+  articlePrefetched = true
+  void import("~/pages/article/[slug].vue")
 }
 </script>
 

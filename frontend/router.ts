@@ -346,6 +346,7 @@ function pageTypeOf(path: string): string {
 function trackVisitorVisit(to: { path: string; name?: unknown }) {
   if (typeof document === "undefined") return;
   if (!navigator.onLine) return;
+  if (to.path === "/") return;
   const pageType = pageTypeOf(to.path);
   import("./composables/useVisitor").then(({ useVisitor }) => {
     const visitor = useVisitor();

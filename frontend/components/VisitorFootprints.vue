@@ -34,6 +34,9 @@
         <div class="fp-copy">
           <p class="fp-line">
             <strong :title="visit.nickname">{{ visit.nickname }}</strong>
+            <em v-if="visit.region" class="fp-region" :title="`来自 ${visit.region}`">
+              <Icon name="ph:map-pin-bold" />{{ visit.region }}
+            </em>
             <i class="fp-sep" aria-hidden="true" />
             <span class="fp-action-text">{{ pageLabel(visit.pageType) }}</span>
           </p>
@@ -57,7 +60,7 @@ dayjs.locale("zh-cn");
 const { fetchRecent } = useVisitor();
 const route = useRoute();
 
-const items = ref<Array<{ id: string; nickname: string; pageType: string; targetTitle?: string | null; time: string }>>([]);
+const items = ref<Array<{ id: string; nickname: string; pageType: string; targetTitle?: string | null; region?: string | null; time: string }>>([]);
 const loading = ref(false);
 const refreshing = ref(false);
 
@@ -272,6 +275,22 @@ onMounted(() => load());
   background: var(--c-text-3);
   opacity: 0.55;
 }
+.fp-region {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, transparent);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--c-primary) 10%, var(--ld-bg-card));
+  color: color-mix(in srgb, var(--c-primary) 78%, var(--c-text-2));
+  font-size: 0.52rem;
+  font-style: normal;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.fp-region > svg { font-size: 0.5rem; }
 .fp-action-text {
   overflow-wrap: anywhere;
 }

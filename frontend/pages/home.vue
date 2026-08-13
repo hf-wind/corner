@@ -1,23 +1,29 @@
 <template>
   <div class="page-layout">
     <main class="main-content">
-      <FeaturedSwiper />
-      <AiDiscoveryPanel />
+      <div class="featured-module-slot">
+        <FeaturedSwiper />
+      </div>
+      <div class="discovery-module-slot">
+        <AiDiscoveryPanel />
+      </div>
 
       <div class="section-title">· 最新文章</div>
 
       <div
-        v-if="!loading"
-        class="article-list-wrap content-reveal"
-        :class="{ refreshing }"
+        class="article-list-wrap"
+        :class="{ refreshing, 'content-reveal': !loading }"
         aria-live="polite"
       >
+        <div v-if="loading" class="article-skeleton" aria-label="正在加载文章">
+          <span v-for="index in 3" :key="index" />
+        </div>
         <div v-if="refreshing" class="article-refresh-bar"><span /></div>
-        <div v-if="!articles.length" class="article-empty">
+        <div v-if="!loading && !articles.length" class="article-empty">
           <Icon name="ph:article-bold" />
           <span>暂时还没有文章</span>
         </div>
-        <div v-else class="article-list">
+        <div v-else-if="!loading" class="article-list">
           <ArticleCard
             v-for="(article, i) in articles"
             :key="article.slug"
@@ -51,6 +57,9 @@
 import { defineAsyncComponent } from "vue";
 
 const AiPet = defineAsyncComponent(() => import("~/components/AiPet.vue"));
+const FeaturedSwiper = defineAsyncComponent(() => import("~/components/FeaturedSwiper.vue"));
+const AiDiscoveryPanel = defineAsyncComponent(() => import("~/components/AiDiscoveryPanel.vue"));
+const HomeSidebar = defineAsyncComponent(() => import("~/components/HomeSidebar.vue"));
 const api = useApi();
 const articles = ref<any[]>([]);
 const loading = ref(true);
@@ -172,6 +181,14 @@ onUnmounted(() => {
   scroll-behavior: auto;
 }
 
+.featured-module-slot {
+  min-height: 244px;
+}
+
+.discovery-module-slot {
+  min-height: 96px;
+}
+
 .section-title {
   font-size: 0.75rem;
   color: var(--c-text-2);
@@ -196,7 +213,27 @@ onUnmounted(() => {
 
 .article-list-wrap {
   position: relative;
-  min-height: 180px;
+  min-height: 372px;
+}
+
+.article-skeleton {
+  display: grid;
+  gap: 12px;
+}
+
+.article-skeleton span {
+  display: block;
+  height: 110px;
+  border: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  border-radius: 10px;
+  background: linear-gradient(
+    100deg,
+    var(--ld-bg-card) 24%,
+    color-mix(in srgb, var(--c-primary-soft) 52%, var(--ld-bg-card)) 38%,
+    var(--ld-bg-card) 52%
+  );
+  background-size: 240% 100%;
+  animation: article-skeleton-shimmer 1.25s ease-in-out infinite;
 }
 
 .article-list-wrap.refreshing .article-list {
@@ -250,6 +287,20 @@ onUnmounted(() => {
   to {
     transform: translateX(190%);
   }
+}
+
+@keyframes article-skeleton-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (max-width: 640px) {
+  .featured-module-slot { min-height: 206px; }
+  .discovery-module-slot { min-height: 96px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article-skeleton span { animation: none; }
 }
 
 .sidebar-right {
