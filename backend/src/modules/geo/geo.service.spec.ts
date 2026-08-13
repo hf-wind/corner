@@ -11,12 +11,12 @@ describe('GeoService', () => {
   } as any;
   const service = new GeoService(redis);
 
-  const IP_API_URL = 'http://ip-api.com/json';
-
   afterEach(() => {
     jest.restoreAllMocks();
     redis.getJson.mockResolvedValue(null);
     redis.client.incr.mockResolvedValue(1);
+    redis.client.expire.mockClear();
+    redis.setJson.mockClear();
   });
 
   function mockIpApi(body: unknown) {
@@ -74,9 +74,11 @@ describe('GeoService', () => {
   });
 
   it('超过分钟限速时静默返回 null', async () => {
-    redis.client.incr.mockResolvedValue(31);
+    redis.client.incr.mockResolvedValueOnce(31);
+    redis.client.expire.mockClear();
     expect(await service.locate('8.8.8.8')).toBeNull();
-    expect(redis.client.expire).toHaveBeenCalled();
+    expect(redis.client.incr).toHaveBeenCalled();
+    expect(redis.client.expire).not.toHaveBeenCalled();
   });
 
   it('接口失败/异常时静默返回 null（含负缓存）', async () => {

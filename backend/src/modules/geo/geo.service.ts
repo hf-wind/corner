@@ -10,19 +10,24 @@ export type GeoInfo = {
 
 const GEO_CACHE_TTL = 7 * 24 * 3600;
 const GEO_RATE_LIMIT_PER_MINUTE = 30;
-const NEGATIVE_CACHE_MARKER = 'null';
+const NEGATIVE_CACHE_MARKER = 'null' as const;
 
 function isPrivateIp(ip: string): boolean {
   if (
     !ip ||
     ip === '::1' ||
+    ip.startsWith('fc00:') ||
+    ip.startsWith('fd00:') ||
     ip.startsWith('127.') ||
     ip.startsWith('10.') ||
     ip.startsWith('192.168.') ||
-    ip.startsWith('172.16.') ||
     ip.startsWith('169.254.')
   ) {
     return true;
+  }
+  if (ip.startsWith('172.')) {
+    const second = Number.parseInt(ip.split('.')[1] || '', 10);
+    if (second >= 16 && second <= 31) return true;
   }
   return /^0\./.test(ip) || /^\./.test(ip) || ip === 'localhost';
 }
@@ -64,9 +69,9 @@ export class GeoService {
     const cacheKey = `corner:geo:ip:${ip}`;
 
     try {
-      const cached = await this.redis.getJson<GeoInfo>(cacheKey);
-      if (cached === (NEGATIVE_CACHE_MARKER as never)) return null;
-      if (cached) return cached;
+      const cached = await this.redis.getJson<GeoInfo | 'null'>(cacheKey);
+      if (cached === NEGATIVE_CACHE_MARKER) return null;
+      if (cached && typeof cached !== 'string') return cached;
     } catch (e) {
       this.logger.warn(`geo 缓存读取失败: ${(e as Error).message}`);
     }
