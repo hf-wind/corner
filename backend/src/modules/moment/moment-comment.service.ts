@@ -1,10 +1,17 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { EmailService } from '../email/email.service';
 import { AiService } from '../ai/ai.service';
 import { CreateMomentCommentDto } from './dto/create-moment-comment.dto';
 import { contentPreview } from '../../common/utils/content-preview';
+import { checkContentNonsense } from '../../common/content-filter/content-filter';
 
 @Injectable()
 export class MomentCommentService {
@@ -30,13 +37,17 @@ export class MomentCommentService {
       parentId: null,
       OR: [
         { status: 'approved' },
-        ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
+        ...(currentUserId
+          ? [{ status: 'pending', userId: currentUserId }]
+          : []),
       ],
     };
     const visibleReplyWhere: any = {
       OR: [
         { status: 'approved' },
-        ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
+        ...(currentUserId
+          ? [{ status: 'pending', userId: currentUserId }]
+          : []),
       ],
     };
 
@@ -62,12 +73,22 @@ export class MomentCommentService {
               _count: { select: { likes: true } },
               user: { select: { avatar: true } },
               ...(currentUserId
-                ? { likes: { where: { userId: currentUserId }, select: { id: true } } }
+                ? {
+                    likes: {
+                      where: { userId: currentUserId },
+                      select: { id: true },
+                    },
+                  }
                 : {}),
             },
           },
           ...(currentUserId
-            ? { likes: { where: { userId: currentUserId }, select: { id: true } } }
+            ? {
+                likes: {
+                  where: { userId: currentUserId },
+                  select: { id: true },
+                },
+              }
             : {}),
         },
         orderBy: { createdAt: 'desc' },
@@ -110,13 +131,20 @@ export class MomentCommentService {
     };
   }
 
-  async findReplies(commentId: string, currentUserId?: string, page = 1, limit = 3) {
+  async findReplies(
+    commentId: string,
+    currentUserId?: string,
+    page = 1,
+    limit = 3,
+  ) {
     const skip = (page - 1) * limit;
     const where: any = {
       parentId: commentId,
       OR: [
         { status: 'approved' },
-        ...(currentUserId ? [{ status: 'pending', userId: currentUserId }] : []),
+        ...(currentUserId
+          ? [{ status: 'pending', userId: currentUserId }]
+          : []),
       ],
     };
 
@@ -131,7 +159,12 @@ export class MomentCommentService {
           _count: { select: { likes: true } },
           user: { select: { avatar: true } },
           ...(currentUserId
-            ? { likes: { where: { userId: currentUserId }, select: { id: true } } }
+            ? {
+                likes: {
+                  where: { userId: currentUserId },
+                  select: { id: true },
+                },
+              }
             : {}),
         },
       }),
@@ -184,19 +217,29 @@ export class MomentCommentService {
   }
 
   async create(dto: CreateMomentCommentDto, userId: string, userName: string) {
-    const moment = await this.prisma.moment.findUnique({ where: { id: dto.momentId } });
+    const moment = await this.prisma.moment.findUnique({
+      where: { id: dto.momentId },
+    });
     if (!moment) throw new NotFoundException('Moment not found');
 
     let resolvedParentId = dto.parentId;
     let parentComment = null;
 
     if (resolvedParentId) {
-      parentComment = await this.prisma.momentComment.findUnique({ where: { id: resolvedParentId } });
-      if (!parentComment) throw new NotFoundException('Parent comment not found');
+      parentComment = await this.prisma.momentComment.findUnique({
+        where: { id: resolvedParentId },
+      });
+      if (!parentComment)
+        throw new NotFoundException('Parent comment not found');
       if (parentComment.momentId !== dto.momentId) {
-        throw new BadRequestException('Parent comment does not belong to this moment');
+        throw new BadRequestException(
+          'Parent comment does not belong to this moment',
+        );
       }
-      if (parentComment.userId === userId || (!parentComment.userId && parentComment.authorName === userName)) {
+      if (
+        parentComment.userId === userId ||
+        (!parentComment.userId && parentComment.authorName === userName)
+      ) {
         throw new ForbiddenException('You cannot reply to your own comment');
       }
       if (parentComment.parentId) resolvedParentId = parentComment.parentId;
@@ -218,7 +261,13 @@ export class MomentCommentService {
       },
     });
 
-    this.moderateAndNotify(comment, moment, parentComment, userId, userName).catch((error) => {
+    this.moderateAndNotify(
+      comment,
+      moment,
+      parentComment,
+      userId,
+      userName,
+    ).catch((error) => {
       this.logger.error('Moment comment moderation failed', error);
     });
 
@@ -234,8 +283,39 @@ export class MomentCommentService {
   ) {
     let approved = true;
     let reason = 'AI 审核异常，自动通过';
+    const nonsenseReason = checkContentNonsense(comment.content);
+    if (nonsenseReason) {
+      await this.prisma.momentComment.update({
+        where: { id: comment.id },
+        data: {
+          aiReview: nonsenseReason,
+          aiReviewResult: 'rejected',
+          status: 'rejected',
+          rejectReason: nonsenseReason,
+        },
+      });
+      await this.notifyAdminsOfModeration(
+        moment,
+        comment,
+        userName,
+        false,
+        nonsenseReason,
+      );
+      if (comment.userId) {
+        await this.notificationService.create(comment.userId, {
+          type: 'system',
+          title: '瞬间评论未通过',
+          content: `瞬间：「${moment.title}」\n你的评论：${contentPreview(comment.content)}\n审核结果：未通过\n原因：${nonsenseReason}`,
+          link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}&reviewComment=${comment.id}&review=rejected`,
+        });
+      }
+      return;
+    }
     try {
-      const review = await this.aiService.moderateComment(comment.content, moment.title);
+      const review = await this.aiService.moderateComment(
+        comment.content,
+        moment.title,
+      );
       approved = review.approved;
       reason = review.reason;
 
@@ -253,13 +333,30 @@ export class MomentCommentService {
       approved = true;
       await this.prisma.momentComment.update({
         where: { id: comment.id },
-        data: { status: 'approved', aiReviewResult: 'approved', aiReview: reason, rejectReason: null },
+        data: {
+          status: 'approved',
+          aiReviewResult: 'approved',
+          aiReview: reason,
+          rejectReason: null,
+        },
       });
     }
 
-    const adminEmails = await this.notifyAdminsOfModeration(moment, comment, userName, approved, reason);
+    const adminEmails = await this.notifyAdminsOfModeration(
+      moment,
+      comment,
+      userName,
+      approved,
+      reason,
+    );
     if (approved) {
-      await this.sendCommentNotification(moment, { ...comment, status: 'approved' }, parentComment, currentUserId, adminEmails);
+      await this.sendCommentNotification(
+        moment,
+        { ...comment, status: 'approved' },
+        parentComment,
+        currentUserId,
+        adminEmails,
+      );
       if (comment.userId) {
         await this.notificationService.create(comment.userId, {
           type: 'system',
@@ -291,33 +388,40 @@ export class MomentCommentService {
         where: { role: 'admin', isActive: true },
         select: { id: true, username: true, email: true },
       });
-      await Promise.allSettled(admins.map(async (admin) => {
-        if (!approved) {
-          await this.notificationService.create(admin.id, {
-            type: 'comment',
-            title: '瞬间评论被拦截',
-            content: `瞬间：「${moment.title}」\n评论人：${userName}\n评论内容：${contentPreview(comment.content)}\n拦截原因：${reason}`,
+      await Promise.allSettled(
+        admins.map(async (admin) => {
+          if (!approved) {
+            await this.notificationService
+              .create(admin.id, {
+                type: 'comment',
+                title: '瞬间评论被拦截',
+                content: `瞬间：「${moment.title}」\n评论人：${userName}\n评论内容：${contentPreview(comment.content)}\n拦截原因：${reason}`,
+                link: '/admin/comments',
+              })
+              .catch((error) => {
+                this.logger.error(
+                  `发送管理员瞬间评论站内通知失败: ${admin.id}`,
+                  error,
+                );
+              });
+          }
+          if (admin.id === comment.userId) return;
+          if (!admin.email) return;
+          adminEmails.add(admin.email.toLowerCase());
+          await this.emailService.sendCommentModerationNotification({
+            to: admin.email,
+            toName: admin.username,
+            authorName: userName,
+            sourceType: '瞬间',
+            sourceTitle: moment.title,
+            sourceId: moment.id,
+            content: comment.content,
+            approved,
+            reason: approved ? undefined : reason,
             link: '/admin/comments',
-          }).catch((error) => {
-            this.logger.error(`发送管理员瞬间评论站内通知失败: ${admin.id}`, error);
           });
-        }
-        if (admin.id === comment.userId) return;
-        if (!admin.email) return;
-        adminEmails.add(admin.email.toLowerCase());
-        await this.emailService.sendCommentModerationNotification({
-          to: admin.email,
-          toName: admin.username,
-          authorName: userName,
-          sourceType: '瞬间',
-          sourceTitle: moment.title,
-          sourceId: moment.id,
-          content: comment.content,
-          approved,
-          reason: approved ? undefined : reason,
-          link: '/admin/comments',
-        });
-      }));
+        }),
+      );
     } catch (error) {
       this.logger.error('发送管理员瞬间评论审核通知失败:', error);
     }
@@ -331,7 +435,11 @@ export class MomentCommentService {
     currentUserId: string,
     excludedEmails = new Set<string>(),
   ) {
-    if (parentComment && parentComment.userId && parentComment.userId !== currentUserId) {
+    if (
+      parentComment &&
+      parentComment.userId &&
+      parentComment.userId !== currentUserId
+    ) {
       const parentAuthor = await this.prisma.user.findUnique({
         where: { id: parentComment.userId },
         select: { username: true, email: true },
@@ -342,7 +450,10 @@ export class MomentCommentService {
         content: `瞬间：「${moment.title}」\n回复人：${comment.authorName || '匿名用户'}\n你的评论：${contentPreview(parentComment.content)}\n回复内容：${contentPreview(comment.content)}`,
         link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
       });
-      if (parentAuthor?.email && !excludedEmails.has(parentAuthor.email.toLowerCase())) {
+      if (
+        parentAuthor?.email &&
+        !excludedEmails.has(parentAuthor.email.toLowerCase())
+      ) {
         await this.emailService.sendReplyNotification({
           to: parentAuthor.email,
           toName: parentAuthor.username,
@@ -367,7 +478,10 @@ export class MomentCommentService {
         content: `瞬间：「${moment.title}」\n评论人：${comment.authorName || '匿名用户'}\n评论内容：${contentPreview(comment.content)}`,
         link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}`,
       });
-      if (momentAuthor?.email && !excludedEmails.has(momentAuthor.email.toLowerCase())) {
+      if (
+        momentAuthor?.email &&
+        !excludedEmails.has(momentAuthor.email.toLowerCase())
+      ) {
         await this.emailService.sendCommentNotification({
           to: momentAuthor.email,
           toName: momentAuthor.username,
@@ -383,24 +497,33 @@ export class MomentCommentService {
   }
 
   async toggleLike(commentId: string, userId: string) {
-    const comment = await this.prisma.momentComment.findUnique({ where: { id: commentId } });
+    const comment = await this.prisma.momentComment.findUnique({
+      where: { id: commentId },
+    });
     if (!comment) throw new NotFoundException('Comment not found');
-    if (comment.userId === userId) throw new ForbiddenException('You cannot like your own comment');
+    if (comment.userId === userId)
+      throw new ForbiddenException('You cannot like your own comment');
 
     const existing = await this.prisma.momentCommentLike.findUnique({
       where: { userId_commentId: { userId, commentId } },
     });
 
     if (existing) {
-      await this.prisma.momentCommentLike.delete({ where: { id: existing.id } });
+      await this.prisma.momentCommentLike.delete({
+        where: { id: existing.id },
+      });
     } else {
-      await this.prisma.momentCommentLike.create({ data: { userId, commentId } });
+      await this.prisma.momentCommentLike.create({
+        data: { userId, commentId },
+      });
       this.sendLikeNotification(comment, userId).catch((error) => {
         this.logger.error('Moment comment like notification failed', error);
       });
     }
 
-    const count = await this.prisma.momentCommentLike.count({ where: { commentId } });
+    const count = await this.prisma.momentCommentLike.count({
+      where: { commentId },
+    });
     return { liked: !existing, likesCount: count };
   }
 
@@ -484,7 +607,9 @@ export class MomentCommentService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.momentComment.findUnique({ where: { id } });
+    const existing = await this.prisma.momentComment.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Comment not found');
     await this.prisma.momentComment.delete({ where: { id } });
   }
@@ -492,7 +617,13 @@ export class MomentCommentService {
   async findStatus(id: string, userId: string) {
     const comment = await this.prisma.momentComment.findUnique({
       where: { id },
-      select: { id: true, status: true, aiReview: true, aiReviewResult: true, userId: true },
+      select: {
+        id: true,
+        status: true,
+        aiReview: true,
+        aiReviewResult: true,
+        userId: true,
+      },
     });
     if (!comment || comment.userId !== userId) return null;
     return comment;

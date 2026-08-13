@@ -11,6 +11,7 @@ import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { NotificationService } from '../notification/notification.service';
+import { checkContentNonsense } from '../../common/content-filter/content-filter';
 import {
   BOTTLE_CHAIN_MAX,
   BOTTLE_RATE_LIMIT_PER_DAY,
@@ -77,9 +78,7 @@ export class VisitorService {
   private ipHash(req: VisitorRequest): string | null {
     const ip = req.ip;
     if (!ip) return null;
-    return createHash('sha256')
-      .update(`${IP_HASH_SALT}:${ip}`)
-      .digest('hex');
+    return createHash('sha256').update(`${IP_HASH_SALT}:${ip}`).digest('hex');
   }
 
   private async checkRateLimit(
@@ -97,7 +96,12 @@ export class VisitorService {
     }
   }
 
-  async identify(req: VisitorRequest, visitorIdHash: string, nickname: string, email?: string) {
+  async identify(
+    req: VisitorRequest,
+    visitorIdHash: string,
+    nickname: string,
+    email?: string,
+  ) {
     await this.checkRateLimit(req, 'identify', IDENTIFY_RATE_LIMIT_PER_DAY);
     const clean = nickname.trim().slice(0, 20);
     if (!clean) {
@@ -118,7 +122,12 @@ export class VisitorService {
         email: cleanEmail,
         lastSeenAt: new Date(),
       },
-      create: { visitorIdHash, nickname: clean, email: cleanEmail, ipHash: this.ipHash(req) },
+      create: {
+        visitorIdHash,
+        nickname: clean,
+        email: cleanEmail,
+        ipHash: this.ipHash(req),
+      },
     });
     if (profile.isBanned) {
       throw new ForbiddenException('该访客已被封禁');
@@ -156,7 +165,13 @@ export class VisitorService {
       });
     }
     const dayVisitKey = `corner:visitor:day-visit:${visitorIdHash}:${dayKey()}`;
-    const firstToday = await this.redis.client.set(dayVisitKey, '1', 'EX', 48 * 3600, 'NX');
+    const firstToday = await this.redis.client.set(
+      dayVisitKey,
+      '1',
+      'EX',
+      48 * 3600,
+      'NX',
+    );
     if (firstToday) {
       await this.prisma.visitorProfile.update({
         where: { visitorIdHash },
@@ -177,7 +192,11 @@ export class VisitorService {
     chainId: string | null = null,
     parentId: string | null = null,
   ) {
-    let profile: { nickname: string; visitorIdHash: string; isBanned: boolean } | null = null;
+    let profile: {
+      nickname: string;
+      visitorIdHash: string;
+      isBanned: boolean;
+    } | null = null;
     if (actor) {
       if (!actor.username.trim()) {
         throw new BadRequestException('登录账号缺少用户名');
@@ -196,15 +215,31 @@ export class VisitorService {
         throw new ForbiddenException('该访客已被封禁');
       }
     }
-    await this.checkRateLimit(req, type, type === 'message' ? MESSAGE_RATE_LIMIT_PER_DAY : BOTTLE_RATE_LIMIT_PER_DAY);
+    await this.checkRateLimit(
+      req,
+      type,
+      type === 'message'
+        ? MESSAGE_RATE_LIMIT_PER_DAY
+        : BOTTLE_RATE_LIMIT_PER_DAY,
+    );
 
     const clean = content.trim();
     if (!clean) {
       throw new BadRequestException('内容不能为空');
     }
 
-    const review = await this.aiService.moderateComment(clean);
-    const status = review.approved ? 'approved' : 'rejected';
+    const nonsenseReason = checkContentNonsense(clean);
+    let review: { approved: boolean; reason: string; pending?: boolean };
+    if (nonsenseReason) {
+      review = { approved: false, reason: nonsenseReason };
+    } else {
+      review = await this.aiService.moderateStrict(clean);
+    }
+    const status = review.pending
+      ? 'pending'
+      : review.approved
+        ? 'approved'
+        : 'rejected';
 
     const record = await this.prisma.visitorMessage.create({
       data: {
@@ -214,8 +249,13 @@ export class VisitorService {
         visitorIdHash: actor ? visitorIdHash : profile!.visitorIdHash,
         userId: actor?.userId ?? null,
         status,
-        aiReview: status === 'rejected' ? review.reason : null,
-        aiReviewResult: review.approved ? 'approved' : 'rejected',
+        aiReview:
+          status === 'rejected' || status === 'pending' ? review.reason : null,
+        aiReviewResult: review.pending
+          ? 'pending'
+          : review.approved
+            ? 'approved'
+            : 'rejected',
         chainId,
         parentId,
       },
@@ -229,7 +269,12 @@ export class VisitorService {
       record.chainId = record.id;
     }
 
-    if (status === 'approved' && type === 'message' && !actor && visitorIdHash) {
+    if (
+      status === 'approved' &&
+      type === 'message' &&
+      !actor &&
+      visitorIdHash
+    ) {
       await this.prisma.visitorProfile.update({
         where: { visitorIdHash },
         data: { messageCount: { increment: 1 } },
@@ -248,7 +293,7 @@ export class VisitorService {
           content:
             status === 'approved'
               ? clean
-              : (review.reason || '内容未通过 AI 审核'),
+              : review.reason || '内容未通过 AI 审核',
           link: '/guestbook',
         });
       } catch (error) {
@@ -256,7 +301,9 @@ export class VisitorService {
       }
     }
 
-    const unlocked = visitorIdHash ? await this.syncAchievements(visitorIdHash) : [];
+    const unlocked = visitorIdHash
+      ? await this.syncAchievements(visitorIdHash)
+      : [];
     return { record, unlocked, review };
   }
 
@@ -278,7 +325,9 @@ export class VisitorService {
   ) {
     let chainId: string | null = null;
     if (parentId) {
-      const parent = await this.prisma.visitorMessage.findUnique({ where: { id: parentId } });
+      const parent = await this.prisma.visitorMessage.findUnique({
+        where: { id: parentId },
+      });
       if (!parent || parent.type !== 'bottle') {
         throw new BadRequestException('接力的瓶子不存在');
       }
@@ -287,14 +336,26 @@ export class VisitorService {
       }
       const chainRoot = parent.chainId ?? parent.id;
       const depth = await this.prisma.visitorMessage.count({
-        where: { chainId: chainRoot, type: 'bottle', status: { in: ['approved', 'caught'] } },
+        where: {
+          chainId: chainRoot,
+          type: 'bottle',
+          status: { in: ['approved', 'caught'] },
+        },
       });
       if (depth >= BOTTLE_CHAIN_MAX) {
         throw new BadRequestException('这封信已经漂了太久，让它在此安歇吧');
       }
       chainId = chainRoot;
     }
-    return this.createMessage(req, actor, visitorIdHash, 'bottle', content, chainId, parentId ?? null);
+    return this.createMessage(
+      req,
+      actor,
+      visitorIdHash,
+      'bottle',
+      content,
+      chainId,
+      parentId ?? null,
+    );
   }
 
   async fishBottle(
@@ -304,7 +365,9 @@ export class VisitorService {
     bottleId: string,
   ) {
     await this.checkRateLimit(req, 'fish', FISH_RATE_LIMIT_PER_DAY);
-    const bottle = await this.prisma.visitorMessage.findUnique({ where: { id: bottleId } });
+    const bottle = await this.prisma.visitorMessage.findUnique({
+      where: { id: bottleId },
+    });
     if (!bottle || bottle.type !== 'bottle' || bottle.status !== 'approved') {
       throw new NotFoundException('这只瓶子已经被别人捞走了');
     }
@@ -326,7 +389,11 @@ export class VisitorService {
       throw new NotFoundException('这只瓶子已经被别人捞走了');
     }
     const chainRows = await this.prisma.visitorMessage.findMany({
-      where: { chainId: bottle.chainId ?? bottle.id, type: 'bottle', status: { in: ['approved', 'caught'] } },
+      where: {
+        chainId: bottle.chainId ?? bottle.id,
+        type: 'bottle',
+        status: { in: ['approved', 'caught'] },
+      },
       orderBy: { createdAt: 'asc' },
       select: { id: true, nickname: true, content: true, createdAt: true },
     });
@@ -356,7 +423,9 @@ export class VisitorService {
         this.logger.warn(`捞起通知发送失败: ${(error as Error).message}`);
       }
     }
-    const unlocked = visitorIdHash ? await this.syncAchievements(visitorIdHash) : [];
+    const unlocked = visitorIdHash
+      ? await this.syncAchievements(visitorIdHash)
+      : [];
     const ownerUserId = bottle.userId ?? null;
     return {
       bottle: {
@@ -382,7 +451,9 @@ export class VisitorService {
     if (!actor?.userId) {
       throw new UnauthorizedException('请先登录后再回复漂流瓶主人');
     }
-    const bottle = await this.prisma.visitorMessage.findUnique({ where: { id: bottleId } });
+    const bottle = await this.prisma.visitorMessage.findUnique({
+      where: { id: bottleId },
+    });
     if (!bottle || bottle.type !== 'bottle') {
       throw new NotFoundException('瓶子不存在');
     }
@@ -435,7 +506,10 @@ export class VisitorService {
     excludeVisitorHash: string | null = null,
     excludeUserId: string | null = null,
   ) {
-    const where: Record<string, unknown> = { type: 'bottle', status: 'approved' };
+    const where: Record<string, unknown> = {
+      type: 'bottle',
+      status: 'approved',
+    };
     const not: Record<string, unknown>[] = [];
     if (excludeVisitorHash) not.push({ visitorIdHash: excludeVisitorHash });
     if (excludeUserId) not.push({ userId: excludeUserId });
@@ -465,7 +539,10 @@ export class VisitorService {
       id: t.id,
       nicknameFirstChar: t.nickname.slice(0, 1),
       chainLength: depthByChain.get(t.chainId ?? t.id) ?? 1,
-      seed: [...t.id].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 997, 7),
+      seed: [...t.id].reduce(
+        (acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 997,
+        7,
+      ),
     }));
   }
 
@@ -500,24 +577,37 @@ export class VisitorService {
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-    const [messageCount, bottleCount, totalVisitors, todayVisitors, totalVisits, recentRows, recentMessages] =
-      await Promise.all([
-        this.prisma.visitorMessage.count({ where: { type: 'message', status: 'approved' } }),
-        this.prisma.visitorMessage.count({ where: { type: 'bottle', status: { in: ['approved', 'caught'] } } }),
-        this.prisma.visitorProfile.count(),
-        this.prisma.visitorProfile.count({ where: { lastSeenAt: { gte: today } } }),
-        this.prisma.visitorVisit.count(),
-        this.prisma.visitorVisit.findMany({
-          where: { createdAt: { gte: sevenDaysAgo } },
-          select: { createdAt: true },
-        }),
-        this.prisma.visitorMessage.findMany({
-          where: { type: 'message', status: 'approved' },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          select: { nickname: true, content: true, createdAt: true },
-        }),
-      ]);
+    const [
+      messageCount,
+      bottleCount,
+      totalVisitors,
+      todayVisitors,
+      totalVisits,
+      recentRows,
+      recentMessages,
+    ] = await Promise.all([
+      this.prisma.visitorMessage.count({
+        where: { type: 'message', status: 'approved' },
+      }),
+      this.prisma.visitorMessage.count({
+        where: { type: 'bottle', status: { in: ['approved', 'caught'] } },
+      }),
+      this.prisma.visitorProfile.count(),
+      this.prisma.visitorProfile.count({
+        where: { lastSeenAt: { gte: today } },
+      }),
+      this.prisma.visitorVisit.count(),
+      this.prisma.visitorVisit.findMany({
+        where: { createdAt: { gte: sevenDaysAgo } },
+        select: { createdAt: true },
+      }),
+      this.prisma.visitorMessage.findMany({
+        where: { type: 'message', status: 'approved' },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { nickname: true, content: true, createdAt: true },
+      }),
+    ]);
 
     const perDay = new Map<string, Set<string>>();
     for (const row of recentRows) {
@@ -550,7 +640,14 @@ export class VisitorService {
       where: { visitorIdHash },
     });
     if (!profile) {
-      return { nickname: null, visitCount: 0, messageCount: 0, bottleCount: 0, caughtCount: 0, achievements: [] };
+      return {
+        nickname: null,
+        visitCount: 0,
+        messageCount: 0,
+        bottleCount: 0,
+        caughtCount: 0,
+        achievements: [],
+      };
     }
     const [achievements, bottleCount, caughtCount] = await Promise.all([
       this.prisma.visitorAchievement.findMany({
@@ -559,9 +656,15 @@ export class VisitorService {
         select: { code: true, unlockedAt: true },
       }),
       this.prisma.visitorMessage.count({
-        where: { visitorIdHash, type: 'bottle', status: { in: ['approved', 'caught'] } },
+        where: {
+          visitorIdHash,
+          type: 'bottle',
+          status: { in: ['approved', 'caught'] },
+        },
       }),
-      this.prisma.visitorMessage.count({ where: { caughtByIdHash: visitorIdHash } }),
+      this.prisma.visitorMessage.count({
+        where: { caughtByIdHash: visitorIdHash },
+      }),
     ]);
     return {
       nickname: profile.nickname,
@@ -597,7 +700,9 @@ export class VisitorService {
       where: { visitorIdHash: { in: hashes } },
       select: { visitorIdHash: true, nickname: true },
     });
-    const nicknameByHash = new Map(profiles.map((p) => [p.visitorIdHash, p.nickname]));
+    const nicknameByHash = new Map(
+      profiles.map((p) => [p.visitorIdHash, p.nickname]),
+    );
 
     const items: Array<Record<string, unknown>> = [];
     const seen = new Set<string>();
@@ -626,26 +731,31 @@ export class VisitorService {
       });
       if (!profile) return [];
 
-      const [msgCount, bottleCount, caughtCount, pageTypes, owned] = await Promise.all([
-        this.prisma.visitorMessage.count({
-          where: { visitorIdHash, type: 'message', status: 'approved' },
-        }),
-        this.prisma.visitorMessage.count({
-          where: { visitorIdHash, type: 'bottle', status: { in: ['approved', 'caught'] } },
-        }),
-        this.prisma.visitorMessage.count({
-          where: { caughtByIdHash: visitorIdHash },
-        }),
-        this.prisma.visitorVisit.findMany({
-          where: { visitorIdHash },
-          select: { pageType: true },
-          distinct: ['pageType'],
-        }),
-        this.prisma.visitorAchievement.findMany({
-          where: { visitorIdHash },
-          select: { code: true },
-        }),
-      ]);
+      const [msgCount, bottleCount, caughtCount, pageTypes, owned] =
+        await Promise.all([
+          this.prisma.visitorMessage.count({
+            where: { visitorIdHash, type: 'message', status: 'approved' },
+          }),
+          this.prisma.visitorMessage.count({
+            where: {
+              visitorIdHash,
+              type: 'bottle',
+              status: { in: ['approved', 'caught'] },
+            },
+          }),
+          this.prisma.visitorMessage.count({
+            where: { caughtByIdHash: visitorIdHash },
+          }),
+          this.prisma.visitorVisit.findMany({
+            where: { visitorIdHash },
+            select: { pageType: true },
+            distinct: ['pageType'],
+          }),
+          this.prisma.visitorAchievement.findMany({
+            where: { visitorIdHash },
+            select: { code: true },
+          }),
+        ]);
 
       const ownedSet = new Set(owned.map((o) => o.code));
       const pageCount = pageTypes.length;
@@ -679,20 +789,46 @@ export class VisitorService {
   async adminStats() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const [visitors, todayVisitors, visits, messages, bottles, pendingMessages, pendingBottles] =
-      await Promise.all([
-        this.prisma.visitorProfile.count(),
-        this.prisma.visitorProfile.count({ where: { lastSeenAt: { gte: today } } }),
-        this.prisma.visitorVisit.count(),
-        this.prisma.visitorMessage.count({ where: { type: 'message' } }),
-        this.prisma.visitorMessage.count({ where: { type: 'bottle' } }),
-        this.prisma.visitorMessage.count({ where: { type: 'message', status: 'pending' } }),
-        this.prisma.visitorMessage.count({ where: { type: 'bottle', status: 'pending' } }),
-      ]);
-    return { visitors, todayVisitors, visits, messages, bottles, pendingMessages, pendingBottles };
+    const [
+      visitors,
+      todayVisitors,
+      visits,
+      messages,
+      bottles,
+      pendingMessages,
+      pendingBottles,
+    ] = await Promise.all([
+      this.prisma.visitorProfile.count(),
+      this.prisma.visitorProfile.count({
+        where: { lastSeenAt: { gte: today } },
+      }),
+      this.prisma.visitorVisit.count(),
+      this.prisma.visitorMessage.count({ where: { type: 'message' } }),
+      this.prisma.visitorMessage.count({ where: { type: 'bottle' } }),
+      this.prisma.visitorMessage.count({
+        where: { type: 'message', status: 'pending' },
+      }),
+      this.prisma.visitorMessage.count({
+        where: { type: 'bottle', status: 'pending' },
+      }),
+    ]);
+    return {
+      visitors,
+      todayVisitors,
+      visits,
+      messages,
+      bottles,
+      pendingMessages,
+      pendingBottles,
+    };
   }
 
-  async adminMessages(query: { status?: string; type?: string; page?: number; pageSize?: number }) {
+  async adminMessages(query: {
+    status?: string;
+    type?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
     const where: Record<string, unknown> = {};
     if (query.status) where.status = query.status;
     if (query.type) where.type = query.type;
@@ -707,7 +843,9 @@ export class VisitorService {
       }),
       this.prisma.visitorMessage.count({ where }),
     ]);
-    const userIds = [...new Set(items.map((m) => m.userId).filter(Boolean) as string[])];
+    const userIds = [
+      ...new Set(items.map((m) => m.userId).filter(Boolean) as string[]),
+    ];
     const users = userIds.length
       ? await this.prisma.user.findMany({
           where: { id: { in: userIds } },
@@ -717,20 +855,33 @@ export class VisitorService {
     const userMap = new Map(users.map((u) => [u.id, u]));
     const decorated = items.map((m) => ({
       ...m,
-      account: m.userId ? userMap.get(m.userId) ?? null : null,
+      account: m.userId ? (userMap.get(m.userId) ?? null) : null,
     }));
     return { items: decorated, total, page, pageSize };
   }
 
-  async reviewMessage(id: string, action: 'approve' | 'reject', reason?: string) {
-    const message = await this.prisma.visitorMessage.findUnique({ where: { id } });
+  async reviewMessage(
+    id: string,
+    action: 'approve' | 'reject',
+    reason?: string,
+  ) {
+    const message = await this.prisma.visitorMessage.findUnique({
+      where: { id },
+    });
     if (!message) throw new NotFoundException('消息不存在');
     const data: Record<string, unknown> =
       action === 'approve'
         ? { status: 'approved', rejectReason: null }
         : { status: 'rejected', rejectReason: reason || '管理员拒绝' };
-    const updated = await this.prisma.visitorMessage.update({ where: { id }, data });
-    if (action === 'approve' && message.type === 'message' && message.visitorIdHash) {
+    const updated = await this.prisma.visitorMessage.update({
+      where: { id },
+      data,
+    });
+    if (
+      action === 'approve' &&
+      message.type === 'message' &&
+      message.visitorIdHash
+    ) {
       await this.prisma.visitorProfile.update({
         where: { visitorIdHash: message.visitorIdHash },
         data: { messageCount: { increment: 1 } },
@@ -741,7 +892,9 @@ export class VisitorService {
   }
 
   async setBan(id: string, banned: boolean) {
-    const profile = await this.prisma.visitorProfile.findUnique({ where: { id } });
+    const profile = await this.prisma.visitorProfile.findUnique({
+      where: { id },
+    });
     if (!profile) throw new NotFoundException('访客不存在');
     await this.prisma.visitorProfile.update({
       where: { id },
@@ -750,7 +903,12 @@ export class VisitorService {
     return { ok: true, isBanned: banned };
   }
 
-  async adminProfiles(query: { keyword?: string; banned?: string; page?: number; pageSize?: number }) {
+  async adminProfiles(query: {
+    keyword?: string;
+    banned?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
     const where: Record<string, unknown> = {};
     if (query.keyword?.trim()) {
       where.nickname = { contains: query.keyword.trim() };
@@ -769,34 +927,45 @@ export class VisitorService {
       this.prisma.visitorProfile.count({ where }),
     ]);
     const hashes = items.map((p) => p.visitorIdHash);
-    const [messageCounts, bottleCounts, caughtCounts, achievementCounts] = await Promise.all([
-      this.prisma.visitorMessage.groupBy({
-        by: ['visitorIdHash'],
-        where: { visitorIdHash: { in: hashes }, type: 'message', status: 'approved' },
-        _count: { _all: true },
-      }),
-      this.prisma.visitorMessage.groupBy({
-        by: ['visitorIdHash'],
-        where: { visitorIdHash: { in: hashes }, type: 'bottle', status: { in: ['approved', 'caught'] } },
-        _count: { _all: true },
-      }),
-      this.prisma.visitorMessage.groupBy({
-        by: ['caughtByIdHash'],
-        where: { caughtByIdHash: { in: hashes } },
-        _count: { _all: true },
-      }),
-      this.prisma.visitorAchievement.groupBy({
-        by: ['visitorIdHash'],
-        where: { visitorIdHash: { in: hashes } },
-        _count: { _all: true },
-      }),
-    ]);
+    const [messageCounts, bottleCounts, caughtCounts, achievementCounts] =
+      await Promise.all([
+        this.prisma.visitorMessage.groupBy({
+          by: ['visitorIdHash'],
+          where: {
+            visitorIdHash: { in: hashes },
+            type: 'message',
+            status: 'approved',
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.visitorMessage.groupBy({
+          by: ['visitorIdHash'],
+          where: {
+            visitorIdHash: { in: hashes },
+            type: 'bottle',
+            status: { in: ['approved', 'caught'] },
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.visitorMessage.groupBy({
+          by: ['caughtByIdHash'],
+          where: { caughtByIdHash: { in: hashes } },
+          _count: { _all: true },
+        }),
+        this.prisma.visitorAchievement.groupBy({
+          by: ['visitorIdHash'],
+          where: { visitorIdHash: { in: hashes } },
+          _count: { _all: true },
+        }),
+      ]);
     const countBy = (rows: Array<Record<string, unknown>>, key: string) =>
-      new Map(rows.map((r) => [String(r[key]), (r._count as { _all: number })._all]));
-    const messageMap = countBy(messageCounts as unknown as Array<Record<string, unknown>>, 'visitorIdHash');
-    const bottleMap = countBy(bottleCounts as unknown as Array<Record<string, unknown>>, 'visitorIdHash');
-    const caughtMap = countBy(caughtCounts as unknown as Array<Record<string, unknown>>, 'caughtByIdHash');
-    const achMap = countBy(achievementCounts as unknown as Array<Record<string, unknown>>, 'visitorIdHash');
+      new Map(
+        rows.map((r) => [String(r[key]), (r._count as { _all: number })._all]),
+      );
+    const messageMap = countBy(messageCounts, 'visitorIdHash');
+    const bottleMap = countBy(bottleCounts, 'visitorIdHash');
+    const caughtMap = countBy(caughtCounts, 'caughtByIdHash');
+    const achMap = countBy(achievementCounts, 'visitorIdHash');
     return {
       items: items.map((p) => ({
         id: p.id,

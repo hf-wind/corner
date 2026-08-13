@@ -37,7 +37,12 @@ describe('AiService model configuration compatibility', () => {
         ai_model: 'deepseek-chat',
       }),
     };
-    const service = new AiService(prisma as any, settings as any, {} as any, {} as any);
+    const service = new AiService(
+      prisma as any,
+      settings as any,
+      {} as any,
+      {} as any,
+    );
     return { service, prisma };
   }
 
@@ -207,16 +212,29 @@ describe('AiService model configuration compatibility', () => {
     jest.spyOn(service as any, 'canUseModel').mockResolvedValue(true);
     const chat = jest
       .spyOn(service, 'chat')
-      .mockResolvedValueOnce(JSON.stringify({ title: 'NestJS 事务实践', content: '事务与外键约束详解' }))
-      .mockResolvedValueOnce(JSON.stringify({
-        slug: 'nestjs-transactions',
-        category: { name: '技术', icon: 'ph:code-bold', color: '#2563eb' },
-        tags: [{ name: 'NestJS', icon: 'ph:code-bold', color: '#059669' }],
-      }));
-    jest.spyOn(service, 'summarize').mockResolvedValue({ excerpt: '摘要', source: 'ai' });
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          title: 'NestJS 事务实践',
+          content: '事务与外键约束详解',
+        }),
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          slug: 'nestjs-transactions',
+          category: { name: '技术', icon: 'ph:code-bold', color: '#2563eb' },
+          tags: [{ name: 'NestJS', icon: 'ph:code-bold', color: '#059669' }],
+        }),
+      );
+    jest
+      .spyOn(service, 'summarize')
+      .mockResolvedValue({ excerpt: '摘要', source: 'ai' });
     jest.spyOn(service, 'pickAndImportCover').mockResolvedValue('');
-    jest.spyOn(service as any, 'ensureCategoryByName').mockResolvedValue({ id: 'category-tech', name: '技术' });
-    jest.spyOn(service as any, 'ensureTagsByNames').mockResolvedValue([{ id: 'tag-nest', name: 'NestJS' }]);
+    jest
+      .spyOn(service as any, 'ensureCategoryByName')
+      .mockResolvedValue({ id: 'category-tech', name: '技术' });
+    jest
+      .spyOn(service as any, 'ensureTagsByNames')
+      .mockResolvedValue([{ id: 'tag-nest', name: 'NestJS' }]);
     prisma.category.findMany.mockResolvedValue([
       { id: 'category-essay', name: '随笔', slug: 'essay' },
       { id: 'category-tech', name: '技术', slug: 'technology' },
@@ -227,9 +245,59 @@ describe('AiService model configuration compatibility', () => {
 
     await service.generateArticle('写一篇 NestJS 事务文章');
 
-    const metaMessages = chat.mock.calls[1][0] as Array<{ role: string; content: string }>;
+    const metaMessages = chat.mock.calls[1][0] as Array<{
+      role: string;
+      content: string;
+    }>;
     expect(metaMessages[0].content).toContain('“随笔”不是默认分类');
     expect(metaMessages[1].content).toContain('"id":"category-tech"');
     expect(metaMessages[1].content).toContain('"slug":"nestjs"');
+  });
+
+  describe('moderateStrict — 留言/漂流瓶严格审核', () => {
+    it('AI 未启用时返回 pending', async () => {
+      const { service } = createService();
+      (service as any).getConfig = jest
+        .fn()
+        .mockResolvedValue({ ai_comment_moderation_enabled: false });
+      const r = await service.moderateStrict('你好');
+      expect(r.pending).toBe(true);
+    });
+
+    it('AI 返回格式异常时 pending 而非放行', async () => {
+      const { service } = createService();
+      (service as any).getConfig = jest.fn().mockResolvedValue({
+        ai_comment_moderation_enabled: true,
+        ai_moderate_model_config_id: 'm',
+        ai_moderate_model: 'm',
+        ai_moderate_temperature: 0.1,
+        ai_moderate_max_tokens: 200,
+        ai_moderate_prompt: 'x',
+      });
+      (service as any).canUseModel = jest.fn().mockResolvedValue(true);
+      (service as any).chat = jest.fn().mockResolvedValue('不是JSON');
+      const r = await service.moderateStrict('你好');
+      expect(r.pending).toBe(true);
+      expect(r.approved).toBe(false);
+    });
+
+    it('AI 正常判定通过时不带 pending', async () => {
+      const { service } = createService();
+      (service as any).getConfig = jest.fn().mockResolvedValue({
+        ai_comment_moderation_enabled: true,
+        ai_moderate_model_config_id: 'm',
+        ai_moderate_model: 'm',
+        ai_moderate_temperature: 0.1,
+        ai_moderate_max_tokens: 200,
+        ai_moderate_prompt: 'x',
+      });
+      (service as any).canUseModel = jest.fn().mockResolvedValue(true);
+      (service as any).chat = jest
+        .fn()
+        .mockResolvedValue('{"approved": true, "reason": "正常交流"}');
+      const r = await service.moderateStrict('你好');
+      expect(r.approved).toBe(true);
+      expect(r.pending).toBeUndefined();
+    });
   });
 });

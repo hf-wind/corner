@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { VisitorService } from './visitor.service';
 
 function hashOf(id: string): string {
@@ -8,7 +12,10 @@ function hashOf(id: string): string {
 
 describe('VisitorService', () => {
   const actor = { userId: 'user-1', username: '阿风' };
-  const req = { headers: { 'x-visitor-id': 'guest-1' }, ip: '203.0.113.9' } as never;
+  const req = {
+    headers: { 'x-visitor-id': 'guest-1' },
+    ip: '203.0.113.9',
+  } as never;
   const redis = {
     client: {
       incr: jest.fn().mockResolvedValue(1),
@@ -16,13 +23,20 @@ describe('VisitorService', () => {
     },
   } as any;
   const ai = {
-    moderateComment: jest.fn().mockResolvedValue({ approved: true, reason: null }),
+    moderateComment: jest
+      .fn()
+      .mockResolvedValue({ approved: true, reason: null }),
+    moderateStrict: jest
+      .fn()
+      .mockResolvedValue({ approved: true, reason: null }),
   } as any;
   const notifications = { create: jest.fn().mockResolvedValue({}) } as any;
 
   afterEach(() => {
     jest.restoreAllMocks();
     notifications.create.mockClear();
+    ai.moderateComment.mockClear();
+    ai.moderateStrict.mockClear();
   });
 
   function makeService(prisma: any) {
@@ -41,7 +55,12 @@ describe('VisitorService', () => {
       } as any;
       const service = makeService(prisma);
 
-      const result = await service.createMessageEntry(req, actor, null, '你好，时光');
+      const result = await service.createMessageEntry(
+        req,
+        actor,
+        null,
+        '你好，时光',
+      );
 
       expect(prisma.visitorProfile.findUnique).not.toHaveBeenCalled();
       expect(create).toHaveBeenCalledWith({
@@ -77,7 +96,10 @@ describe('VisitorService', () => {
     });
 
     it('登录通道：审核拒绝时通知携带原因', async () => {
-      ai.moderateComment.mockResolvedValueOnce({ approved: false, reason: '疑似广告内容' });
+      ai.moderateStrict.mockResolvedValueOnce({
+        approved: false,
+        reason: '疑似广告内容',
+      });
       const prisma = {
         visitorProfile: { findUnique: jest.fn() },
         visitorMessage: { create: jest.fn().mockResolvedValue({ id: 'm4' }) },
@@ -100,7 +122,11 @@ describe('VisitorService', () => {
     it('访客通道：不发送审核通知（仅访客提示）', async () => {
       const prisma = {
         visitorProfile: {
-          findUnique: jest.fn().mockResolvedValue({ nickname: '旅人甲', visitorIdHash: 'h', isBanned: false }),
+          findUnique: jest.fn().mockResolvedValue({
+            nickname: '旅人甲',
+            visitorIdHash: 'h',
+            isBanned: false,
+          }),
           update: jest.fn().mockResolvedValue({}),
         },
         visitorMessage: { create: jest.fn().mockResolvedValue({ id: 'm5' }) },
@@ -110,7 +136,12 @@ describe('VisitorService', () => {
       } as any;
       const service = makeService(prisma);
 
-      await service.createMessageEntry(req, null, hashOf('guest-1'), '访客留言');
+      await service.createMessageEntry(
+        req,
+        null,
+        hashOf('guest-1'),
+        '访客留言',
+      );
 
       expect(notifications.create).not.toHaveBeenCalled();
     });
@@ -118,7 +149,9 @@ describe('VisitorService', () => {
     it('访客通道：未起名（无名旅人）时拒绝留言', async () => {
       const prisma = {
         visitorProfile: {
-          findUnique: jest.fn().mockResolvedValue({ nickname: '无名旅人', isBanned: false }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ nickname: '无名旅人', isBanned: false }),
         },
         visitorMessage: { create: jest.fn() },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
@@ -136,7 +169,9 @@ describe('VisitorService', () => {
     it('访客通道：被封禁时拒绝留言', async () => {
       const prisma = {
         visitorProfile: {
-          findUnique: jest.fn().mockResolvedValue({ nickname: '阿风', isBanned: true }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ nickname: '阿风', isBanned: true }),
         },
         visitorMessage: { create: jest.fn() },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
@@ -161,10 +196,18 @@ describe('VisitorService', () => {
       } as any;
       const service = makeService(prisma);
 
-      await service.createMessageEntry(req, actor, null, '没有访客标识也能留言');
+      await service.createMessageEntry(
+        req,
+        actor,
+        null,
+        '没有访客标识也能留言',
+      );
 
       expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ visitorIdHash: null, userId: 'user-1' }),
+        data: expect.objectContaining({
+          visitorIdHash: null,
+          userId: 'user-1',
+        }),
       });
     });
   });
@@ -206,7 +249,10 @@ describe('VisitorService', () => {
           findUnique: jest.fn().mockResolvedValue({ email: 'feng@corner.ink' }),
           findMany: jest.fn(),
         },
-        visitorAchievement: { findMany: jest.fn().mockResolvedValue([]), createMany: jest.fn() },
+        visitorAchievement: {
+          findMany: jest.fn().mockResolvedValue([]),
+          createMany: jest.fn(),
+        },
         visitorVisit: { findMany: jest.fn() },
         ...overrides,
       } as any;
@@ -215,7 +261,9 @@ describe('VisitorService', () => {
     it('登录用户捞起他人瓶子：返回完整信链与 canReply', async () => {
       const prisma = makePrisma({
         visitorMessage: {
-          findUnique: jest.fn().mockResolvedValue({ ...baseBottle, userId: 'user-2' }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...baseBottle, userId: 'user-2' }),
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           findMany: jest.fn().mockResolvedValue([chainRow]),
         },
@@ -226,7 +274,10 @@ describe('VisitorService', () => {
 
       expect(prisma.visitorMessage.updateMany).toHaveBeenCalledWith({
         where: { id: 'b1', status: 'approved' },
-        data: expect.objectContaining({ status: 'caught', caughtAt: expect.any(Date) }),
+        data: expect.objectContaining({
+          status: 'caught',
+          caughtAt: expect.any(Date),
+        }),
       });
       expect(result.bottle.chain).toEqual([chainRow]);
       expect(result.bottle.contactEmail).toBe('feng@corner.ink');
@@ -244,11 +295,20 @@ describe('VisitorService', () => {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           findMany: jest.fn().mockResolvedValue([chainRow]),
         },
-        visitorProfile: { findUnique: jest.fn().mockResolvedValue({ email: 'guest@example.com' }) },
+        visitorProfile: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ email: 'guest@example.com' }),
+        },
       });
       const service = makeService(prisma);
 
-      const result = await service.fishBottle(req, null, hashOf('guest-1'), 'b1');
+      const result = await service.fishBottle(
+        req,
+        null,
+        hashOf('guest-1'),
+        'b1',
+      );
 
       expect(prisma.visitorProfile.findUnique).toHaveBeenCalledWith({
         where: { visitorIdHash: hashOf('guest-2') },
@@ -262,15 +322,23 @@ describe('VisitorService', () => {
       const prisma = makePrisma();
       const service = makeService(prisma);
 
-      await expect(service.fishBottle(req, { userId: 'user-1', username: '阿风' }, null, 'b1'))
-        .rejects.toThrow('不能捞起自己投的瓶子');
+      await expect(
+        service.fishBottle(
+          req,
+          { userId: 'user-1', username: '阿风' },
+          null,
+          'b1',
+        ),
+      ).rejects.toThrow('不能捞起自己投的瓶子');
       expect(prisma.visitorMessage.updateMany).not.toHaveBeenCalled();
     });
 
     it('瓶子已被捞走时拒绝（并发保护）', async () => {
       const prisma = makePrisma({
         visitorMessage: {
-          findUnique: jest.fn().mockResolvedValue({ ...baseBottle, status: 'caught' }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...baseBottle, status: 'caught' }),
           updateMany: jest.fn(),
           findMany: jest.fn(),
         },
@@ -311,7 +379,9 @@ describe('VisitorService', () => {
     it('捞起后通知瓶主（登录用户）', async () => {
       const prisma = makePrisma({
         visitorMessage: {
-          findUnique: jest.fn().mockResolvedValue({ ...baseBottle, userId: 'user-2' }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...baseBottle, userId: 'user-2' }),
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           findMany: jest.fn().mockResolvedValue([chainRow]),
         },
@@ -342,9 +412,9 @@ describe('VisitorService', () => {
       } as any;
       const service = makeService(prisma);
 
-      await expect(service.identify(req, hashOf('guest-1'), '新名字')).rejects.toThrow(
-        '已登记的名字不能修改',
-      );
+      await expect(
+        service.identify(req, hashOf('guest-1'), '新名字'),
+      ).rejects.toThrow('已登记的名字不能修改');
       expect(prisma.visitorProfile.upsert).not.toHaveBeenCalled();
     });
 
@@ -356,12 +426,20 @@ describe('VisitorService', () => {
           upsert: jest.fn().mockResolvedValue(profile),
         },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
-        visitorAchievement: { findMany: jest.fn().mockResolvedValue([]), createMany: jest.fn() },
+        visitorAchievement: {
+          findMany: jest.fn().mockResolvedValue([]),
+          createMany: jest.fn(),
+        },
         visitorVisit: { findMany: jest.fn() },
       } as any;
       const service = makeService(prisma);
 
-      const result = await service.identify(req, hashOf('guest-1'), '阿风', 'a@b.com');
+      const result = await service.identify(
+        req,
+        hashOf('guest-1'),
+        '阿风',
+        'a@b.com',
+      );
 
       expect(prisma.visitorProfile.upsert).toHaveBeenCalled();
       expect(result.nickname).toBe('阿风');
@@ -399,7 +477,10 @@ describe('VisitorService', () => {
         },
         visitorProfile: { findUnique: jest.fn() },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
-        visitorAchievement: { findMany: jest.fn().mockResolvedValue([]), createMany: jest.fn() },
+        visitorAchievement: {
+          findMany: jest.fn().mockResolvedValue([]),
+          createMany: jest.fn(),
+        },
         visitorVisit: { findMany: jest.fn() },
       } as any;
       const service = makeService(prisma);
@@ -414,7 +495,9 @@ describe('VisitorService', () => {
         }),
       });
       expect(prisma.visitorMessage.count).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ type: 'bottle' }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ type: 'bottle' }),
+        }),
       );
       expect(prisma.visitorMessage.update).not.toHaveBeenCalled();
     });
@@ -422,7 +505,9 @@ describe('VisitorService', () => {
     it('接力：父瓶必须是被捞起状态', async () => {
       const prisma = {
         visitorMessage: {
-          findUnique: jest.fn().mockResolvedValue({ ...caughtParent, status: 'approved' }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...caughtParent, status: 'approved' }),
           count: jest.fn(),
           create: jest.fn(),
         },
@@ -433,9 +518,9 @@ describe('VisitorService', () => {
       } as any;
       const service = makeService(prisma);
 
-      await expect(service.throwBottle(req, actor, null, '话', 'b1')).rejects.toThrow(
-        '只能接力一只刚捞起的瓶子',
-      );
+      await expect(
+        service.throwBottle(req, actor, null, '话', 'b1'),
+      ).rejects.toThrow('只能接力一只刚捞起的瓶子');
     });
 
     it('接力：信链超过 10 段时拒绝', async () => {
@@ -452,14 +537,16 @@ describe('VisitorService', () => {
       } as any;
       const service = makeService(prisma);
 
-      await expect(service.throwBottle(req, actor, null, '话', 'b1')).rejects.toThrow(
-        '这封信已经漂了太久',
-      );
+      await expect(
+        service.throwBottle(req, actor, null, '话', 'b1'),
+      ).rejects.toThrow('这封信已经漂了太久');
     });
 
     it('首投：无 parentId 时链字段为 null，且补写自身 id 为 chainId', async () => {
       const create = jest.fn().mockResolvedValue({ id: 'm-first' });
-      const update = jest.fn().mockResolvedValue({ id: 'm-first', chainId: 'm-first' });
+      const update = jest
+        .fn()
+        .mockResolvedValue({ id: 'm-first', chainId: 'm-first' });
       const prisma = {
         visitorMessage: {
           findUnique: jest.fn(),
@@ -469,7 +556,10 @@ describe('VisitorService', () => {
         },
         visitorProfile: { findUnique: jest.fn() },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
-        visitorAchievement: { findMany: jest.fn().mockResolvedValue([]), createMany: jest.fn() },
+        visitorAchievement: {
+          findMany: jest.fn().mockResolvedValue([]),
+          createMany: jest.fn(),
+        },
         visitorVisit: { findMany: jest.fn() },
       } as any;
       const service = makeService(prisma);
@@ -477,7 +567,11 @@ describe('VisitorService', () => {
       await service.throwBottle(req, actor, null, '第一封信');
 
       expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ type: 'bottle', chainId: null, parentId: null }),
+        data: expect.objectContaining({
+          type: 'bottle',
+          chainId: null,
+          parentId: null,
+        }),
       });
       expect(update).toHaveBeenCalledWith({
         where: { id: 'm-first' },
@@ -510,8 +604,9 @@ describe('VisitorService', () => {
       const prisma = { visitorMessage: { findUnique: jest.fn() } } as any;
       const service = makeService(prisma);
 
-      await expect(service.replyBottle(req, null, hashOf('guest-1'), 'b1', '你好'))
-        .rejects.toThrow('请先登录后再回复漂流瓶主人');
+      await expect(
+        service.replyBottle(req, null, hashOf('guest-1'), 'b1', '你好'),
+      ).rejects.toThrow('请先登录后再回复漂流瓶主人');
     });
 
     it('登录用户回复：创建 reply 记录并通知瓶主', async () => {
@@ -528,7 +623,13 @@ describe('VisitorService', () => {
       } as any;
       const service = makeService(prisma);
 
-      const result = await service.replyBottle(req, actor, null, 'b1', '我也在海边');
+      const result = await service.replyBottle(
+        req,
+        actor,
+        null,
+        'b1',
+        '我也在海边',
+      );
 
       expect(create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -550,15 +651,17 @@ describe('VisitorService', () => {
     it('不能回复自己投的瓶子', async () => {
       const prisma = {
         visitorMessage: {
-          findUnique: jest.fn().mockResolvedValue({ ...caughtBottle, userId: 'user-1' }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...caughtBottle, userId: 'user-1' }),
           create: jest.fn(),
         },
       } as any;
       const service = makeService(prisma);
 
-      await expect(service.replyBottle(req, actor, null, 'b1', '你好')).rejects.toThrow(
-        '不能回复自己投的瓶子',
-      );
+      await expect(
+        service.replyBottle(req, actor, null, 'b1', '你好'),
+      ).rejects.toThrow('不能回复自己投的瓶子');
     });
   });
 
@@ -594,7 +697,9 @@ describe('VisitorService', () => {
       });
       expect(result[0]).not.toHaveProperty('content');
       expect(prisma.visitorMessage.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ type: 'bottle' }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ type: 'bottle' }),
+        }),
       );
     });
 
@@ -640,7 +745,11 @@ describe('VisitorService', () => {
           createdAt: new Date('2026-08-01'),
           userId: 'u1',
           visitorIdHash: 'h1',
-          user: { id: 'u1', username: '张三', avatar: '/uploads/avatar/a.webp' },
+          user: {
+            id: 'u1',
+            username: '张三',
+            avatar: '/uploads/avatar/a.webp',
+          },
         },
         {
           id: 'm2',
@@ -665,7 +774,9 @@ describe('VisitorService', () => {
           select: expect.objectContaining({
             userId: true,
             visitorIdHash: true,
-            user: expect.objectContaining({ select: expect.objectContaining({ avatar: true }) }),
+            user: expect.objectContaining({
+              select: expect.objectContaining({ avatar: true }),
+            }),
           }),
         }),
       );
@@ -674,7 +785,11 @@ describe('VisitorService', () => {
         visitorIdHash: 'h1',
         user: { avatar: '/uploads/avatar/a.webp' },
       });
-      expect(result.items[1]).toMatchObject({ userId: null, visitorIdHash: 'h2', user: null });
+      expect(result.items[1]).toMatchObject({
+        userId: null,
+        visitorIdHash: 'h2',
+        user: null,
+      });
       expect(result.total).toBe(2);
       expect(result.hasMore).toBe(false);
     });
@@ -691,12 +806,133 @@ describe('VisitorService', () => {
 
       expect(findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ type: 'bottle', status: 'approved' }),
+          where: expect.objectContaining({
+            type: 'bottle',
+            status: 'approved',
+          }),
           skip: 10,
           take: 10,
         }),
       );
       expect(result).toMatchObject({ page: 2, pageSize: 10, hasMore: true });
+    });
+  });
+
+  describe('审核约束 — 前置规则引擎', () => {
+    const prisma = {
+      visitorProfile: { findUnique: jest.fn(), update: jest.fn() },
+      visitorMessage: { create: jest.fn().mockResolvedValue({ id: 'm-x' }) },
+      user: { findUnique: jest.fn(), findMany: jest.fn() },
+      visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
+      visitorVisit: { findMany: jest.fn() },
+    } as any;
+    const make = () => new VisitorService(prisma, redis, ai, notifications);
+
+    it('单字符「1」直接拒绝且不调用 AI', async () => {
+      prisma.visitorProfile.findUnique.mockResolvedValue({
+        nickname: '旅人甲',
+        visitorIdHash: 'h',
+        isBanned: false,
+      });
+      const service = make();
+      const result = await service.createMessageEntry(
+        req,
+        null,
+        hashOf('guest-1'),
+        '1',
+      );
+      expect(ai.moderateStrict).not.toHaveBeenCalled();
+      expect(prisma.visitorMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          status: 'rejected',
+          aiReviewResult: 'rejected',
+        }),
+      });
+      expect(result.review.approved).toBe(false);
+    });
+
+    it('纯数字「11111」直接拒绝', async () => {
+      prisma.visitorProfile.findUnique.mockResolvedValue({
+        nickname: '旅人甲',
+        visitorIdHash: 'h',
+        isBanned: false,
+      });
+      const service = make();
+      const result = await service.createMessageEntry(
+        req,
+        null,
+        hashOf('guest-1'),
+        '11111',
+      );
+      expect(ai.moderateStrict).not.toHaveBeenCalled();
+      expect(result.review.approved).toBe(false);
+    });
+
+    it('重复字符「啊啊啊啊」直接拒绝', async () => {
+      prisma.visitorProfile.findUnique.mockResolvedValue({
+        nickname: '旅人甲',
+        visitorIdHash: 'h',
+        isBanned: false,
+      });
+      const service = make();
+      const result = await service.createMessageEntry(
+        req,
+        null,
+        hashOf('guest-1'),
+        '啊啊啊啊',
+      );
+      expect(result.review.approved).toBe(false);
+    });
+
+    it('正常内容「你好呀」走 AI 审核', async () => {
+      prisma.visitorProfile.findUnique.mockResolvedValue({
+        nickname: '旅人甲',
+        visitorIdHash: 'h',
+        isBanned: false,
+      });
+      const service = make();
+      await service.createMessageEntry(req, null, hashOf('guest-1'), '你好呀');
+      expect(ai.moderateStrict).toHaveBeenCalled();
+    });
+
+    it('AI 返回 pending（审核不可用）时落库 pending 状态', async () => {
+      prisma.visitorProfile.findUnique.mockResolvedValue({
+        nickname: '旅人甲',
+        visitorIdHash: 'h',
+        isBanned: false,
+      });
+      ai.moderateStrict.mockResolvedValueOnce({
+        approved: false,
+        reason: 'AI 审核暂不可用',
+        pending: true,
+      });
+      const service = make();
+      const result = await service.createMessageEntry(
+        req,
+        null,
+        hashOf('guest-1'),
+        '这条等人工审核',
+      );
+      expect(prisma.visitorMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          status: 'pending',
+          aiReviewResult: 'pending',
+        }),
+      });
+      expect(result.review.pending).toBe(true);
+    });
+
+    it('登录通道：单字符「1」同样直接拒绝（一视同仁）', async () => {
+      const service = make();
+      const result = await service.createMessageEntry(req, actor, null, '1');
+      expect(ai.moderateStrict).not.toHaveBeenCalled();
+      expect(prisma.visitorMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          status: 'rejected',
+          aiReviewResult: 'rejected',
+        }),
+      });
+      expect(result.review.approved).toBe(false);
     });
   });
 });

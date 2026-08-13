@@ -77,6 +77,14 @@ const MODEL_CONFIG_SETTING_KEYS = [
   'ai_library_model_config_id',
 ] as const;
 
+const STRICT_MODERATION_CLAUSE = [
+  '',
+  '附加硬性规则（必须遵守）：',
+  '1. 单字符或极短的无意义内容（如「1」「a」「我」）一律拒绝',
+  '2. 纯数字、纯符号、纯标点、表情拼凑的内容一律拒绝',
+  '3. 重复字符拼凑的无意义内容（如「啊啊啊啊」「11111」）一律拒绝',
+].join('\n');
+
 type TaxonomySuggestion = {
   name: string;
   icon?: string;
@@ -1315,6 +1323,70 @@ export class AiService {
     } catch (e) {
       this.logger.warn(`评论审核失败: ${e}`);
       return { approved: true, reason: 'AI 审核异常，自动通过' };
+    }
+  }
+
+  async moderateStrict(
+    content: string,
+  ): Promise<{ approved: boolean; reason: string; pending?: boolean }> {
+    const cfg = await this.getConfig();
+    if (!cfg.ai_comment_moderation_enabled) {
+      return {
+        approved: false,
+        reason: 'AI 审核暂不可用，已转人工审核',
+        pending: true,
+      };
+    }
+    if (!(await this.canUseModel(cfg, cfg.ai_moderate_model_config_id))) {
+      return {
+        approved: false,
+        reason: 'AI 审核暂不可用，已转人工审核',
+        pending: true,
+      };
+    }
+    const cleanContent = content
+      .replace(/\[\[emoji:[^\]|]+\|([^\]]+)\]\]/g, '[$1]')
+      .replace(/◆emoji:[^◆]+◆/g, '[表情]');
+    try {
+      const result = await this.chat(
+        [
+          {
+            role: 'system',
+            content: `${cfg.ai_moderate_prompt}\n${STRICT_MODERATION_CLAUSE}`,
+          },
+          {
+            role: 'user',
+            content: `留言内容：\n${cleanContent.slice(0, 1000)}`,
+          },
+        ],
+        {
+          modelConfigId: cfg.ai_moderate_model_config_id,
+          model: cfg.ai_moderate_model || cfg.ai_model,
+          temperature: cfg.ai_moderate_temperature,
+          maxTokens: cfg.ai_moderate_max_tokens,
+          thinking: 'disabled',
+        },
+      );
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return {
+          approved: false,
+          reason: 'AI 审核暂不可用，已转人工审核',
+          pending: true,
+        };
+      }
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        approved: Boolean(parsed.approved),
+        reason: String(parsed.reason || 'AI 审核完成'),
+      };
+    } catch (e) {
+      this.logger.warn(`严格审核失败: ${e}`);
+      return {
+        approved: false,
+        reason: 'AI 审核暂不可用，已转人工审核',
+        pending: true,
+      };
     }
   }
 
