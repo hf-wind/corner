@@ -21,7 +21,7 @@
               <i /><small>{{ yearPercentage(group.items.length) }}%</small>
             </header>
             <div class="year-items">
-              <NuxtLink v-for="item in group.items" :key="item.slug" :to="`/article/${item.slug}`" class="timeline-item">
+              <AppLink v-for="item in group.items" :key="item.slug" :to="`/article/${item.slug}`" class="timeline-item">
                 <time><strong>{{ dayOf(item.date) }}</strong><span>{{ monthOf(item.date) }}</span></time>
                 <i class="timeline-dot" />
                 <div class="timeline-copy">
@@ -30,7 +30,7 @@
                   <p>{{ item.desc || '这篇文章没有留下摘要，点开继续阅读。' }}</p>
                 </div>
                 <span class="timeline-arrow"><Icon name="ph:arrow-up-right-bold" /></span>
-              </NuxtLink>
+              </AppLink>
             </div>
           </article>
         </section>
@@ -55,8 +55,8 @@
         </div>
       </section>
       <section class="right-card">
-        <div class="right-card-title"><span><Icon name="ph:fire-bold" /> 常用标签</span><NuxtLink to="/tags">标签页</NuxtLink></div>
-        <div class="tag-cloud"><NuxtLink v-for="tag in hotTags" :key="tag" to="/tags">#{{ tag }}</NuxtLink></div>
+        <div class="right-card-title"><span><Icon name="ph:fire-bold" /> 常用标签</span><AppLink to="/tags">标签页</AppLink></div>
+        <div class="tag-cloud"><AppLink v-for="tag in hotTags" :key="tag" to="/tags">#{{ tag }}</AppLink></div>
       </section>
       <section class="right-card archive-note"><Icon name="ph:quotes-fill" /><p>归档不是结束，而是让旧文字拥有再次被看见的入口。</p></section>
     </aside>

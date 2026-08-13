@@ -1,5 +1,5 @@
 <template>
-  <NuxtLink :to="`/article/${article.slug}`" class="compact-article">
+  <AppLink :to="`/article/${article.slug}`" class="compact-article">
     <div class="article-cover">
       <img v-if="article.cover" :src="coverUrl" alt="" loading="lazy">
       <span v-else><Icon name="ph:article" /></span>
@@ -10,7 +10,7 @@
       <p v-if="article.excerpt">{{ article.excerpt }}</p>
       <span class="read-link">阅读全文 <Icon name="ph:arrow-right-bold" /></span>
     </div>
-  </NuxtLink>
+  </AppLink>
 </template>
 
 <script setup lang="ts">

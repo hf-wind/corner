@@ -10,13 +10,13 @@
         <div class="search-hints" v-if="!query">输入关键词搜索站内全部内容...</div>
         <div class="search-hints" v-if="query && searching">搜索中...</div>
         <div class="search-results" v-if="query && !searching && results.length > 0">
-          <NuxtLink v-for="r in results" :key="`${r.type}:${r.sourceId}`" :to="r.href" class="search-result-row" @click="close">
+          <AppLink v-for="r in results" :key="`${r.type}:${r.sourceId}`" :to="r.href" class="search-result-row" @click="close">
             <div class="search-row-icon"><Icon :name="r.icon" /></div>
             <div class="search-row-body">
               <div class="search-row-title">{{ r.title }}</div>
               <div class="search-row-desc">{{ r.excerpt }}</div>
             </div>
-          </NuxtLink>
+          </AppLink>
         </div>
         <div class="search-empty" v-if="query && !searching && results.length === 0">未找到相关文章</div>
       </div>

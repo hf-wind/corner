@@ -14,11 +14,11 @@
 
         <div class="moment-context">
           <span v-if="moment.happenedAt"><Icon name="ph:clock-bold" />发生于 {{ happenedAtText }}</span>
-          <NuxtLink v-if="moment.publicLocation?.slug" :to="`/places/${moment.publicLocation.slug}`">
+          <AppLink v-if="moment.publicLocation?.slug" :to="`/places/${moment.publicLocation.slug}`">
             <Icon name="ph:map-pin-bold" />{{ moment.publicLocation.name }}
-          </NuxtLink>
+          </AppLink>
           <span v-else-if="moment.publicLocation"><Icon name="ph:map-pin-bold" />{{ moment.publicLocation.name }}</span>
-          <NuxtLink v-if="moment.publicLocation?.latitude != null" :to="nearbyMapLink"><Icon name="ph:map-trifold-bold" />查看附近记忆</NuxtLink>
+          <AppLink v-if="moment.publicLocation?.latitude != null" :to="nearbyMapLink"><Icon name="ph:map-trifold-bold" />查看附近记忆</AppLink>
         </div>
 
         <aside class="moment-summary" aria-label="记录摘要">

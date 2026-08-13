@@ -58,7 +58,7 @@
                 v-if="!m.streaming && m.cards?.length"
                 class="pet-source-cards"
               >
-                <NuxtLink
+                <AppLink
                   v-for="card in m.cards"
                   :key="`${card.type}:${card.sourceId}`"
                   :to="card.href"
@@ -84,7 +84,7 @@
                     name="ph:arrow-up-right-bold"
                     class="pet-source-arrow"
                   />
-                </NuxtLink>
+                </AppLink>
               </div>
               <div
                 v-if="!m.streaming && m.music?.length"

@@ -9,9 +9,9 @@
         <span id="home-overview-title"
           ><Icon name="ph:wind-bold" /> 风隅坐标</span
         >
-        <NuxtLink to="/archive" aria-label="查看归档"
+        <AppLink to="/archive" aria-label="查看归档"
           ><Icon name="ph:arrow-up-right-bold"
-        /></NuxtLink>
+        /></AppLink>
       </div>
       <div class="overview-grid">
         <div

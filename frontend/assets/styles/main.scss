@@ -18,7 +18,7 @@
   --font-mono: var(--font-mono-rounded);
   --font-heading-weight: 650;
   --font-letter-spacing: 0.01em;
-  --ui-scale: 0.9;
+  --ui-scale: 1;
 
   --c-bg: hsl(var(--hue-theme) 0% 100%);
   --c-bg-1: hsl(var(--hue-theme) 20% 98%);
@@ -144,7 +144,8 @@ html, body {
   font-family: var(--font-body);
   background: var(--c-bg);
   color: var(--c-text);
-  height: 100vh;
+  width: 100%;
+  height: 100dvh;
   overflow: hidden;
   transition: background-color 0.24s ease, color 0.24s ease;
   letter-spacing: var(--font-letter-spacing);
@@ -204,10 +205,6 @@ html.theme-switching .ui-hover-surface {
   transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1), background-color 0.24s ease, border-color 0.24s ease, color 0.24s ease, box-shadow 0.24s ease !important;
 }
 
-html.theme-switching .article-card .cover-shade {
-  transition: background-color 0.24s ease, box-shadow 0.24s ease !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ui-hover-surface {
     transition: background-color 0.24s ease, box-shadow 0.24s ease;
@@ -251,33 +248,32 @@ select {
 
 #app {
   width: 100%;
-  height: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* Desktop density: CSS zoom participates in layout, so text and hit areas stay sharp. */
-@supports (zoom: 1) {
-  body {
-    zoom: var(--ui-scale);
-    /* 111.11vh × 0.9 = 100vh; width must stay untouched to avoid right clipping. */
-    height: 111.111111vh;
-  }
-}
-
-@supports not (zoom: 1) {
-  html {
-    font-size: 90%;
-  }
-
+@media (min-width: 1920px) {
   :root {
-    --left-w: 216px;
-    --right-w: 234px;
+    --left-w: 12.5vw;
+    --right-w: 13.5417vw;
   }
+}
+
+.layout > .sidebar-shell {
+  transition: flex-basis 0.32s var(--ui-ease-out), opacity 0.22s ease;
+}
+
+html.article-immersive .layout > .sidebar-shell {
+  flex-basis: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 @media (max-width: 900px) {
   html,
   body {
-    zoom: 1;
     width: 100%;
     height: 100dvh;
     min-height: 100%;
@@ -364,16 +360,7 @@ a { text-decoration: none; color: inherit; }
 
 .table-spin { min-height:200px; display:flex; align-items:center; justify-content:center; }
 
-/* ant-design-vue popover/dropdown/tooltip 修正 zoom 偏移 */
-:where(.ant-select-dropdown, .ant-picker-dropdown, .ant-cascader-dropdown, .ant-dropdown, .ant-popover, .ant-tooltip, .ant-modal-wrap, .ant-notification, .ant-message) {
-  zoom: calc(1 / var(--ui-scale));
-}
-
 @media (max-width: 900px) {
-  :where(.ant-select-dropdown, .ant-picker-dropdown, .ant-cascader-dropdown, .ant-dropdown, .ant-popover, .ant-tooltip, .ant-modal-wrap, .ant-notification, .ant-message) {
-    zoom: 1;
-  }
-
   .admin-main .table-toolbar,
   .admin-main .media-toolbar,
   .admin-main .selection-bar,

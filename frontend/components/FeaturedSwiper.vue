@@ -32,7 +32,7 @@
       @pointercancel="onPointerUp"
     >
       <div class="featured-track" :style="trackStyle">
-        <NuxtLink
+        <AppLink
           v-for="(item, i) in featured"
           :key="item.slug"
           :to="'/article/' + item.slug"
@@ -57,7 +57,7 @@
             <h3>{{ item.title }}</h3>
             <span class="featured-open">阅读全文 <Icon name="ph:arrow-up-right-bold" /></span>
           </div>
-        </NuxtLink>
+        </AppLink>
       </div>
     </div>
 

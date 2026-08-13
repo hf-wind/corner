@@ -137,7 +137,10 @@ onUnmounted(() => {
 
 <style scoped>
 .admin-root {
-  height: 100%;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
   display: flex;
   min-width: 0;
   overflow: hidden;
@@ -151,6 +154,10 @@ onUnmounted(() => {
   z-index: 30;
   overflow: visible;
   border-right: 1px solid var(--border);
+  height: 100%;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   transition:
     flex-basis 0.32s cubic-bezier(0.16, 1, 0.3, 1),
     width 0.32s cubic-bezier(0.16, 1, 0.3, 1);
@@ -169,6 +176,8 @@ onUnmounted(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  max-height: 100dvh;
 }
 
 .admin-menu-trigger,
@@ -250,14 +259,14 @@ onUnmounted(() => {
   }
 
   .sidebar-shell :deep(.sidebar-bottom) {
-    max-height: 38%;
+    flex: 0 0 auto;
     margin-top: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .sidebar-shell :deep(.sidebar-bottom-scroll) {
-    min-height: 0;
-    overflow-y: auto;
+    flex: 0 0 auto;
+    overflow-y: visible;
   }
 
   .admin-main {

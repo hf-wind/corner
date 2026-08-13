@@ -81,8 +81,8 @@
         </div>
       </section>
       <section class="right-card">
-        <div class="right-card-title"><span><Icon name="ph:hash-bold" /> 热门标签</span><NuxtLink to="/tags">全部</NuxtLink></div>
-        <div class="tag-cloud"><NuxtLink v-for="tag in hotTags" :key="tag" to="/tags"># {{ tag }}</NuxtLink></div>
+        <div class="right-card-title"><span><Icon name="ph:hash-bold" /> 热门标签</span><AppLink to="/tags">全部</AppLink></div>
+        <div class="tag-cloud"><AppLink v-for="tag in hotTags" :key="tag" to="/tags"># {{ tag }}</AppLink></div>
       </section>
     </aside>
   </div>

@@ -1,5 +1,5 @@
 <template>
-  <NuxtLink :to="'/article/' + slug" class="article-card ui-hover-surface" @mouseenter="prefetchArticle" @focus="prefetchArticle" @pointerdown="prefetchArticle" @click="saveScroll">
+  <AppLink :to="'/article/' + slug" class="article-card ui-hover-surface" @mouseenter="prefetchArticle" @focus="prefetchArticle" @pointerdown="prefetchArticle" @click="saveScroll">
     <div class="card-cover">
       <img
         v-if="coverUrl"
@@ -10,7 +10,6 @@
         decoding="async"
         height="220"
       >
-      <span class="cover-shade" aria-hidden="true" />
     </div>
     <div class="card-body">
       <div class="card-top">
@@ -40,7 +39,7 @@
         </div>
       </div>
     </div>
-  </NuxtLink>
+  </AppLink>
 </template>
 
 <script setup lang="ts">
@@ -119,19 +118,7 @@ function prefetchArticle() {
   inset: 0 0 0 auto;
   width: 46%;
   overflow: hidden;
-  background: var(--c-bg-2);
-}
-.cover-shade {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 40%;
-  pointer-events: none;
-  background-color: var(--ld-bg-card);
-  box-shadow:
-    10px 0 14px 8px var(--ld-bg-card),
-    24px 0 24px 8px color-mix(in srgb, var(--ld-bg-card) 68%, transparent),
-    38px 0 30px 4px color-mix(in srgb, var(--ld-bg-card) 30%, transparent);
-  transition: background-color .24s ease, box-shadow .24s ease;
+  background: var(--ld-bg-card);
 }
 .card-cover img {
   position: absolute;
@@ -140,6 +127,20 @@ function prefetchArticle() {
   height: 100%;
   object-fit: cover;
   display: block;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgb(0 0 0 / 8%) 12%,
+    rgb(0 0 0 / 62%) 38%,
+    #000 62%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgb(0 0 0 / 8%) 12%,
+    rgb(0 0 0 / 62%) 38%,
+    #000 62%
+  );
   filter: saturate(.96);
   transition: transform .55s cubic-bezier(.22, .61, .36, 1), filter .4s ease;
 }
@@ -269,14 +270,6 @@ function prefetchArticle() {
 
   .card-cover {
     width: 43%;
-  }
-
-  .cover-shade {
-    width: 44%;
-    box-shadow:
-      9px 0 13px 7px var(--ld-bg-card),
-      21px 0 21px 7px color-mix(in srgb, var(--ld-bg-card) 68%, transparent),
-      33px 0 26px 3px color-mix(in srgb, var(--ld-bg-card) 30%, transparent);
   }
 
   .card-body {

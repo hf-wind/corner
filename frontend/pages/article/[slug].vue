@@ -1,5 +1,15 @@
 <template>
-  <div class="page-layout article-page">
+  <div class="page-layout article-page" :class="{ 'is-immersive': immersiveMode, 'is-traversing': traversing }">
+    <button
+      v-if="immersiveMode"
+      type="button"
+      class="immersive-exit"
+      title="退出沉浸阅读"
+      aria-label="退出沉浸阅读"
+      @click="toggleImmersive"
+    >
+      <Icon name="ph:corners-in-bold" />
+    </button>
     <main
       id="main-content"
       ref="articleMainRef"
@@ -8,10 +18,10 @@
       @scroll.passive="handleArticleScroll"
     >
       <template v-if="!articleLoading">
-        <NuxtLink to="/home" class="back-btn">
+        <AppLink to="/home" class="back-btn">
           <Icon name="ph:arrow-left-bold" />
           返回首页
-        </NuxtLink>
+        </AppLink>
 
         <div
           class="post-header article-anim"
@@ -141,7 +151,7 @@
         </div>
 
         <div v-if="adjacentLoaded" class="surround-post article-anim">
-          <NuxtLink
+          <AppLink
             v-if="prevArticle"
             :to="'/article/' + prevArticle.slug"
             class="surround-link"
@@ -153,7 +163,7 @@
               }}</strong>
               <span class="date">{{ prevArticle.date }}</span>
             </div>
-          </NuxtLink>
+          </AppLink>
           <div v-else class="surround-link no-link">
             <Icon name="solar:rewind-back-bold-duotone" />
             <div class="surround-text">
@@ -161,7 +171,7 @@
             </div>
           </div>
 
-          <NuxtLink
+          <AppLink
             v-if="nextArticle"
             :to="'/article/' + nextArticle.slug"
             class="surround-link align-end"
@@ -171,7 +181,7 @@
               <strong class="title">{{ nextArticle.title }}</strong>
               <span class="date">{{ nextArticle.date }}</span>
             </div>
-          </NuxtLink>
+          </AppLink>
           <div v-else class="surround-link align-end no-link">
             <Icon name="solar:reel-bold-duotone" />
             <div class="surround-text">
@@ -190,8 +200,11 @@
       scroll-element="#main-content"
       :progress="readingProgress"
       :show-top="showBackTop"
+      :immersive="immersiveMode"
       @scroll-top="scrollToTop"
       @scroll-comment="scrollToComment"
+      @catalog-navigate="navigateCatalog"
+      @toggle-immersive="toggleImmersive"
     />
 
     <ArticleShare v-model:open="shareOpen" :article="article" />
@@ -206,6 +219,7 @@
 <script setup lang="ts">
 import avatarImg from "~/assets/images/avatar.jpg";
 import { getDisplayImageUrl } from "~/utils/imagePerformance";
+import { gsap } from "gsap";
 
 function coverUrl(source: string) {
   return getDisplayImageUrl(source, 800, 300);
@@ -235,6 +249,8 @@ const articleReady = ref(false);
 const adjacentLoaded = ref(false);
 const readingProgress = ref(0);
 const showBackTop = ref(false);
+const immersiveMode = ref(false);
+const traversing = ref(false);
 const articleContext = computed(() => ({
   title: article.value?.title || "",
   content: article.value?.content || "",
@@ -304,6 +320,94 @@ function scrollToComment() {
   const cRect = container.getBoundingClientRect();
   const tRect = target.getBoundingClientRect();
   container.scrollBy({ top: tRect.top - cRect.top - 16, behavior: "smooth" });
+}
+
+function catalogHeading(item: { text: string; index: number }) {
+  const direct = document.getElementById(item.text);
+  if (direct) return direct;
+  const headings = document.querySelectorAll<HTMLElement>(
+    `#${editorId} h1, #${editorId} h2, #${editorId} h3, #${editorId} h4, #${editorId} h5, #${editorId} h6`,
+  );
+  return headings[item.index - 1] || null;
+}
+
+function navigateCatalog(event: MouseEvent, item: { text: string; level: number; index: number }) {
+  event.preventDefault();
+  const container = articleMainRef.value;
+  const target = catalogHeading(item);
+  if (!container || !target) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const destination = Math.max(
+    0,
+    container.scrollTop + targetRect.top - containerRect.top - 28,
+  );
+  const distance = Math.abs(destination - container.scrollTop);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    container.scrollTop = destination;
+    return;
+  }
+
+  gsap.killTweensOf(container);
+  traversing.value = true;
+  gsap.to(container, {
+    scrollTop: destination,
+    duration: Math.min(0.66, Math.max(0.34, distance / 4200)),
+    ease: "power3.inOut",
+    overwrite: true,
+    onComplete: () => {
+      traversing.value = false;
+    },
+    onInterrupt: () => {
+      traversing.value = false;
+    },
+  });
+}
+
+function setImmersive(active: boolean) {
+  immersiveMode.value = active;
+  document.documentElement.classList.toggle(
+    "article-immersive",
+    active,
+  );
+}
+
+async function toggleImmersive() {
+  if (!immersiveMode.value) {
+    setImmersive(true);
+    if (!document.fullscreenElement) {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        // Fullscreen can be denied by browser policy; page-level immersion remains usable.
+      }
+    }
+    return;
+  }
+
+  setImmersive(false);
+  if (document.fullscreenElement) {
+    try {
+      await document.exitFullscreen();
+    } catch {
+      /* the fullscreen state may have changed between the check and request */
+    }
+  }
+}
+
+function onFullscreenChange() {
+  if (!document.fullscreenElement && immersiveMode.value) setImmersive(false);
+}
+
+function onPageKeydown(event: KeyboardEvent) {
+  if (
+    event.key === "Escape" &&
+    immersiveMode.value &&
+    !document.fullscreenElement
+  ) {
+    setImmersive(false);
+  }
 }
 
 let scrollFrame: number | null = null;
@@ -392,6 +496,8 @@ function checkOutdated() {
 }
 
 onMounted(async () => {
+  document.addEventListener("keydown", onPageKeydown);
+  document.addEventListener("fullscreenchange", onFullscreenChange);
   await loadArticle();
   await nextTick();
   requestAnimationFrame(() => {
@@ -409,6 +515,11 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener("keydown", onPageKeydown);
+  document.removeEventListener("fullscreenchange", onFullscreenChange);
+  setImmersive(false);
+  if (document.fullscreenElement) void document.exitFullscreen();
+  if (articleMainRef.value) gsap.killTweensOf(articleMainRef.value);
   articleResizeObserver?.disconnect();
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
   if (excerptTimer) clearTimeout(excerptTimer);
@@ -422,13 +533,82 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.article-page {
+  --article-inline-pad: clamp(28px, 2.2vw, 56px);
+  transition: background-color 0.28s ease;
+}
+
 .article-main {
   position: relative;
   flex: 1;
   overflow-y: auto;
-  padding: 28px 32px;
+  padding: 28px var(--article-inline-pad) 60px;
   min-width: 0;
   scrollbar-gutter: stable;
+}
+
+.article-main > * {
+  width: min(100%, 1080px);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.article-page :deep(.sidebar-right),
+.article-main {
+  transition:
+    width 0.32s var(--ui-ease-out),
+    flex-basis 0.32s var(--ui-ease-out),
+    opacity 0.24s ease,
+    padding 0.32s var(--ui-ease-out);
+}
+
+.article-page.is-immersive :deep(.sidebar-right) {
+  width: 0;
+  flex-basis: 0;
+  padding-right: 0;
+  padding-left: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.article-page.is-immersive .article-main {
+  padding-right: clamp(24px, 6vw, 120px);
+  padding-left: clamp(24px, 6vw, 120px);
+}
+
+.article-page.is-immersive .article-main > * {
+  width: min(100%, 920px);
+}
+
+.article-page.is-traversing .article-shell {
+  filter: saturate(0.9) contrast(0.98);
+  transform: scale(0.997);
+}
+
+.article-shell {
+  transition: filter 0.22s ease, transform 0.22s ease;
+}
+
+.immersive-exit {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  z-index: 1180;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
+  color: var(--c-text-2);
+  box-shadow: var(--ui-shadow-soft);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.immersive-exit:hover {
+  color: var(--c-primary);
 }
 
 .article-main::-webkit-scrollbar {
@@ -868,6 +1048,26 @@ onUnmounted(() => {
   .surround-link {
     width: 100%;
     padding: 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  .immersive-exit {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  .article-page.is-immersive .article-main {
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article-page :deep(.sidebar-right),
+  .article-main,
+  .article-shell {
+    transition: none;
   }
 }
 

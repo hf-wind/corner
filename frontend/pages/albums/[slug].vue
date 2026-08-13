@@ -16,8 +16,8 @@
           >
         </div>
         <div class="head-copy">
-          <NuxtLink to="/albums" class="back"
-            ><Icon name="ph:arrow-left-bold" /><span>返回相册</span></NuxtLink
+          <AppLink to="/albums" class="back"
+            ><Icon name="ph:arrow-left-bold" /><span>返回相册</span></AppLink
           >
           <p class="head-kicker">PHOTO STORY · {{ issueNumber }}</p>
           <h1>{{ album.title }}</h1>
@@ -104,8 +104,8 @@
       </section>
 
       <footer class="detail-footer">
-        <NuxtLink to="/albums"
-          ><Icon name="ph:arrow-left-bold" />继续翻阅其他相册</NuxtLink
+        <AppLink to="/albums"
+          ><Icon name="ph:arrow-left-bold" />继续翻阅其他相册</AppLink
         ><span>风隅随笔 · PHOTO ARCHIVE</span>
       </footer>
       <ImageLightbox
@@ -115,13 +115,13 @@
         label="相册照片"
       >
         <template #toolbar="{ index }"
-          ><NuxtLink
+          ><AppLink
             v-if="album.items?.[index]?.publicLocation?.latitude != null"
             class="lightbox-map-link"
             :to="mapLink(album.items[index])"
             title="在地图查看"
             aria-label="在地图查看"
-            ><Icon name="ph:map-trifold-bold" /></NuxtLink
+            ><Icon name="ph:map-trifold-bold" /></AppLink
         ></template>
         <template #caption="{ image, index }"
           ><div class="lightbox-rich-caption">
@@ -132,19 +132,19 @@
                 album.items?.[index]?.publicLocation
               "
             >
-              <NuxtLink
+              <AppLink
                 v-if="album.items[index].moment"
                 :to="`/moments?focus=${album.items[index].moment.slug}`"
                 ><Icon name="ph:sparkle-bold" />{{
                   album.items[index].moment.title
-                }}</NuxtLink
-              ><NuxtLink
+                }}</AppLink
+              ><AppLink
                 v-if="album.items[index].publicLocation?.latitude != null"
                 :to="mapLink(album.items[index])"
                 ><Icon name="ph:map-pin-fill" />{{
                   album.items[index].publicLocation.name
                 }}
-                · 在地图查看</NuxtLink
+                · 在地图查看</AppLink
               >
             </div>
           </div></template
@@ -155,8 +155,8 @@
       <Icon name="ph:image-broken" />
       <h1>相册没有找到</h1>
       <p>也许它还在整理，或已被收回私藏。</p>
-      <NuxtLink to="/albums"
-        ><Icon name="ph:arrow-left-bold" />回到相册馆</NuxtLink
+      <AppLink to="/albums"
+        ><Icon name="ph:arrow-left-bold" />回到相册馆</AppLink
       >
     </div>
   </main>

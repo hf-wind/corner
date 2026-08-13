@@ -2,26 +2,26 @@
   <div class="place-page">
     <main>
       <header class="place-hero">
-        <NuxtLink to="/time/map"><Icon name="ph:arrow-left-bold" />返回地图</NuxtLink>
+        <AppLink to="/time/map"><Icon name="ph:arrow-left-bold" />返回地图</AppLink>
         <span><Icon name="ph:map-pin-fill" /></span>
         <p>PLACE · 时光地点</p>
         <h1>{{ place.name || '地点' }}</h1>
         <small>{{ regionText }}</small>
         <strong>{{ totalMemories }} 条公开记忆</strong>
-        <NuxtLink v-if="place.latitude != null" class="map-link" :to="mapLink"><Icon name="ph:map-trifold-bold" />在地图查看</NuxtLink>
+        <AppLink v-if="place.latitude != null" class="map-link" :to="mapLink"><Icon name="ph:map-trifold-bold" />在地图查看</AppLink>
       </header>
 
       <section class="place-content">
         <header><div><span>MEMORIES HERE</span><h2>发生在这里</h2></div></header>
         <div v-if="loading" class="place-state"><Icon name="ph:spinner-gap-bold" class="spinning" />正在读取</div>
-        <div v-else-if="moments.length" class="moment-list"><NuxtLink v-for="moment in moments" :key="moment.id" :to="moment.href" class="moment-link"><span><Icon name="ph:sparkle-bold" /></span><div><small>{{ formatDate(moment.occurredAt) }}</small><h3>{{ moment.title }}</h3><p>{{ moment.excerpt || '一段发生在这里的瞬间。' }}</p></div><Icon name="ph:arrow-up-right-bold" /></NuxtLink></div>
+        <div v-else-if="moments.length" class="moment-list"><AppLink v-for="moment in moments" :key="moment.id" :to="moment.href" class="moment-link"><span><Icon name="ph:sparkle-bold" /></span><div><small>{{ formatDate(moment.occurredAt) }}</small><h3>{{ moment.title }}</h3><p>{{ moment.excerpt || '一段发生在这里的瞬间。' }}</p></div><Icon name="ph:arrow-up-right-bold" /></AppLink></div>
         <div v-else class="place-state"><Icon name="ph:map-pin-line" />这里暂时没有公开瞬间</div>
       </section>
 
       <section v-if="albums.length || photos.length" class="other-memories">
         <header><span>ALBUM & PHOTO</span><h2>相册与照片</h2></header>
-        <div class="album-grid"><NuxtLink v-for="album in albums" :key="album.id" :to="album.href"><img v-if="album.thumbnail" :src="mediaUrl(album.thumbnail)" :alt="album.title"><span>{{ album.title }}</span></NuxtLink></div>
-        <div class="photo-grid"><NuxtLink v-for="photo in photos" :key="photo.id" :to="photo.href"><img :src="mediaUrl(photo.thumbnail)" :alt="photo.title"></NuxtLink></div>
+        <div class="album-grid"><AppLink v-for="album in albums" :key="album.id" :to="album.href"><img v-if="album.thumbnail" :src="mediaUrl(album.thumbnail)" :alt="album.title"><span>{{ album.title }}</span></AppLink></div>
+        <div class="photo-grid"><AppLink v-for="photo in photos" :key="photo.id" :to="photo.href"><img :src="mediaUrl(photo.thumbnail)" :alt="photo.title"></AppLink></div>
       </section>
     </main>
   </div>

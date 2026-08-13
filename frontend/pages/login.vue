@@ -6,7 +6,7 @@
       <div class="login-bg-circle"></div>
     </div>
 
-    <NuxtLink to="/home" class="back-link">← 返回首页</NuxtLink>
+    <AppLink to="/home" class="back-link">← 返回首页</AppLink>
 
     <div class="theme-toggle">
       <button class="theme-btn" :class="{ active: theme === 'light' }" @click="setTheme('light')" title="亮色">
@@ -64,7 +64,7 @@
 
       <div class="login-footer">
         <span>没有账号？</span>
-        <NuxtLink :to="authSwitchTarget('/register')" class="login-footer-link">去注册</NuxtLink>
+        <AppLink :to="authSwitchTarget('/register')" class="login-footer-link">去注册</AppLink>
       </div>
     </div>
   </div>

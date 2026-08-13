@@ -25,11 +25,20 @@
           sync-with="preview"
           class="article-md-catalog"
           :on-active="onCatalogActive"
+          :on-click="onCatalogClick"
         />
       </ClientOnly>
     </div>
 
     <div class="sidebar-actions">
+      <button
+        type="button"
+        class="action-btn visible"
+        :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+        @click="emit('toggle-immersive')"
+      >
+        <Icon :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'" />
+      </button>
       <button
         type="button"
         class="action-btn"
@@ -90,6 +99,7 @@
               sync-with="preview"
               class="article-md-catalog"
               :on-active="onCatalogActive"
+              :on-click="onCatalogClick"
             />
           </ClientOnly>
         </div>
@@ -100,6 +110,9 @@
       <div v-if="mobileActionsOpen" class="mobile-tool-menu">
         <button type="button" aria-label="文章目录" title="文章目录" @click="openMobileCatalog">
           <i><Icon name="ph:list-bullets-bold" /></i>
+        </button>
+        <button type="button" :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'" :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'" @click="runMobileAction('immersive')">
+          <i><Icon :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'" /></i>
         </button>
         <button type="button" aria-label="去评论区" title="去评论区" @click="runMobileAction('comment')">
           <i><Icon name="ph:chat-circle-text-bold" /></i>
@@ -135,16 +148,20 @@ const props = withDefaults(defineProps<{
   scrollElement?: string
   progress?: number
   showTop?: boolean
+  immersive?: boolean
 }>(), {
   editorId: 'article-preview',
   scrollElement: '#main-content',
   progress: 0,
   showTop: false,
+  immersive: false,
 })
 
 const emit = defineEmits<{
   'scroll-top': []
   'scroll-comment': []
+  'catalog-navigate': [event: MouseEvent, item: { text: string; level: number; index: number }]
+  'toggle-immersive': []
 }>()
 
 const catalogWrapRef = ref<HTMLElement | null>(null)
@@ -177,10 +194,17 @@ function openMobileCatalog() {
   mobileCatalogOpen.value = true
 }
 
-function runMobileAction(action: 'top' | 'comment') {
+function runMobileAction(action: 'top' | 'comment' | 'immersive') {
   mobileActionsOpen.value = false
   if (action === 'top') emit('scroll-top')
-  else emit('scroll-comment')
+  else if (action === 'comment') emit('scroll-comment')
+  else emit('toggle-immersive')
+}
+
+function onCatalogClick(event: MouseEvent, item: { text: string; level: number; index: number }) {
+  event.preventDefault()
+  emit('catalog-navigate', event, item)
+  window.setTimeout(() => { mobileCatalogOpen.value = false }, 180)
 }
 
 function handleMobileCatalogClick(event: MouseEvent) {
@@ -482,13 +506,18 @@ onUnmounted(() => {
   }
 
   .mobile-tool-menu button:nth-child(2) {
-    --scatter-x: -70px;
-    --scatter-y: 0px;
+    --scatter-x: -72px;
+    --scatter-y: -18px;
   }
 
   .mobile-tool-menu button:nth-child(3) {
+    --scatter-x: -72px;
+    --scatter-y: 22px;
+  }
+
+  .mobile-tool-menu button:nth-child(4) {
     --scatter-x: -48px;
-    --scatter-y: 51px;
+    --scatter-y: 57px;
   }
 
   .mobile-tool-menu button i {

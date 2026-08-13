@@ -13,7 +13,7 @@
     <header class="section-heading"><div><span>ROUTES & STOPS</span><h2>旅行路线</h2></div><p>沿时间从近到远</p></header>
     <Transition name="content-switch" mode="out-in">
       <section v-if="items.length" key="journeys" class="journey-list content-reveal">
-        <NuxtLink v-for="(item, index) in items" :key="item.id" :to="`/journeys/${item.slug}`" class="journey-card">
+        <AppLink v-for="(item, index) in items" :key="item.id" :to="`/journeys/${item.slug}`" class="journey-card">
           <div class="journey-cover">
             <img v-if="item.coverImage" :src="mediaUrl(item.coverImage)" :alt="item.title">
             <span v-else><Icon name="ph:path-bold" /></span>
@@ -21,7 +21,7 @@
           </div>
           <div class="journey-copy"><span><Icon name="ph:map-pin-line-bold" />{{ item.stops.length }} 站</span><h2>{{ item.title }}</h2><p>{{ item.description || '一条由地点串起的时间路线。' }}</p></div>
           <span class="journey-action"><Icon name="ph:arrow-up-right-bold" /></span>
-        </NuxtLink>
+        </AppLink>
       </section>
       <div v-else-if="!loading" key="empty" class="public-empty content-reveal"><Icon name="ph:path" /><h2>还没有公开旅行</h2><p>下一段路线，会在抵达之后出现。</p></div>
     </Transition>

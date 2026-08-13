@@ -151,7 +151,7 @@
             <a-switch v-model:checked="form.recommended" />
           </div>
           <div class="preview-link" v-if="item?.slug && item.publishStatus === 'published'">
-            <NuxtLink :to="`/library/${item.slug}`" target="_blank"><Icon name="ph:arrow-square-out-bold" /> 预览前台详情</NuxtLink>
+            <AppLink :to="`/library/${item.slug}`" target="_blank"><Icon name="ph:arrow-square-out-bold" /> 预览前台详情</AppLink>
           </div>
         </a-card>
       </aside>

@@ -12,12 +12,12 @@
 
     <header class="section-heading">
       <div><span>CHAPTERED MEMORIES</span><h2>故事航线</h2></div>
-      <NuxtLink to="/journeys">浏览旅行 <Icon name="ph:arrow-right-bold" /></NuxtLink>
+      <AppLink to="/journeys">浏览旅行 <Icon name="ph:arrow-right-bold" /></AppLink>
     </header>
 
     <Transition name="content-switch" mode="out-in">
       <section v-if="items.length" key="stories" class="story-grid content-reveal">
-        <NuxtLink v-for="(item, index) in items" :key="item.id" :to="`/stories/${item.slug}`" class="story-card">
+        <AppLink v-for="(item, index) in items" :key="item.id" :to="`/stories/${item.slug}`" class="story-card">
           <div class="story-cover">
             <img v-if="item.coverImage || item.steps[0]?.photo?.path" :src="mediaUrl(item.coverImage || item.steps[0].photo.path)" :alt="item.title">
             <span v-else><Icon name="ph:star-four-bold" /></span>
@@ -31,7 +31,7 @@
             <strong><Icon name="ph:play-fill" /> 播放故事</strong>
           </div>
           <Icon name="ph:arrow-up-right-bold" class="story-arrow" />
-        </NuxtLink>
+        </AppLink>
       </section>
       <div v-else-if="!loading" key="empty" class="public-empty content-reveal"><Icon name="ph:star-four" /><h2>故事仍在编排中</h2><p>第一条航线会从这里启程。</p></div>
     </Transition>

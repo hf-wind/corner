@@ -1,7 +1,7 @@
 <template>
   <div class="moment-preview-page">
     <header class="preview-header">
-      <NuxtLink to="/admin/moments"><Icon name="ph:arrow-left-bold" /> 返回列表</NuxtLink>
+      <AppLink to="/admin/moments"><Icon name="ph:arrow-left-bold" /> 返回列表</AppLink>
       <a-button v-if="moment.slug" type="primary" @click="router.push(`/admin/moments/${moment.slug}`)">继续编辑</a-button>
     </header>
 

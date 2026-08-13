@@ -26,7 +26,7 @@
             <div class="focus-meta"><span><Icon :name="typeIcon(selectedMemory.type)" />{{ typeLabel(selectedMemory.type) }}</span><time>{{ formatDate(selectedMemory.occurredAt) }}</time></div>
             <h2>{{ selectedMemory.title }}</h2>
             <p>{{ selectedMemory.excerpt || `${selectedMemory.placeName}的一段记忆。` }}</p>
-            <footer><span><Icon name="ph:map-pin-fill" />{{ selectedMemory.placeName }} · {{ precisionLabel(selectedMemory.precision) }}</span><NuxtLink :to="selectedMemory.href">查看详情 <Icon name="ph:arrow-up-right-bold" /></NuxtLink></footer>
+            <footer><span><Icon name="ph:map-pin-fill" />{{ selectedMemory.placeName }} · {{ precisionLabel(selectedMemory.precision) }}</span><AppLink :to="selectedMemory.href">查看详情 <Icon name="ph:arrow-up-right-bold" /></AppLink></footer>
           </div>
         </article>
       </Transition>
@@ -47,7 +47,7 @@
         <article v-if="item.kind === 'memory'" :id="`map-memory-${safeId(item.id)}`" :class="['memory-card', item.type, { active: selectedId === item.id }]" @click="selectMemory(item, true, true)">
           <img v-if="item.thumbnail" :src="mediaUrl(item.thumbnail)" :alt="item.title" loading="lazy">
           <div v-else class="memory-icon"><Icon :name="typeIcon(item.type)" /></div>
-          <div class="memory-copy"><div><span>{{ typeLabel(item.type) }}</span><time>{{ formatDate(item.occurredAt) }}</time></div><h2>{{ item.title }}</h2><p>{{ item.excerpt || `${item.placeName}的一段记忆。` }}</p><footer><span><Icon name="ph:map-pin-fill" />{{ item.placeName }} · {{ precisionLabel(item.precision) }}</span><NuxtLink :to="item.href">查看 <Icon name="ph:arrow-up-right-bold" /></NuxtLink></footer></div>
+          <div class="memory-copy"><div><span>{{ typeLabel(item.type) }}</span><time>{{ formatDate(item.occurredAt) }}</time></div><h2>{{ item.title }}</h2><p>{{ item.excerpt || `${item.placeName}的一段记忆。` }}</p><footer><span><Icon name="ph:map-pin-fill" />{{ item.placeName }} · {{ precisionLabel(item.precision) }}</span><AppLink :to="item.href">查看 <Icon name="ph:arrow-up-right-bold" /></AppLink></footer></div>
         </article>
         <button v-else type="button" class="cluster-card" @click="openCluster(item)"><span><strong>{{ item.count }}</strong><small>条记忆</small></span><div><h2>一组相邻的时光</h2><p>{{ clusterSummary(item) }}</p></div><Icon name="ph:magnifying-glass-plus-bold" /></button>
         </template>

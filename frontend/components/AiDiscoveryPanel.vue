@@ -97,7 +97,7 @@
             </div>
 
             <div v-if="cards.length" class="discovery-results">
-              <NuxtLink
+              <AppLink
                 v-for="(card, index) in cards"
                 :key="`${card.type}:${card.sourceId}`"
                 :to="card.href"
@@ -132,7 +132,7 @@
                   </time>
                 </div>
                 <Icon name="ph:arrow-up-right-bold" class="card-arrow" />
-              </NuxtLink>
+              </AppLink>
             </div>
           </section>
         </div>

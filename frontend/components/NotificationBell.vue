@@ -66,9 +66,9 @@
             </div>
           </div>
         </div>
-        <NuxtLink v-if="items.length > 0" to="/admin/messages" class="notif-footer" @click="panelOpen = false">
+        <AppLink v-if="items.length > 0" to="/admin/messages" class="notif-footer" @click="panelOpen = false">
           查看全部
-        </NuxtLink>
+        </AppLink>
       </section>
     </Transition>
     </Teleport>

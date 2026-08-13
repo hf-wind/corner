@@ -47,8 +47,8 @@
       <Icon name="ph:chat-centered-dots-bold" class="prompt-icon" />
       <p class="prompt-text">请登录后发表评论</p>
       <div class="prompt-actions">
-        <NuxtLink to="/login" class="prompt-btn prompt-btn-primary">去登录</NuxtLink>
-        <NuxtLink to="/register" class="prompt-btn prompt-btn-secondary">注册</NuxtLink>
+        <AppLink to="/login" class="prompt-btn prompt-btn-primary">去登录</AppLink>
+        <AppLink to="/register" class="prompt-btn prompt-btn-secondary">注册</AppLink>
       </div>
     </div>
   </div>

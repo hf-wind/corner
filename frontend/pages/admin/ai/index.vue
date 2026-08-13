@@ -720,9 +720,9 @@
                   class="knowledge-item"
                 >
                   <div class="knowledge-title">
-                    <NuxtLink :to="`/article/${item.slug}`" target="_blank">{{
+                    <AppLink :to="`/article/${item.slug}`" target="_blank">{{
                       item.title
-                    }}</NuxtLink>
+                    }}</AppLink>
                   </div>
                   <div class="knowledge-meta">
                     <a-tag v-for="tag in item.tags" :key="tag" size="small">{{

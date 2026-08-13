@@ -18,7 +18,6 @@
       ref="rootRef"
       class="smp"
       :class="{
-        'is-bar': barOpen,
         'is-list': listOpen,
         'is-playing': playing,
         'is-ready': ready,
@@ -106,24 +105,6 @@
       </Transition>
 
       <div class="smp-shell">
-        <button
-          type="button"
-          class="smp-cover-btn"
-          :title="listOpen ? '收起歌单' : '展开歌单'"
-          @click="toggleList"
-        >
-          <span class="smp-cover" :style="coverStyle">
-            <Icon
-              v-if="!coverLoaded"
-              name="ph:music-notes-fill"
-              class="smp-cover-fallback"
-            />
-          </span>
-          <span v-if="playing" class="smp-eq" aria-hidden="true">
-            <i /><i /><i />
-          </span>
-        </button>
-
         <div class="smp-bar">
           <div class="smp-info" @click="toggleList">
             <div class="smp-title" :title="current?.name">
@@ -189,14 +170,6 @@
                 "
               />
             </button>
-            <button
-              type="button"
-              class="smp-icon-btn"
-              title="收起"
-              @click="collapseBar"
-            >
-              <Icon name="ph:caret-left-bold" />
-            </button>
           </div>
 
           <div class="smp-progress" @click="seek">
@@ -204,15 +177,6 @@
           </div>
         </div>
 
-        <button
-          v-show="!barOpen"
-          type="button"
-          class="smp-mini-play"
-          :title="playing ? '暂停 · 展开' : '播放 · 展开'"
-          @click="onMiniPlay"
-        >
-          <Icon :name="playing ? 'ph:pause-fill' : 'ph:play-fill'" />
-        </button>
       </div>
     </div>
   </Teleport>
@@ -257,7 +221,6 @@ watch(playing, (v) => setPlaying(v), { immediate: true });
 watch(slotEl, (el) => {
   if (el) slotKey.value += 1;
 });
-const barOpen = ref(false);
 const listOpen = ref(false);
 const tracks = ref<Track[]>([]);
 const playlists = ref<PlaylistMeta[]>([]);
@@ -274,32 +237,8 @@ const errorRecoveryAvailable = ref(false);
 const trackPage = ref(1);
 const hasMoreTracks = ref(false);
 const loadingMore = ref(false);
-const coverLoaded = ref(false);
-let coverRequestId = 0;
 
 const current = computed(() => tracks.value[index.value] || null);
-const coverStyle = computed(() => {
-  if (!current.value?.pic || !coverLoaded.value) return {};
-  return {
-    backgroundImage: `url(${current.value.pic})`,
-  };
-});
-watch(
-  () => current.value?.pic,
-  async (source) => {
-    const requestId = ++coverRequestId;
-    coverLoaded.value = false;
-    if (!source) return;
-    await new Promise<void>((resolve) => {
-      const image = new Image();
-      image.onload = () => resolve();
-      image.onerror = () => resolve();
-      image.src = source;
-    });
-    if (requestId === coverRequestId) coverLoaded.value = true;
-  },
-  { immediate: true },
-);
 watch(playRequest, (request) => {
   if (!request?.url) return;
   const existing = tracks.value.findIndex(
@@ -318,7 +257,6 @@ watch(playRequest, (request) => {
     });
     index.value = 0;
   }
-  barOpen.value = true;
   listOpen.value = false;
   errorRecoveryAvailable.value = true;
   void reloadAndPlay();
@@ -334,7 +272,6 @@ const modeTitle = computed(() => {
   return "列表循环";
 });
 
-let autoCollapseTimer: ReturnType<typeof setTimeout> | null = null;
 let playlistRequestId = 0;
 
 onMounted(async () => {
@@ -344,7 +281,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("click", onDocClick);
-  if (autoCollapseTimer) clearTimeout(autoCollapseTimer);
   setPlaying(false);
   const a = audioRef.value;
   if (a) {
@@ -378,7 +314,6 @@ async function bootstrap() {
     await loadPlaylist(0, false);
     if (isLoggedIn.value) void loadFavorites();
     applyVolume();
-    await waitForCurrentCover();
     await nextTick();
     ready.value = true;
     if (autoplay.value) {
@@ -405,23 +340,6 @@ async function loadFavorites() {
   } finally {
     favoritesLoading.value = false;
   }
-}
-
-async function waitForCurrentCover() {
-  if (!current.value?.pic || coverLoaded.value) return;
-  await new Promise<void>((resolve) => {
-    let finished = false;
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      stop();
-      resolve();
-    };
-    const stop = watch(coverLoaded, (loaded) => {
-      if (loaded) finish();
-    });
-    window.setTimeout(finish, 3500);
-  });
 }
 
 async function loadPlaylist(i: number, refresh = false) {
@@ -590,8 +508,6 @@ async function tryAutoplay() {
     a.muted = true;
     await a.play();
     playing.value = true;
-    barOpen.value = true;
-    scheduleBarCollapse();
     // keep muted unless user interacts — policy
     a.muted = false;
     muted.value = false;
@@ -602,21 +518,13 @@ async function tryAutoplay() {
   }
 }
 
-function onMiniPlay() {
-  barOpen.value = true;
-  togglePlay();
-  scheduleBarCollapse();
-}
-
 function togglePlay() {
   if (!current.value) return;
-  if (!barOpen.value) barOpen.value = true;
   if (playing.value) pause();
   else {
     errorRecoveryAvailable.value = true;
     play();
   }
-  scheduleBarCollapse();
 }
 
 async function play() {
@@ -670,7 +578,6 @@ async function next(resetErrorRecovery: boolean | Event = true) {
 
 function playAt(i: number) {
   index.value = i;
-  barOpen.value = true;
   errorRecoveryAvailable.value = true;
   reloadAndPlay();
 }
@@ -749,7 +656,6 @@ function toggleMute() {
 function toggleList() {
   listOpen.value = !listOpen.value;
   if (listOpen.value) {
-    barOpen.value = true;
     void nextTick(locateCurrentTrack);
   }
 }
@@ -771,23 +677,8 @@ function onTrackListScroll(event: Event) {
   }
 }
 
-function collapseBar() {
-  listOpen.value = false;
-  barOpen.value = false;
-}
-
-function scheduleBarCollapse() {
-  if (autoCollapseTimer) clearTimeout(autoCollapseTimer);
-  autoCollapseTimer = setTimeout(() => {
-    if (!listOpen.value) barOpen.value = false;
-  }, 10000);
-}
-
 watch(volume, applyVolume);
 watch(muted, applyVolume);
-watch(listOpen, (v) => {
-  if (v) barOpen.value = true;
-});
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) void loadFavorites();
   else {
@@ -802,16 +693,15 @@ watch(isLoggedIn, (loggedIn) => {
 
 <style scoped>
 .smp {
-  --smp-h: 44px;
-  --smp-r: 14px;
-  --smp-expand-w: min(318px, calc(100vw - 28px));
+  --smp-r: 12px;
   position: relative;
   z-index: 40;
-  width: var(--smp-h);
-  height: var(--smp-h);
+  width: 100%;
+  min-width: 0;
+  height: 76px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   pointer-events: none;
   opacity: 0;
   transform: translateY(7px);
@@ -828,175 +718,40 @@ watch(isLoggedIn, (loggedIn) => {
   visibility: visible;
 }
 
-.smp.is-bar,
-.smp.is-list {
-  width: var(--smp-expand-w);
-}
-
 .smp > * {
   pointer-events: auto;
 }
 
 .smp-shell {
   position: relative;
-  display: flex;
-  align-items: center;
-  height: var(--smp-h);
+  display: block;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  height: 76px;
   border-radius: var(--smp-r);
-  background: transparent;
-  border: 1px solid transparent;
-  box-shadow: none;
-  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-bg-1));
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  box-shadow: 0 7px 22px color-mix(in srgb, var(--ld-shadow) 32%, transparent);
   overflow: hidden;
-  transition:
-    width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.25s ease,
-    border-color 0.2s ease;
-  width: var(--smp-h);
+  contain: layout paint;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease;
   z-index: 2;
 }
 
-.smp.is-bar .smp-shell,
 .smp.is-list .smp-shell {
-  width: var(--smp-expand-w);
-  background: color-mix(in srgb, var(--ld-bg-card) 94%, transparent);
-  border-color: color-mix(in srgb, var(--border) 80%, transparent);
-  box-shadow: 0 12px 32px color-mix(in srgb, #000 14%, var(--ld-shadow));
-}
-
-.smp-cover-btn {
-  position: relative;
-  width: var(--smp-h);
-  height: var(--smp-h);
-  flex-shrink: 0;
-  border: none;
-  border-radius: 50%;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--c-primary-soft) 72%, transparent),
-    transparent
-  );
-  padding: 0;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-
-.smp-cover {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background:
-    center / cover no-repeat,
-    linear-gradient(135deg, var(--c-primary-soft), var(--c-bg-2));
-  box-shadow:
-    0 5px 15px color-mix(in srgb, var(--ld-shadow) 55%, transparent),
-    inset 0 0 0 2px color-mix(in srgb, #fff 16%, transparent);
-  transition: transform 0.35s ease;
-}
-
-.smp.is-playing .smp-cover {
-  animation: smp-spin 14s linear infinite;
-  border-radius: 50%;
-}
-
-.smp-cover-fallback {
-  color: var(--c-primary);
-  font-size: 1rem;
-}
-
-.smp-eq {
-  position: absolute;
-  right: 4px;
-  bottom: 5px;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 10px;
-  padding: 2px 3px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--ld-bg-card) 80%, transparent);
-}
-
-.smp-eq i {
-  display: block;
-  width: 2px;
-  height: 100%;
-  border-radius: 1px;
-  background: var(--c-primary);
-  animation: smp-eq 0.9s ease-in-out infinite;
-  transform-origin: bottom;
-}
-
-.smp-eq i:nth-child(2) {
-  animation-delay: 0.15s;
-  height: 70%;
-}
-.smp-eq i:nth-child(3) {
-  animation-delay: 0.3s;
-  height: 90%;
-}
-
-.smp-mini-play {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 50%;
-  background: var(--c-primary);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  font-size: 0.62rem;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--c-primary) 40%, transparent);
-  transition:
-    transform 0.15s ease,
-    opacity 0.2s ease;
-}
-
-.smp:not(.is-bar):not(.is-list)::before {
-  position: absolute;
-  inset: 3px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, transparent);
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
-  animation: smp-breathe 3.2s ease-in-out infinite;
-}
-
-.smp-mini-play:hover {
-  transform: scale(1.08);
-}
-
-.smp.is-bar .smp-mini-play,
-.smp.is-list .smp-mini-play {
-  opacity: 0;
-  pointer-events: none;
+  border-color: color-mix(in srgb, var(--c-primary) 30%, var(--border));
 }
 
 .smp-bar {
-  flex: 1;
   min-width: 0;
   height: 100%;
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: minmax(0, 1fr) auto 3px;
   align-items: center;
-  column-gap: 4px;
-  padding: 4px 8px 4px 0;
-  opacity: 0;
-  transform: translateX(-6px);
-  pointer-events: none;
-  transition:
-    opacity 0.22s ease 0.05s,
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.smp.is-bar .smp-bar,
-.smp.is-list .smp-bar {
+  column-gap: 3px;
+  padding: 7px 9px 6px;
   opacity: 1;
   transform: none;
   pointer-events: auto;
@@ -1030,13 +785,13 @@ watch(isLoggedIn, (loggedIn) => {
 .smp-controls {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 1px;
   justify-content: flex-end;
 }
 
 .smp-icon-btn {
-  width: 26px;
-  height: 26px;
+  width: 23px;
+  height: 23px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -1044,7 +799,7 @@ watch(isLoggedIn, (loggedIn) => {
   display: grid;
   place-items: center;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   transition:
     color 0.15s,
     background 0.15s;
@@ -1056,8 +811,8 @@ watch(isLoggedIn, (loggedIn) => {
 }
 
 .smp-play {
-  width: 28px;
-  height: 28px;
+  width: 25px;
+  height: 25px;
   border: none;
   border-radius: 50%;
   background: var(--c-primary);
@@ -1065,7 +820,7 @@ watch(isLoggedIn, (loggedIn) => {
   display: grid;
   place-items: center;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--c-primary) 35%, transparent);
   transition:
     transform 0.15s ease,
@@ -1100,16 +855,17 @@ watch(isLoggedIn, (loggedIn) => {
 .smp-list {
   position: absolute;
   left: 0;
+  right: 0;
   bottom: calc(100% + 8px);
-  width: var(--smp-expand-w);
-  max-height: 240px;
+  width: 100%;
+  min-width: 0;
+  max-height: min(240px, calc(100dvh - 260px));
   display: flex;
   flex-direction: column;
   border-radius: 14px;
   background: color-mix(in srgb, var(--ld-bg-card) 96%, transparent);
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
   box-shadow: 0 16px 40px color-mix(in srgb, #000 16%, var(--ld-shadow));
-  backdrop-filter: blur(14px);
   overflow: hidden;
   transform-origin: bottom left;
 }
@@ -1300,35 +1056,7 @@ watch(isLoggedIn, (loggedIn) => {
   transform: translate3d(0, 12px, 0) scale(0.975);
 }
 
-@keyframes smp-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes smp-eq {
-  0%,
-  100% {
-    transform: scaleY(0.35);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-@keyframes smp-breathe {
-  50% {
-    opacity: 0.32;
-    transform: scale(1.08);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .smp.is-playing .smp-cover,
-  .smp-eq i,
-  .smp:not(.is-bar):not(.is-list)::before {
-    animation: none !important;
-  }
   .smp-shell,
   .smp-bar,
   .smp-list-enter-active,

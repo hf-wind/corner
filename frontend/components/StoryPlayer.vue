@@ -23,12 +23,12 @@
         <MemoryGraph2D v-else :nodes="storyGraph.nodes" :relations="storyGraph.relations" :selected-id="current?.node?.id" @select="selectGraphNode" />
       </div>
       <div class="stage-shade" />
-      <header><NuxtLink to="/stories" title="返回故事列表"><Icon name="ph:arrow-left-bold" /></NuxtLink><span>{{ story.title }}</span><div class="header-actions"><button type="button" :title="visualMode==='constellation'?'显示照片':'显示星图航线'" @click="toggleVisual"><Icon :name="visualMode==='constellation'?'ph:image-bold':'ph:graph-bold'" /></button><button type="button" title="复制分享链接" @click="share"><Icon name="ph:share-network-bold" /></button></div></header>
+      <header><AppLink to="/stories" title="返回故事列表"><Icon name="ph:arrow-left-bold" /></AppLink><span>{{ story.title }}</span><div class="header-actions"><button type="button" :title="visualMode==='constellation'?'显示照片':'显示星图航线'" @click="toggleVisual"><Icon :name="visualMode==='constellation'?'ph:image-bold':'ph:graph-bold'" /></button><button type="button" title="复制分享链接" @click="share"><Icon name="ph:share-network-bold" /></button></div></header>
       <section class="story-copy">
         <span>{{ String(index + 1).padStart(2,'0') }} / {{ String(story.steps.length).padStart(2,'0') }}</span>
         <h1>{{ current?.title }}</h1>
         <p>{{ current?.narration || '这一站，把画面留给记忆本身。' }}</p>
-        <NuxtLink v-if="current?.node?.href" :to="current.node.href" class="detail-link" @click="pause"><Icon name="ph:arrow-square-out-bold" />进入内容</NuxtLink>
+        <AppLink v-if="current?.node?.href" :to="current.node.href" class="detail-link" @click="pause"><Icon name="ph:arrow-square-out-bold" />进入内容</AppLink>
       </section>
     </div>
     <footer class="story-controls">
@@ -41,7 +41,7 @@
     </footer>
     <audio ref="audioEl" />
   </main>
-  <div v-else-if="!loading" class="story-empty"><Icon name="ph:path-bold" /><h1>故事没有找到</h1><NuxtLink to="/stories">返回故事列表</NuxtLink></div>
+  <div v-else-if="!loading" class="story-empty"><Icon name="ph:path-bold" /><h1>故事没有找到</h1><AppLink to="/stories">返回故事列表</AppLink></div>
 </template>
 
 <script setup lang="ts">

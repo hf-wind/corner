@@ -49,7 +49,7 @@
             :key="album.id"
             class="album-card"
           >
-            <NuxtLink :to="`/albums/${album.slug}`" class="album-frame">
+            <AppLink :to="`/albums/${album.slug}`" class="album-frame">
               <div class="film-edge" aria-hidden="true">
                 <i v-for="dot in 8" :key="dot" />
               </div>
@@ -73,7 +73,7 @@
               <div class="open-hint">
                 <span>打开相册</span><Icon name="ph:arrow-up-right-bold" />
               </div>
-            </NuxtLink>
+            </AppLink>
             <div class="album-copy">
               <div class="album-meta">
                 <time>{{
@@ -86,9 +86,9 @@
                 >
               </div>
               <h2>
-                <NuxtLink :to="`/albums/${album.slug}`">{{
+                <AppLink :to="`/albums/${album.slug}`">{{
                   album.title
-                }}</NuxtLink>
+                }}</AppLink>
               </h2>
               <p>{{ album.description || "一组被风留住的照片。" }}</p>
             </div>

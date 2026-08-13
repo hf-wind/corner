@@ -7,7 +7,7 @@
         <span class="wind-stroke wind-stroke-one" aria-hidden="true" />
         <span class="wind-stroke wind-stroke-two" aria-hidden="true" />
         <div class="hero-content">
-          <NuxtLink :to="heroLink" class="hero-row" :title="heroTitle">
+          <AppLink :to="heroLink" class="hero-row" :title="heroTitle">
             <div class="logo-wrap">
               <SiteWindLogo />
             </div>
@@ -17,7 +17,7 @@
               <div class="hero-slogan">{{ heroSlogan }}</div>
             </div>
             <span class="hero-status" aria-hidden="true"><i /></span>
-          </NuxtLink>
+          </AppLink>
         </div>
       </div>
     </div>
@@ -35,7 +35,7 @@
           </button>
           <div class="nav-group-items" :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }">
             <div class="nav-group-inner">
-              <NuxtLink
+              <AppLink
                 v-for="item in group.items"
                 :key="item.to"
                 :to="item.to"
@@ -44,7 +44,7 @@
                 :title="collapsed ? item.label : undefined"
               >
                 <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
-              </NuxtLink>
+              </AppLink>
             </div>
           </div>
         </section>
@@ -56,9 +56,9 @@
       <div ref="playerSlotRef" class="sidebar-player-slot" />
       <div class="sidebar-bottom-scroll">
         <div class="sidebar-divider"></div>
-        <NuxtLink v-if="!isLoggedIn && !isPanel" to="/login" class="login-link">
+        <AppLink v-if="!isLoggedIn && !isPanel" to="/login" class="login-link">
           <Icon name="ph:sign-in-bold" /> 登录 / 注册
-        </NuxtLink>
+        </AppLink>
         <div v-else-if="isLoggedIn" class="user-card">
           <div class="user-row">
             <button type="button" class="user-main" @click="goPanel">
@@ -84,10 +84,10 @@
               <Icon name="ph:sign-out-bold" />
             </button>
           </div>
-          <NuxtLink v-if="isPanel" to="/home" class="user-back">
+          <AppLink v-if="isPanel" to="/home" class="user-back">
             <Icon name="ph:arrow-left-bold" />
             <span>返回前台</span>
-          </NuxtLink>
+          </AppLink>
         </div>
         <div class="theme-pill" :class="`theme-${theme}`">
           <button
@@ -459,9 +459,10 @@ watch(
   display: flex;
   flex-direction: column;
   padding: 24px 16px 16px;
-  overflow: visible;
+  overflow: hidden;
   min-height: 0;
   height: 100%;
+  max-height: 100dvh;
 }
 
 .sidebar-hero {
@@ -471,7 +472,7 @@ watch(
 }
 
 .sidebar-scroll {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -484,6 +485,7 @@ watch(
   z-index: 50;
   overflow: visible;
   width: 100%;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -777,8 +779,8 @@ watch(
 /* ===== Bottom ===== */
 .sidebar-bottom {
   position: relative;
-  flex-shrink: 0;
-  max-height: 44%;
+  flex: 0 0 auto;
+  min-height: 0;
   margin-top: 0;
   padding-top: 7px;
   display: flex;
@@ -789,13 +791,11 @@ watch(
 
 .sidebar-bottom-scroll {
   display: flex;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-width: 0;
   flex-direction: column;
   gap: 10px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 2px;
+  overflow: visible;
 }
 
 .sidebar-divider {
@@ -1117,7 +1117,7 @@ watch(
   align-items: center;
 }
 .is-collapsed .sidebar-player-slot {
-  width: 44px;
+  display: none;
 }
 .is-collapsed .login-link {
   width: 42px;

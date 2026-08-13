@@ -110,7 +110,10 @@ watch(
 <style scoped>
 .layout {
   display: flex;
-  height: 100%;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
@@ -122,6 +125,8 @@ watch(
   position: relative;
   z-index: 30;
   overflow: visible;
+  height: 100%;
+  max-height: 100dvh;
 }
 
 .layout-page {
@@ -129,6 +134,7 @@ watch(
   flex: 1;
   min-width: 0;
   height: 100%;
+  max-height: 100dvh;
   overflow: hidden;
 }
 
@@ -209,7 +215,8 @@ watch(
   }
 
   .sidebar-shell :deep(.sidebar-bottom) {
-    max-height: 46%;
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .layout-page {

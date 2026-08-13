@@ -4,7 +4,7 @@
       <Icon name="ph:books" />
       <h1>没有找到这份记录</h1>
       <p>它可能还在草稿箱，或已经被移走。</p>
-      <NuxtLink to="/library">返回书影</NuxtLink>
+      <AppLink to="/library">返回书影</AppLink>
     </div>
     <template v-else>
       <section class="detail-hero content-reveal">
@@ -18,8 +18,8 @@
         />
         <div class="hero-overlay" />
         <div class="hero-inner">
-          <NuxtLink to="/library" class="back-link"
-            ><Icon name="ph:arrow-left-bold" /> 返回收藏馆</NuxtLink
+          <AppLink to="/library" class="back-link"
+            ><Icon name="ph:arrow-left-bold" /> 返回收藏馆</AppLink
           >
           <div class="hero-content">
             <div class="poster" :class="item.type">
@@ -199,17 +199,17 @@
             <small>KEEP EXPLORING</small>
             <h2>也许你还会喜欢</h2>
           </div>
-          <NuxtLink to="/library"
+          <AppLink to="/library"
             >查看全部 <Icon name="ph:arrow-right-bold"
-          /></NuxtLink>
+          /></AppLink>
         </header>
         <div>
           <LibraryCard v-for="entry in related" :key="entry.id" :item="entry" />
         </div>
       </section>
       <footer class="detail-footer">
-        <NuxtLink to="/library"
-          ><Icon name="ph:arrow-left" /> 回到书影收藏馆</NuxtLink
+        <AppLink to="/library"
+          ><Icon name="ph:arrow-left" /> 回到书影收藏馆</AppLink
         ><span>风隅随笔 · PERSONAL COLLECTION</span>
       </footer>
     </template>

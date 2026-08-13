@@ -153,9 +153,9 @@
         </div>
         <h2>{{ selected.title }}</h2>
         <p>{{ selected.excerpt || "这颗星保存着一段尚未展开的记忆。" }}</p>
-        <NuxtLink v-if="selected.href" :to="selected.href"
+        <AppLink v-if="selected.href" :to="selected.href"
           ><span>读取这段时光</span><Icon name="ph:arrow-up-right-bold"
-        /></NuxtLink>
+        /></AppLink>
         <section v-if="neighbors.length">
           <h3>
             <span>相连轨迹</span><small>{{ neighbors.length }} 条</small>

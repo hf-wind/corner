@@ -5,7 +5,7 @@
         <span class="title-icon"><Icon name="ph:planet-bold" /></span>
         <div><small>TIME CONSTELLATION</small><h1>时光星图</h1><p>发布内容并记录时间、地点，系统会自动完成其余工作。</p></div>
       </div>
-      <NuxtLink to="/time/constellation" target="_blank" class="preview-link"><Icon name="ph:arrow-square-out-bold" />查看前台星图</NuxtLink>
+      <AppLink to="/time/constellation" target="_blank" class="preview-link"><Icon name="ph:arrow-square-out-bold" />查看前台星图</AppLink>
     </header>
 
     <section class="automation-card">
@@ -45,7 +45,7 @@
 
     <a-modal v-model:open="issueOpen" :title="activeIssue?.title" :footer="null">
       <div class="issue-list">
-        <NuxtLink v-for="item in activeIssue?.items || []" :key="item.id" :to="item.href" target="_blank"><span><Icon :name="nodeIcon(item.type)" /></span><div><small>{{ typeText(item.type) }}</small><strong>{{ item.title }}</strong></div><Icon name="ph:arrow-up-right-bold" /></NuxtLink>
+        <AppLink v-for="item in activeIssue?.items || []" :key="item.id" :to="item.href" target="_blank"><span><Icon :name="nodeIcon(item.type)" /></span><div><small>{{ typeText(item.type) }}</small><strong>{{ item.title }}</strong></div><Icon name="ph:arrow-up-right-bold" /></AppLink>
       </div>
     </a-modal>
   </div>

@@ -8,7 +8,7 @@
   </component>
   <GlobalToast v-if="toasts.length" />
   <LightConfirm />
-  <SidebarMusicPlayer v-if="showPlayer" />
+  <!-- SidebarMusicPlayer 暂停挂载，保留组件供后续二次开发。 -->
 </template>
 
 <script setup lang="ts">
@@ -20,7 +20,7 @@ import WelcomeLayout from './layouts/welcome.vue'
 import LightConfirm from './components/LightConfirm.vue'
 
 const GlobalToast = defineAsyncComponent(() => import('./components/GlobalToast.vue'))
-const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/SidebarMusicPlayer.vue'))
+// const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/SidebarMusicPlayer.vue'))
 
 const { init: initTypography } = useTypography()
 const { init: initTheme } = useTheme()
@@ -30,9 +30,7 @@ const { toasts } = useToast()
 const { siteTitle, loadSiteSettings } = useSiteSettings()
 const route = useRoute()
 const isSpaceRoute = computed(() => route.path === '/' || route.path === '/time/constellation')
-const showPlayer = ref(false)
 const clientProtection = useProductionClientProtection(isAdmin)
-let playerIdleHandle: number | undefined
 
 readStorage()
 const sessionReady = ref(isLoggedIn.value)
@@ -64,22 +62,11 @@ onMounted(() => {
     connectRealtime()
     void refreshUnread()
   }
-  const schedule = window.requestIdleCallback || ((callback: IdleRequestCallback) => window.setTimeout(callback, 800))
-  playerIdleHandle = schedule(() => {
-    if (route.meta.layout !== 'welcome' && route.meta.layout !== false && route.path !== '/') showPlayer.value = true
-  }, { timeout: 1600 })
-})
-
-watch(() => route.path, (path) => {
-  showPlayer.value = route.meta.layout !== 'welcome' && route.meta.layout !== false && path !== '/'
 })
 
 onUnmounted(() => {
   clientProtection.stop()
   disconnectRealtime()
-  if (playerIdleHandle === undefined) return
-  if (window.cancelIdleCallback) window.cancelIdleCallback(playerIdleHandle)
-  else window.clearTimeout(playerIdleHandle)
 })
 
 watch(isLoggedIn, (loggedIn) => {

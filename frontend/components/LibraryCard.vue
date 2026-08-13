@@ -1,5 +1,5 @@
 <template>
-  <NuxtLink :to="`/library/${item.slug}`" class="library-card" :class="item.type">
+  <AppLink :to="`/library/${item.slug}`" class="library-card" :class="item.type">
     <div class="cover-wrap">
       <img v-if="item.coverImage" :src="mediaUrl(item.coverImage)" :alt="`${item.title}封面`" loading="lazy">
       <div v-else class="cover-placeholder">
@@ -24,7 +24,7 @@
         <span class="read-more">{{ item.type === 'book' ? '翻开' : '回看' }} <Icon name="ph:arrow-right-bold" /></span>
       </div>
     </div>
-  </NuxtLink>
+  </AppLink>
 </template>
 
 <script setup lang="ts">

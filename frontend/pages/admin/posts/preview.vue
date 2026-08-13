@@ -2,10 +2,10 @@
   <div class="page-layout article-page admin-preview">
     <main id="main-content" ref="articleMainRef" class="article-main" :class="{ 'article-ready': articleReady }">
       <template v-if="!loading && article.title">
-        <NuxtLink to="/admin/posts" class="back-btn">
+        <AppLink to="/admin/posts" class="back-btn">
           <Icon name="ph:arrow-left-bold" />
           返回列表
-        </NuxtLink>
+        </AppLink>
 
         <div class="post-header article-anim" :class="{ 'has-cover': article.hero }">
           <img
