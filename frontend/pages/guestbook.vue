@@ -11,14 +11,14 @@
         metric-label="条时光留言"
       />
 
-      <div class="tabs content-reveal" role="tablist" aria-label="时光留言板分区">
+      <div ref="tabsRef" class="tabs content-reveal" role="tablist" aria-label="时光留言板分区">
         <span class="tabs-track" :class="`tabs-${activeTab}`" aria-hidden="true" />
         <button
           type="button"
           role="tab"
           :aria-selected="activeTab === 'messages'"
           :class="{ active: activeTab === 'messages' }"
-          @click="activeTab = 'messages'"
+          @click="switchTab('messages')"
         >
           <Icon name="ph:note-pencil-bold" />
           留言墙
@@ -139,7 +139,7 @@
           <SeaScene
             ref="seaRef"
             class="sea-scene-wrap"
-            :disabled="fishing"
+            :disabled="fishing || !!caughtBottle"
             @fish="onFishBottle"
           />
 
@@ -149,29 +149,44 @@
           </div>
 
           <Transition name="bottle-pop">
-            <div v-if="caughtBottle" class="bottle-caught" ref="caughtRef">
+            <div v-if="caughtBottle" class="bottle-caught">
+              <button type="button" class="caught-close" title="合上信纸并放回海里" aria-label="关闭并放回海里" @click="releaseCaughtBottle(false)">
+                <Icon name="ph:x-bold" />
+              </button>
               <div class="caught-head">
                 <span class="caught-seal"><Icon name="ph:anchor-fill" /></span>
                 <div class="caught-title">
                   <strong>一封漂了 {{ caughtBottle.chain?.length ?? 1 }} 段的信</strong>
-                  <span class="caught-meta">来自「{{ caughtBottle.nickname }}」 · {{ dateLabel(caughtBottle.createdAt) }} 投入</span>
+                  <span class="caught-meta">
+                    <Icon name="ph:user-circle-bold" />{{ caughtBottle.nickname }}
+                    <i aria-hidden="true" />
+                    <Icon name="ph:map-pin-bold" />{{ caughtBottle.originRegion || '神秘海岸' }}
+                    <i aria-hidden="true" />
+                    <Icon name="ph:clock-bold" />{{ minuteLabel(caughtBottle.createdAt) }} 投入
+                  </span>
                 </div>
               </div>
               <ol class="chain-list">
                 <li v-for="(seg, i) in chainReversed" :key="seg.id" class="chain-seg">
                   <span class="chain-tag">{{ i === 0 ? '最新' : `第 ${(caughtBottle?.chain?.length ?? 1) - i} 段` }}</span>
                   <div class="chain-body">
-                    <span class="chain-meta">{{ seg.nickname }} · {{ msgRelativeTime(seg.createdAt) }}</span>
+                    <span class="chain-meta">
+                      <Icon name="ph:user-bold" />{{ seg.nickname }}
+                      <Icon name="ph:map-pin-bold" />{{ seg.originRegion || '神秘海岸' }}
+                      <Icon name="ph:clock-bold" />{{ minuteLabel(seg.createdAt) }}
+                    </span>
                     <p>{{ seg.content }}</p>
                   </div>
                 </li>
               </ol>
+              <p class="relay-prompt"><Icon name="ph:arrows-clockwise-bold" />把一句新的话接在信尾，再交给下一位旅人。</p>
               <div class="caught-actions">
-                <button v-if="canReply" type="button" class="caught-action reply" @click="openReplyDialog">
-                  <Icon name="ph:envelope-simple-bold" />回复这位旅人
-                </button>
                 <button v-if="!relayMode" type="button" class="caught-action relay" @click="relayMode = true">
-                  <Icon name="ph:paper-plane-tilt-bold" />留一句话，让瓶子继续漂流
+                  <Icon name="ph:paper-plane-tilt-bold" />接力下去
+                </button>
+                <button type="button" class="caught-action release" :disabled="releasingBottle" @click="releaseCaughtBottle(true)">
+                  <Icon :name="releasingBottle ? 'ph:circle-notch-bold' : 'ph:arrow-u-down-left-bold'" :spin="releasingBottle" />
+                  {{ releasingBottle ? '交还潮汐…' : '原样扔回海里' }}
                 </button>
               </div>
               <div v-if="relayMode" class="relay-box">
@@ -180,7 +195,7 @@
                   <span class="composer-count">{{ relayText.length }}/120</span>
                   <button type="button" class="composer-submit sea-submit" :disabled="relaySending" @click="submitRelay">
                     <Icon :name="relaySending ? 'ph:circle-notch-bold' : 'solar:bottle-outline'" :spin="relaySending" />
-                    {{ relaySending ? '瓶子审核中…' : '投入时光海' }}
+                    {{ relaySending ? '瓶子审核中…' : '写入并接力' }}
                   </button>
                 </div>
               </div>
@@ -224,13 +239,18 @@
       </section>
 
       <!-- ========== 我的徽章 ========== -->
-      <section class="badges content-reveal">
+      <section class="badges content-reveal" :class="{ expanded: badgesExpanded }">
         <header class="badges-head">
           <div>
             <span class="badges-kicker">MY CONSTELLATION · 我的徽章</span>
             <h2>旅途中的星光</h2>
           </div>
-          <span class="badges-progress">{{ me?.achievements?.length ?? 0 }} / {{ badges.length }} 枚点亮</span>
+          <div class="badges-head-actions">
+            <span class="badges-progress">{{ me?.achievements?.length ?? 0 }} / {{ badges.length }} 枚点亮</span>
+            <button type="button" class="badge-toggle" :aria-expanded="badgesExpanded" :title="badgesExpanded ? '收起徽章详情' : '展开徽章详情'" @click="badgesExpanded = !badgesExpanded">
+              <Icon :name="badgesExpanded ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" />
+            </button>
+          </div>
         </header>
         <div class="badges-grid">
           <div
@@ -244,7 +264,7 @@
               <span>{{ badge.rarity }}</span>
               <Icon :name="ownedCodes.has(badge.code) ? 'ph:seal-check-fill' : 'ph:lock-key-bold'" />
             </span>
-            <span class="badge-icon"><BadgeMedal :code="badge.code" :locked="!ownedCodes.has(badge.code)" /></span>
+            <span class="badge-icon"><BadgeMedal :code="badge.code" :locked="!ownedCodes.has(badge.code)" :size="badgesExpanded ? 58 : 38" /></span>
             <strong>{{ badge.title }}</strong>
             <small>{{ badge.description }}</small>
             <span class="badge-meter" aria-hidden="true"><i :style="{ width: `${badgeProgress(badge).percent}%` }" /></span>
@@ -334,19 +354,6 @@
       @authenticated="handleAuthenticated"
     />
 
-    <a-modal
-      v-model:open="replyDialogOpen"
-      title="回复这位旅人"
-      :ok-text="replySending ? '发送中…' : '发送回复'"
-      :ok-button-props="{ disabled: !replyText.trim() || replySending }"
-      :cancel-text="'取消'"
-      @ok="submitReply"
-    >
-      <p style="margin:0 0 10px;color:var(--c-text-2);font-size:.68rem;">
-        回复会接在「{{ caughtBottle?.nickname }}」的漂流瓶链上，内容经过 AI 审核。
-      </p>
-      <a-textarea v-model:value="replyText" :maxlength="120" :rows="4" placeholder="写几句想对这位旅人说的话…" />
-    </a-modal>
   </div>
 </template>
 
@@ -368,7 +375,7 @@ const {
   sendMessage,
   throwBottle,
   fishBottle,
-  replyBottle,
+  releaseBottle,
 } = useVisitor();
 const toast = useToast();
 const { isLoggedIn, user } = useAuth();
@@ -400,23 +407,14 @@ const caughtBottle = ref<any>(null);
 
 const seaRef = ref<InstanceType<any> | null>(null);
 const seaCardRef = ref<HTMLElement | null>(null);
-const caughtRef = ref<HTMLElement | null>(null);
+const tabsRef = ref<HTMLElement | null>(null);
 const relayMode = ref(false);
 const relayText = ref("");
 const relaySending = ref(false);
-const replyDialogOpen = ref(false);
-const replyText = ref("");
-const replySending = ref(false);
+const releasingBottle = ref(false);
+const badgesExpanded = ref(false);
 const identityCompleting = ref(false);
 const chainReversed = computed(() => [...(caughtBottle.value?.chain ?? [])].reverse());
-
-const canReply = computed(() => {
-  const bottle = caughtBottle.value;
-  if (!bottle) return false;
-  if (isLoggedIn.value && bottle.ownerUserId)
-    return bottle.ownerUserId !== user.value?.id;
-  return true;
-});
 
 const avatarErrors = ref<Set<string>>(new Set());
 const myAvatarError = ref(false);
@@ -498,28 +496,8 @@ function scrollToEl(el: HTMLElement | null | undefined, align: "start" | "center
 
 async function switchTab(tab: "messages" | "bottles") {
   activeTab.value = tab;
-  if (tab !== "bottles") return;
   await nextTick();
-  scrollToEl(seaCardRef.value);
-}
-
-function openReplyDialog() {
-  pendingAction.value = {
-    fn: async () => {
-      await refreshMe();
-      await nextTick();
-      if (canReply.value) {
-        replyDialogOpen.value = true;
-        scrollToEl(caughtRef.value);
-      }
-    },
-    hint: "回复漂流瓶主人",
-  };
-  if (isLoggedIn.value || nickname.value) {
-    void runPendingAction();
-    return;
-  }
-  nameModalVisible.value = true;
+  scrollToEl(tabsRef.value);
 }
 
 const nameModalVisible = ref(false);
@@ -568,7 +546,7 @@ function badgeProgress(badge: BadgeDefinition) {
 }
 
 const msgRelativeTime = (time: string) => dayjs(time).fromNow();
-const dateLabel = (time: string) => dayjs(time).format("YYYY 年 M 月 D 日");
+const minuteLabel = (time: string) => dayjs(time).format("YYYY 年 M 月 D 日 HH:mm");
 
 function celebrate(unlocked: string[] | undefined) {
   if (!unlocked?.length) return;
@@ -736,7 +714,7 @@ async function doThrowBottle(text: string) {
     toast.success("瓶子已通过审核，漂向时光海等待有缘人");
     celebrate(result?.unlocked);
     await nextTick();
-    scrollToEl(seaCardRef.value, "center");
+    scrollToEl(tabsRef.value);
     seaRef.value?.launch();
     await Promise.all([refreshWall(), refreshMe()]);
   } catch (err: any) {
@@ -758,7 +736,6 @@ async function doFishBottle() {
   caughtBottle.value = null;
   relayMode.value = false;
   relayText.value = "";
-  replyText.value = "";
   try {
     const result = await fishBottle();
     caughtBottle.value = result?.bottle ?? null;
@@ -766,7 +743,7 @@ async function doFishBottle() {
     celebrate(result?.unlocked);
     await Promise.all([refreshWall(), refreshMe()]);
     await nextTick();
-    scrollToEl(caughtRef.value);
+    scrollToEl(tabsRef.value);
   } catch (err: any) {
     toast.info(err?.message || "潮汐暂时没有带来新的信");
   } finally {
@@ -806,31 +783,23 @@ async function submitRelay() {
   }
 }
 
-async function submitReply() {
-  const text = replyText.value.trim();
-  if (!text) {
-    toast.warning("先写下想说的话吧");
-    return;
-  }
+async function releaseCaughtBottle(showMessage = true) {
+  if (releasingBottle.value) return;
   if (!caughtBottle.value) return;
-  replySending.value = true;
+  releasingBottle.value = true;
+  const bottleId = caughtBottle.value.id;
+  caughtBottle.value = null;
+  relayMode.value = false;
+  relayText.value = "";
+  seaRef.value?.launch();
   try {
-    const result = await replyBottle(caughtBottle.value.id, text);
-    if (result?.review?.pending) {
-      toast.warning("回复已提交，等待管理员审核后送达");
-      return;
-    }
-    if (result?.review && !result.review.approved) {
-      toast.error(`回复未通过审核：${result.review.reason}`);
-      return;
-    }
-    replyDialogOpen.value = false;
-    replyText.value = "";
-    toast.success("回复已送达瓶主，祝你们有缘");
+    await releaseBottle(bottleId);
+    if (showMessage) toast.success("瓶子已回到潮汐中，其他旅人仍能继续捞到它");
+    await refreshWall();
   } catch (err: any) {
-    toast.error(err?.message || "回复失败，请稍后再试");
+    if (showMessage) toast.info("瓶子已经随潮汐继续漂流");
   } finally {
-    replySending.value = false;
+    releasingBottle.value = false;
   }
 }
 
@@ -883,15 +852,18 @@ useHead({ title: "时光留言板" });
 
 /* ===== Tabs ===== */
 .tabs {
-  position: relative;
+  position: sticky;
+  z-index: 30;
+  top: 0;
   display: inline-flex;
   gap: 2px;
   margin: 0 0 18px;
   padding: 4px;
   border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
   border-radius: 14px;
-  background: var(--ld-bg-card);
+  background: color-mix(in srgb, var(--ld-bg-card) 92%, transparent);
   box-shadow: var(--ui-shadow-soft);
+  backdrop-filter: blur(14px);
 }
 .tabs-track {
   position: absolute;
@@ -1384,6 +1356,8 @@ useHead({ title: "时光留言板" });
   box-shadow: 0 14px 34px color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
   text-align: left;
 }
+.caught-close { position: absolute; z-index: 2; top: 10px; right: 10px; display: grid; width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent); color: var(--c-text-3); cursor: pointer; place-items: center; transition: border-color .18s ease, color .18s ease, transform .18s ease; }
+.caught-close:hover { border-color: var(--c-primary); color: var(--c-primary); transform: rotate(8deg); }
 .caught-seal {
   display: grid;
   width: 38px;
@@ -1397,10 +1371,20 @@ useHead({ title: "时光留言板" });
   place-items: center;
 }
 .caught-meta {
-  display: block;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
   color: var(--c-text-3);
   font-size: 0.56rem;
-  letter-spacing: 0.04em;
+}
+.caught-meta > svg { color: var(--c-primary); font-size: .66rem; }
+.caught-meta > i {
+  width: 2px;
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: var(--c-text-3);
 }
 .bottle-pop-enter-active {
   transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
@@ -1425,14 +1409,17 @@ useHead({ title: "时光留言板" });
 .chain-seg { display: flex; gap: 9px; align-items: flex-start; }
 .chain-tag { flex: 0 0 auto; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--c-primary) 14%, transparent); color: var(--c-primary); font-size: 0.52rem; font-weight: 700; }
 .chain-body { min-width: 0; flex: 1; padding: 8px 11px; border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 11px; background: var(--ld-bg-card); }
-.chain-meta { color: var(--c-text-3); font-size: 0.54rem; }
+.chain-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; color: var(--c-text-3); font-size: 0.54rem; }
+.chain-meta > svg { color: color-mix(in srgb, var(--c-primary) 72%, var(--c-text-3)); font-size: .62rem; }
 .chain-body p { margin: 4px 0 0; color: var(--c-text); font-size: 0.74rem; line-height: 1.7; overflow-wrap: break-word; }
+.relay-prompt { display: flex; align-items: center; gap: 7px; margin: 13px 0 0; padding: 9px 11px; border-left: 3px solid var(--c-primary); background: color-mix(in srgb, var(--c-primary-soft) 54%, transparent); color: var(--c-text-2); font-size: .62rem; line-height: 1.6; }
+.relay-prompt > svg { flex: 0 0 auto; color: var(--c-primary); font-size: .76rem; }
 .caught-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
-.caught-action { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 0.64rem; font-weight: 700; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease; text-decoration: none; }
+.caught-action { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 7px; font: inherit; font-size: 0.64rem; font-weight: 700; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease; text-decoration: none; }
 .caught-action:hover { transform: translateY(-1px); }
-.caught-action.reply { border: 1px solid var(--c-primary); background: linear-gradient(145deg, hsl(215deg 92% 58%), hsl(222deg 92% 44%)); color: #fff; box-shadow: 0 7px 18px color-mix(in srgb, hsl(220deg 90% 50%) 34%, transparent); }
-.caught-action.reply-link { border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border)); background: var(--ld-bg-card); color: var(--c-primary); }
-.caught-action.relay { border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border)); background: color-mix(in srgb, var(--c-primary-soft) 50%, var(--ld-bg-card)); color: var(--c-primary); }
+.caught-action.relay { border: 1px solid var(--c-primary); background: var(--c-primary); color: #fff; box-shadow: 0 7px 18px color-mix(in srgb, var(--c-primary) 28%, transparent); }
+.caught-action.release { border: 1px solid color-mix(in srgb, var(--c-text-3) 34%, var(--border)); background: var(--ld-bg-card); color: var(--c-text-2); }
+.caught-action:disabled { cursor: not-allowed; opacity: .62; transform: none; }
 .relay-box { margin-top: 13px; padding-top: 13px; border-top: 1px dashed color-mix(in srgb, var(--border) 78%, transparent); }
 .relay-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }
 .sea-submit {
@@ -1447,19 +1434,19 @@ useHead({ title: "时光留言板" });
 .badges {
   position: relative;
   margin-top: 34px;
-  padding: 25px 26px 28px;
+  padding: 16px 18px 18px;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 9%);
-  border-radius: 16px;
-  background: linear-gradient(145deg, #17191d, #22262a 62%, #191c20);
-  box-shadow: 0 24px 58px rgb(12 14 18 / 28%), inset 0 1px 0 rgb(255 255 255 / 7%);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 10px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--c-bg-2) 72%, var(--ld-bg-card)), var(--ld-bg-card));
+  box-shadow: var(--ui-shadow-panel), inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
 }
 .badges::before {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgb(255 255 255 / 2.5%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 2.5%) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--c-text-3) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--c-text-3) 6%, transparent) 1px, transparent 1px);
   background-size: 32px 32px;
   content: "";
   pointer-events: none;
@@ -1471,47 +1458,50 @@ useHead({ title: "时光留言板" });
   align-items: flex-end;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 .badges-kicker {
-  color: #d8b96e;
+  color: var(--ui-accent-warm);
   font-size: 0.48rem;
   font-weight: 750;
   letter-spacing: 0.18em;
 }
 .badges-head h2 {
   margin: 5px 0 0;
-  color: #f4f1e9;
+  color: var(--c-text);
   font-family: var(--font-heading);
   font-size: 1.15rem;
 }
 .badges-progress {
   padding: 5px 9px;
-  border: 1px solid rgb(216 185 110 / 25%);
+  border: 1px solid color-mix(in srgb, var(--ui-accent-warm) 32%, var(--border));
   border-radius: 6px;
-  color: #c9c4b8;
+  color: var(--c-text-2);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   font-variant-numeric: tabular-nums;
 }
+.badges-head-actions { display: flex; align-items: center; gap: 7px; }
+.badge-toggle { display: grid; width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--ld-bg-card); color: var(--c-text-2); cursor: pointer; place-items: center; }
+.badge-toggle:hover { border-color: var(--c-primary); color: var(--c-primary); }
 .badges-grid {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
 }
 .badge {
   --badge-accent: #d8b96e;
   position: relative;
   display: flex;
-  min-height: 206px;
+  min-height: 92px;
   flex-direction: column;
   align-items: center;
-  padding: 15px 13px 13px;
-  border: 1px solid rgb(255 255 255 / 9%);
+  padding: 8px 6px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
   border-radius: 8px;
-  background: linear-gradient(155deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 2%));
+  background: color-mix(in srgb, var(--ld-bg-card) 86%, var(--badge-accent) 4%);
   text-align: center;
   transition: border-color 0.28s ease, background 0.28s ease, transform 0.28s var(--ui-ease-out);
   animation: badge-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -1532,7 +1522,7 @@ useHead({ title: "时光留言板" });
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  color: color-mix(in srgb, var(--badge-accent) 78%, #fff);
+  color: color-mix(in srgb, var(--badge-accent) 78%, var(--c-text));
   font-size: .48rem;
   font-weight: 750;
 }
@@ -1542,9 +1532,9 @@ useHead({ title: "时光留言板" });
 .badge-icon {
   position: relative;
   display: grid;
-  width: 58px;
-  height: 58px;
-  margin: 9px 0 11px;
+  width: 42px;
+  height: 42px;
+  margin: 2px 0 4px;
   place-items: center;
 }
 .badge-icon::after {
@@ -1557,19 +1547,19 @@ useHead({ title: "时光留言板" });
   pointer-events: none;
 }
 .badge strong {
-  color: #f4f1e9;
-  font-size: 0.74rem;
+  color: var(--c-text);
+  font-size: 0.61rem;
   font-weight: 700;
 }
 .badge small {
   margin-top: 3px;
-  color: #979da3;
+  color: var(--c-text-3);
   font-size: 0.56rem;
   line-height: 1.5;
 }
 .badge.locked {
-  border-color: rgb(255 255 255 / 6%);
-  background: rgb(255 255 255 / 2%);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--c-bg-2) 72%, transparent);
   filter: saturate(.25);
   opacity: 0.72;
 }
@@ -1581,7 +1571,7 @@ useHead({ title: "时光留言板" });
   border-color: color-mix(in srgb, var(--border) 90%, transparent);
 }
 .badge.locked strong {
-  color: #92979d;
+  color: var(--c-text-3);
 }
 .badge.fresh .badge-icon {
   animation: badge-unlock 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -1613,8 +1603,20 @@ useHead({ title: "时光留言板" });
   text-align: right;
 }
 .badge:not(.locked) .badge-count { color: color-mix(in srgb, var(--badge-accent) 74%, #fff); }
-.badge :deep(.badge-medal.locked)::before { background: #2c3035; }
-.badge :deep(.badge-medal.locked)::after { border-color: #4b5158; }
+.badge :deep(.badge-medal.locked)::before { background: var(--c-bg-3); }
+.badge :deep(.badge-medal.locked)::after { border-color: var(--border); }
+.badges:not(.expanded) .badge-status > span,
+.badges:not(.expanded) .badge small,
+.badges:not(.expanded) .badge-meter,
+.badges:not(.expanded) .badge-count { display: none; }
+.badges:not(.expanded) .badge-status { position: absolute; top: 7px; right: 7px; width: auto; }
+.badges.expanded { padding: 25px 26px 28px; }
+.badges.expanded .badges-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.badges.expanded .badge { min-height: 206px; padding: 15px 13px 13px; }
+.badges.expanded .badge-icon { width: 58px; height: 58px; margin: 9px 0 11px; }
+.badges.expanded .badge strong { font-size: .74rem; }
+:global(.dark) .badges { background: linear-gradient(145deg, #17191d, #22262a 62%, #191c20); border-color: rgb(255 255 255 / 9%); box-shadow: 0 24px 58px rgb(12 14 18 / 28%), inset 0 1px 0 rgb(255 255 255 / 7%); }
+:global(.dark) .badge { background: linear-gradient(155deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 2%)); border-color: rgb(255 255 255 / 9%); }
 @keyframes badge-in {
   from { opacity: 0; transform: translateY(10px) scale(0.97); }
 }
@@ -1839,8 +1841,9 @@ useHead({ title: "时光留言板" });
     padding-bottom: 20px;
   }
   .badges-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  .badges.expanded .badges-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tabs {
     width: 100%;
   }
@@ -1850,6 +1853,8 @@ useHead({ title: "时光留言板" });
   }
 }
 @media (max-width: 480px) {
+  .badges-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .badges.expanded { padding: 20px 16px; }
   .badges-head {
     flex-direction: column;
     align-items: flex-start;

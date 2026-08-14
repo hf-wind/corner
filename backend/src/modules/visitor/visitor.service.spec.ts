@@ -47,7 +47,7 @@ describe('VisitorService', () => {
     it('登录通道：无需访客档案即可留言，写入 userId 与 username 快照', async () => {
       const create = jest.fn().mockResolvedValue({ id: 'm1' });
       const prisma = {
-        visitorProfile: { findUnique: jest.fn() },
+        visitorProfile: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
         visitorMessage: { create },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
         visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
@@ -77,7 +77,7 @@ describe('VisitorService', () => {
 
     it('登录通道：审核通过后发送审核结果通知', async () => {
       const prisma = {
-        visitorProfile: { findUnique: jest.fn() },
+        visitorProfile: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
         visitorMessage: { create: jest.fn().mockResolvedValue({ id: 'm3' }) },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
         visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
@@ -295,7 +295,7 @@ describe('VisitorService', () => {
       } as any;
     }
 
-    it('登录用户捞起他人瓶子：返回完整信链与 canReply', async () => {
+    it('登录用户捞起他人瓶子：返回完整信链、地区与打捞次数', async () => {
       const prisma = makePrisma({
         visitorMessage: {
           findMany: jest
@@ -322,13 +322,13 @@ describe('VisitorService', () => {
       expect(prisma.visitorMessage.updateMany).toHaveBeenCalledWith({
         where: { id: 'b1', status: 'approved' },
         data: expect.objectContaining({
-          status: 'caught',
           caughtAt: expect.any(Date),
+          catchCount: { increment: 1 },
         }),
       });
       expect(result.bottle.chain).toEqual([chainRow]);
       expect(result.bottle).not.toHaveProperty('contactEmail');
-      expect(result.bottle.canReply).toBe(true);
+      expect(result.bottle.catchCount).toBe(1);
     });
 
     it('瓶主为访客时不暴露联系邮箱', async () => {
@@ -355,7 +355,7 @@ describe('VisitorService', () => {
         expect.objectContaining({ select: { email: true } }),
       );
       expect(result.bottle).not.toHaveProperty('contactEmail');
-      expect(result.bottle.canReply).toBe(false);
+      expect(result.bottle).not.toHaveProperty('canReply');
     });
 
     it('在数据库查询阶段同时排除账号和绑定的访客身份', async () => {
@@ -425,6 +425,56 @@ describe('VisitorService', () => {
         const result = await service.fishBottle(req, actor, null);
         expect(result.bottle.id).toBe('b2');
         expect(prisma.visitorMessage.updateMany).toHaveBeenCalledTimes(2);
+      } finally {
+        random.mockRestore();
+      }
+    });
+
+    it('地区维度：同等等待与曝光下优先匹配异地瓶子', async () => {
+      const random = jest.spyOn(Math, 'random').mockReturnValue(0.4);
+      const prisma = makePrisma({
+        visitorMessage: {
+          findMany: jest
+            .fn()
+            .mockResolvedValueOnce([
+              { ...baseBottle, id: 'same-region', originRegion: '上海', currentRegion: '上海', catchCount: 0, catchEvents: [] },
+              { ...baseBottle, id: 'other-region', originRegion: '北京', currentRegion: '北京', catchCount: 0, catchEvents: [] },
+            ])
+            .mockResolvedValueOnce([{ ...chainRow, id: 'other-region' }]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      });
+      const geo = { locate: jest.fn().mockResolvedValue({ label: '上海' }) } as any;
+      const service = new VisitorService(prisma, redis, ai, notifications, geo);
+
+      try {
+        const result = await service.fishBottle(req, null, hashOf('guest-1'));
+        expect(result.bottle.id).toBe('other-region');
+      } finally {
+        random.mockRestore();
+      }
+    });
+
+    it('分布维度：显著降低同一旅人重复捞到旧瓶的概率', async () => {
+      const random = jest.spyOn(Math, 'random').mockReturnValue(0.2);
+      const catcherHash = hashOf('guest-1');
+      const prisma = makePrisma({
+        visitorMessage: {
+          findMany: jest
+            .fn()
+            .mockResolvedValueOnce([
+              { ...baseBottle, id: 'seen', catchCount: 1, catchEvents: [{ catcherVisitorIdHash: catcherHash, catcherUserId: null }] },
+              { ...baseBottle, id: 'unseen', catchCount: 1, catchEvents: [] },
+            ])
+            .mockResolvedValueOnce([{ ...chainRow, id: 'unseen' }]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      });
+      const service = makeService(prisma);
+
+      try {
+        const result = await service.fishBottle(req, null, catcherHash);
+        expect(result.bottle.id).toBe('unseen');
       } finally {
         random.mockRestore();
       }
@@ -520,7 +570,7 @@ describe('VisitorService', () => {
       caughtAt: null,
     };
 
-    it('接力：校验父瓶为 caught 且继承 chainId', async () => {
+    it('接力：校验本人打捞事件并继承 chainId', async () => {
       const create = jest.fn().mockResolvedValue({ id: 'm-relay' });
       const prisma = {
         visitorMessage: {
@@ -529,7 +579,11 @@ describe('VisitorService', () => {
           create,
           update: jest.fn(),
         },
-        visitorProfile: { findUnique: jest.fn() },
+        visitorProfile: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
+        visitorBottleCatch: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'catch-1', catcherUserId: 'user-1', catcherVisitorIdHash: null }),
+          update: jest.fn(),
+        },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
         visitorAchievement: {
           findMany: jest.fn().mockResolvedValue([]),
@@ -556,7 +610,7 @@ describe('VisitorService', () => {
       expect(prisma.visitorMessage.update).not.toHaveBeenCalled();
     });
 
-    it('接力：父瓶必须是被捞起状态', async () => {
+    it('接力：没有本人打捞事件时拒绝', async () => {
       const prisma = {
         visitorMessage: {
           findUnique: jest
@@ -565,7 +619,8 @@ describe('VisitorService', () => {
           count: jest.fn(),
           create: jest.fn(),
         },
-        visitorProfile: { findUnique: jest.fn() },
+        visitorProfile: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
+        visitorBottleCatch: { findFirst: jest.fn().mockResolvedValue(null) },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
         visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
         visitorVisit: { findMany: jest.fn() },
@@ -574,7 +629,7 @@ describe('VisitorService', () => {
 
       await expect(
         service.throwBottle(req, actor, null, '话', 'b1'),
-      ).rejects.toThrow('只能接力一只刚捞起的瓶子');
+      ).rejects.toThrow('只能接力自己刚捞起的瓶子');
     });
 
     it('接力：信链超过 10 段时拒绝', async () => {
@@ -584,7 +639,10 @@ describe('VisitorService', () => {
           count: jest.fn().mockResolvedValue(10),
           create: jest.fn(),
         },
-        visitorProfile: { findUnique: jest.fn() },
+        visitorProfile: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
+        visitorBottleCatch: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'catch-1', catcherUserId: 'user-1', catcherVisitorIdHash: null }),
+        },
         user: { findUnique: jest.fn(), findMany: jest.fn() },
         visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
         visitorVisit: { findMany: jest.fn() },
@@ -634,11 +692,11 @@ describe('VisitorService', () => {
     });
   });
 
-  describe('replyBottle — 站内回复', () => {
+  describe('releaseBottle — 扔回海里', () => {
     const caughtBottle = {
       id: 'b1',
       type: 'bottle',
-      status: 'caught',
+      status: 'approved',
       content: '第一封信',
       nickname: '阿风',
       visitorIdHash: null,
@@ -652,126 +710,69 @@ describe('VisitorService', () => {
       rejectReason: null,
       caughtByIdHash: null,
       caughtAt: null,
+      originRegion: '浙江 · 杭州',
+      currentRegion: '上海',
     };
 
-    it('未登记访客不能回复', async () => {
+    it('当前打捞者可以把瓶子恢复为 approved', async () => {
+      const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      const updateCatch = jest.fn().mockResolvedValue({ id: 'catch-1' });
       const prisma = {
         visitorMessage: {
           findUnique: jest.fn().mockResolvedValue(caughtBottle),
-          create: jest.fn(),
+          updateMany,
         },
-        visitorProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+        visitorProfile: { findFirst: jest.fn().mockResolvedValue(null) },
+        visitorBottleCatch: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'catch-1',
+            catcherVisitorIdHash: hashOf('guest-1'),
+            catcherUserId: null,
+          }),
+          update: updateCatch,
+        },
       } as any;
       const service = makeService(prisma);
 
-      await expect(
-        service.replyBottle(req, null, hashOf('guest-1'), 'b1', '你好'),
-      ).rejects.toThrow('请先给自己起一个名字');
-      expect(prisma.visitorMessage.create).not.toHaveBeenCalled();
+      const result = await service.releaseBottle(
+        req, null, hashOf('guest-1'), 'b1',
+      );
+
+      expect(updateMany).toHaveBeenCalledWith({
+        where: { id: 'b1', status: { in: ['approved', 'caught'] } },
+        data: expect.objectContaining({
+          status: 'approved',
+          currentRegion: '上海',
+          releasedAt: expect.any(Date),
+        }),
+      });
+      expect(updateCatch).toHaveBeenCalledWith({
+        where: { id: 'catch-1' },
+        data: expect.objectContaining({ resolution: 'returned' }),
+      });
+      expect(result.ok).toBe(true);
     });
 
-    it('已登记访客回复：创建 reply 记录并通知瓶主', async () => {
-      const create = jest.fn().mockResolvedValue({ id: 'r1' });
+    it('非当前打捞者不能扔回瓶子', async () => {
       const prisma = {
         visitorMessage: {
           findUnique: jest.fn().mockResolvedValue(caughtBottle),
-          create,
+          updateMany: jest.fn(),
         },
-        visitorProfile: {
-          findUnique: jest.fn().mockResolvedValue({
-            nickname: '阿花',
-            email: 'hua@example.com',
-            isBanned: false,
-            visitorIdHash: hashOf('guest-1'),
+        visitorProfile: { findFirst: jest.fn().mockResolvedValue(null) },
+        visitorBottleCatch: {
+          findFirst: jest.fn().mockResolvedValue({
+            catcherVisitorIdHash: hashOf('guest-2'),
+            catcherUserId: null,
           }),
         },
-        visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
-      } as any;
-      const service = makeService(prisma);
-
-      const result = await service.replyBottle(
-        req,
-        null,
-        hashOf('guest-1'),
-        'b1',
-        '我也在海边',
-      );
-
-      expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          type: 'reply',
-          parentId: 'b1',
-          chainId: 'chain-1',
-          visitorIdHash: hashOf('guest-1'),
-          userId: null,
-          nickname: '阿花',
-        }),
-      });
-      expect(notifications.create).toHaveBeenCalledWith('user-2', {
-        type: 'guestbook',
-        title: '有人回复了你的漂流瓶',
-        content: expect.stringContaining('我也在海边'),
-        link: '/guestbook',
-      });
-      expect(result.ok).toBe(true);
-    });
-
-    it('登录用户回复：创建 reply 记录并通知瓶主', async () => {
-      const create = jest.fn().mockResolvedValue({ id: 'r1' });
-      const prisma = {
-        visitorMessage: {
-          findUnique: jest.fn().mockResolvedValue(caughtBottle),
-          create,
-        },
-        visitorProfile: { findUnique: jest.fn(), findFirst: jest.fn() },
-        user: { findUnique: jest.fn(), findMany: jest.fn() },
-        visitorAchievement: { findMany: jest.fn(), createMany: jest.fn() },
-        visitorVisit: { findMany: jest.fn() },
-      } as any;
-      const service = makeService(prisma);
-
-      const result = await service.replyBottle(
-        req,
-        actor,
-        null,
-        'b1',
-        '我也在海边',
-      );
-
-      expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          type: 'reply',
-          parentId: 'b1',
-          chainId: 'chain-1',
-          userId: 'user-1',
-        }),
-      });
-      expect(notifications.create).toHaveBeenCalledWith('user-2', {
-        type: 'guestbook',
-        title: '有人回复了你的漂流瓶',
-        content: expect.stringContaining('我也在海边'),
-        link: '/guestbook',
-      });
-      expect(result.ok).toBe(true);
-    });
-
-    it('不能回复自己投的瓶子', async () => {
-      const prisma = {
-        visitorMessage: {
-          findUnique: jest
-            .fn()
-            .mockResolvedValue({ ...caughtBottle, userId: 'user-1' }),
-          create: jest.fn(),
-        },
-        visitorProfile: { findUnique: jest.fn(), findFirst: jest.fn() },
-        user: { findUnique: jest.fn(), findMany: jest.fn() },
       } as any;
       const service = makeService(prisma);
 
       await expect(
-        service.replyBottle(req, actor, null, 'b1', '你好'),
-      ).rejects.toThrow('不能回复自己投的瓶子');
-      expect(prisma.visitorMessage.create).not.toHaveBeenCalled();
+        service.releaseBottle(req, null, hashOf('guest-1'), 'b1'),
+      ).rejects.toThrow('只能扔回自己刚捞起的瓶子');
+      expect(prisma.visitorMessage.updateMany).not.toHaveBeenCalled();
     });
   });
 

@@ -57,8 +57,8 @@ export function useVisitor() {
   const throwBottle = (content: string, parentId?: string) =>
     api.post<any>("/visitor/bottles", { content, parentId });
   const fishBottle = () => api.post<any>("/visitor/bottles/fish");
-  const replyBottle = (id: string, content: string) =>
-    api.post<any>(`/visitor/bottles/${id}/reply`, { content });
+  const releaseBottle = (id: string) =>
+    api.post<any>(`/visitor/bottles/${id}/release`);
 
   return {
     nickname,
@@ -73,6 +73,6 @@ export function useVisitor() {
     sendMessage,
     throwBottle,
     fishBottle,
-    replyBottle,
+    releaseBottle,
   };
 }

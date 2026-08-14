@@ -58,5 +58,4 @@ export const MESSAGE_RATE_LIMIT_PER_DAY = 5;
 export const BOTTLE_RATE_LIMIT_PER_DAY = 3;
 export const FISH_RATE_LIMIT_PER_DAY = 8;
 export const IDENTIFY_RATE_LIMIT_PER_DAY = 10;
-export const REPLY_RATE_LIMIT_PER_DAY = 5;
 export const BOTTLE_CHAIN_MAX = 10;

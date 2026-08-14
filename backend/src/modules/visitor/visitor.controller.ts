@@ -20,7 +20,6 @@ import { OptionalReasonDto } from '../../common/dto/request-body.dto';
 import {
   CreateVisitorBottleDto,
   CreateVisitorMessageDto,
-  ReplyVisitorBottleDto,
   SetVisitorNicknameDto,
 } from './dto/create-visitor-message.dto';
 
@@ -150,25 +149,23 @@ export class VisitorController {
   }
 
   @UseGuards(OptionalJwtAuthGuard)
-  @Post('bottles/:id/reply')
+  @Post('bottles/:id/release')
   @HttpCode(200)
-  async replyBottle(
+  async releaseBottle(
     @Req() req: { ip: string; user?: { id?: string; username?: string } },
     @Headers('x-visitor-id') visitorId: string,
     @Param('id') id: string,
-    @Body() dto: ReplyVisitorBottleDto,
   ) {
     const actor: VisitorActor = req.user?.id
       ? { userId: req.user.id, username: req.user.username ?? '' }
       : null;
     const visitorIdHash =
       this.visitorService.resolveVisitorIdOptional(visitorId);
-    return this.visitorService.replyBottle(
+    return this.visitorService.releaseBottle(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
       visitorIdHash,
       id,
-      dto.content,
     );
   }
 

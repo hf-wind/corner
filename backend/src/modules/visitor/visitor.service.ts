@@ -19,7 +19,6 @@ import {
   FISH_RATE_LIMIT_PER_DAY,
   IDENTIFY_RATE_LIMIT_PER_DAY,
   MESSAGE_RATE_LIMIT_PER_DAY,
-  REPLY_RATE_LIMIT_PER_DAY,
   VISITOR_ACHIEVEMENTS,
 } from './visitor.constants';
 
@@ -40,6 +39,55 @@ function dayKey(date = new Date()): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}${mm}${dd}`;
+}
+
+type BottleCandidate = {
+  createdAt: Date;
+  releasedAt?: Date | null;
+  caughtAt?: Date | null;
+  catchCount?: number;
+  originRegion?: string | null;
+  currentRegion?: string | null;
+  catchEvents?: Array<{
+    catcherVisitorIdHash: string | null;
+    catcherUserId: string | null;
+  }>;
+};
+
+function bottleMatchWeight(
+  bottle: BottleCandidate,
+  catcherRegion: string | null,
+  catcherVisitorIdHash: string | null,
+  catcherUserId: string | null,
+  now: Date,
+): number {
+  const lastWaterAt = bottle.releasedAt ?? bottle.createdAt;
+  const waitingHours = Math.max(0, (now.getTime() - lastWaterAt.getTime()) / 3_600_000);
+  const waitingWeight = 0.85 + Math.min(1.65, Math.log1p(waitingHours) / 2.8);
+  const exposureWeight = 1 / Math.sqrt(1 + Math.max(0, bottle.catchCount ?? 0));
+  const bottleRegion = bottle.currentRegion ?? bottle.originRegion;
+  const regionWeight = catcherRegion && bottleRegion
+    ? catcherRegion === bottleRegion
+      ? 0.72
+      : 1.42
+    : 1;
+  const seenByCatcher = (bottle.catchEvents ?? []).some(
+    (event) =>
+      (!!catcherVisitorIdHash && event.catcherVisitorIdHash === catcherVisitorIdHash) ||
+      (!!catcherUserId && event.catcherUserId === catcherUserId),
+  );
+  const diversityWeight = seenByCatcher ? 0.035 : 1;
+  return Math.max(0.001, waitingWeight * exposureWeight * regionWeight * diversityWeight);
+}
+
+function weightedBottleIndex(weights: number[]): number {
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let cursor = Math.random() * total;
+  for (let index = 0; index < weights.length; index += 1) {
+    cursor -= weights[index];
+    if (cursor <= 0) return index;
+  }
+  return Math.max(0, weights.length - 1);
 }
 
 function parseUserAgent(ua: string | undefined): {
@@ -312,6 +360,9 @@ export class VisitorService {
         ? 'approved'
         : 'rejected';
 
+    const bottleRegion = type === 'bottle'
+      ? await this.resolveRequestRegion(req)
+      : null;
     const record = await this.prisma.visitorMessage.create({
       data: {
         type,
@@ -329,6 +380,8 @@ export class VisitorService {
             : 'rejected',
         chainId,
         parentId,
+        originRegion: bottleRegion,
+        currentRegion: bottleRegion,
       },
     });
 
@@ -397,6 +450,7 @@ export class VisitorService {
     parentId?: string,
   ) {
     let chainId: string | null = null;
+    let catchEventId: string | null = null;
     if (parentId) {
       const parent = await this.prisma.visitorMessage.findUnique({
         where: { id: parentId },
@@ -404,9 +458,29 @@ export class VisitorService {
       if (!parent || parent.type !== 'bottle') {
         throw new BadRequestException('接力的瓶子不存在');
       }
-      if (parent.status !== 'caught') {
-        throw new BadRequestException('只能接力一只刚捞起的瓶子');
+      if (!['approved', 'caught'].includes(parent.status)) {
+        throw new BadRequestException('这只瓶子已经离开时光海');
       }
+      const selfHash = await this.resolveSelfVisitorHash(actor, visitorIdHash);
+      const catcherIdentity: Record<string, string>[] = [];
+      if (selfHash) catcherIdentity.push({ catcherVisitorIdHash: selfHash });
+      if (actor?.userId) catcherIdentity.push({ catcherUserId: actor.userId });
+      const latestCatch = await (this.prisma as any).visitorBottleCatch?.findFirst?.({
+        where: {
+          bottleId: parent.id,
+          resolution: 'holding',
+          ...(catcherIdentity.length ? { OR: catcherIdentity } : {}),
+        },
+        orderBy: { caughtAt: 'desc' },
+      });
+      const isCurrentCatcher = latestCatch
+        ? (!!actor?.userId && latestCatch.catcherUserId === actor.userId) ||
+          (!!selfHash && latestCatch.catcherVisitorIdHash === selfHash)
+        : parent.status === 'caught' && !!selfHash && parent.caughtByIdHash === selfHash;
+      if (!isCurrentCatcher) {
+        throw new ForbiddenException('只能接力自己刚捞起的瓶子');
+      }
+      catchEventId = latestCatch?.id ?? null;
       const chainRoot = parent.chainId ?? parent.id;
       const depth = await this.prisma.visitorMessage.count({
         where: {
@@ -420,7 +494,7 @@ export class VisitorService {
       }
       chainId = chainRoot;
     }
-    return this.createMessage(
+    const result = await this.createMessage(
       req,
       actor,
       visitorIdHash,
@@ -429,6 +503,13 @@ export class VisitorService {
       chainId,
       parentId ?? null,
     );
+    if (parentId && catchEventId && result.review.approved) {
+      await (this.prisma as any).visitorBottleCatch?.update?.({
+        where: { id: catchEventId },
+        data: { resolution: 'relayed', releasedAt: new Date() },
+      });
+    }
+    return result;
   }
 
   async fishBottle(
@@ -438,6 +519,7 @@ export class VisitorService {
   ) {
     await this.checkRateLimit(req, 'fish', FISH_RATE_LIMIT_PER_DAY);
     const selfHash = await this.resolveSelfVisitorHash(actor, visitorIdHash);
+    const catcherRegion = await this.resolveRequestRegion(req);
     const not: Record<string, unknown>[] = [];
     if (selfHash) not.push({ visitorIdHash: selfHash });
     if (actor?.userId) not.push({ userId: actor.userId });
@@ -448,23 +530,55 @@ export class VisitorService {
         ...(not.length > 0 ? { NOT: not } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      take: 60,
+      take: 120,
+      include: {
+        catchEvents: {
+          orderBy: { caughtAt: 'desc' },
+          take: 24,
+          select: {
+            catcherVisitorIdHash: true,
+            catcherUserId: true,
+          },
+        },
+      },
     });
 
     let bottle: (typeof candidates)[number] | null = null;
+    let catchEventId: string | null = null;
+    const now = new Date();
     while (candidates.length > 0) {
-      const index = Math.floor(Math.random() * candidates.length);
+      const index = weightedBottleIndex(
+        candidates.map((candidate) =>
+          bottleMatchWeight(
+            candidate,
+            catcherRegion,
+            selfHash,
+            actor?.userId ?? null,
+            now,
+          ),
+        ),
+      );
       const candidate = candidates.splice(index, 1)[0];
       const updated = await this.prisma.visitorMessage.updateMany({
         where: { id: candidate.id, status: 'approved' },
         data: {
-          status: 'caught',
-          caughtByIdHash: visitorIdHash ?? undefined,
-          caughtAt: new Date(),
+          caughtByIdHash: selfHash ?? undefined,
+          caughtAt: now,
+          currentRegion: catcherRegion ?? candidate.currentRegion ?? candidate.originRegion,
+          catchCount: { increment: 1 },
         },
       });
       if (updated.count > 0) {
         bottle = candidate;
+        const catchEvent = await (this.prisma as any).visitorBottleCatch?.create?.({
+          data: {
+            bottleId: candidate.id,
+            catcherVisitorIdHash: selfHash,
+            catcherUserId: actor?.userId ?? null,
+            catcherRegion,
+          },
+        });
+        catchEventId = catchEvent?.id ?? null;
         break;
       }
     }
@@ -477,7 +591,13 @@ export class VisitorService {
         status: { in: ['approved', 'caught'] },
       },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, nickname: true, content: true, createdAt: true },
+      select: {
+        id: true,
+        nickname: true,
+        content: true,
+        createdAt: true,
+        originRegion: true,
+      },
     });
     if (bottle.userId) {
       try {
@@ -501,8 +621,10 @@ export class VisitorService {
         chain: chainRows,
         nickname: bottle.nickname,
         createdAt: bottle.createdAt,
+        originRegion: bottle.originRegion,
+        catchCount: (bottle.catchCount ?? 0) + 1,
+        catchEventId,
         ownerUserId,
-        canReply: !!bottle.userId && (!actor || bottle.userId !== actor.userId),
       },
       unlocked,
     };
@@ -521,99 +643,71 @@ export class VisitorService {
         where: { userId: actor.userId },
         select: { visitorIdHash: true },
       });
-      return bound?.visitorIdHash ?? null;
+      return bound?.visitorIdHash ?? visitorIdHash;
     }
     return visitorIdHash;
   }
 
-  async replyBottle(
+  private async resolveRequestRegion(req: VisitorRequest): Promise<string | null> {
+    if (!req.ip || !this.geo) return null;
+    const location = await this.geo.locate(req.ip).catch(() => null);
+    return location?.label?.trim().slice(0, 100) || null;
+  }
+
+  async releaseBottle(
     req: VisitorRequest,
     actor: VisitorActor,
     visitorIdHash: string | null,
     bottleId: string,
-    content: string,
   ) {
     const bottle = await this.prisma.visitorMessage.findUnique({
       where: { id: bottleId },
     });
     if (!bottle || bottle.type !== 'bottle') {
-      throw new NotFoundException('瓶子不存在');
+      throw new NotFoundException('漂流瓶不存在');
     }
-    if (bottle.status !== 'caught') {
-      throw new BadRequestException('只能回复一只你捞起的瓶子');
+    if (!['approved', 'caught'].includes(bottle.status)) {
+      throw new BadRequestException('这只瓶子已经离开时光海');
     }
-
-    let nickname: string;
-    let selfHash: string | null;
-    if (actor?.userId) {
-      if (!actor.username.trim()) {
-        throw new BadRequestException('登录账号缺少用户名');
-      }
-      const userRow = await this.prisma.user.findUnique({
-        where: { id: actor.userId },
-        select: { isActive: true },
-      });
-      if (userRow && !userRow.isActive) {
-        throw new ForbiddenException('该账号已被封禁');
-      }
-      nickname = actor.username.slice(0, 20);
-      selfHash = await this.resolveSelfVisitorHash(actor, visitorIdHash);
-    } else {
-      if (!visitorIdHash) {
-        throw new UnauthorizedException('请先登记名字后再回复漂流瓶主人');
-      }
-      const profile = await this.prisma.visitorProfile.findUnique({
-        where: { visitorIdHash },
-      });
-      if (!profile || !profile.nickname?.trim()) {
-        throw new BadRequestException('请先给自己起一个名字');
-      }
-      if (profile.isBanned) {
-        throw new ForbiddenException('该访客已被封禁');
-      }
-      nickname = profile.nickname.slice(0, 20);
-      selfHash = visitorIdHash;
+    const selfHash = await this.resolveSelfVisitorHash(actor, visitorIdHash);
+    const catcherIdentity: Record<string, string>[] = [];
+    if (selfHash) catcherIdentity.push({ catcherVisitorIdHash: selfHash });
+    if (actor?.userId) catcherIdentity.push({ catcherUserId: actor.userId });
+    const latestCatch = await (this.prisma as any).visitorBottleCatch?.findFirst?.({
+      where: {
+        bottleId,
+        resolution: 'holding',
+        ...(catcherIdentity.length ? { OR: catcherIdentity } : {}),
+      },
+      orderBy: { caughtAt: 'desc' },
+    });
+    const isCurrentCatcher = latestCatch
+      ? (!!actor?.userId && latestCatch.catcherUserId === actor.userId) ||
+        (!!selfHash && latestCatch.catcherVisitorIdHash === selfHash)
+      : bottle.status === 'caught' && !!selfHash && bottle.caughtByIdHash === selfHash;
+    if (!isCurrentCatcher) {
+      throw new ForbiddenException('只能扔回自己刚捞起的瓶子');
     }
-
-    const sameUser = !!bottle.userId && bottle.userId === actor?.userId;
-    const sameVisitor =
-      !!bottle.visitorIdHash && !!selfHash && bottle.visitorIdHash === selfHash;
-    if (sameUser || sameVisitor) {
-      throw new BadRequestException('不能回复自己投的瓶子');
-    }
-    await this.checkRateLimit(req, 'reply', REPLY_RATE_LIMIT_PER_DAY);
-    const clean = content.trim();
-    if (!clean) {
-      throw new BadRequestException('回复内容不能为空');
-    }
-    const review = await this.aiService.moderateComment(clean);
-    const record = await this.prisma.visitorMessage.create({
+    const releasedAt = new Date();
+    const currentRegion = await this.resolveRequestRegion(req);
+    const updated = await this.prisma.visitorMessage.updateMany({
+      where: { id: bottleId, status: { in: ['approved', 'caught'] } },
       data: {
-        type: 'reply',
-        content: clean,
-        nickname,
-        userId: actor?.userId ?? null,
-        visitorIdHash: selfHash ?? visitorIdHash,
-        status: review.approved ? 'approved' : 'rejected',
-        aiReview: review.approved ? null : review.reason,
-        aiReviewResult: review.approved ? 'approved' : 'rejected',
-        chainId: bottle.chainId ?? bottle.id,
-        parentId: bottle.id,
+        status: 'approved',
+        releasedAt,
+        currentRegion: currentRegion ?? bottle.currentRegion ?? bottle.originRegion,
       },
     });
-    if (review.approved && bottle.userId) {
-      try {
-        await this.notificationService.create(bottle.userId, {
-          type: 'guestbook',
-          title: '有人回复了你的漂流瓶',
-          content: `${nickname}：${clean}`,
-          link: '/guestbook',
-        });
-      } catch (error) {
-        this.logger.warn(`回复通知发送失败: ${(error as Error).message}`);
-      }
+    if (!updated.count) {
+      throw new BadRequestException('这只瓶子已经被潮汐带走了');
     }
-    return { ok: true, record, review };
+    if (latestCatch?.id) {
+      await (this.prisma as any).visitorBottleCatch.update({
+        where: { id: latestCatch.id },
+        data: { resolution: 'returned', releasedAt },
+      });
+    }
+    return { ok: true, releasedAt };
   }
 
   async listMessages(type: 'message' | 'bottle', page: number, pageSize = 20) {
@@ -735,9 +829,7 @@ export class VisitorService {
           status: { in: ['approved', 'caught'] },
         },
       }),
-      this.prisma.visitorMessage.count({
-        where: { caughtByIdHash: visitorIdHash },
-      }),
+      this.countBottleCatches(visitorIdHash),
     ]);
     return {
       nickname: profile.nickname,
@@ -835,9 +927,7 @@ export class VisitorService {
               status: { in: ['approved', 'caught'] },
             },
           }),
-          this.prisma.visitorMessage.count({
-            where: { caughtByIdHash: visitorIdHash },
-          }),
+          this.countBottleCatches(visitorIdHash),
           this.prisma.visitorAchievement.findMany({
             where: { visitorIdHash },
             select: { code: true },
@@ -868,6 +958,16 @@ export class VisitorService {
       this.logger.warn(`成就同步失败: ${(error as Error).message}`);
       return [];
     }
+  }
+
+  private countBottleCatches(visitorIdHash: string): Promise<number> {
+    const catchModel = (this.prisma as any).visitorBottleCatch;
+    if (catchModel?.count) {
+      return catchModel.count({ where: { catcherVisitorIdHash: visitorIdHash } });
+    }
+    return this.prisma.visitorMessage.count({
+      where: { caughtByIdHash: visitorIdHash },
+    });
   }
 
   async adminStats() {
@@ -1040,6 +1140,10 @@ export class VisitorService {
     ]);
     const hashes = items.map((p) => p.visitorIdHash);
     const userIds = items.map((profile) => profile.userId).filter(Boolean) as string[];
+    const catchModel = (this.prisma as any).visitorBottleCatch;
+    const catchGroupKey = catchModel?.groupBy
+      ? 'catcherVisitorIdHash'
+      : 'caughtByIdHash';
     const [messageCounts, bottleCounts, caughtCounts, achievementCounts, users, visits] =
       await Promise.all([
         this.prisma.visitorMessage.groupBy({
@@ -1060,11 +1164,17 @@ export class VisitorService {
           },
           _count: { _all: true },
         }),
-        this.prisma.visitorMessage.groupBy({
-          by: ['caughtByIdHash'],
-          where: { caughtByIdHash: { in: hashes } },
-          _count: { _all: true },
-        }),
+        catchModel?.groupBy
+          ? catchModel.groupBy({
+              by: ['catcherVisitorIdHash'],
+              where: { catcherVisitorIdHash: { in: hashes } },
+              _count: { _all: true },
+            })
+          : this.prisma.visitorMessage.groupBy({
+              by: ['caughtByIdHash'],
+              where: { caughtByIdHash: { in: hashes } },
+              _count: { _all: true },
+            }),
         this.prisma.visitorAchievement.groupBy({
           by: ['visitorIdHash'],
           where: { visitorIdHash: { in: hashes } },
@@ -1094,7 +1204,7 @@ export class VisitorService {
       );
     const messageMap = countBy(messageCounts, 'visitorIdHash');
     const bottleMap = countBy(bottleCounts, 'visitorIdHash');
-    const caughtMap = countBy(caughtCounts, 'caughtByIdHash');
+    const caughtMap = countBy(caughtCounts, catchGroupKey);
     const achMap = countBy(achievementCounts, 'visitorIdHash');
     const accountMap = new Map(users.map((user) => [user.id, user]));
     const regionByHash = new Map<string, string>();

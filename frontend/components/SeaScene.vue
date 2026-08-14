@@ -2,7 +2,7 @@
   <div
     ref="rootRef"
     class="sea-scene"
-    :class="[`sea-mode-${mode}`, `sea-phase-${dayPhase}`, { 'sea-scene-disabled': disabled }]"
+    :class="[`sea-mode-${mode}`, `sea-phase-${dayPhase}`, { 'sea-scene-disabled': disabled, 'is-fishing': internalFishing }]"
   >
     <template v-if="mode === 'gl'">
       <canvas ref="glCanvasRef" class="sea-canvas sea-canvas-gl" />
@@ -42,17 +42,32 @@
         </span>
       </div>
     </template>
+    <div v-if="dayPhase !== 'day'" class="twinkle-field" aria-hidden="true">
+      <i v-for="index in 20" :key="index" :style="starStyle(index)" />
+    </div>
+    <div class="beach-life" aria-hidden="true">
+      <i class="shell shell-one" /><i class="shell shell-two" /><i class="shell shell-three" />
+      <span class="crab"><i class="crab-body" /><i class="crab-eye eye-left" /><i class="crab-eye eye-right" /><i class="crab-claw claw-left" /><i class="crab-claw claw-right" /></span>
+    </div>
+    <Transition name="net-fade">
+      <div v-if="internalFishing" class="fishing-rig" :class="`rig-${fishingStage}`" aria-live="polite">
+        <span class="rig-pole">
+          <i class="rig-grip" />
+          <span class="rig-net"><i /><b /></span>
+        </span>
+        <span class="rig-status">{{ fishingStage === 'lifting' ? '网里传来瓶子的轻响…' : '网兜正在潮汐里寻找…' }}</span>
+      </div>
+    </Transition>
     <button
       type="button"
-      class="sea-fish-control"
-      :disabled="disabled"
+      class="shore-net-control"
+      :disabled="disabled || internalFishing"
+      title="从沙滩撒网打捞一封来信"
+      aria-label="撒网打捞一封来信"
       @click="fishRandom"
     >
-      <span class="fish-icon"><Icon :name="disabled ? 'ph:circle-notch-bold' : 'ph:anchor-simple-bold'" :spin="disabled" /></span>
-      <span>
-        <strong>打捞一封来信</strong>
-        <small>让潮汐替你选择一封陌生来信</small>
-      </span>
+      <span class="shore-net-tool"><i class="tool-pole" /><i class="tool-hoop" /><i class="tool-mesh" /></span>
+      <span class="shore-net-label">撒网打捞</span>
     </button>
   </div>
 </template>
@@ -86,7 +101,10 @@ const rootRef = ref<HTMLDivElement>();
 const canvasRef = ref<HTMLCanvasElement>();
 const glCanvasRef = ref<HTMLCanvasElement>();
 const splash = ref("");
+const internalFishing = ref(false);
+const fishingStage = ref<"casting" | "searching" | "lifting">("casting");
 let splashTimer: ReturnType<typeof setTimeout> | null = null;
+const fishingTimers = new Set<ReturnType<typeof setTimeout>>();
 
 const mode = ref<"gl" | "canvas">("canvas");
 let reduceMotion = false;
@@ -112,6 +130,50 @@ function bottleStyle(b: AmbientBottle) {
     "--bh": `${46 * (0.8 + rand() * 0.5)}px`,
     "--br": `${-14 + rand() * 28}deg`,
   };
+}
+
+function starStyle(index: number) {
+  const rand = mulberry(index * 917 + 41);
+  return {
+    left: `${4 + rand() * 92}%`,
+    top: `${3 + rand() * 39}%`,
+    width: `${1 + rand() * 2.2}px`,
+    height: `${1 + rand() * 2.2}px`,
+    "--star-delay": `${-rand() * 4.5}s`,
+    "--star-duration": `${1.6 + rand() * 2.8}s`,
+  };
+}
+
+function queueFishingTimer(callback: () => void, delay: number) {
+  const timer = setTimeout(() => {
+    fishingTimers.delete(timer);
+    callback();
+  }, delay);
+  fishingTimers.add(timer);
+}
+
+function finishFishingSequence() {
+  launching = false;
+  internalFishing.value = false;
+  fishingStage.value = "casting";
+  emit("fish");
+}
+
+function beginFishingSequence(lift: () => void) {
+  if (internalFishing.value || launching) return;
+  internalFishing.value = true;
+  launching = true;
+  fishingStage.value = "casting";
+  if (reduceMotion) {
+    lift();
+    return;
+  }
+  const searchDuration = 2200 + Math.random() * 1600;
+  queueFishingTimer(() => (fishingStage.value = "searching"), 420);
+  queueFishingTimer(() => {
+    fishingStage.value = "lifting";
+    lift();
+  }, searchDuration);
 }
 
 function showSplash(text: string) {
@@ -691,28 +753,25 @@ function glLoop() {
 }
 
 function glFishAnim(group: THREE.Group) {
-  launching = true;
   const bottleId = [...glBottles.keys()].find((id) => glBottles.get(id) === group);
   if (bottleId) glAnimated.add(bottleId);
-  if (reduceMotion) {
-    group.removeFromParent();
-    launching = false;
-    rebuildGlBottles();
-    emit("fish");
-    return;
-  }
-  const target = { x: 9.4, y: 3.8, z: -4.6 };
-  const tl = gsap.timeline({
-    onComplete: () => {
-      launching = false;
+  beginFishingSequence(() => {
+    if (reduceMotion) {
       rebuildGlBottles();
-      emit("fish");
-    },
+      finishFishingSequence();
+      return;
+    }
+    const tl = gsap.timeline({
+      onComplete: () => {
+        rebuildGlBottles();
+        finishFishingSequence();
+      },
+    });
+    tl.to(group.position, { y: "+=0.22", duration: 0.28, ease: "sine.out" }, 0)
+      .to(group.rotation, { z: "+=0.5", duration: 0.42, ease: "sine.inOut" }, 0)
+      .to(group.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 0.42, ease: "power2.in" }, 0.18)
+      .to({}, { duration: 0.48 });
   });
-  tl.to(group.position, { y: 2.2, duration: 0.5, ease: "power2.out" }, 0)
-    .to(group.rotation, { x: 2.4, z: 2.6, duration: 0.5, ease: "power2.out" }, 0)
-    .to(group.position, { x: target.x, y: target.y, z: target.z, duration: 0.62, ease: "power1.in" }, 0.42)
-    .to(group.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 0.3, ease: "power1.in" }, 0.78);
 }
 
 function glLaunch(cb?: () => void) {
@@ -1038,40 +1097,40 @@ function animateBottles() {
 }
 
 function onClickBottle(b: AmbientBottle) {
-  if (props.disabled || launching) return;
+  if (props.disabled || launching || internalFishing.value) return;
   const el = rootRef.value?.querySelector<HTMLElement>(`.sea-bottle-item[data-id="${b.id}"]`);
   if (!el) return;
-  if (reduceMotion) {
-    emit("fish");
-    return;
-  }
-  launching = true;
   const rect = el.getBoundingClientRect();
   const rootRect = rootRef.value!.getBoundingClientRect();
-  burst(rect.left - rootRect.left + rect.width / 2, rect.top - rootRect.top + rect.height / 2, 14);
-  const tl = gsap.timeline({
-    onComplete: () => {
-      launching = false;
-      floatTweens.forEach((t) => t.kill());
-      floatTweens = [];
-      rootRef.value
-        ?.querySelectorAll<HTMLElement>(".sea-bottle-item")
-        .forEach((item) => {
-          item.classList.remove("is-animated");
-          gsap.set(item, { clearProps: "transform" });
-        });
-      void nextTick().then(animateBottles);
-      emit("fish");
-    },
+  beginFishingSequence(() => {
+    if (reduceMotion) {
+      finishFishingSequence();
+      return;
+    }
+    burst(rect.left - rootRect.left + rect.width / 2, rect.top - rootRect.top + rect.height / 2, 14);
+    const tl = gsap.timeline({
+      onComplete: () => {
+        finishFishingSequence();
+        floatTweens.forEach((t) => t.kill());
+        floatTweens = [];
+        rootRef.value
+          ?.querySelectorAll<HTMLElement>(".sea-bottle-item")
+          .forEach((item) => {
+            item.classList.remove("is-animated");
+            gsap.set(item, { clearProps: "transform" });
+          });
+        void nextTick().then(animateBottles);
+      },
+    });
+    tl.to(el, { scale: 0.55, opacity: 0, rotation: "+=24", duration: 0.46, ease: "power2.in" }, 0)
+      .add(() => burst(rect.left - rootRect.left + rect.width / 2, rect.top - rootRect.top + rect.height / 2, 18), 0)
+      .to({}, { duration: 0.48 });
   });
-  tl.to(el, { y: "-=70", rotation: "+=160", duration: 0.55, ease: "power2.in" }, 0)
-    .to(el, { scale: 0.01, opacity: 0, duration: 0.28, ease: "power1.in" }, 0.55)
-    .add(() => burst(rect.left - rootRect.left + rect.width / 2, rect.top - rootRect.top - 26, 22), 0.6);
 }
 
 let fishCursor = 0;
 function fishRandom() {
-  if (props.disabled || launching) return;
+  if (props.disabled || launching || internalFishing.value) return;
   const bottle = ambientBottles[fishCursor % ambientBottles.length];
   fishCursor += 1;
   if (mode.value === "gl") {
@@ -1177,6 +1236,8 @@ onBeforeUnmount(() => {
   canvasResizeObserver = null;
   floatTweens.forEach((t) => t.kill());
   floatTweens = [];
+  fishingTimers.forEach((timer) => clearTimeout(timer));
+  fishingTimers.clear();
   if (phaseTimer) clearInterval(phaseTimer);
   phaseTimer = null;
   disposeGl();
@@ -1275,50 +1336,144 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   place-items: center;
 }
-.sea-fish-control {
+.twinkle-field {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 48%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.twinkle-field > i {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 5px rgb(218 233 255 / 85%);
+  opacity: .3;
+  animation: star-twinkle var(--star-duration) var(--star-delay) ease-in-out infinite;
+}
+.beach-life {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 20%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.shell {
+  position: absolute;
+  width: 15px;
+  height: 11px;
+  border: 1px solid rgb(115 72 45 / 32%);
+  border-radius: 60% 60% 42% 42%;
+  background: repeating-radial-gradient(circle at 50% 100%, #f9dfc1 0 2px, #dcae8d 3px 4px);
+  box-shadow: 0 3px 6px rgb(74 45 23 / 18%);
+  transform: rotate(-12deg);
+}
+.shell::after { position: absolute; right: 2px; bottom: -3px; left: 2px; height: 3px; border-radius: 50%; background: rgb(80 48 25 / 16%); content: ""; filter: blur(1px); }
+.shell-one { right: 14%; bottom: 18%; }
+.shell-two { right: 31%; bottom: 7%; width: 11px; height: 9px; transform: rotate(24deg); }
+.shell-three { left: 17%; bottom: 12%; width: 13px; height: 10px; transform: rotate(-32deg); }
+.crab {
+  position: absolute;
+  bottom: 13%;
+  left: 35%;
+  width: 34px;
+  height: 20px;
+  filter: drop-shadow(0 4px 3px rgb(73 36 21 / 22%));
+  animation: crab-walk 12s ease-in-out infinite alternate;
+}
+.crab-body { position: absolute; right: 7px; bottom: 1px; left: 7px; height: 12px; border-radius: 55% 55% 42% 42%; background: #d45f47; box-shadow: inset 0 2px 2px rgb(255 196 157 / 35%); }
+.crab-eye { position: absolute; z-index: 1; bottom: 11px; width: 4px; height: 6px; border-radius: 50% 50% 40% 40%; border-top: 2px solid #2c2220; background: #f3b37c; }
+.eye-left { left: 11px; }.eye-right { right: 11px; }
+.crab-claw { position: absolute; bottom: 5px; width: 9px; height: 8px; border: 3px solid #cf5943; border-bottom: 0; border-radius: 60% 60% 0 0; }
+.claw-left { left: 0; transform: rotate(-24deg); }.claw-right { right: 0; transform: rotate(24deg); }
+.fishing-rig {
+  position: absolute;
+  z-index: 9;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.rig-pole {
+  position: absolute;
+  right: 10%;
+  bottom: 9%;
+  width: clamp(180px, 36%, 270px);
+  height: 7px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #d5ad71, #8b6035 72%, #684425);
+  box-shadow: 0 3px 5px rgb(46 28 16 / 28%), inset 0 1px rgb(255 236 193 / 48%);
+  transform: rotate(26deg);
+  transform-origin: 100% 50%;
+}
+.rig-grip {
+  position: absolute;
+  right: -4px;
+  top: -3px;
+  width: 54px;
+  height: 13px;
+  border-radius: 7px;
+  background: repeating-linear-gradient(90deg, #765032 0 5px, #9e7048 5px 9px);
+  box-shadow: 0 3px 5px rgb(50 29 14 / 25%);
+}
+.rig-net {
+  position: absolute;
+  top: -31px;
+  left: -60px;
+  width: 70px;
+  height: 62px;
+  overflow: hidden;
+  border: 3px solid #d6bf91;
+  border-left-width: 5px;
+  border-radius: 52% 44% 48% 52%;
+  background-image: linear-gradient(45deg, transparent 46%, rgb(222 204 166 / 72%) 47% 52%, transparent 53%), linear-gradient(-45deg, transparent 46%, rgb(222 204 166 / 72%) 47% 52%, transparent 53%);
+  background-size: 11px 11px;
+  box-shadow: inset 0 0 15px rgb(255 255 255 / 14%), 0 8px 18px rgb(1 18 42 / 25%);
+  transform: perspective(120px) rotateY(-14deg);
+  transform-origin: 100% 50%;
+}
+.rig-net::before { position: absolute; top: -4px; bottom: -4px; right: -5px; width: 13px; border: 4px solid #a87b49; border-radius: 50%; content: ""; }
+.rig-net > i { position: absolute; right: 17px; bottom: 9px; width: 20px; height: 29px; border: 1px solid rgb(255 255 255 / 58%); border-radius: 5px 5px 9px 9px; background: rgb(149 205 236 / 42%); transform: rotate(28deg); opacity: 0; }
+.rig-lifting .rig-net > i { animation: caught-bottle .45s .28s ease-out forwards; }
+.rig-net > b { position: absolute; right: 21px; bottom: 16px; width: 12px; height: 8px; background: #f2e6cc; transform: rotate(28deg); opacity: 0; }
+.rig-lifting .rig-net > b { animation: caught-bottle .45s .28s ease-out forwards; }
+.rig-status { position: absolute; right: 31%; bottom: 37%; padding: 5px 9px; border-radius: 5px; background: rgb(8 24 43 / 62%); color: rgb(245 249 255 / 92%); font-size: .56rem; text-shadow: 0 1px 5px rgb(0 0 0 / 45%); white-space: nowrap; backdrop-filter: blur(6px); }
+.rig-casting .rig-pole { animation: shore-cast .58s cubic-bezier(.22, 1, .36, 1) both; }
+.rig-searching .rig-pole { animation: shore-search 1.3s ease-in-out infinite alternate; }
+.rig-lifting .rig-pole { animation: shore-lift 1.15s cubic-bezier(.3,.1,.6,1) both; }
+.shore-net-control {
   position: absolute;
   z-index: 10;
-  left: 50%;
-  bottom: 18px;
-  display: grid;
-  min-width: min(260px, calc(100% - 32px));
-  grid-template-columns: 38px minmax(0, 1fr);
+  right: 8%;
+  bottom: 4%;
+  display: flex;
+  width: 108px;
+  height: 54px;
   align-items: center;
-  gap: 10px;
-  padding: 9px 13px 9px 9px;
-  border: 1px solid rgb(255 255 255 / 28%);
-  border-radius: 8px;
-  background: rgb(12 28 48 / 72%);
-  box-shadow: 0 12px 32px rgb(1 10 25 / 30%), inset 0 1px 0 rgb(255 255 255 / 12%);
-  color: #f5f8fc;
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: #583a22;
   cursor: pointer;
   font: inherit;
-  text-align: left;
-  transform: translateX(-50%);
-  transition: border-color .2s ease, background .2s ease, transform .2s ease;
+  filter: drop-shadow(0 4px 4px rgb(72 43 23 / 24%));
+  transition: transform .2s ease, filter .2s ease, opacity .2s ease;
 }
-.sea-fish-control:hover:not(:disabled) {
-  border-color: rgb(255 255 255 / 55%);
-  background: rgb(10 35 62 / 82%);
-  transform: translateX(-50%) translateY(-2px);
+.shore-net-control:hover:not(:disabled) {
+  filter: drop-shadow(0 7px 6px rgb(72 43 23 / 30%));
+  transform: translateY(-3px) rotate(-2deg);
 }
-.sea-fish-control:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.sea-fish-control:disabled { cursor: not-allowed; opacity: .58; }
-.fish-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  border-radius: 7px;
-  background: rgb(255 255 255 / 13%);
-  color: #d8edff;
-  font-size: 1.08rem;
-  place-items: center;
-}
-.sea-fish-control > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.sea-fish-control strong { overflow: hidden; font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
-.sea-fish-control small { overflow: hidden; color: rgb(226 237 247 / 72%); font-size: .49rem; text-overflow: ellipsis; white-space: nowrap; }
+.shore-net-control:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.shore-net-control:disabled { cursor: not-allowed; opacity: .28; }
+.shore-net-tool { position: relative; width: 68px; height: 46px; transform: rotate(-10deg); }
+.tool-pole { position: absolute; right: 0; bottom: 8px; width: 62px; height: 5px; border-radius: 4px; background: linear-gradient(#d5ad71,#79502d); transform: rotate(-18deg); transform-origin: right; }
+.tool-hoop { position: absolute; top: 0; left: 0; width: 34px; height: 30px; border: 4px solid #a87b49; border-radius: 50%; transform: rotate(-14deg); }
+.tool-mesh { position: absolute; top: 6px; left: 4px; width: 30px; height: 31px; border-radius: 45% 45% 60% 60%; background-image: linear-gradient(45deg, transparent 43%, rgb(120 91 56 / 62%) 46% 52%, transparent 55%), linear-gradient(-45deg, transparent 43%, rgb(120 91 56 / 62%) 46% 52%, transparent 55%); background-size: 8px 8px; }
+.shore-net-label { position: absolute; right: 1px; bottom: -1px; padding: 2px 5px; border-radius: 4px; background: rgb(255 244 219 / 72%); box-shadow: 0 2px 5px rgb(85 52 26 / 14%); font-size: .48rem; font-weight: 750; white-space: nowrap; }
 .seed-1 { --tint: hue-rotate(18deg); }
 .seed-2 { --tint: hue-rotate(-16deg) saturate(1.15); }
 .seed-3 { --tint: hue-rotate(40deg) saturate(1.1); }
@@ -1346,12 +1501,24 @@ onBeforeUnmount(() => {
   18% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -50%) translateY(-10px); }
 }
+@keyframes star-twinkle { 0%, 100% { opacity: .18; transform: scale(.72); } 48% { opacity: 1; transform: scale(1.45); } 62% { opacity: .52; transform: scale(.95); } }
+@keyframes crab-walk { 0% { transform: translateX(-22px) rotate(-2deg); } 45% { transform: translateX(16px) rotate(2deg); } 52% { transform: translateX(16px) rotate(2deg) scaleX(-1); } 100% { transform: translateX(68px) rotate(-2deg) scaleX(-1); } }
+@keyframes shore-cast { from { opacity: .5; transform: rotate(-16deg) scale(.84); } to { opacity: 1; transform: rotate(26deg) scale(1); } }
+@keyframes shore-search { from { transform: rotate(23deg) translateX(-3px); } to { transform: rotate(29deg) translateX(4px); } }
+@keyframes shore-lift { 0% { transform: rotate(27deg); } 46% { transform: rotate(13deg) translateX(8px); } 100% { transform: rotate(-14deg) translateX(18px); } }
+@keyframes caught-bottle { to { opacity: .9; } }
+.net-fade-enter-active { transition: opacity .2s ease; }
+.net-fade-leave-active { transition: opacity .32s ease .25s; }
+.net-fade-enter-from, .net-fade-leave-to { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .sea-bottle-item { animation: none; }
   .sea-splash-text { animation: none; }
+  .twinkle-field > i, .crab, .rig-pole, .rig-net { animation: none; }
 }
 @media (max-width: 700px) {
   .sea-scene { height: 300px; }
-  .sea-fish-control { bottom: 12px; min-width: min(240px, calc(100% - 24px)); }
+  .shore-net-control { right: 5%; bottom: 3%; transform: scale(.9); transform-origin: right bottom; }
+  .rig-pole { right: 8%; width: 190px; }
+  .rig-status { right: 24%; }
 }
 </style>

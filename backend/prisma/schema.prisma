@@ -847,23 +847,28 @@ model VisitorProfile {
 }
 
 model VisitorMessage {
-  id             String    @id @default(uuid()) @db.Uuid
-  type           String    @db.VarChar(10)
-  content        String    @db.VarChar(200)
-  nickname       String    @db.VarChar(20)
-  visitorIdHash  String?   @map("visitor_id_hash") @db.VarChar(64)
-  userId         String?   @map("user_id") @db.Uuid
-  status         String    @default("pending") @db.VarChar(20)
-  aiReview       String?   @map("ai_review") @db.Text
-  aiReviewResult String?   @map("ai_review_result") @db.VarChar(20)
-  rejectReason   String?   @map("reject_reason") @db.Text
-  caughtByIdHash String?   @map("caught_by_id_hash") @db.VarChar(64)
-  caughtAt       DateTime? @map("caught_at")
-  chainId        String?   @map("chain_id") @db.Uuid
-  parentId       String?   @map("parent_id") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  user           User?     @relation(fields: [userId], references: [id])
+  id             String               @id @default(uuid()) @db.Uuid
+  type           String               @db.VarChar(10)
+  content        String               @db.VarChar(200)
+  nickname       String               @db.VarChar(20)
+  visitorIdHash  String?              @map("visitor_id_hash") @db.VarChar(64)
+  userId         String?              @map("user_id") @db.Uuid
+  status         String               @default("pending") @db.VarChar(20)
+  aiReview       String?              @map("ai_review") @db.Text
+  aiReviewResult String?              @map("ai_review_result") @db.VarChar(20)
+  rejectReason   String?              @map("reject_reason") @db.Text
+  caughtByIdHash String?              @map("caught_by_id_hash") @db.VarChar(64)
+  caughtAt       DateTime?            @map("caught_at")
+  releasedAt     DateTime?            @map("released_at")
+  originRegion   String?              @map("origin_region") @db.VarChar(100)
+  currentRegion  String?              @map("current_region") @db.VarChar(100)
+  catchCount     Int                  @default(0) @map("catch_count")
+  chainId        String?              @map("chain_id") @db.Uuid
+  parentId       String?              @map("parent_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  user           User?                @relation(fields: [userId], references: [id])
+  catchEvents    VisitorBottleCatch[]
 
   @@index([chainId, createdAt])
   @@index([status, createdAt])
@@ -871,6 +876,23 @@ model VisitorMessage {
   @@index([caughtByIdHash, caughtAt])
   @@index([userId, createdAt])
   @@map("visitor_messages")
+}
+
+model VisitorBottleCatch {
+  id                   String         @id @default(uuid()) @db.Uuid
+  bottleId             String         @map("bottle_id") @db.Uuid
+  catcherVisitorIdHash String?        @map("catcher_visitor_id_hash") @db.VarChar(64)
+  catcherUserId        String?        @map("catcher_user_id") @db.Uuid
+  catcherRegion        String?        @map("catcher_region") @db.VarChar(100)
+  resolution           String         @default("holding") @db.VarChar(20)
+  caughtAt             DateTime       @default(now()) @map("caught_at")
+  releasedAt           DateTime?      @map("released_at")
+  bottle               VisitorMessage @relation(fields: [bottleId], references: [id], onDelete: Cascade)
+
+  @@index([bottleId, caughtAt])
+  @@index([catcherVisitorIdHash, caughtAt])
+  @@index([catcherUserId, caughtAt])
+  @@map("visitor_bottle_catches")
 }
 
 model VisitorVisit {
