@@ -30,6 +30,10 @@
       </ClientOnly>
     </div>
 
+    <div class="pet-dock" v-if="!immersive">
+      <slot name="pet" />
+    </div>
+
     <div class="sidebar-actions">
       <button
         type="button"
@@ -59,7 +63,103 @@
     </div>
   </aside>
 
-  <div class="mobile-article-tools" :class="{ expanded: mobileActionsOpen }">
+  <Transition name="immersive-ui" appear>
+    <div v-if="immersive" class="immersive-ui">
+      <button
+        type="button"
+        class="immersive-catalog-bar"
+        :class="{ open: immersiveCatalogOpen }"
+        title="文章目录"
+        aria-label="文章目录"
+        @click="immersiveCatalogOpen = !immersiveCatalogOpen"
+      >
+        <Icon name="ph:list-bullets-bold" />
+        <span class="bar-title">文章目录</span>
+        <span class="bar-progress">{{ percent }}%</span>
+        <Icon
+          :name="immersiveCatalogOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'"
+          class="bar-caret"
+        />
+      </button>
+
+      <Transition name="immersive-catalog">
+        <section
+          v-if="immersiveCatalogOpen"
+          class="immersive-catalog-panel"
+          role="dialog"
+          aria-label="文章目录"
+        >
+          <header class="immersive-catalog-head">
+            <div>
+              <Icon name="ph:list-bullets-bold" class="head-icon" />
+              <span>文章目录</span>
+            </div>
+            <div class="head-right">
+              <span class="head-progress">已阅读 {{ percent }}%</span>
+              <button
+                type="button"
+                class="head-close"
+                aria-label="收起目录"
+                title="收起目录"
+                @click="immersiveCatalogOpen = false"
+              >
+                <Icon name="ph:x-bold" />
+              </button>
+            </div>
+          </header>
+          <div ref="immersiveCatalogWrapRef" class="immersive-catalog-content catalog-wrap">
+            <ClientOnly>
+              <MdCatalog
+                v-if="resolvedScrollEl"
+                :key="`${catalogKey}-immersive`"
+                :editor-id="editorId"
+                :scroll-element="resolvedScrollEl"
+                :theme="mdTheme"
+                :offset-top="110"
+                sync-with="preview"
+                class="article-md-catalog"
+                :on-active="onCatalogActive"
+                :on-click="onCatalogClick"
+              />
+            </ClientOnly>
+          </div>
+        </section>
+      </Transition>
+
+      <div class="immersive-actions">
+        <button
+          type="button"
+          class="im-action"
+          title="去评论区"
+          aria-label="去评论区"
+          @click="emit('scroll-comment')"
+        >
+          <Icon name="ph:chat-circle-text-bold" />
+        </button>
+        <button
+          v-if="showTop"
+          type="button"
+          class="im-action"
+          title="回到顶部"
+          aria-label="回到顶部"
+          @click="emit('scroll-top')"
+        >
+          <Icon name="ph:arrow-up-bold" />
+        </button>
+        <button
+          type="button"
+          class="im-action im-exit"
+          title="退出沉浸阅读"
+          aria-label="退出沉浸阅读"
+          @click="emit('toggle-immersive')"
+        >
+          <Icon name="ph:corners-in-bold" />
+        </button>
+      </div>
+    </div>
+  </Transition>
+
+  <div class="mobile-article-tools" :class="{ expanded: mobileActionsOpen }" v-show="!immersive">
     <Transition name="catalog-backdrop">
       <button
         v-if="mobileCatalogOpen"
@@ -166,6 +266,8 @@ const emit = defineEmits<{
 
 const catalogWrapRef = ref<HTMLElement | null>(null)
 const mobileCatalogWrapRef = ref<HTMLElement | null>(null)
+const immersiveCatalogWrapRef = ref<HTMLElement | null>(null)
+const immersiveCatalogOpen = ref(false)
 const resolvedScrollEl = ref<string | HTMLElement | null>(null)
 const isDark = ref(false)
 const mobileActionsOpen = ref(false)
@@ -179,6 +281,7 @@ let observer: MutationObserver | null = null
 function onCatalogActive(_heading: unknown, activeElement?: HTMLElement) {
   const wrap = activeElement?.closest('.catalog-wrap, .mobile-catalog-content') as HTMLElement | null
     || catalogWrapRef.value
+    || immersiveCatalogWrapRef.value
   if (!activeElement || !wrap) return
   const wrapRect = wrap.getBoundingClientRect()
   const elRect = activeElement.getBoundingClientRect()
@@ -229,6 +332,15 @@ function resolveScrollElement() {
   }
 }
 
+watch(
+  () => props.immersive,
+  (v) => {
+    immersiveCatalogOpen.value = false
+    mobileCatalogOpen.value = false
+    mobileActionsOpen.value = false
+  },
+)
+
 onMounted(async () => {
   const sync = () => {
     isDark.value = document.documentElement.classList.contains('dark')
@@ -251,9 +363,10 @@ onUnmounted(() => {
 <style scoped>
 .sidebar-right {
   width: var(--right-w);
+  height: 100dvh;
   flex-shrink: 0;
   padding: 22px 12px 14px;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -376,6 +489,16 @@ onUnmounted(() => {
   background: var(--c-primary-soft);
 }
 
+.pet-dock {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 104px;
+  padding: 10px 0 6px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
 .sidebar-actions {
   display: flex;
   align-items: center;
@@ -413,11 +536,354 @@ onUnmounted(() => {
   transform: translateY(-1px);
 }
 
+.immersive-ui-enter-active,
+.immersive-ui-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.immersive-ui-enter-from,
+.immersive-ui-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.immersive-catalog-bar {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1180;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
+  color: var(--c-text-2);
+  box-shadow: var(--ui-shadow-soft);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-family: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.immersive-catalog-bar:hover {
+  transform: translateX(-50%) translateY(-1px);
+  color: var(--c-primary);
+  border-color: color-mix(in srgb, var(--c-primary) 32%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--c-primary) 10%, var(--ld-shadow));
+}
+
+.immersive-catalog-bar .bar-title {
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.immersive-catalog-bar .bar-progress {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--c-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.6em;
+  text-align: right;
+}
+
+.immersive-catalog-bar .bar-caret {
+  color: var(--c-text-3);
+  font-size: 0.8rem;
+  transition: transform 0.22s ease;
+}
+
+.immersive-catalog-bar.open .bar-caret {
+  transform: rotate(180deg);
+}
+
+.immersive-catalog-panel {
+  position: fixed;
+  top: max(58px, calc(env(safe-area-inset-top) + 46px));
+  left: 50%;
+  transform: translateX(-50%);
+  transform-origin: top center;
+  z-index: 1175;
+  width: min(380px, calc(100vw - 48px));
+  max-height: min(56dvh, 480px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-bg-1));
+  box-shadow:
+    0 32px 80px rgb(0 0 0 / 30%),
+    0 0 44px color-mix(in srgb, var(--c-primary) 8%, transparent),
+    0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset;
+  backdrop-filter: blur(24px) saturate(1.25);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+}
+
+.immersive-catalog-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--c-primary) 55%, transparent),
+    transparent
+  );
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.immersive-catalog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 13px 14px 11px 16px;
+  background: color-mix(in srgb, var(--c-primary-soft) 32%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.immersive-catalog-head > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.immersive-catalog-head .head-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 9px;
+  color: var(--c-primary);
+  background: color-mix(in srgb, var(--c-primary) 12%, var(--ld-bg-card));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--c-primary) 12%, transparent);
+  font-size: 0.9rem;
+}
+
+.immersive-catalog-head > div:first-child span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.immersive-catalog-head .head-progress {
+  font-size: 0.64rem;
+  color: var(--c-text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.head-close {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: var(--c-text-2);
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.head-close:hover {
+  color: var(--c-primary);
+  background: color-mix(in srgb, var(--c-primary) 14%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--c-primary) 16%, transparent);
+  transform: rotate(90deg) scale(1.06);
+}
+
+.immersive-catalog-content {
+  min-height: 120px;
+  padding: 10px 14px 16px;
+  overscroll-behavior: contain;
+}
+
+.immersive-actions {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1180;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.im-action {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
+  color: var(--c-text-2);
+  box-shadow: var(--ui-shadow-soft);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.im-action:hover {
+  transform: translateY(-2px);
+  color: var(--c-primary);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--c-primary) 14%, var(--ld-shadow));
+}
+
+.im-action.im-exit {
+  color: var(--c-primary);
+  border-color: color-mix(in srgb, var(--c-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--c-primary-soft) 55%, var(--ld-bg-card));
+}
+
+.immersive-catalog-enter-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.immersive-catalog-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.22s cubic-bezier(0.55, 0, 0.55, 0.2);
+}
+
+.immersive-catalog-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-14px) scale(0.94);
+}
+
+.immersive-catalog-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px) scale(0.98);
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link) {
+  animation: cat-item-in 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(2)) {
+  animation-delay: 0.03s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(3)) {
+  animation-delay: 0.06s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(4)) {
+  animation-delay: 0.09s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(5)) {
+  animation-delay: 0.12s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(6)) {
+  animation-delay: 0.15s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(7)) {
+  animation-delay: 0.18s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(8)) {
+  animation-delay: 0.21s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(9)) {
+  animation-delay: 0.24s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(10)) {
+  animation-delay: 0.27s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(11)) {
+  animation-delay: 0.3s;
+}
+
+.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(12)) {
+  animation-delay: 0.33s;
+}
+
+@keyframes cat-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .mobile-article-tools {
   display: none;
 }
 
 @media (max-width: 900px) {
+  .immersive-catalog-bar {
+    top: max(12px, env(safe-area-inset-top));
+  }
+
+  .immersive-catalog-panel {
+    width: calc(100vw - 24px);
+    max-height: min(68dvh, 540px);
+  }
+
+  .immersive-actions {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+
+  .im-action {
+    width: 38px;
+    height: 38px;
+    font-size: 0.95rem;
+  }
+
   .mobile-article-tools {
     position: fixed;
     top: 50%;
@@ -739,6 +1205,14 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .immersive-ui-enter-active,
+  .immersive-ui-leave-active,
+  .immersive-catalog-enter-active,
+  .immersive-catalog-leave-active,
+  .immersive-catalog-content :deep(.md-editor-catalog-link) {
+    transition: none;
+    animation: none;
+  }
   .mobile-tool-trigger,
   .mobile-tool-menu-enter-active,
   .mobile-tool-menu-leave-active,

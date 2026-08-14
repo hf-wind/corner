@@ -1,5 +1,6 @@
 <template>
-  <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isArticleMode }">
+  <Teleport to="body" :disabled="!teleportToBody">
+    <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isArticleMode, docked }">
     <Transition name="pet-panel">
       <div
         v-if="chatOpen"
@@ -213,7 +214,8 @@
         <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
       </Transition>
     </button>
-  </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -298,9 +300,11 @@ const props = withDefaults(
   defineProps<{
     mode?: "home" | "article" | "context";
     article?: ArticleContext;
+    docked?: boolean;
   }>(),
   {
     mode: "home",
+    docked: false,
   },
 );
 
@@ -356,6 +360,13 @@ const isArticleMode = computed(() => props.mode === "article");
 const isContentMode = computed(
   () => props.mode === "article" || props.mode === "context",
 );
+const isMobileView = ref(false);
+const teleportToBody = computed(
+  () => props.docked && isMobileView.value,
+);
+function syncViewport() {
+  isMobileView.value = window.matchMedia("(max-width: 900px)").matches;
+}
 const contentType = computed(
   () => props.article?.type || (isArticleMode.value ? "post" : "home"),
 );
@@ -1157,6 +1168,8 @@ function waitForTypingDrain() {
 }
 
 onMounted(() => {
+  syncViewport();
+  window.addEventListener("resize", syncViewport);
   chooseGreeting();
   loadPetMeta();
   hintTimer = setTimeout(
@@ -1168,6 +1181,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("resize", syncViewport);
   if (hintTimer) clearTimeout(hintTimer);
   if (actionRevealTimer) clearTimeout(actionRevealTimer);
   streamController?.abort();
@@ -1185,8 +1199,8 @@ onUnmounted(() => {
   right: 22px;
   bottom: 22px;
   z-index: 1100;
-  width: 96px;
-  height: 104px;
+  width: 88px;
+  height: 92px;
   pointer-events: none;
 }
 
@@ -1194,9 +1208,6 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-.ai-pet.is-article {
-  bottom: 78px;
-}
 
 .pet-fab {
   position: absolute;
@@ -1250,7 +1261,7 @@ onUnmounted(() => {
 .pet-hint {
   position: absolute;
   right: calc(100% + 10px);
-  top: 46%;
+  top: 50%;
   transform: translateY(-50%);
   width: max-content;
   max-width: min(196px, calc(100vw - 132px));
@@ -1279,10 +1290,10 @@ onUnmounted(() => {
 
 .pet-chat {
   position: absolute;
-  right: 0;
-  bottom: calc(100% + 10px);
-  width: min(368px, calc(100vw - 32px));
-  height: min(520px, calc(100dvh - 150px));
+  right: calc(100% + 10px);
+  bottom: 0;
+  width: min(300px, calc(100vw - 32px));
+  height: min(400px, calc(100dvh - 180px));
   display: flex;
   flex-direction: column;
   border-radius: 18px;
@@ -1623,7 +1634,9 @@ onUnmounted(() => {
 .pet-actions {
   position: absolute;
   right: calc(100% + 8px);
-  bottom: 18px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
   width: max-content;
   max-width: min(230px, calc(100vw - 140px));
   display: flex;
@@ -1789,7 +1802,7 @@ onUnmounted(() => {
 .pet-actions-enter-from,
 .pet-actions-leave-to {
   opacity: 0;
-  transform: translateX(8px);
+  transform: translateY(-50%) translateX(8px);
 }
 
 @media (max-width: 640px) {
@@ -1798,18 +1811,7 @@ onUnmounted(() => {
     bottom: max(10px, env(safe-area-inset-bottom));
   }
 
-  .ai-pet.is-article {
-    right: max(8px, env(safe-area-inset-right));
-    bottom: max(64px, calc(env(safe-area-inset-bottom) + 56px));
-  }
-
-  .pet-hint:not(.pet-hint-login) {
-    display: none;
-  }
-
   .pet-hint-login {
-    right: calc(100% + 6px);
-    display: block;
     width: max-content;
     max-width: min(210px, calc(100vw - 92px));
     white-space: normal;
@@ -1817,20 +1819,16 @@ onUnmounted(() => {
     text-align: left;
   }
 
-  .pet-fab {
-    scale: 0.78;
-    transform-origin: right bottom;
-  }
-
   .pet-chat {
-    width: min(368px, calc(100vw - 20px));
-    height: min(500px, calc(68dvh - env(safe-area-inset-bottom)));
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    width: min(300px, calc(100vw - 20px));
+    height: min(400px, calc(68dvh - env(safe-area-inset-bottom)));
     border-radius: 18px;
   }
 
   .pet-actions {
-    right: 0;
-    bottom: 82px;
     max-width: calc(100vw - 24px);
     gap: 5px;
   }
@@ -1840,6 +1838,125 @@ onUnmounted(() => {
     padding: 6px 9px;
     border-radius: 11px;
     font-size: 0.66rem;
+  }
+}
+
+.ai-pet.docked {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: auto;
+  height: auto;
+  margin: 0 0 0 auto;
+}
+
+.ai-pet.docked .pet-fab {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  display: block;
+  margin: 0;
+  animation: none;
+}
+
+.ai-pet.docked .pet-fab:hover {
+  transform: scale(1.04);
+}
+
+.ai-pet.docked .pet-hint {
+  right: calc(100% + 8px);
+  left: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.ai-pet.docked .pet-hint::after {
+  right: -6px;
+  left: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.ai-pet.docked .pet-hint-enter-from,
+.ai-pet.docked .pet-hint-leave-to {
+  transform: translateY(-50%) translateX(8px);
+}
+
+.ai-pet.docked .pet-actions {
+  right: calc(100% + 8px);
+  left: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  align-items: flex-end;
+}
+
+.ai-pet.docked .pet-actions-enter-from,
+.ai-pet.docked .pet-actions-leave-to {
+  transform: translateY(-50%) translateX(8px);
+}
+
+.ai-pet.docked .pet-chat {
+  position: absolute;
+  right: calc(100% + 10px);
+  bottom: 0;
+  width: min(300px, calc(100vw - 32px));
+  height: min(400px, calc(100dvh - 180px));
+}
+
+@media (max-width: 900px) {
+  .ai-pet.docked {
+    position: fixed;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: 88px;
+    height: 92px;
+    margin: 0;
+  }
+
+  .ai-pet.docked .pet-fab {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    animation: pet-bob 2.8s ease-in-out infinite;
+  }
+
+  .ai-pet.docked .pet-hint {
+    right: calc(100% + 10px);
+    left: auto;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+  }
+
+  .ai-pet.docked .pet-hint::after {
+    right: -6px;
+    left: auto;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  .ai-pet.docked .pet-actions {
+    right: calc(100% + 8px);
+    left: auto;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    align-items: flex-end;
+  }
+
+  .ai-pet.docked .pet-chat {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    width: min(300px, calc(100vw - 20px));
+    height: min(400px, calc(68dvh - env(safe-area-inset-bottom)));
   }
 }
 

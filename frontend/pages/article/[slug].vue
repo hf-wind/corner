@@ -1,15 +1,5 @@
 <template>
   <div class="page-layout article-page" :class="{ 'is-immersive': immersiveMode, 'is-traversing': traversing }">
-    <button
-      v-if="immersiveMode"
-      type="button"
-      class="immersive-exit"
-      title="退出沉浸阅读"
-      aria-label="退出沉浸阅读"
-      @click="toggleImmersive"
-    >
-      <Icon name="ph:corners-in-bold" />
-    </button>
     <main
       id="main-content"
       ref="articleMainRef"
@@ -205,14 +195,16 @@
       @scroll-comment="scrollToComment"
       @catalog-navigate="navigateCatalog"
       @toggle-immersive="toggleImmersive"
-    />
+    >
+      <template #pet>
+        <ClientOnly>
+          <AiPet docked mode="article" :article="articleContext" />
+        </ClientOnly>
+      </template>
+    </ArticleSidebar>
 
     <ArticleShare v-model:open="shareOpen" :article="article" />
     <ArticlePoster v-model:open="posterOpen" :article="article" />
-
-    <ClientOnly>
-      <AiPet v-if="!articleLoading" mode="article" :article="articleContext" />
-    </ClientOnly>
   </div>
 </template>
 
@@ -551,6 +543,7 @@ onUnmounted(() => {
   width: min(100%, 1080px);
   margin-right: auto;
   margin-left: auto;
+  transition: width 0.32s var(--ui-ease-out);
 }
 
 .article-page :deep(.sidebar-right),
@@ -562,22 +555,23 @@ onUnmounted(() => {
     padding 0.32s var(--ui-ease-out);
 }
 
-.article-page.is-immersive :deep(.sidebar-right) {
-  width: 0;
-  flex-basis: 0;
-  padding-right: 0;
-  padding-left: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .article-page.is-immersive .article-main {
-  padding-right: clamp(24px, 6vw, 120px);
-  padding-left: clamp(24px, 6vw, 120px);
+  padding-right: clamp(24px, 4vw, 88px);
+  padding-left: clamp(24px, 4vw, 88px);
 }
 
 .article-page.is-immersive .article-main > * {
-  width: min(100%, 920px);
+  width: min(100%, 760px);
+}
+
+.article-page.is-immersive :deep(.sidebar-right) {
+  width: 0;
+  flex-basis: 0;
+  opacity: 0;
+  padding-right: 0;
+  padding-left: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .article-page.is-traversing .article-shell {
@@ -587,28 +581,6 @@ onUnmounted(() => {
 
 .article-shell {
   transition: filter 0.22s ease, transform 0.22s ease;
-}
-
-.immersive-exit {
-  position: fixed;
-  top: 18px;
-  right: 20px;
-  z-index: 1180;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
-  color: var(--c-text-2);
-  box-shadow: var(--ui-shadow-soft);
-  backdrop-filter: blur(12px);
-  cursor: pointer;
-}
-
-.immersive-exit:hover {
-  color: var(--c-primary);
 }
 
 .article-main::-webkit-scrollbar {
@@ -1052,11 +1024,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
-  .immersive-exit {
-    top: max(12px, env(safe-area-inset-top));
-    right: max(12px, env(safe-area-inset-right));
-  }
-
   .article-page.is-immersive .article-main {
     padding-right: max(16px, env(safe-area-inset-right)) !important;
     padding-left: max(16px, env(safe-area-inset-left)) !important;
