@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 
-export type FontPresetId = 'rounded' | 'system-rounded' | 'noto' | 'wenkai'
+export type FontPresetId = 'ayuan' | 'rounded' | 'system-rounded' | 'noto' | 'wenkai'
 
 export interface FontPresetOption {
   id: FontPresetId
@@ -9,6 +9,7 @@ export interface FontPresetOption {
 }
 
 export const fontPresetOptions: FontPresetOption[] = [
+  { id: 'ayuan', label: '汉仪A圆', short: 'A' },
   { id: 'rounded', label: '小米圆润', short: '米' },
   { id: 'system-rounded', label: '系统圆体', short: '圆' },
   { id: 'noto', label: '思源黑体', short: '思' },
@@ -19,7 +20,7 @@ const FONT_STORAGE_KEY = 'font-preset'
 const WENKAI_STYLESHEET_ID = 'font-wenkai-stylesheet'
 
 export function useTypography() {
-  const fontPreset: Ref<FontPresetId> = useState('font-preset', () => 'rounded')
+  const fontPreset: Ref<FontPresetId> = useState('font-preset', () => 'ayuan')
 
   function isFontPreset(value: string | null): value is FontPresetId {
     return fontPresetOptions.some(option => option.id === value)
@@ -44,7 +45,7 @@ export function useTypography() {
 
   function init() {
     const saved = localStorage.getItem(FONT_STORAGE_KEY)
-    fontPreset.value = isFontPreset(saved) ? saved : 'rounded'
+    fontPreset.value = isFontPreset(saved) ? saved : 'ayuan'
     applyFont(fontPreset.value)
   }
 

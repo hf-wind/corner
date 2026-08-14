@@ -2,7 +2,7 @@
   try {
     var root = document.documentElement
     root.classList.add('no-transition')
-    root.dataset.font = localStorage.getItem('font-preset') || 'rounded'
+    root.dataset.font = localStorage.getItem('font-preset') || 'ayuan'
 
     var theme = localStorage.getItem('theme') || 'auto'
     var dark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)

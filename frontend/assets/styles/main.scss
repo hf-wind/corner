@@ -1,6 +1,15 @@
+@font-face {
+  font-family: 'HanYi A-Yuan';
+  src: url('/fonts/ayuan.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --hue-theme: 220deg;
 
+  --font-ayuan: 'HanYi A-Yuan', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-rounded: 'Noto Sans SC Variable', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
   --font-system-rounded: 'Nunito Variable', 'Noto Sans SC Variable', ui-rounded, 'SF Pro Rounded', 'PingFang SC', sans-serif;
   --font-noto: 'Noto Sans SC Variable', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
@@ -9,14 +18,14 @@
   --font-mono-system: 'Cascadia Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   --font-mono-modern: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
 
-  --font-body: var(--font-rounded);
-  --font-heading: var(--font-system-rounded);
-  --font-brand: var(--font-system-rounded);
-  --font-summary: var(--font-rounded);
-  --font-accent: 'Nunito Variable', var(--font-rounded);
-  --font-serif: var(--font-heading);
+  --font-body: var(--font-ayuan);
+  --font-heading: var(--font-ayuan);
+  --font-brand: var(--font-ayuan);
+  --font-summary: var(--font-ayuan);
+  --font-accent: var(--font-ayuan);
+  --font-serif: var(--font-ayuan);
   --font-mono: var(--font-mono-rounded);
-  --font-heading-weight: 650;
+  --font-heading-weight: 400;
   --font-letter-spacing: 0.01em;
   --ui-scale: 1;
 
@@ -57,6 +66,18 @@
   --ui-shadow-soft: 0 6px 20px color-mix(in srgb, var(--ld-shadow) 25%, transparent);
   --ui-ease-out: cubic-bezier(.22, 1, .36, 1);
   --app-transition-bg: #eaf5ff;
+}
+
+:root[data-font='ayuan'] {
+  --font-body: var(--font-ayuan);
+  --font-heading: var(--font-ayuan);
+  --font-brand: var(--font-ayuan);
+  --font-summary: var(--font-ayuan);
+  --font-accent: var(--font-ayuan);
+  --font-serif: var(--font-ayuan);
+  --font-mono: var(--font-mono-rounded);
+  --font-heading-weight: 400;
+  --font-letter-spacing: 0.01em;
 }
 
 :root[data-font='rounded'] {
@@ -228,9 +249,9 @@ select {
   font-weight: var(--font-heading-weight);
 }
 
-:where(.site-title, .hero-name, .brand-name, .site-name) { font-family: var(--font-brand); font-weight: 760; letter-spacing: .025em; }
-:where(.excerpt, .summary, .description, .card-summary, .article-excerpt) { font-family: var(--font-summary); font-weight: 410; }
-:where(.eyebrow, .kicker, .hero-kicker, .section-kicker, .head-kicker) { font-family: var(--font-accent); font-weight: 720; }
+:where(.site-title, .hero-name, .brand-name, .site-name) { font-family: var(--font-brand); font-weight: 400; letter-spacing: .025em; }
+:where(.excerpt, .summary, .description, .card-summary, .article-excerpt) { font-family: var(--font-summary); font-weight: 400; }
+:where(.eyebrow, .kicker, .hero-kicker, .section-kicker, .head-kicker) { font-family: var(--font-accent); font-weight: 400; }
 
 :where(code, pre, kbd, samp) {
   font-family: var(--font-mono);
