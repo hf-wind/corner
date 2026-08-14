@@ -1206,10 +1206,12 @@ export class AiService {
     ]);
     const taxonomyCandidates = (rows: typeof categories | typeof tags) =>
       rows.map((row) => ({
+        id: row.id,
         name: row.name,
+        slug: row.slug,
         icon: row.icon,
         color: row.color,
-        posts: row._count.posts,
+        posts: (row as any)._count?.posts ?? 0,
       }));
 
     let slug = this.normalizeMetaSlug(title);

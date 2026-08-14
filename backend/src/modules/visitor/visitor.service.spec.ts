@@ -967,6 +967,7 @@ describe('VisitorService', () => {
       const visitUpdate = jest.fn().mockResolvedValue({});
       const prisma = {
         visitorProfile: {
+          findFirst: jest.fn().mockResolvedValue(null),
           upsert: jest.fn().mockResolvedValue({ isBanned: false }),
           update: jest.fn().mockResolvedValue({}),
           findUnique: jest.fn().mockResolvedValue({ nickname: '旅人', visitCount: 1 }),
