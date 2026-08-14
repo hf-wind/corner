@@ -66,7 +66,7 @@
                     <span class="content-ellipsis" :class="{ 'is-caught': record.status === 'caught' }">{{ record.content }}</span>
                   </div>
                 </template>
-                <template v-else-if="column.key === 'nickname'"><span class="nick-cell">{{ record.nickname || '无名旅人' }}</span></template>
+                <template v-else-if="column.key === 'nickname'"><span class="nick-cell">{{ record.nickname || '未署名' }}</span></template>
                 <template v-else-if="column.key === 'account'">
                   <template v-if="record.account">
                     <a-tag color="green" class="acct-tag">登录</a-tag>
@@ -121,7 +121,7 @@
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'nickname'">
-                  <span class="nick-cell">{{ record.nickname || '无名旅人' }}</span>
+                  <span class="nick-cell">{{ record.nickname || '未署名' }}</span>
                   <a-tag :color="identityColor(record.identity)" class="identity-tag">{{ identityText(record.identity) }}</a-tag>
                   <a-tag v-if="record.isBanned" color="red" class="banned-tag">已封禁</a-tag>
                 </template>
@@ -159,7 +159,7 @@
       <div v-if="detailDialog.record" class="detail-body">
         <div class="detail-row"><span class="detail-label">类型</span><a-tag :color="detailDialog.record.type === 'bottle' ? 'blue' : 'cyan'">{{ detailDialog.record.type === 'bottle' ? '漂流瓶' : '留言' }}</a-tag></div>
         <div class="detail-row detail-row-block"><span class="detail-label">内容</span><p class="detail-content">{{ detailDialog.record.content }}</p></div>
-        <div class="detail-row"><span class="detail-label">署名</span><span>{{ detailDialog.record.nickname || '无名旅人' }}</span></div>
+        <div class="detail-row"><span class="detail-label">署名</span><span>{{ detailDialog.record.nickname || '未署名' }}</span></div>
         <div class="detail-row"><span class="detail-label">账号</span><span v-if="detailDialog.record.account">{{ detailDialog.record.account.username }}<small v-if="detailDialog.record.account.email">（{{ detailDialog.record.account.email }}）</small></span><span v-else class="acct-guest">访客</span></div>
         <div class="detail-row"><span class="detail-label">状态</span><a-tag :color="statusColor(detailDialog.record.status)">{{ statusText(detailDialog.record.status) }}</a-tag></div>
         <div v-if="detailDialog.record.aiReview" class="detail-row"><span class="detail-label">AI 审核</span><span>{{ detailDialog.record.aiReview }}</span></div>
@@ -338,7 +338,7 @@ function handleProfileChange(pag: any) {
 function handleBan(record: any, ban: boolean) {
   Modal.confirm({
     title: ban ? '封禁该访客' : '解除封禁',
-    content: ban ? `封禁后「${record.nickname || '无名旅人'}」将无法再留言、投瓶或起名。` : `解除「${record.nickname || '无名旅人'}」的封禁？`,
+    content: ban ? `封禁后「${record.nickname || '未署名'}」将无法再留言、投瓶或起名。` : `解除「${record.nickname || '未署名'}」的封禁？`,
     okText: ban ? '封禁' : '解封',
     okType: ban ? 'danger' : 'primary',
     cancelText: '取消',

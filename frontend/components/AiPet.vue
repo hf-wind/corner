@@ -1236,8 +1236,7 @@ onUnmounted(() => {
 }
 
 .pet-fab:hover {
-  transform: translateY(-4px) scale(1.04);
-  animation-play-state: paused;
+  cursor: pointer;
 }
 
 .pet-sprite-wrap {
@@ -1859,10 +1858,6 @@ onUnmounted(() => {
   display: block;
   margin: 0;
   animation: none;
-}
-
-.ai-pet.docked .pet-fab:hover {
-  transform: scale(1.04);
 }
 
 .ai-pet.docked .pet-hint {

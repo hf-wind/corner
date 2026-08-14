@@ -27,7 +27,14 @@ function appIconsPlugin(): Plugin {
     },
     load(id) {
       if (id !== resolvedVirtualIcons) return undefined
-      const files = [resolve(root, 'app.vue'), ...sourceFiles(resolve(root, 'components')), ...sourceFiles(resolve(root, 'layouts')), ...sourceFiles(resolve(root, 'pages'))]
+      const files = [
+        resolve(root, 'app.vue'),
+        ...sourceFiles(resolve(root, 'components')),
+        ...sourceFiles(resolve(root, 'layouts')),
+        ...sourceFiles(resolve(root, 'pages')),
+        ...sourceFiles(resolve(root, 'composables')),
+        ...sourceFiles(resolve(root, 'utils')),
+      ]
       const names = new Set<string>()
       for (const file of files) {
         const source = readFileSync(file, 'utf8')

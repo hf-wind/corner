@@ -47,18 +47,6 @@ export const VISITOR_ACHIEVEMENTS: Array<{
     title: '三十夜长旅',
     description: '三十次往返，已成默契',
   },
-  {
-    code: 'pages_10',
-    icon: 'ph:compass-fill',
-    title: '十页浮光',
-    description: '浏览过十个角落',
-  },
-  {
-    code: 'pages_20',
-    icon: 'ph:map-trifold-fill',
-    title: '深度游历',
-    description: '足迹踏遍二十页光景',
-  },
 ];
 
 export const VISITOR_NICKNAME_MAX_LENGTH = 20;

@@ -51,10 +51,10 @@ export function useVisitor() {
     return result;
   };
 
-  const trackVisit = async (pageType: string, targetTitle?: string, targetHref?: string) => {
+  const trackVisit = async () => {
     if (!visitorId()) return null;
     try {
-      return await api.post<any>("/visitor/track", { pageType, targetTitle, targetHref });
+      return await api.post<any>("/visitor/track");
     } catch {
       return null;
     }

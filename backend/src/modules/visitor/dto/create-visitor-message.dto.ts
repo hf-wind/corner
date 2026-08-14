@@ -52,19 +52,3 @@ export class SetVisitorNicknameDto {
   @MaxLength(4096)
   turnstileToken?: string;
 }
-
-export class TrackVisitDto {
-  @IsString()
-  @MaxLength(30)
-  pageType: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  targetTitle?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  targetHref?: string;
-}

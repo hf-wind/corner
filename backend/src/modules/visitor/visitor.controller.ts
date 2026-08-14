@@ -22,7 +22,6 @@ import {
   CreateVisitorMessageDto,
   ReplyVisitorBottleDto,
   SetVisitorNicknameDto,
-  TrackVisitDto,
 } from './dto/create-visitor-message.dto';
 
 @Controller('visitor')
@@ -61,18 +60,21 @@ export class VisitorController {
   @Post('track')
   @HttpCode(200)
   async trackVisit(
-    @Req() req: { ip: string; user?: { id?: string } },
+    @Req()
+    req: {
+      ip: string;
+      user?: { id?: string };
+      headers: Record<string, string | string[] | undefined>;
+    },
     @Headers('x-visitor-id') visitorId: string,
-    @Body() dto: TrackVisitDto,
   ) {
     const hash = this.visitorService.resolveVisitorId({
       headers: { 'x-visitor-id': visitorId },
       ip: req.ip,
     });
     return this.visitorService.trackVisit(
-      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
+      { headers: req.headers, ip: req.ip },
       hash,
-      dto,
       req.user?.id ?? null,
     );
   }

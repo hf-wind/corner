@@ -40,7 +40,6 @@ export class StatsService {
       visitorMessages,
       momentLikes,
       commentLikes,
-      visits,
     ] = await Promise.all([
       this.prisma.post.findMany({
         where: { status: 'published', publishedAt: { not: null } },
@@ -109,18 +108,6 @@ export class StatsService {
           comment: {
             select: { post: { select: { title: true, slug: true } } },
           },
-        },
-      }),
-      this.prisma.visitorVisit.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 6,
-        select: {
-          id: true,
-          pageType: true,
-          targetTitle: true,
-          targetHref: true,
-          visitorIdHash: true,
-          createdAt: true,
         },
       }),
     ]);
@@ -206,28 +193,6 @@ export class StatsService {
         timestamp: l.createdAt,
       });
     }
-    if (visits.length > 0) {
-      const hashes = [...new Set(visits.map((v) => v.visitorIdHash))];
-      const profiles = await this.prisma.visitorProfile.findMany({
-        where: { visitorIdHash: { in: hashes } },
-        select: { visitorIdHash: true, nickname: true },
-      });
-      const nicknameByHash = new Map(
-        profiles.map((p) => [p.visitorIdHash, p.nickname]),
-      );
-      for (const v of visits) {
-        const nickname = nicknameByHash.get(v.visitorIdHash) ?? '无名旅人';
-        pool.push({
-          id: v.id,
-          type: 'footprint',
-          label: '新足迹',
-          title: `${nickname} 到访${v.targetTitle ? `「${v.targetTitle}」` : ''}`,
-          href: v.targetHref ?? '/home',
-          timestamp: v.createdAt,
-        });
-      }
-    }
-
     return pool
       .sort(
         (a, b) => (b.timestamp?.getTime() ?? 0) - (a.timestamp?.getTime() ?? 0),

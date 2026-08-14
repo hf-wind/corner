@@ -81,6 +81,7 @@ export function useAuth() {
       localStorage.setItem('token', accessToken)
       localStorage.setItem('user', JSON.stringify(nextUser))
     }
+    void useVisitor().trackVisit()
   }
 
   function clearSession() {

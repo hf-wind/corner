@@ -49,17 +49,12 @@
     <aside class="sidebar-right">
       <HomeSidebar />
     </aside>
-
-    <ClientOnly>
-      <AiPet v-if="showPet" mode="home" />
-    </ClientOnly>
   </div>
 </template>
 
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
 
-const AiPet = defineAsyncComponent(() => import("~/components/AiPet.vue"));
 const FeaturedSwiper = defineAsyncComponent(() => import("~/components/FeaturedSwiper.vue"));
 const AiDiscoveryPanel = defineAsyncComponent(() => import("~/components/AiDiscoveryPanel.vue"));
 const HomeSidebar = defineAsyncComponent(() => import("~/components/HomeSidebar.vue"));
@@ -70,10 +65,8 @@ const loading = ref(true);
 const refreshing = ref(false);
 const page = ref(1);
 const totalPages = ref(1);
-const showPet = ref(false);
 const homeReady = ref(false);
 let requestId = 0;
-let petIdleHandle: number | undefined;
 let enterFrame = 0;
 
 async function loadArticles() {
@@ -154,22 +147,10 @@ onMounted(() => {
     homeReady.value = true;
   });
   loadArticles().then(restoreScroll);
-  const schedule =
-    window.requestIdleCallback ||
-    ((callback: IdleRequestCallback) => window.setTimeout(callback, 1000));
-  petIdleHandle = schedule(
-    () => {
-      showPet.value = true;
-    },
-    { timeout: 2200 },
-  );
 });
 
 onUnmounted(() => {
   window.cancelAnimationFrame(enterFrame);
-  if (petIdleHandle === undefined) return;
-  if (window.cancelIdleCallback) window.cancelIdleCallback(petIdleHandle);
-  else window.clearTimeout(petIdleHandle);
 });
 </script>
 
@@ -297,7 +278,7 @@ onUnmounted(() => {
   width: var(--right-w);
   flex-shrink: 0;
   padding: 24px 14px;
-  overflow-y: auto;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 12px;

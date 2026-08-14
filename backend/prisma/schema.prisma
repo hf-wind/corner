@@ -876,14 +876,13 @@ model VisitorMessage {
 model VisitorVisit {
   id            String   @id @default(uuid()) @db.Uuid
   visitorIdHash String   @map("visitor_id_hash") @db.VarChar(64)
-  pageType      String   @db.VarChar(30)
-  targetTitle   String?  @map("target_title") @db.VarChar(255)
-  targetHref    String?  @map("target_href") @db.VarChar(255)
   region        String?  @db.VarChar(100)
+  browser       String?  @db.VarChar(40)
+  os            String?  @db.VarChar(30)
+  device        String?  @db.VarChar(20)
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([visitorIdHash, createdAt])
-  @@index([pageType, createdAt])
   @@map("visitor_visits")
 }
 

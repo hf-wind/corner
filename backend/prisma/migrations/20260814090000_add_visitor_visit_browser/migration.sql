@@ -1,0 +1,2 @@
+ALTER TABLE "visitor_visits" ADD COLUMN IF NOT EXISTS "browser" VARCHAR(40);
+ALTER TABLE "visitor_visits" ADD COLUMN IF NOT EXISTS "os" VARCHAR(30);

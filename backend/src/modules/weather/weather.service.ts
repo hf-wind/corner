@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { RedisService } from '../../common/redis/redis.service';
+import { GeoService } from '../geo/geo.service';
 
 type WeatherSnapshot = {
   temperature: number;
@@ -19,36 +20,59 @@ type WeatherSnapshot = {
   stale?: boolean;
 };
 
+type WeatherLocation = {
+  latitude: number;
+  longitude: number;
+  city: string;
+};
+
+const DEFAULT_LOCATION: WeatherLocation = {
+  latitude: Number(process.env.WEATHER_LATITUDE || '30.0024'),
+  longitude: Number(process.env.WEATHER_LONGITUDE || '120.5781'),
+  city: process.env.WEATHER_CITY || '绍兴',
+};
+
 @Injectable()
 export class WeatherService {
   private readonly logger = new Logger(WeatherService.name);
-  private readonly cacheKey = 'corner:weather:shaoxing:now';
-  private readonly staleCacheKey = `${this.cacheKey}:stale`;
-  private memoryCache: WeatherSnapshot | null = null;
-  private memoryExpiresAt = 0;
+  private readonly memoryCache = new Map<
+    string,
+    { snapshot: WeatherSnapshot; expiresAt: number }
+  >();
 
-  constructor(private readonly redis: RedisService) {}
+  constructor(
+    private readonly redis: RedisService,
+    private readonly geo?: GeoService,
+  ) {}
 
-  async getWeather(): Promise<WeatherSnapshot> {
-    if (this.memoryCache && Date.now() < this.memoryExpiresAt)
-      return this.memoryCache;
+  private cacheKeys(location: WeatherLocation) {
+    const bucket = `${location.latitude.toFixed(1)},${location.longitude.toFixed(1)}`;
+    const base = `corner:weather:loc:${bucket}:now`;
+    return { fresh: base, stale: `${base}:stale` };
+  }
+
+  async getWeather(ip?: string): Promise<WeatherSnapshot> {
+    const location = await this.locateFor(ip);
+    const keys = this.cacheKeys(location);
+    const memory = this.memoryCache.get(keys.fresh);
+    if (memory && Date.now() < memory.expiresAt) return memory.snapshot;
 
     const cached = await this.withCacheDeadline(
-      this.redis.getJson<WeatherSnapshot>(this.cacheKey),
+      this.redis.getJson<WeatherSnapshot>(keys.fresh),
       null,
     );
     if (cached) {
-      this.remember(cached);
+      this.remember(keys.fresh, cached);
       return cached;
     }
 
     try {
-      const snapshot = await this.fetchOpenMeteo();
-      this.remember(snapshot);
+      const snapshot = await this.fetchOpenMeteo(location);
+      this.remember(keys.fresh, snapshot);
       await this.withCacheDeadline(
         Promise.all([
-          this.redis.setJson(this.cacheKey, snapshot, 15 * 60),
-          this.redis.setJson(this.staleCacheKey, snapshot, 24 * 60 * 60),
+          this.redis.setJson(keys.fresh, snapshot, 15 * 60),
+          this.redis.setJson(keys.stale, snapshot, 24 * 60 * 60),
         ]),
         undefined,
       );
@@ -56,18 +80,49 @@ export class WeatherService {
     } catch (error) {
       this.logger.warn(`Open-Meteo 请求失败: ${(error as Error).message}`);
       const stale = await this.withCacheDeadline(
-        this.redis.getJson<WeatherSnapshot>(this.staleCacheKey),
+        this.redis.getJson<WeatherSnapshot>(keys.stale),
         null,
       );
       if (stale) return { ...stale, stale: true };
-      if (this.memoryCache) return { ...this.memoryCache, stale: true };
+      const memory = this.memoryCache.get(keys.fresh);
+      if (memory) return { ...memory.snapshot, stale: true };
       throw new ServiceUnavailableException('天气暂时躲进云后了');
     }
   }
 
-  private remember(snapshot: WeatherSnapshot) {
-    this.memoryCache = snapshot;
-    this.memoryExpiresAt = Date.now() + 5 * 60 * 1000;
+  private async locateFor(ip?: string): Promise<WeatherLocation> {
+    if (ip && this.geo) {
+      try {
+        const info = await this.geo.locate(ip);
+        if (
+          info &&
+          typeof info.lat === 'number' &&
+          typeof info.lon === 'number' &&
+          Number.isFinite(info.lat) &&
+          Number.isFinite(info.lon)
+        ) {
+          return {
+            latitude: info.lat,
+            longitude: info.lon,
+            city: info.label || info.city || DEFAULT_LOCATION.city,
+          };
+        }
+      } catch (error) {
+        this.logger.warn(`访客定位失败: ${(error as Error).message}`);
+      }
+    }
+    return DEFAULT_LOCATION;
+  }
+
+  private remember(key: string, snapshot: WeatherSnapshot) {
+    this.memoryCache.set(key, {
+      snapshot,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    });
+    if (this.memoryCache.size > 64) {
+      const oldest = this.memoryCache.keys().next().value;
+      if (oldest) this.memoryCache.delete(oldest);
+    }
   }
 
   private async withCacheDeadline<T>(
@@ -90,12 +145,10 @@ export class WeatherService {
     }
   }
 
-  private async fetchOpenMeteo(): Promise<WeatherSnapshot> {
-    const latitude = String(process.env.WEATHER_LATITUDE || '30.0024').trim();
-    const longitude = String(
-      process.env.WEATHER_LONGITUDE || '120.5781',
-    ).trim();
-    const city = String(process.env.WEATHER_CITY || '绍兴').trim();
+  private async fetchOpenMeteo(
+    location: WeatherLocation,
+  ): Promise<WeatherSnapshot> {
+    const { latitude, longitude, city } = location;
     const url =
       'https://api.open-meteo.com/v1/forecast' +
       `?latitude=${encodeURIComponent(latitude)}` +

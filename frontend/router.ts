@@ -324,36 +324,12 @@ router.beforeEach(async (to) => {
   return true;
 });
 
-router.afterEach((to) => {
+router.afterEach(() => {
   if (typeof document === "undefined") return;
   window.requestAnimationFrame(() =>
     document.documentElement.classList.remove("space-pending"),
   );
-  void trackVisitorVisit(to);
 });
-
-function pageTypeOf(path: string): string {
-  if (path === "/" || path === "/home") return "home";
-  if (path.startsWith("/article/")) return "post";
-  if (path.startsWith("/albums/")) return "album";
-  if (path === "/time/map") return "memory-map";
-  if (path === "/time/constellation") return "memory-graph";
-  if (path === "/guestbook") return "guestbook";
-  if (path.startsWith("/journeys/")) return "journey";
-  return "page";
-}
-
-function trackVisitorVisit(to: { path: string; name?: unknown }) {
-  if (typeof document === "undefined") return;
-  if (!navigator.onLine) return;
-  if (to.path === "/") return;
-  const pageType = pageTypeOf(to.path);
-  import("./composables/useVisitor").then(({ useVisitor }) => {
-    const visitor = useVisitor();
-    const title = document.title || to.path;
-    visitor.trackVisit(pageType, title, to.path);
-  });
-}
 
 router.onError(() => {
   if (typeof document !== "undefined")

@@ -179,11 +179,8 @@
                 </li>
               </ol>
               <div class="caught-actions">
-                <button v-if="canReply" type="button" class="caught-action reply" @click="replyDialogOpen = true">
+                <button v-if="canReply" type="button" class="caught-action reply" @click="openReplyDialog">
                   <Icon name="ph:envelope-simple-bold" />回复这位旅人
-                </button>
-                <button v-else-if="!isLoggedIn" type="button" class="caught-action reply-link" @click="openIdentityForReply">
-                  <Icon name="ph:envelope-simple-bold" />登录后可以回复这位旅人
                 </button>
                 <button v-if="!relayMode" type="button" class="caught-action relay" @click="relayMode = true">
                   <Icon name="ph:paper-plane-tilt-bold" />留一句话，让瓶子继续漂流
@@ -341,7 +338,7 @@
       @ok="submitReply"
     >
       <p style="margin:0 0 10px;color:var(--c-text-2);font-size:.68rem;">
-        回复会通过站内通知送达「{{ caughtBottle?.nickname }}」，内容经过 AI 审核。
+        回复会接在「{{ caughtBottle?.nickname }}」的漂流瓶链上，内容经过 AI 审核。
       </p>
       <a-textarea v-model:value="replyText" :maxlength="120" :rows="4" placeholder="写几句想对这位旅人说的话…" />
     </a-modal>
@@ -378,7 +375,7 @@ const composerName = computed(() =>
   isLoggedIn.value ? user.value?.username || "" : nickname.value,
 );
 const displayName = computed(() =>
-  isLoggedIn.value ? user.value?.username || "登录旅人" : nickname.value || "无名旅人",
+  isLoggedIn.value ? user.value?.username || "登录旅人" : nickname.value || "一位旅人",
 );
 
 const activeTab = ref<"messages" | "bottles">("messages");
@@ -412,9 +409,10 @@ const chainReversed = computed(() => [...(caughtBottle.value?.chain ?? [])].reve
 
 const canReply = computed(() => {
   const bottle = caughtBottle.value;
-  if (!isLoggedIn.value || !bottle) return false;
-  if (bottle.ownerUserId) return bottle.ownerUserId !== user.value?.id;
-  return !!bottle.canReply;
+  if (!bottle) return false;
+  if (isLoggedIn.value && bottle.ownerUserId)
+    return bottle.ownerUserId !== user.value?.id;
+  return true;
 });
 
 const avatarErrors = ref<Set<string>>(new Set());
@@ -499,7 +497,7 @@ async function switchTab(tab: "messages" | "bottles") {
   scrollToEl(seaCardRef.value);
 }
 
-function openIdentityForReply() {
+function openReplyDialog() {
   pendingAction.value = {
     fn: async () => {
       await refreshMe();
@@ -511,6 +509,10 @@ function openIdentityForReply() {
     },
     hint: "回复漂流瓶主人",
   };
+  if (isLoggedIn.value || nickname.value) {
+    void pendingAction.value.fn();
+    return;
+  }
   nameModalVisible.value = true;
 }
 

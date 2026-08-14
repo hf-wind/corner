@@ -77,7 +77,7 @@
 
           <template v-else-if="mode === 'login'">
             <h2>欢迎回来</h2>
-            <p>登录后可以给瓶主回信，还能实时收到瓶子被捞起、被回复的通知。</p>
+            <p>登录后能实时收到瓶子被捞起、被回复的通知，并同步你的访客足迹。</p>
             <div class="vn-email-wrap">
               <input
                 v-model="email"

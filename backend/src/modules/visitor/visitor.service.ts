@@ -42,6 +42,34 @@ function dayKey(date = new Date()): string {
   return `${d.getFullYear()}${mm}${dd}`;
 }
 
+function parseUserAgent(ua: string | undefined): {
+  browser: string | null;
+  os: string | null;
+  device: string | null;
+} {
+  if (!ua || ua.length > 500) return { browser: null, os: null, device: null };
+  const text = ua.toLowerCase();
+  let browser: string | null = null;
+  if (/edg\//.test(text)) browser = 'Edge';
+  else if (/opr\/|opera/.test(text)) browser = 'Opera';
+  else if (/micromessenger|微信/.test(text)) browser = '微信';
+  else if (/chrome\/|chromium/.test(text)) browser = 'Chrome';
+  else if (/firefox\//.test(text)) browser = 'Firefox';
+  else if (/safari\//.test(text)) browser = 'Safari';
+  let os: string | null = null;
+  if (/windows nt/.test(text)) os = 'Windows';
+  else if (/iphone|ipad|ipod/.test(text)) os = 'iOS';
+  else if (/mac os x/.test(text)) os = 'macOS';
+  else if (/android/.test(text)) os = 'Android';
+  else if (/linux/.test(text)) os = 'Linux';
+  let device: string | null = null;
+  if (/ipad|tablet/.test(text)) device = 'tablet';
+  else if (/iphone|ipod|android|windows phone|mobile/.test(text))
+    device = 'mobile';
+  else device = 'desktop';
+  return { browser, os, device };
+}
+
 @Injectable()
 export class VisitorService {
   private readonly logger = new Logger(VisitorService.name);
@@ -113,7 +141,7 @@ export class VisitorService {
       where: { visitorIdHash },
       select: { nickname: true },
     });
-    if (existing && existing.nickname && existing.nickname !== '无名旅人') {
+    if (existing && existing.nickname?.trim()) {
       throw new BadRequestException('已登记的名字不能修改');
     }
     const cleanEmail = email?.trim().slice(0, 255) || null;
@@ -141,7 +169,6 @@ export class VisitorService {
   async trackVisit(
     req: VisitorRequest,
     visitorIdHash: string,
-    data: { pageType: string; targetTitle?: string; targetHref?: string },
     userId?: string | null,
   ) {
     let profile: { isBanned: boolean; visitorIdHash: string } | null = null;
@@ -162,7 +189,7 @@ export class VisitorService {
           update: { lastSeenAt: new Date(), userId },
           create: {
             visitorIdHash,
-            nickname: '无名旅人',
+            nickname: '',
             ipHash: this.ipHash(req),
             userId,
           },
@@ -174,7 +201,7 @@ export class VisitorService {
         update: { lastSeenAt: new Date() },
         create: {
           visitorIdHash,
-          nickname: '无名旅人',
+          nickname: '',
           ipHash: this.ipHash(req),
         },
       });
@@ -184,31 +211,26 @@ export class VisitorService {
     }
 
     const dedupKey = `corner:visitor:visit-dedup:${visitorIdHash}:${dayKey()}`;
-    const dedupMember = `${data.pageType}:${data.targetHref ?? ''}`;
-    const isNew = await this.redis.client.sadd(dedupKey, dedupMember);
+    const isNew = await this.redis.client.sadd(dedupKey, 'visit');
     if (isNew) {
       await this.redis.client.expire(dedupKey, 7 * 24 * 3600);
-      const created = await this.prisma.visitorVisit.create({
+      const ua = parseUserAgent(
+        (req.headers['user-agent'] as string | undefined) ?? undefined,
+      );
+      let region: string | null = null;
+      if (req.ip && this.geo) {
+        const info = await this.geo.locate(req.ip).catch(() => null);
+        region = info?.label ?? null;
+      }
+      await this.prisma.visitorVisit.create({
         data: {
           visitorIdHash,
-          pageType: data.pageType,
-          targetTitle: data.targetTitle ?? null,
-          targetHref: data.targetHref ?? null,
+          browser: ua.browser,
+          os: ua.os,
+          device: ua.device,
+          region,
         },
       });
-      if (created.id && req.ip && this.geo) {
-        void this.geo
-          .locate(req.ip)
-          .then((info) =>
-            info
-              ? this.prisma.visitorVisit.update({
-                  where: { id: created.id },
-                  data: { region: info.label },
-                })
-              : null,
-          )
-          .catch(() => undefined);
-      }
     }
     const dayVisitKey = `corner:visitor:day-visit:${visitorIdHash}:${dayKey()}`;
     const firstToday = await this.redis.client.set(
@@ -261,7 +283,7 @@ export class VisitorService {
       profile = await this.prisma.visitorProfile.findUnique({
         where: { visitorIdHash },
       });
-      if (!profile || !profile.nickname || profile.nickname === '无名旅人') {
+      if (!profile || !profile.nickname?.trim()) {
         throw new BadRequestException('请先给自己起一个名字');
       }
       if (profile.isBanned) {
@@ -426,10 +448,13 @@ export class VisitorService {
     if (!bottle || bottle.type !== 'bottle' || bottle.status !== 'approved') {
       throw new NotFoundException('这只瓶子已经被别人捞走了');
     }
-    if (actor && bottle.userId === actor.userId) {
-      throw new BadRequestException('不能捞起自己投的瓶子');
-    }
-    if (!actor && visitorIdHash && bottle.visitorIdHash === visitorIdHash) {
+    const selfHash = await this.resolveSelfVisitorHash(actor, visitorIdHash);
+    const sameUser = !!bottle.userId && bottle.userId === actor?.userId;
+    const sameVisitor =
+      !!bottle.visitorIdHash &&
+      !!selfHash &&
+      bottle.visitorIdHash === selfHash;
+    if (sameUser || sameVisitor) {
       throw new BadRequestException('不能捞起自己投的瓶子');
     }
     const updated = await this.prisma.visitorMessage.updateMany({
@@ -496,6 +521,24 @@ export class VisitorService {
     };
   }
 
+  /**
+   * 登录账号与其访客档案（visitorIdHash）视为同一个人：
+   * 优先取登录账号绑定的访客 hash，其次使用请求携带的访客 hash。
+   */
+  private async resolveSelfVisitorHash(
+    actor: VisitorActor,
+    visitorIdHash: string | null,
+  ): Promise<string | null> {
+    if (actor?.userId) {
+      const bound = await this.prisma.visitorProfile.findFirst({
+        where: { userId: actor.userId },
+        select: { visitorIdHash: true },
+      });
+      return bound?.visitorIdHash ?? null;
+    }
+    return visitorIdHash;
+  }
+
   async replyBottle(
     req: VisitorRequest,
     actor: VisitorActor,
@@ -503,9 +546,6 @@ export class VisitorService {
     bottleId: string,
     content: string,
   ) {
-    if (!actor?.userId) {
-      throw new UnauthorizedException('请先登录后再回复漂流瓶主人');
-    }
     const bottle = await this.prisma.visitorMessage.findUnique({
       where: { id: bottleId },
     });
@@ -515,10 +555,43 @@ export class VisitorService {
     if (bottle.status !== 'caught') {
       throw new BadRequestException('只能回复一只你捞起的瓶子');
     }
-    if (!bottle.userId) {
-      throw new BadRequestException('这只瓶子的主人还没有账号，暂时无法回复');
+
+    let nickname: string;
+    let selfHash: string | null;
+    if (actor?.userId) {
+      if (!actor.username.trim()) {
+        throw new BadRequestException('登录账号缺少用户名');
+      }
+      const userRow = await this.prisma.user.findUnique({
+        where: { id: actor.userId },
+        select: { isActive: true },
+      });
+      if (userRow && !userRow.isActive) {
+        throw new ForbiddenException('该账号已被封禁');
+      }
+      nickname = actor.username.slice(0, 20);
+      selfHash = await this.resolveSelfVisitorHash(actor, visitorIdHash);
+    } else {
+      if (!visitorIdHash) {
+        throw new UnauthorizedException('请先登记名字后再回复漂流瓶主人');
+      }
+      const profile = await this.prisma.visitorProfile.findUnique({
+        where: { visitorIdHash },
+      });
+      if (!profile || !profile.nickname?.trim()) {
+        throw new BadRequestException('请先给自己起一个名字');
+      }
+      if (profile.isBanned) {
+        throw new ForbiddenException('该访客已被封禁');
+      }
+      nickname = profile.nickname.slice(0, 20);
+      selfHash = visitorIdHash;
     }
-    if (bottle.userId === actor.userId) {
+
+    const sameUser = !!bottle.userId && bottle.userId === actor?.userId;
+    const sameVisitor =
+      !!bottle.visitorIdHash && !!selfHash && bottle.visitorIdHash === selfHash;
+    if (sameUser || sameVisitor) {
       throw new BadRequestException('不能回复自己投的瓶子');
     }
     await this.checkRateLimit(req, 'reply', REPLY_RATE_LIMIT_PER_DAY);
@@ -531,9 +604,9 @@ export class VisitorService {
       data: {
         type: 'reply',
         content: clean,
-        nickname: actor.username.slice(0, 20),
-        userId: actor.userId,
-        visitorIdHash,
+        nickname,
+        userId: actor?.userId ?? null,
+        visitorIdHash: selfHash ?? visitorIdHash,
         status: review.approved ? 'approved' : 'rejected',
         aiReview: review.approved ? null : review.reason,
         aiReviewResult: review.approved ? 'approved' : 'rejected',
@@ -541,12 +614,12 @@ export class VisitorService {
         parentId: bottle.id,
       },
     });
-    if (review.approved) {
+    if (review.approved && bottle.userId) {
       try {
         await this.notificationService.create(bottle.userId, {
           type: 'guestbook',
           title: '有人回复了你的漂流瓶',
-          content: `${actor.username}：${clean}`,
+          content: `${nickname}：${clean}`,
           link: '/guestbook',
         });
       } catch (error) {
@@ -735,63 +808,65 @@ export class VisitorService {
     };
   }
 
-  async recentVisits(limit = 5) {
+  async recentVisits(limit = 12) {
+    const take = Math.min(50, Math.max(5, limit));
     const rows = await this.prisma.visitorVisit.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 60,
+      take: 120,
       select: {
         id: true,
-        pageType: true,
-        targetTitle: true,
-        targetHref: true,
         visitorIdHash: true,
+        region: true,
+        browser: true,
+        os: true,
         createdAt: true,
       },
     });
     if (rows.length === 0) return [];
 
-    const hashes = [...new Set(rows.map((r) => r.visitorIdHash))];
-    const profiles = await this.prisma.visitorProfile.findMany({
-      where: { visitorIdHash: { in: hashes } },
-      select: { visitorIdHash: true, nickname: true },
-    });
-    const nicknameByHash = new Map(
-      profiles.map((p) => [p.visitorIdHash, p.nickname]),
-    );
-    const regionRows = await this.prisma.visitorVisit.findMany({
-      where: {
-        visitorIdHash: { in: hashes },
-        region: { not: null },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: { visitorIdHash: true, region: true },
-    });
-    const regionByHash = new Map<string, string>();
-    for (const row of regionRows) {
-      if (row.region && !regionByHash.has(row.visitorIdHash)) {
-        regionByHash.set(row.visitorIdHash, row.region);
-      }
+    const seen = new Set<string>();
+    const latest: Array<(typeof rows)[number]> = [];
+    for (const row of rows) {
+      if (seen.has(row.visitorIdHash)) continue;
+      seen.add(row.visitorIdHash);
+      latest.push(row);
+      if (latest.length >= take) break;
     }
 
-    const items: Array<Record<string, unknown>> = [];
-    const seen = new Set<string>();
-    for (const row of rows) {
-      const key = `${row.visitorIdHash}:${row.pageType}:${row.targetHref ?? ''}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push({
+    const hashes = latest.map((row) => row.visitorIdHash);
+    const profiles = await this.prisma.visitorProfile.findMany({
+      where: { visitorIdHash: { in: hashes } },
+      select: { visitorIdHash: true, nickname: true, userId: true },
+    });
+    const profileByHash = new Map(
+      profiles.map((profile) => [profile.visitorIdHash, profile]),
+    );
+    const userIds = profiles
+      .map((profile) => profile.userId)
+      .filter((id): id is string => !!id);
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, username: true },
+        })
+      : [];
+    const usernameByUserId = new Map(users.map((user) => [user.id, user.username]));
+
+    return latest.map((row) => {
+      const profile = profileByHash.get(row.visitorIdHash);
+      const boundUser = profile?.userId
+        ? usernameByUserId.get(profile.userId)
+        : null;
+      return {
         id: row.id,
-        nickname: nicknameByHash.get(row.visitorIdHash) ?? '无名旅人',
-        pageType: row.pageType,
-        targetTitle: row.targetTitle,
-        targetHref: row.targetHref,
-        region: regionByHash.get(row.visitorIdHash) ?? null,
+        nickname: boundUser || profile?.nickname || '',
+        region: row.region ?? null,
+        browser: row.browser ?? null,
+        os: row.os ?? null,
+        device: row.device ?? null,
         time: row.createdAt,
-      });
-      if (items.length >= limit) break;
-    }
-    return items;
+      };
+    });
   }
 
   private async syncAchievements(visitorIdHash: string): Promise<string[]> {
@@ -802,7 +877,7 @@ export class VisitorService {
       });
       if (!profile) return [];
 
-      const [msgCount, bottleCount, caughtCount, pageTypes, owned] =
+      const [msgCount, bottleCount, caughtCount, owned] =
         await Promise.all([
           this.prisma.visitorMessage.count({
             where: { visitorIdHash, type: 'message', status: 'approved' },
@@ -817,11 +892,6 @@ export class VisitorService {
           this.prisma.visitorMessage.count({
             where: { caughtByIdHash: visitorIdHash },
           }),
-          this.prisma.visitorVisit.findMany({
-            where: { visitorIdHash },
-            select: { pageType: true },
-            distinct: ['pageType'],
-          }),
           this.prisma.visitorAchievement.findMany({
             where: { visitorIdHash },
             select: { code: true },
@@ -829,17 +899,14 @@ export class VisitorService {
         ]);
 
       const ownedSet = new Set(owned.map((o) => o.code));
-      const pageCount = pageTypes.length;
       const candidates: Array<[string, boolean]> = [
         ['first_visit', profile.visitCount >= 1],
-        ['set_nickname', !!profile.nickname && profile.nickname !== '无名旅人'],
+        ['set_nickname', !!profile.nickname?.trim()],
         ['first_message', msgCount >= 1],
         ['first_bottle', bottleCount >= 1],
         ['catch_bottle', caughtCount >= 1],
         ['visits_5', profile.visitCount >= 5],
         ['visits_30', profile.visitCount >= 30],
-        ['pages_10', pageCount >= 10],
-        ['pages_20', pageCount >= 20],
       ];
       const toUnlock = candidates
         .filter(([code, ok]) => ok && !ownedSet.has(code))
@@ -1008,11 +1075,11 @@ export class VisitorService {
     else if (query.type === 'registered') {
       where.userId = null;
       where.nickname = query.keyword?.trim()
-        ? { contains: query.keyword.trim(), not: '无名旅人' }
-        : { not: '无名旅人' };
+        ? { contains: query.keyword.trim(), not: '' }
+        : { not: '' };
     } else if (query.type === 'anonymous') {
       where.userId = null;
-      where.nickname = '无名旅人';
+      where.nickname = { in: ['', null] };
     }
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 20));
@@ -1098,7 +1165,7 @@ export class VisitorService {
         account: p.userId ? (accountMap.get(p.userId) ?? null) : null,
         identity: p.userId
           ? 'user'
-          : p.nickname === '无名旅人'
+          : !p.nickname?.trim()
             ? 'anonymous'
             : 'registered',
         region: regionByHash.get(p.visitorIdHash) ?? null,

@@ -21,6 +21,7 @@ import DefaultLayout from './layouts/default.vue'
 import AdminLayout from './layouts/admin.vue'
 import WelcomeLayout from './layouts/welcome.vue'
 import LightConfirm from './components/LightConfirm.vue'
+import { useVisitor } from './composables/useVisitor'
 
 const GlobalToast = defineAsyncComponent(() => import('./components/GlobalToast.vue'))
 // const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/SidebarMusicPlayer.vue'))
@@ -60,6 +61,7 @@ onMounted(() => {
   void loadSiteSettings()
   initTheme()
   initTypography()
+  void useVisitor().trackVisit()
   if (sessionReady.value) {
     void refreshProfile()
     connectRealtime()

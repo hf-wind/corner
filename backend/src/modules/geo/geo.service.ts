@@ -6,6 +6,8 @@ export type GeoInfo = {
   regionName: string;
   city: string;
   label: string;
+  lat?: number;
+  lon?: number;
 } | null;
 
 const GEO_CACHE_TTL = 7 * 24 * 3600;
@@ -53,9 +55,11 @@ function stripAdminSuffix(name: string): string {
 }
 
 function buildLabel(country: string, regionName: string, city: string): string {
-  const parts = [regionName, city]
-    .map(stripAdminSuffix)
-    .filter((p) => p && p !== country);
+  const parts = [...new Set(
+    [regionName, city]
+      .map(stripAdminSuffix)
+      .filter((p) => p && p !== country),
+  )];
   return parts.length ? parts.join(' · ') : country;
 }
 
@@ -96,6 +100,8 @@ export class GeoService {
         country?: string;
         regionName?: string;
         city?: string;
+        lat?: number;
+        lon?: number;
       };
       if (data.status !== 'success') return this.negative(cacheKey);
       const info: GeoInfo = {
@@ -107,6 +113,8 @@ export class GeoService {
           data.regionName || '',
           data.city || '',
         ),
+        lat: typeof data.lat === 'number' ? data.lat : undefined,
+        lon: typeof data.lon === 'number' ? data.lon : undefined,
       };
       await this.redis
         .setJson(cacheKey, info, GEO_CACHE_TTL)
