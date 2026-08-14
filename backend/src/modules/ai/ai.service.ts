@@ -136,9 +136,10 @@ const ARTICLE_META_VISUAL_INSTRUCTION = [
   `icon 只能从以下值中选择：${TAXONOMY_ICONS.join('、')}。`,
   'color 必须是 #RRGGBB 格式的十六进制颜色。',
   '严格只返回 JSON：{"slug":"english-slug","category":{"name":"分类名","icon":"ph:folder-open-bold","color":"#2563eb"},"tags":[{"name":"标签1","icon":"ph:tag-bold","color":"#059669"}]}。',
-  'tags 输出 2 到 5 个；已有分类或标签合适时优先复用其名称和视觉信息。',
-  '必须先在已有分类中选择语义最匹配的一项；只有确实没有合适分类时才能创建新分类。',
-  '“随笔”不是默认分类。除非正文核心明确是个人日常记录、感悟或散文，否则禁止选择“随笔”。',
+  'tags 输出 2 到 5 个。',
+  '分类选择规则：必须从「已有分类」清单中挑选与正文主题语义最贴切、最具体的一项；清单里确实没有语义匹配的分类时，必须创建新分类，不要勉强复用语义不符的分类。',
+  '“随笔”不是默认分类。除非正文核心明确是个人日常记录、感悟或散文，否则禁止选择“随笔”；即使正文属于个人随笔，也要检查清单中是否有更具体的分类（如旅行、读书、技术）可匹配，有就优先用更具体的。',
+  '标签同样先匹配清单中语义贴切的已有标签并复用其名称与视觉信息；清单中没有贴切标签时，允许创建新标签。',
   '复用已有分类或标签时，name、icon、color 必须与清单中的记录完全一致。',
 ].join(' ');
 
@@ -1181,14 +1182,35 @@ export class AiService {
 
     const [categories, tags] = await Promise.all([
       this.prisma.category.findMany({
-        select: { id: true, name: true, slug: true, icon: true, color: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+          color: true,
+          _count: { select: { posts: true } },
+        },
         take: 200,
       }),
       this.prisma.tag.findMany({
-        select: { id: true, name: true, slug: true, icon: true, color: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+          color: true,
+          _count: { select: { posts: true } },
+        },
         take: 300,
       }),
     ]);
+    const taxonomyCandidates = (rows: typeof categories | typeof tags) =>
+      rows.map((row) => ({
+        name: row.name,
+        icon: row.icon,
+        color: row.color,
+        posts: row._count.posts,
+      }));
 
     let slug = this.normalizeMetaSlug(title);
     let categoryId: string | undefined;
@@ -1208,8 +1230,8 @@ export class AiService {
             content: [
               `标题：${title}`,
               `正文：\n${content.slice(0, 6000)}`,
-              `已有分类（优先复用）：${JSON.stringify(categories)}`,
-              `已有标签（优先复用）：${JSON.stringify(tags)}`,
+              `已有分类清单（含各分类已收录文章数 posts，优先复用语义贴切的）：${JSON.stringify(taxonomyCandidates(categories))}`,
+              `已有标签清单（含各标签已收录文章数 posts）：${JSON.stringify(taxonomyCandidates(tags))}`,
             ].join('\n'),
           },
         ],

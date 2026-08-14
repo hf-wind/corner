@@ -144,19 +144,41 @@ export class VisitorService {
     data: { pageType: string; targetTitle?: string; targetHref?: string },
     userId?: string | null,
   ) {
-    const profile = await this.prisma.visitorProfile.upsert({
-      where: { visitorIdHash },
-      update: {
-        lastSeenAt: new Date(),
-        ...(userId ? { userId } : {}),
-      },
-      create: {
-        visitorIdHash,
-        nickname: '无名旅人',
-        ipHash: this.ipHash(req),
-        ...(userId ? { userId } : {}),
-      },
-    });
+    let profile: { isBanned: boolean; visitorIdHash: string } | null = null;
+    if (userId) {
+      profile = await this.prisma.visitorProfile.findFirst({
+        where: { userId },
+        select: { visitorIdHash: true, isBanned: true },
+      });
+      if (profile) {
+        visitorIdHash = profile.visitorIdHash;
+        await this.prisma.visitorProfile.update({
+          where: { visitorIdHash },
+          data: { lastSeenAt: new Date() },
+        });
+      } else {
+        profile = await this.prisma.visitorProfile.upsert({
+          where: { visitorIdHash },
+          update: { lastSeenAt: new Date(), userId },
+          create: {
+            visitorIdHash,
+            nickname: '无名旅人',
+            ipHash: this.ipHash(req),
+            userId,
+          },
+        });
+      }
+    } else {
+      profile = await this.prisma.visitorProfile.upsert({
+        where: { visitorIdHash },
+        update: { lastSeenAt: new Date() },
+        create: {
+          visitorIdHash,
+          nickname: '无名旅人',
+          ipHash: this.ipHash(req),
+        },
+      });
+    }
     if (profile.isBanned) {
       return { ok: false, reason: 'banned' };
     }
