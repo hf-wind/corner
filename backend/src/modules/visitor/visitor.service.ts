@@ -819,6 +819,7 @@ export class VisitorService {
         region: true,
         browser: true,
         os: true,
+        device: true,
         createdAt: true,
       },
     });
