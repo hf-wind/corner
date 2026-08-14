@@ -52,7 +52,6 @@ export class VisitorController {
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       hash,
       dto.nickname,
-      dto.email,
     );
   }
 
@@ -132,12 +131,11 @@ export class VisitorController {
   }
 
   @UseGuards(OptionalJwtAuthGuard)
-  @Post('bottles/:id/fish')
+  @Post('bottles/fish')
   @HttpCode(200)
   async fishBottle(
     @Req() req: { ip: string; user?: { id?: string; username?: string } },
     @Headers('x-visitor-id') visitorId: string,
-    @Param('id') id: string,
   ) {
     const actor: VisitorActor = req.user?.id
       ? { userId: req.user.id, username: req.user.username ?? '' }
@@ -148,7 +146,6 @@ export class VisitorController {
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
       visitorIdHash,
-      id,
     );
   }
 
@@ -172,28 +169,6 @@ export class VisitorController {
       visitorIdHash,
       id,
       dto.content,
-    );
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Get('bottles/peek')
-  async peekBottles(
-    @Query('limit') limit = '8',
-    @Req()
-    req: {
-      headers?: { 'x-visitor-id'?: string | string[] | undefined };
-      user?: { id?: string };
-    },
-  ) {
-    const raw = req.headers?.['x-visitor-id'];
-    const visitorId = Array.isArray(raw) ? raw[0] : raw;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(
-      visitorId ?? '',
-    );
-    return this.visitorService.peekBottles(
-      Math.min(8, Math.max(1, Number(limit) || 8)),
-      visitorIdHash,
-      req.user?.id ?? null,
     );
   }
 

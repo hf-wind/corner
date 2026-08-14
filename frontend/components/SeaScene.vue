@@ -2,7 +2,7 @@
   <div
     ref="rootRef"
     class="sea-scene"
-    :class="[`sea-mode-${mode}`, { 'sea-scene-disabled': disabled }]"
+    :class="[`sea-mode-${mode}`, `sea-phase-${dayPhase}`, { 'sea-scene-disabled': disabled }]"
   >
     <template v-if="mode === 'gl'">
       <canvas ref="glCanvasRef" class="sea-canvas sea-canvas-gl" />
@@ -11,17 +11,14 @@
       <canvas ref="canvasRef" class="sea-canvas" />
       <span v-if="splash" class="sea-splash-text">{{ splash }}</span>
       <div class="sea-bottles">
-        <button
-          v-for="b in bottles"
+        <span
+          v-for="b in ambientBottles"
           :key="b.id"
-          type="button"
           class="sea-bottle-item"
           :class="`seed-${b.seed % 6}`"
           :data-id="b.id"
           :style="bottleStyle(b)"
-          :title="`来自时光海的一封信 · 已漂 ${b.chainLength} 段`"
-          :disabled="disabled"
-          @click="onClickBottle(b)"
+          title="漂在时光海上的瓶子"
         >
           <svg viewBox="0 0 64 84" class="bottle-svg" aria-hidden="true">
             <defs>
@@ -41,11 +38,22 @@
             <path d="M29 30h6M29 34h6" stroke="rgba(140,110,80,.8)" stroke-width="1.2" stroke-linecap="round" />
             <path d="M28 22a10 10 0 0 1 8 0" stroke="rgba(255,255,255,.25)" fill="none" stroke-width="1.2" />
           </svg>
-          <i class="bottle-initial">{{ b.chainLength }}段</i>
-          <span class="bottle-hint">捞起这只</span>
-        </button>
+          <i class="bottle-initial"><Icon name="ph:seal-check-fill" /></i>
+        </span>
       </div>
     </template>
+    <button
+      type="button"
+      class="sea-fish-control"
+      :disabled="disabled"
+      @click="fishRandom"
+    >
+      <span class="fish-icon"><Icon :name="disabled ? 'ph:circle-notch-bold' : 'ph:anchor-simple-bold'" :spin="disabled" /></span>
+      <span>
+        <strong>打捞一封来信</strong>
+        <small>让潮汐替你选择一封陌生来信</small>
+      </span>
+    </button>
   </div>
 </template>
 
@@ -53,21 +61,26 @@
 import * as THREE from "three";
 import { gsap } from "gsap";
 
-export interface PeekBottle {
+interface AmbientBottle {
   id: string;
-  nicknameFirstChar: string;
-  chainLength: number;
   seed: number;
 }
 
+const ambientBottles: AmbientBottle[] = [
+  { id: "ambient-1", seed: 137 },
+  { id: "ambient-2", seed: 283 },
+  { id: "ambient-3", seed: 419 },
+  { id: "ambient-4", seed: 641 },
+  { id: "ambient-5", seed: 857 },
+];
+
 const props = withDefaults(
   defineProps<{
-    bottles: PeekBottle[];
     disabled?: boolean;
   }>(),
   { disabled: false },
 );
-const emit = defineEmits<{ (e: "fish", bottle: PeekBottle): void }>();
+const emit = defineEmits<{ (e: "fish"): void }>();
 
 const rootRef = ref<HTMLDivElement>();
 const canvasRef = ref<HTMLCanvasElement>();
@@ -88,7 +101,7 @@ function mulberry(seed: number) {
   };
 }
 
-function bottleStyle(b: PeekBottle) {
+function bottleStyle(b: AmbientBottle) {
   const rand = mulberry(b.seed + 17);
   const x = 6 + rand() * 84;
   const y = 30 + rand() * 44;
@@ -111,6 +124,25 @@ function showSplash(text: string) {
 // GL 海面（THREE.js 低多边形场景）
 // =====================================================================
 type WeatherKind = "sunny" | "cloudy" | "overcast" | "fog" | "rain" | "snow" | "storm" | "unknown";
+type DayPhase = "dawn" | "day" | "sunset" | "night";
+
+function currentDayPhase(): DayPhase {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 8) return "dawn";
+  if (hour >= 8 && hour < 17) return "day";
+  if (hour >= 17 && hour < 20) return "sunset";
+  return "night";
+}
+
+const dayPhase = ref<DayPhase>(currentDayPhase());
+let phaseTimer: ReturnType<typeof setInterval> | null = null;
+
+const PHASE_SKY: Record<DayPhase, { top: string; mid: string; bot: string; stars: number; moon?: boolean; sun?: boolean }> = {
+  dawn: { top: "#52678e", mid: "#d79578", bot: "#f2c99f", stars: 14, sun: true },
+  day: { top: "#4794df", mid: "#8bc6ea", bot: "#d9edf4", stars: 0, sun: true },
+  sunset: { top: "#384a74", mid: "#c96764", bot: "#f0b878", stars: 8, sun: true },
+  night: { top: "#040812", mid: "#101a34", bot: "#26385a", stars: 72, moon: true },
+};
 
 const SKY_THEME: Record<WeatherKind, { top: string; bot: string; sun?: boolean }> = {
   sunny: { top: "#4a9bff", bot: "#d2ebff", sun: true },
@@ -153,22 +185,23 @@ let glClock = 0;
 let seaMesh: THREE.Mesh | null = null;
 let skyTexture: THREE.CanvasTexture | null = null;
 let sunMesh: THREE.Mesh | null = null;
-let foamStop: THREE.Mesh | null = null;
+let foamStop: THREE.Group | null = null;
 let sandMesh: THREE.Mesh | null = null;
 let shallowMesh: THREE.Mesh | null = null;
+let sandTexture: THREE.CanvasTexture | null = null;
+let cloudTexture: THREE.CanvasTexture | null = null;
 let dirLight: THREE.DirectionalLight | null = null;
 let ambLight: THREE.AmbientLight | null = null;
 let weatherParticles: THREE.Points | null = null;
 let cloudGroup: THREE.Group | null = null;
 const glBottles = new Map<string, THREE.Group>();
-const glBottleData = new Map<string, PeekBottle>();
 const glAnimated = new Set<string>();
 const waterTweens = new Map<string, gsap.core.Tween[]>();
 
 const SEA_WIDTH = 22;
 const SEA_DEPTH = 9;
-const SEA_SEG_X = 72;
-const SEA_SEG_Z = 30;
+const SEA_SEG_X = 96;
+const SEA_SEG_Z = 42;
 const SEA_Y = 0;
 
 function waveY(x: number, z: number, t: number) {
@@ -176,31 +209,64 @@ function waveY(x: number, z: number, t: number) {
     Math.sin(x * 1.1 + t * 1.5) * 0.14 +
     Math.sin(x * 0.6 - t * 0.9 + z * 0.7) * 0.18 +
     Math.sin(z * 1.4 + t * 0.7) * 0.08;
-  return Math.floor(w * 4) / 4;
+  return w;
 }
 
 function makeSkyTexture(kind: WeatherKind): THREE.CanvasTexture {
-  const theme = SKY_THEME[kind] ?? SKY_THEME.unknown;
+  const weather = SKY_THEME[kind] ?? SKY_THEME.unknown;
+  const phase = PHASE_SKY[dayPhase.value];
   const cv = document.createElement("canvas");
-  cv.width = 512;
-  cv.height = 256;
+  cv.width = 1024;
+  cv.height = 512;
   const ctx = cv.getContext("2d")!;
-  const grad = ctx.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0, theme.top);
-  grad.addColorStop(1, theme.bot);
+  const grad = ctx.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, dayPhase.value === "day" ? weather.top : phase.top);
+  grad.addColorStop(0.58, phase.mid);
+  grad.addColorStop(1, dayPhase.value === "day" ? weather.bot : phase.bot);
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 256);
-  if (theme.sun) {
-    const glow = ctx.createRadialGradient(392, 52, 4, 392, 52, 58);
+  ctx.fillRect(0, 0, 1024, 512);
+  const random = mulberry(20260814);
+  for (let i = 0; i < phase.stars; i += 1) {
+    const x = random() * 1024;
+    const y = 18 + random() * 260;
+    const r = 0.7 + random() * 1.7;
+    ctx.fillStyle = `rgba(244,248,255,${0.28 + random() * 0.68})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (phase.sun) {
+    const sunX = dayPhase.value === "sunset" ? 760 : dayPhase.value === "dawn" ? 710 : 790;
+    const sunY = dayPhase.value === "sunset" ? 170 : dayPhase.value === "dawn" ? 150 : 92;
+    const glow = ctx.createRadialGradient(sunX, sunY, 5, sunX, sunY, 118);
     glow.addColorStop(0, "rgba(255,248,220,.95)");
-    glow.addColorStop(0.32, "rgba(255,244,200,.5)");
+    glow.addColorStop(0.24, "rgba(255,221,160,.48)");
     glow.addColorStop(1, "rgba(255,244,200,0)");
     ctx.fillStyle = glow;
-    ctx.fillRect(316, -24, 152, 152);
-    ctx.fillStyle = "#fff8d8";
+    ctx.fillRect(sunX - 128, sunY - 128, 256, 256);
+    ctx.fillStyle = dayPhase.value === "sunset" ? "#ffd39a" : "#fff6d2";
     ctx.beginPath();
-    ctx.arc(392, 52, 22, 0, Math.PI * 2);
+    ctx.arc(sunX, sunY, 30, 0, Math.PI * 2);
     ctx.fill();
+  }
+  if (phase.moon) {
+    const moonX = 782;
+    const moonY = 104;
+    const glow = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, 96);
+    glow.addColorStop(0, "rgba(225,236,255,.5)");
+    glow.addColorStop(1, "rgba(188,210,255,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(moonX - 105, moonY - 105, 210, 210);
+    ctx.fillStyle = "#eef3ff";
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, 31, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(151,168,205,.22)";
+    [[-9, -7, 5], [10, 7, 4], [5, -13, 3]].forEach(([x, y, r]) => {
+      ctx.beginPath();
+      ctx.arc(moonX + x, moonY + y, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -229,7 +295,6 @@ function makeSeaShader() {
         float w = sin(position.x * 1.1 + uTime * 1.5) * 0.14
                 + sin(position.x * 0.6 - uTime * 0.9 + position.z * 0.7) * 0.18
                 + sin(position.z * 1.4 + uTime * 0.7) * 0.08;
-        w = floor(w * 4.0) / 4.0;
         vec3 pos = position + vec3(0.0, w, 0.0);
         vH = w;
         vWorld = (modelMatrix * vec4(pos, 1.0)).xyz;
@@ -272,13 +337,13 @@ function buildBottleMesh(seed: number): THREE.Group {
   const cork = new THREE.MeshStandardMaterial({ color: "#a8784a", roughness: 0.9 });
   const scroll = new THREE.MeshStandardMaterial({ color: "#f2ead6", roughness: 0.8 });
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.85, 10), glass);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.85, 20), glass);
   body.position.y = 0.05;
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.2, 0.22, 8), glass);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.2, 0.22, 16), glass);
   neck.position.y = 0.58;
-  const corkMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.14, 8), cork);
+  const corkMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.14, 16), cork);
   corkMesh.position.y = 0.68;
-  const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.5, 8), scroll);
+  const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.5, 16), scroll);
   paper.position.y = 0.05;
   paper.rotation.y = 0.6;
   group.add(body, neck, corkMesh, paper);
@@ -310,9 +375,8 @@ function rebuildGlBottles() {
     });
   }
   glBottles.clear();
-  glBottleData.clear();
   glAnimated.clear();
-  for (const b of props.bottles) {
+  for (const b of ambientBottles) {
     const g = buildBottleMesh(b.seed);
     const p = normalizeBottlePos(b.seed);
     g.position.set(p.x, waveY(p.x, p.z, glClock), p.z);
@@ -320,23 +384,88 @@ function rebuildGlBottles() {
     g.scale.setScalar(p.s);
     glScene.add(g);
     glBottles.set(b.id, g);
-    glBottleData.set(b.id, b);
   }
+}
+
+function makeCloudTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 128;
+  const context = canvas.getContext("2d")!;
+  const cloud = context.createRadialGradient(128, 70, 8, 128, 70, 92);
+  cloud.addColorStop(0, "rgba(255,255,255,.92)");
+  cloud.addColorStop(0.48, "rgba(255,255,255,.62)");
+  cloud.addColorStop(1, "rgba(255,255,255,0)");
+  context.fillStyle = cloud;
+  context.fillRect(0, 0, 256, 128);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function makeSandTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext("2d")!;
+  const gradient = context.createLinearGradient(0, 0, 0, 256);
+  gradient.addColorStop(0, "#ead8af");
+  gradient.addColorStop(0.5, "#d9bd8c");
+  gradient.addColorStop(1, "#c9a36f");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 512, 256);
+  const random = mulberry(701);
+  for (let i = 0; i < 420; i += 1) {
+    const alpha = 0.06 + random() * 0.11;
+    context.fillStyle = random() > 0.48 ? `rgba(255,247,221,${alpha})` : `rgba(112,76,43,${alpha})`;
+    context.beginPath();
+    context.ellipse(random() * 512, random() * 256, 0.5 + random() * 1.1, 0.35 + random() * 0.7, random() * Math.PI, 0, Math.PI * 2);
+    context.fill();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2.4, 1.2);
+  return texture;
+}
+
+function buildFoamLines(): THREE.Group {
+  const group = new THREE.Group();
+  for (let layer = 0; layer < 3; layer += 1) {
+    const points: THREE.Vector3[] = [];
+    for (let i = 0; i <= 96; i += 1) {
+      const x = -SEA_WIDTH * 0.72 + (i / 96) * SEA_WIDTH * 1.44;
+      points.push(new THREE.Vector3(x, 0.025 + layer * 0.007, 3.15 + layer * 0.2));
+    }
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color: layer === 0 ? "#ffffff" : "#dceeff",
+      transparent: true,
+      opacity: 0.62 - layer * 0.16,
+      depthWrite: false,
+    });
+    const line = new THREE.Line(geometry, material);
+    line.userData = { layer };
+    group.add(line);
+  }
+  return group;
 }
 
 function buildCloud(count: number, color: string): THREE.Group {
   const group = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false });
   const rand = mulberry(2026 + count);
   for (let i = 0; i < count; i++) {
-    const geo = new THREE.CircleGeometry(0.7 + rand(), 3);
-    geo.rotateY(rand() * Math.PI);
-    geo.rotateX(-0.4 - rand() * 0.5);
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(rand() * 20 - 10, 3.4 + rand() * 1.6, -4 - rand() * 3);
-    m.scale.x = 1.6 + rand() * 1.4;
-    m.rotation.z = rand() * 1.2 - 0.6;
-    group.add(m);
+    const material = new THREE.SpriteMaterial({
+      map: cloudTexture,
+      color,
+      transparent: true,
+      opacity: 0.42 + rand() * 0.25,
+      depthWrite: false,
+    });
+    const cloud = new THREE.Sprite(material);
+    cloud.position.set(rand() * 20 - 10, 3.4 + rand() * 1.7, -5 - rand() * 3);
+    cloud.scale.set(3.2 + rand() * 3.6, 1.15 + rand() * 1.2, 1);
+    group.add(cloud);
   }
   return group;
 }
@@ -433,12 +562,17 @@ function initGl(): boolean {
   renderer.setPixelRatio(dpr);
   renderer.setSize(root.clientWidth, root.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = dayPhase.value === "night" ? 0.82 : 1.02;
 
   glScene = new THREE.Scene();
   glScene.fog = new THREE.Fog(0x9db9d9, 14, 30);
   glCamera = new THREE.PerspectiveCamera(58, root.clientWidth / root.clientHeight, 0.1, 60);
-  glCamera.position.set(0, 2.6, 7);
-  glCamera.lookAt(0, -0.35, -1);
+  glCamera.position.set(0, 2.75, 7.8);
+  glCamera.lookAt(0, -0.22, -1.2);
+
+  cloudTexture = makeCloudTexture();
+  sandTexture = makeSandTexture();
 
   const seaGeo = buildSeaGeometry();
   seaMesh = new THREE.Mesh(seaGeo, new THREE.ShaderMaterial(makeSeaShader()));
@@ -447,20 +581,20 @@ function initGl(): boolean {
   glScene.add(seaMesh);
 
   // 沙滩（近前景，向镜头倾斜）
-  const sandGeo = new THREE.PlaneGeometry(SEA_WIDTH * 1.6, 1.7, 8, 3);
+  const sandGeo = new THREE.PlaneGeometry(SEA_WIDTH * 1.65, 2.2, 32, 8);
   sandGeo.rotateX(-Math.PI / 2);
   sandMesh = new THREE.Mesh(
     sandGeo,
     new THREE.MeshStandardMaterial({
-      color: "#e8d9b8",
-      roughness: 0.95,
-      flatShading: true,
+      color: "#ead9b5",
+      map: sandTexture,
+      roughness: 0.88,
       transparent: true,
       opacity: 0.96,
     }),
   );
   sandMesh.rotation.x = -0.05;
-  sandMesh.position.set(0, -0.28, 4.3);
+  sandMesh.position.set(0, -0.25, 4.45);
   glScene.add(sandMesh);
 
   // 浅水过渡带（近端浅色海水）
@@ -472,8 +606,7 @@ function initGl(): boolean {
       color: "#bfe0f5",
       roughness: 0.6,
       transparent: true,
-      opacity: 0.8,
-      flatShading: true,
+      opacity: 0.66,
       depthWrite: false,
     }),
   );
@@ -481,28 +614,8 @@ function initGl(): boolean {
   glScene.add(shallowMesh);
 
   // 浪花泡沫带（浅水与深水分界）
-  foamStop = new THREE.Mesh(
-    new THREE.PlaneGeometry(SEA_WIDTH * 1.5, 0.24, 2, 1),
-    new THREE.MeshStandardMaterial({
-      color: "#ffffff",
-      transparent: true,
-      opacity: 0.5,
-      roughness: 0.4,
-      emissive: new THREE.Color("#d9ecff"),
-      emissiveIntensity: 0.3,
-      depthWrite: false,
-    }),
-  );
-  foamStop.rotation.x = -Math.PI / 2;
-  foamStop.position.set(0, 0.02, 3.35);
+  foamStop = buildFoamLines();
   glScene.add(foamStop);
-
-  // 太阳（远景装饰）
-  const sunGeo = new THREE.CircleGeometry(0.62, 8);
-  sunMesh = new THREE.Mesh(sunGeo, new THREE.MeshBasicMaterial({ color: "#fff3c0", transparent: true, opacity: 0.85 }));
-  sunMesh.position.set(7, 5.2, -10.5);
-  sunMesh.lookAt(0, 1.5, 0);
-  glScene.add(sunMesh);
 
   dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
   dirLight.position.set(-4, 7, 5);
@@ -512,9 +625,6 @@ function initGl(): boolean {
 
   updateWeatherVisual("unknown");
   rebuildGlBottles();
-
-  renderer.domElement.addEventListener("pointermove", onGlPointerMove);
-  renderer.domElement.addEventListener("pointerdown", onGlPointerDown);
 
   glClock = 0;
   glRafId = requestAnimationFrame(glLoop);
@@ -563,84 +673,40 @@ function glLoop() {
     });
   }
 
+  if (foamStop) {
+    foamStop.children.forEach((child) => {
+      const line = child as THREE.Line;
+      const position = line.geometry.getAttribute("position") as THREE.BufferAttribute;
+      const layer = Number(line.userData.layer || 0);
+      for (let i = 0; i < position.count; i += 1) {
+        const x = position.getX(i);
+        position.setZ(i, 3.12 + layer * 0.2 + Math.sin(x * 0.52 + t * (0.72 + layer * 0.08)) * (0.055 + layer * 0.018));
+      }
+      position.needsUpdate = true;
+    });
+  }
+
   renderer.render(glScene, glCamera);
   if (!reduceMotion) glRafId = requestAnimationFrame(glLoop);
 }
 
-function glScreenPoint(e: PointerEvent) {
-  const canvas = renderer!.domElement;
-  const rect = canvas.getBoundingClientRect();
-  return new THREE.Vector2(
-    ((e.clientX - rect.left) / rect.width) * 2 - 1,
-    -((e.clientY - rect.top) / rect.height) * 2 + 1,
-  );
-}
-
-function glHitTest(e: PointerEvent) {
-  if (!glScene || !glCamera) return null;
-  const vec = glScreenPoint(e);
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(vec, glCamera);
-  const meshes: THREE.Object3D[] = [];
-  for (const g of glBottles.values()) meshes.push(g);
-  const hit = raycaster.intersectObjects(meshes, true);
-  if (hit.length === 0) return null;
-  let node: THREE.Object3D | null = hit[0].object;
-  while (node && !glBottles.has(node.id) && node !== glScene) {
-    node = node.parent;
-  }
-  if (!node) return null;
-  const bottleId = [...glBottles.keys()].find((id) => glBottles.get(id) === node);
-  return bottleId ? glBottles.get(bottleId)! : null;
-}
-
-let hoverBottle: THREE.Group | null = null;
-function onGlPointerMove(e: PointerEvent) {
-  if (!renderer) return;
-  const hit = glHitTest(e);
-  if (hoverBottle && hoverBottle !== hit) {
-    gsap.killTweensOf(hoverBottle.scale);
-    const p = normalizeBottlePos(hoverBottle.userData.seed);
-    const st = hoverBottle.userData.scale ?? p.s;
-    gsap.to(hoverBottle.scale, { x: st, y: st, z: st, duration: 0.3 });
-    hoverBottle = null;
-  }
-  if (hit && hit !== hoverBottle) {
-    hoverBottle = hit;
-    gsap.killTweensOf(hit.scale);
-    const p = normalizeBottlePos(hit.userData.seed);
-    hit.userData.scale = hit.scale.x;
-    gsap.to(hit.scale, { x: p.s * 1.18, y: p.s * 1.18, z: p.s * 1.18, duration: 0.3 });
-  }
-  renderer.domElement.style.cursor = hoverBottle && !props.disabled ? "pointer" : "default";
-}
-
-function onGlPointerDown(e: PointerEvent) {
-  if (props.disabled || launching) return;
-  const hit = glHitTest(e);
-  if (!hit) return;
-  const bottleId = [...glBottles.keys()].find((id) => glBottles.get(id) === hit);
-  if (!bottleId) return;
-  const data = glBottleData.get(bottleId);
-  if (!data) return;
-  glFishAnim(hit, data);
-}
-
-function glFishAnim(group: THREE.Group, data: PeekBottle) {
+function glFishAnim(group: THREE.Group) {
   launching = true;
   const bottleId = [...glBottles.keys()].find((id) => glBottles.get(id) === group);
   if (bottleId) glAnimated.add(bottleId);
   if (reduceMotion) {
     group.removeFromParent();
     launching = false;
-    emit("fish", data);
+    rebuildGlBottles();
+    emit("fish");
     return;
   }
   const target = { x: 9.4, y: 3.8, z: -4.6 };
   const tl = gsap.timeline({
     onComplete: () => {
       launching = false;
-      emit("fish", data);
+      rebuildGlBottles();
+      emit("fish");
     },
   });
   tl.to(group.position, { y: 2.2, duration: 0.5, ease: "power2.out" }, 0)
@@ -712,23 +778,18 @@ function glLaunch(cb?: () => void) {
     .to(g.position, { x: targetX, z: targetZ, duration: 1.25, ease: "power2.out" }, 1.15)
     .to(g.rotation, { z: 0, y: rand() * Math.PI * 2, duration: 1.25, ease: "power2.out" }, 1.15);
 
-  void nextTick().then(() => {
-    if (props.bottles.some((b) => b.id === `launch-${seed}`)) return;
-  });
 }
 
 function disposeGl() {
   cancelAnimationFrame(glRafId);
   glRafId = 0;
   if (renderer) {
-    renderer.domElement.removeEventListener("pointermove", onGlPointerMove);
-    renderer.domElement.removeEventListener("pointerdown", onGlPointerDown);
+    renderer.domElement.style.cursor = "default";
   }
   if (glScene) {
     glScene.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.geometry) return;
-      mesh.geometry.dispose();
+      if (mesh.geometry) mesh.geometry.dispose();
       if (mesh.material) {
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         mats.forEach((m) => m.dispose());
@@ -737,6 +798,8 @@ function disposeGl() {
     // 逐帧生成的玻璃材质已随 traverse 释放
   }
   if (skyTexture) skyTexture.dispose();
+  if (sandTexture) sandTexture.dispose();
+  if (cloudTexture) cloudTexture.dispose();
   if (renderer) {
     renderer.dispose();
     renderer = null;
@@ -752,6 +815,8 @@ function disposeGl() {
   ambLight = null;
   weatherParticles = null;
   cloudGroup = null;
+  sandTexture = null;
+  cloudTexture = null;
 }
 
 // =====================================================================
@@ -780,74 +845,106 @@ function drawFrame(t: number) {
   const h = canvas.height / Math.min(window.devicePixelRatio || 1, 2);
   ctx.clearRect(0, 0, w, h);
   const kind = weatherKind.value;
-  const sky = SKY_THEME[kind] ?? SKY_THEME.unknown;
+  const weather = SKY_THEME[kind] ?? SKY_THEME.unknown;
+  const phase = PHASE_SKY[dayPhase.value];
   const skyGradient = ctx.createLinearGradient(0, 0, 0, h);
-  skyGradient.addColorStop(0, sky.top);
-  skyGradient.addColorStop(0.68, sky.bot);
-  skyGradient.addColorStop(1, "#8dc8e8");
+  skyGradient.addColorStop(0, dayPhase.value === "day" ? weather.top : phase.top);
+  skyGradient.addColorStop(0.52, phase.mid);
+  skyGradient.addColorStop(1, dayPhase.value === "day" ? weather.bot : phase.bot);
   ctx.fillStyle = skyGradient;
   ctx.fillRect(0, 0, w, h);
-  const seaGradient = ctx.createLinearGradient(0, h * 0.22, 0, h * 0.86);
-  seaGradient.addColorStop(0, "rgba(45,135,205,.12)");
-  seaGradient.addColorStop(1, "rgba(4,55,126,.38)");
+
+  for (let i = 0; i < phase.stars; i += 1) {
+    const px = ((i * 83.7 + 19) % 997) / 997 * w;
+    const py = 12 + (((i * 47.3 + 11) % 211) / 211) * h * 0.42;
+    const radius = 0.55 + (i % 4) * 0.28;
+    ctx.fillStyle = `rgba(244,248,255,${0.3 + (i % 7) * 0.085})`;
+    ctx.beginPath();
+    ctx.arc(px, py, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const celestialX = w * 0.78;
+  const celestialY = h * (dayPhase.value === "sunset" ? 0.26 : 0.17);
+  if (phase.sun || phase.moon) {
+    const glow = ctx.createRadialGradient(celestialX, celestialY, 3, celestialX, celestialY, h * 0.16);
+    glow.addColorStop(0, phase.moon ? "rgba(226,237,255,.48)" : "rgba(255,239,188,.62)");
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(celestialX - h * 0.18, celestialY - h * 0.18, h * 0.36, h * 0.36);
+    ctx.fillStyle = phase.moon ? "#eef3ff" : dayPhase.value === "sunset" ? "#ffd19a" : "#fff3c8";
+    ctx.beginPath();
+    ctx.arc(celestialX, celestialY, h * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const horizon = h * 0.29;
+  const seaBottom = h * 0.84;
+  const seaGradient = ctx.createLinearGradient(0, horizon, 0, seaBottom);
+  seaGradient.addColorStop(0, dayPhase.value === "night" ? "rgba(43,76,126,.66)" : "rgba(91,165,207,.42)");
+  seaGradient.addColorStop(0.48, dayPhase.value === "night" ? "rgba(18,55,104,.86)" : "rgba(31,113,171,.72)");
+  seaGradient.addColorStop(1, dayPhase.value === "night" ? "rgba(8,34,76,.96)" : "rgba(7,69,132,.88)");
   ctx.fillStyle = seaGradient;
-  ctx.fillRect(0, h * 0.22, w, h * 0.64);
-  const sandTop = h * 0.79;
+  ctx.fillRect(0, horizon, w, seaBottom - horizon + 8);
+
+  ctx.globalCompositeOperation = "lighter";
+  const waveColors = dayPhase.value === "night"
+    ? ["rgba(124,168,224,.16)", "rgba(180,208,244,.10)", "rgba(255,255,255,.05)", "rgba(98,142,204,.08)"]
+    : ["rgba(160,218,246,.2)", "rgba(218,242,251,.14)", "rgba(255,255,255,.1)", "rgba(91,173,219,.12)"];
+  for (let layer = 0; layer < 4; layer += 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = waveColors[layer];
+    ctx.lineWidth = 1.35 - layer * 0.16;
+    const amp = 3.8 + layer * 2;
+    const speed = 0.00055 + layer * 0.00017;
+    const freq = 0.009 + layer * 0.0035;
+    for (let x = 0; x <= w; x += 3) {
+      const y = horizon + h * (0.08 + layer * 0.125)
+        + Math.sin(x * freq + t * speed) * amp
+        + Math.sin(x * freq * 1.9 - t * speed * 1.35) * amp * 0.34;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  const sandTop = h * 0.81;
   const sandGradient = ctx.createLinearGradient(0, sandTop, 0, h);
-  sandGradient.addColorStop(0, "#f4e1b8");
-  sandGradient.addColorStop(1, "#c99761");
+  sandGradient.addColorStop(0, "#ead9b4");
+  sandGradient.addColorStop(0.55, "#d8bc8a");
+  sandGradient.addColorStop(1, "#c79e68");
   ctx.fillStyle = sandGradient;
   ctx.beginPath();
-  ctx.moveTo(0, sandTop + 8);
-  ctx.quadraticCurveTo(w * 0.24, sandTop - 8, w * 0.5, sandTop + 6);
-  ctx.quadraticCurveTo(w * 0.76, sandTop + 18, w, sandTop - 2);
+  ctx.moveTo(0, sandTop + 5);
+  ctx.bezierCurveTo(w * 0.22, sandTop - 11, w * 0.38, sandTop + 13, w * 0.58, sandTop + 3);
+  ctx.bezierCurveTo(w * 0.75, sandTop - 5, w * 0.87, sandTop + 11, w, sandTop - 3);
   ctx.lineTo(w, h);
   ctx.lineTo(0, h);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,.82)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, sandTop + 2);
-  ctx.quadraticCurveTo(w * 0.24, sandTop - 14, w * 0.5, sandTop);
-  ctx.quadraticCurveTo(w * 0.76, sandTop + 14, w, sandTop - 8);
-  ctx.stroke();
-  ctx.fillStyle = "rgba(117,77,48,.2)";
-  for (let i = 0; i < 18; i += 1) {
-    const px = (i * 83 + 17) % w;
-    const py = sandTop + 16 + ((i * 29) % Math.max(18, h - sandTop - 18));
+
+  for (let layer = 0; layer < 3; layer += 1) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.72 - layer * 0.2})`;
+    ctx.lineWidth = 1.8 - layer * 0.35;
     ctx.beginPath();
-    ctx.ellipse(px, py, 1.6 + (i % 3), 0.7 + (i % 2) * 0.5, i * 0.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalCompositeOperation = "lighter";
-  const waveColors = ["rgba(120,180,255,.16)", "rgba(170,215,255,.10)", "rgba(255,255,255,.06)"];
-  for (let layer = 0; layer < 3; layer++) {
-    ctx.beginPath();
-    ctx.strokeStyle = waveColors[layer];
-    ctx.lineWidth = 1.6 - layer * 0.35;
-    const amp = 5 + layer * 2.4;
-    const speed = 0.0009 + layer * 0.00022;
-    const freq = 0.012 + layer * 0.005;
-    ctx.moveTo(0, h * (0.28 + layer * 0.2));
     for (let x = 0; x <= w; x += 4) {
-      const y =
-        h * (0.28 + layer * 0.2) +
-        Math.sin(x * freq + t * speed) * amp +
-        Math.sin(x * freq * 2.3 - t * speed * 1.6) * amp * 0.4;
-      ctx.lineTo(x, y);
+      const y = sandTop - 3 - layer * 5 + Math.sin(x * 0.012 + t * (0.001 + layer * 0.00013)) * (4 + layer * 1.5);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
-  ctx.fillStyle = "rgba(255,255,255,.12)";
-  for (let i = 0; i < 7; i++) {
-    const px = (i * 137.5 + t * 0.012) % w;
-    const py = h * 0.32 + Math.sin(px * 0.02 + t * 0.0011) * 12;
+
+  ctx.fillStyle = "rgba(105,73,43,.15)";
+  for (let i = 0; i < 48; i += 1) {
+    const px = (i * 83.37 + 17) % w;
+    const py = sandTop + 13 + ((i * 29.17) % Math.max(18, h - sandTop - 16));
     ctx.beginPath();
-    ctx.arc(px, py, 1.6, 0, Math.PI * 2);
+    ctx.ellipse(px, py, 0.55 + (i % 3) * 0.35, 0.35 + (i % 2) * 0.22, i * 0.4, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.globalCompositeOperation = "source-over";
+
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx;
@@ -933,19 +1030,19 @@ function animateBottles() {
     .querySelectorAll<HTMLElement>(".sea-bottle-item[data-id]:not(.is-animated)")
     .forEach((el) => {
       const id = el.dataset.id;
-      const b = props.bottles.find((x) => x.id === id);
+      const b = ambientBottles.find((x) => x.id === id);
       if (!b) return;
       el.classList.add("is-animated");
       startFloat(el, b.seed);
     });
 }
 
-function onClickBottle(b: PeekBottle) {
+function onClickBottle(b: AmbientBottle) {
   if (props.disabled || launching) return;
   const el = rootRef.value?.querySelector<HTMLElement>(`.sea-bottle-item[data-id="${b.id}"]`);
   if (!el) return;
   if (reduceMotion) {
-    emit("fish", b);
+    emit("fish");
     return;
   }
   launching = true;
@@ -964,12 +1061,26 @@ function onClickBottle(b: PeekBottle) {
           gsap.set(item, { clearProps: "transform" });
         });
       void nextTick().then(animateBottles);
-      emit("fish", b);
+      emit("fish");
     },
   });
   tl.to(el, { y: "-=70", rotation: "+=160", duration: 0.55, ease: "power2.in" }, 0)
     .to(el, { scale: 0.01, opacity: 0, duration: 0.28, ease: "power1.in" }, 0.55)
     .add(() => burst(rect.left - rootRect.left + rect.width / 2, rect.top - rootRect.top - 26, 22), 0.6);
+}
+
+let fishCursor = 0;
+function fishRandom() {
+  if (props.disabled || launching) return;
+  const bottle = ambientBottles[fishCursor % ambientBottles.length];
+  fishCursor += 1;
+  if (mode.value === "gl") {
+    const group = glBottles.get(bottle.id);
+    if (group) glFishAnim(group);
+    else emit("fish");
+    return;
+  }
+  onClickBottle(bottle);
 }
 
 function canvasLaunch(cb?: () => void) {
@@ -1022,6 +1133,11 @@ watch(weatherKind, (kind) => {
   if (mode.value === "gl") updateWeatherVisual(kind);
 }, { immediate: true });
 
+watch(dayPhase, () => {
+  if (renderer) renderer.toneMappingExposure = dayPhase.value === "night" ? 0.82 : 1.02;
+  if (mode.value === "gl") updateWeatherVisual(weatherKind.value);
+});
+
 function resizeGl() {
   const root = rootRef.value;
   if (!root || !renderer || !glCamera) return;
@@ -1031,18 +1147,6 @@ function resizeGl() {
 }
 
 defineExpose({ launch });
-
-watch(
-  () => props.bottles.map((b) => b.id).join(","),
-  () => {
-    if (mode.value === "gl") {
-      rebuildGlBottles();
-    } else {
-      void nextTick().then(animateBottles);
-    }
-  },
-  { immediate: true },
-);
 
 onMounted(() => {
   reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1060,6 +1164,9 @@ onMounted(() => {
     if (!reduceMotion) rafId = requestAnimationFrame(loop);
     void nextTick().then(animateBottles);
   }
+  phaseTimer = setInterval(() => {
+    dayPhase.value = currentDayPhase();
+  }, 60_000);
 });
 
 onBeforeUnmount(() => {
@@ -1070,6 +1177,8 @@ onBeforeUnmount(() => {
   canvasResizeObserver = null;
   floatTweens.forEach((t) => t.kill());
   floatTweens = [];
+  if (phaseTimer) clearInterval(phaseTimer);
+  phaseTimer = null;
   disposeGl();
 });
 </script>
@@ -1078,24 +1187,26 @@ onBeforeUnmount(() => {
 .sea-scene {
   position: relative;
   width: 100%;
-  height: 250px;
+  height: clamp(320px, 42vh, 390px);
   overflow: hidden;
-  border-radius: 18px;
-  background:
-    radial-gradient(120% 130% at 30% 20%, hsl(218deg 76% 52%), hsl(222deg 88% 34%) 46%, hsl(224deg 92% 18%) 78%, hsl(226deg 96% 10%));
-  box-shadow: inset 0 -18px 40px rgb(4 12 32 / 55%), inset 0 12px 26px rgb(255 255 255 / 12%);
+  border-radius: 12px;
+  background: #417fae;
+  box-shadow: inset 0 -22px 48px rgb(4 12 32 / 34%), inset 0 1px 0 rgb(255 255 255 / 18%);
   isolation: isolate;
   user-select: none;
 }
 .sea-mode-gl {
-  background: linear-gradient(180deg, #8fc2f5, #cfe5fb 60%, #cfe5fb);
+  background: #7cb5d6;
 }
+.sea-phase-dawn { background: #8f7b85; }
+.sea-phase-day { background: #74b7da; }
+.sea-phase-sunset { background: #9a6870; }
+.sea-phase-night { background: #0c1830; }
 .sea-scene::before {
   position: absolute;
   z-index: 1;
-  inset: -40px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 24% 18%, rgb(214 235 255 / 14%), transparent 60%);
+  inset: 0;
+  background: linear-gradient(180deg, rgb(255 255 255 / 7%), transparent 34%, rgb(3 14 34 / 8%));
   content: "";
   pointer-events: none;
 }
@@ -1113,7 +1224,7 @@ onBeforeUnmount(() => {
   inset: 0;
   width: 100%;
   height: 100%;
-  touch-action: manipulation;
+  touch-action: none;
 }
 .sea-bottles {
   position: absolute;
@@ -1127,7 +1238,7 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: pointer;
+  cursor: default;
   opacity: 0;
   animation: bottle-in 0.8s ease both;
   width: var(--bw, 34px);
@@ -1136,18 +1247,10 @@ onBeforeUnmount(() => {
   margin-top: calc(var(--bh, 46px) / -2);
   transition: filter 0.25s ease;
   filter: drop-shadow(0 8px 14px rgb(0 8 26 / 45%));
-  pointer-events: auto;
+  pointer-events: none;
 }
 .sea-bottle-item.is-animated {
   opacity: 1;
-}
-.sea-bottle-item:hover:not(:disabled) {
-  filter: drop-shadow(0 10px 20px rgb(140 200 255 / 55%)) brightness(1.25);
-  z-index: 6;
-}
-.sea-bottle-item:disabled {
-  cursor: not-allowed;
-  filter: saturate(0.6);
 }
 .bottle-svg {
   width: 100%;
@@ -1172,26 +1275,50 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   place-items: center;
 }
-.bottle-hint {
+.sea-fish-control {
   position: absolute;
-  top: -26px;
+  z-index: 10;
   left: 50%;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 92%);
-  color: #1c4a8c;
-  font-size: 0.54rem;
-  font-weight: 700;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateX(-50%) translateY(4px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  pointer-events: none;
+  bottom: 18px;
+  display: grid;
+  min-width: min(260px, calc(100% - 32px));
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px 9px 9px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 8px;
+  background: rgb(12 28 48 / 72%);
+  box-shadow: 0 12px 32px rgb(1 10 25 / 30%), inset 0 1px 0 rgb(255 255 255 / 12%);
+  color: #f5f8fc;
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transform: translateX(-50%);
+  transition: border-color .2s ease, background .2s ease, transform .2s ease;
 }
-.sea-bottle-item:hover .bottle-hint {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
+.sea-fish-control:hover:not(:disabled) {
+  border-color: rgb(255 255 255 / 55%);
+  background: rgb(10 35 62 / 82%);
+  transform: translateX(-50%) translateY(-2px);
 }
+.sea-fish-control:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.sea-fish-control:disabled { cursor: not-allowed; opacity: .58; }
+.fish-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 13%);
+  color: #d8edff;
+  font-size: 1.08rem;
+  place-items: center;
+}
+.sea-fish-control > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.sea-fish-control strong { overflow: hidden; font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.sea-fish-control small { overflow: hidden; color: rgb(226 237 247 / 72%); font-size: .49rem; text-overflow: ellipsis; white-space: nowrap; }
 .seed-1 { --tint: hue-rotate(18deg); }
 .seed-2 { --tint: hue-rotate(-16deg) saturate(1.15); }
 .seed-3 { --tint: hue-rotate(40deg) saturate(1.1); }
@@ -1222,5 +1349,9 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .sea-bottle-item { animation: none; }
   .sea-splash-text { animation: none; }
+}
+@media (max-width: 700px) {
+  .sea-scene { height: 300px; }
+  .sea-fish-control { bottom: 12px; min-width: min(240px, calc(100% - 24px)); }
 }
 </style>

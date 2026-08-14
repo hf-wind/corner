@@ -5,7 +5,6 @@ describe('VisitorController', () => {
   const request = { ip: '203.0.113.8' };
   const dto = {
     nickname: '旅人',
-    email: 'traveler@example.com',
     turnstileToken: 'verified-token',
   };
 
@@ -32,7 +31,6 @@ describe('VisitorController', () => {
       { headers: { 'x-visitor-id': 'visitor-id' }, ip: request.ip },
       'hashed-visitor-id',
       dto.nickname,
-      dto.email,
     );
   });
 
@@ -57,5 +55,26 @@ describe('VisitorController', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(visitorService.resolveVisitorId).not.toHaveBeenCalled();
     expect(visitorService.identify).not.toHaveBeenCalled();
+  });
+
+  it('delegates bottle selection to the service when fishing', async () => {
+    const visitorService = {
+      resolveVisitorIdOptional: jest.fn().mockReturnValue('hashed-visitor-id'),
+      fishBottle: jest.fn().mockResolvedValue({ bottle: { id: 'b1' } }),
+    };
+    const controller = new VisitorController(visitorService as any, {} as any);
+    const req = {
+      ip: request.ip,
+      user: { id: 'user-1', username: '阿风' },
+    };
+
+    await expect(controller.fishBottle(req, 'visitor-id')).resolves.toEqual({
+      bottle: { id: 'b1' },
+    });
+    expect(visitorService.fishBottle).toHaveBeenCalledWith(
+      { headers: { 'x-visitor-id': 'visitor-id' }, ip: request.ip },
+      { userId: 'user-1', username: '阿风' },
+      'hashed-visitor-id',
+    );
   });
 });

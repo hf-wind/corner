@@ -97,6 +97,7 @@ const props = withDefaults(defineProps<{
 
 const api = useApi()
 const toast = useToast()
+const route = useRoute()
 const { isLoggedIn } = useAuth()
 const { mediaUrl } = useMediaUrl()
 const commentsOpen = ref(props.initiallyExpandedComments)
@@ -152,7 +153,10 @@ function openPreview(index: number) {
 }
 
 async function toggleLike() {
-  if (!isLoggedIn.value) { toast.warning('登录后才能点赞瞬间'); return navigateTo('/login') }
+  if (!isLoggedIn.value) {
+    toast.warning('登录后才能点赞瞬间')
+    return navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+  }
   try {
     const result = await api.post<any>(`/moments/${props.moment.slug}/like`)
     props.moment.liked = !!result.liked

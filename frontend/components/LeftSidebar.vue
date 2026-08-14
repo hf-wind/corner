@@ -178,6 +178,7 @@ const {
   refreshProfile,
   clearSession,
   panelHome,
+  lastPublicPath,
 } = useAuth();
 const { mediaUrl } = useMediaUrl();
 const route = useRoute();
@@ -427,6 +428,7 @@ async function handleLogout() {
     danger: true,
   });
   if (!accepted) return;
+  const returnPath = route.meta.requiresAuth ? lastPublicPath() : route.fullPath;
   clearSession();
   try {
     const toast = useToast();
@@ -434,7 +436,7 @@ async function handleLogout() {
   } catch {
     // ignore
   }
-  router.replace("/home");
+  await router.replace(returnPath || "/home");
 }
 
 onMounted(() => {

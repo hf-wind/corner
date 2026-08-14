@@ -324,8 +324,16 @@ router.beforeEach(async (to) => {
   return true;
 });
 
-router.afterEach(() => {
+router.afterEach((to) => {
   if (typeof document === "undefined") return;
+  if (
+    !to.meta.requiresAuth
+    && !["/login", "/register"].includes(to.path)
+    && to.fullPath.startsWith("/")
+    && !to.fullPath.startsWith("//")
+  ) {
+    sessionStorage.setItem("corner:last-public-route", to.fullPath);
+  }
   window.requestAnimationFrame(() =>
     document.documentElement.classList.remove("space-pending"),
   );

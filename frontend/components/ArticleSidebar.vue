@@ -63,7 +63,7 @@
     </div>
   </aside>
 
-  <Transition name="immersive-ui" appear>
+  <Transition name="immersive-ui">
     <div v-if="immersive" class="immersive-ui">
       <button
         type="button"
@@ -538,15 +538,12 @@ onUnmounted(() => {
 
 .immersive-ui-enter-active,
 .immersive-ui-leave-active {
-  transition:
-    opacity 0.3s ease,
-    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.22s ease;
 }
 
 .immersive-ui-enter-from,
 .immersive-ui-leave-to {
   opacity: 0;
-  transform: translateY(10px);
 }
 
 .immersive-catalog-bar {

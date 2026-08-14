@@ -57,22 +57,6 @@
               />
               <span class="vn-count">{{ name.length }}/20</span>
             </div>
-            <div class="vn-email-wrap">
-              <input
-                v-model="mail"
-                :maxlength="255"
-                type="email"
-                class="vn-input"
-                placeholder="邮箱（可选）"
-                aria-label="邮箱（可选）"
-                :disabled="submitting"
-                @keydown.enter="submit"
-              />
-              <span class="vn-email-note">
-                <Icon name="ph:envelope-simple-bold" />
-                选填：会随你投出的漂流瓶一起漂向远方，捞到瓶子的旅人可用它联系你。不会展示在公开位置。
-              </span>
-            </div>
           </template>
 
           <template v-else-if="mode === 'login'">
@@ -228,14 +212,13 @@ const props = withDefaults(
   defineProps<{
     visible: boolean
     initial?: string
-    initialEmail?: string
     pendingHint?: string
   }>(),
-  { initial: '', initialEmail: '', pendingHint: '' },
+  { initial: '', pendingHint: '' },
 )
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'confirm', name: string, email: string, turnstileToken: string): void
+  (e: 'confirm', name: string, turnstileToken: string): void
   (e: 'authenticated'): void
 }>()
 
@@ -246,7 +229,6 @@ const { setSession } = useAuth()
 const mode = ref<'guest' | 'login' | 'register'>('guest')
 const loginType = ref<'password' | 'code'>('password')
 const name = ref(props.initial)
-const mail = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
@@ -316,7 +298,6 @@ watch(
       return
     }
     name.value = props.initial
-    mail.value = props.initialEmail
     error.value = ''
     nextTick(() => {
       const card = document.querySelector<HTMLDivElement>('.visitor-name-card')
@@ -407,14 +388,9 @@ async function submitGuest(): Promise<boolean> {
     error.value = '名字不能为空，哪怕是代号也好。'
     return false
   }
-  const cleanMail = mail.value.trim()
-  if (cleanMail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanMail)) {
-    error.value = '邮箱格式好像不太对，检查一下？'
-    return false
-  }
   const token = await resolveTurnstile()
   if (!token) return false
-  emit('confirm', clean, cleanMail, token)
+  emit('confirm', clean, token)
   return true
 }
 

@@ -112,13 +112,9 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  gap: 10px;
-  contain: layout;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
+  gap: 8px;
+  overflow: visible;
 }
-.home-sidebar::-webkit-scrollbar { display: none; }
 
 .side-card,
 .footprints {
@@ -128,8 +124,8 @@ onUnmounted(() => {
 }
 
 .side-card {
-  min-height: 98px;
-  flex: 0 0 98px;
+  min-height: 94px;
+  flex: 0 0 94px;
   padding: 13px 14px 12px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
@@ -245,9 +241,14 @@ onUnmounted(() => {
 
 .footprints {
   display: flex;
-  min-height: 0;
-  flex: 1 0 248px;
+  min-height: 190px;
+  flex: 1 1 190px;
   flex-direction: column;
+}
+
+@media (max-height: 680px) and (min-width: 901px) {
+  .overview-card { display: none; }
+  .footprints { min-height: 170px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -8,6 +8,7 @@ export type AuthUser = {
 }
 
 const USER_PATHS = ['/admin/profile', '/admin/messages']
+const LAST_PUBLIC_ROUTE_KEY = 'corner:last-public-route'
 const PROFILE_TTL = 5 * 60 * 1000
 let refreshing: Promise<void> | null = null
 let lastProfileRefreshAt = 0
@@ -103,6 +104,14 @@ export function useAuth() {
     return isAdmin.value ? '/admin' : '/admin/profile'
   }
 
+  function lastPublicPath() {
+    if (typeof window === 'undefined') return '/home'
+    const target = sessionStorage.getItem(LAST_PUBLIC_ROUTE_KEY) || ''
+    if (!target.startsWith('/') || target.startsWith('//')) return '/home'
+    if (/^\/(?:admin|login|register)(?:\/|$)/.test(target)) return '/home'
+    return target
+  }
+
   function isUserAreaPath(path: string) {
     return USER_PATHS.some((p) => path === p || path.startsWith(`${p}/`))
   }
@@ -123,6 +132,7 @@ export function useAuth() {
     setSession,
     clearSession,
     panelHome,
+    lastPublicPath,
     isUserAreaPath,
     canAccessAdminPath,
   }

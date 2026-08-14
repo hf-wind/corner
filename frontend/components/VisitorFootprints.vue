@@ -35,9 +35,12 @@
         class="fp-item"
         :style="{ '--fp-delay': itemDelay(index) }"
       >
-        <span class="fp-index">{{ String(index + 1).padStart(2, "0") }}</span>
+        <span class="fp-avatar" aria-hidden="true">
+          <template v-if="visit.nickname?.trim()">{{ visit.nickname.trim().charAt(0) }}</template>
+          <Icon v-else name="ph:footprints-bold" />
+        </span>
         <div class="fp-copy">
-          <p :title="greeting(visit)">{{ greeting(visit) }}</p>
+          <p :title="visitorLabel(visit)">{{ visitorLabel(visit) }}</p>
           <div class="fp-meta">
             <span v-if="visit.region"><Icon name="ph:map-pin-bold" />{{ visit.region }}</span>
             <span v-if="visit.device"><Icon :name="deviceIcon(visit.device)" />{{ deviceLabel(visit.device) }}</span>
@@ -74,11 +77,9 @@ const listKey = ref(0);
 let loadSeq = 0;
 let idleHandle: number | null = null;
 
-function greeting(visit: RecentVisit) {
+function visitorLabel(visit: RecentVisit) {
   const nickname = visit.nickname?.trim();
-  if (nickname) return `欢迎 ${nickname} 再次到访`;
-  if (visit.region) return `欢迎来自 ${visit.region} 的朋友`;
-  return "欢迎远方的朋友";
+  return nickname || "途经风隅的旅人";
 }
 
 function itemDelay(index: number) {
@@ -115,7 +116,7 @@ async function load() {
   try {
     const data = await fetchRecent();
     if (seq !== loadSeq) return;
-    items.value = (Array.isArray(data) ? data : []).slice(0, 5);
+    items.value = (Array.isArray(data) ? data : []).slice(0, 3);
     listKey.value += 1;
   } catch {
     // Supplementary content keeps its last successful state on network failure.
@@ -144,7 +145,7 @@ onUnmounted(() => {
 <style scoped>
 .footprints {
   display: flex;
-  min-height: 248px;
+  min-height: 190px;
   flex-direction: column;
   padding: 15px 14px 10px;
   overflow: hidden;
@@ -176,11 +177,9 @@ onUnmounted(() => {
 }
 .fp-head p {
   margin: 4px 0 0;
-  overflow: hidden;
   color: var(--c-text-3);
   font-size: .54rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
 }
 .fp-refresh {
   display: grid;
@@ -215,26 +214,36 @@ onUnmounted(() => {
 .fp-state > svg { color: var(--c-primary); font-size: 1.25rem; }
 .fp-list {
   display: grid;
+  flex: 1;
+  align-content: center;
+  gap: 3px;
   margin: 0;
-  padding: 3px 0 0;
+  padding: 5px 0 0;
   list-style: none;
 }
 .fp-item {
   display: grid;
   min-width: 0;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-height: 39px;
+  min-height: 45px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   animation: fp-item-in .42s var(--ui-ease-out) both;
   animation-delay: var(--fp-delay);
 }
 .fp-item:last-child { border-bottom: 0; }
-.fp-index {
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: .46rem;
+.fp-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-primary-soft) 62%, var(--ld-bg-card));
+  color: var(--c-primary);
+  font-size: .62rem;
+  font-weight: 750;
+  place-items: center;
 }
 .fp-copy { min-width: 0; }
 .fp-copy > p {
@@ -253,7 +262,7 @@ onUnmounted(() => {
   margin-top: 2px;
   overflow: hidden;
   color: var(--c-text-3);
-  font-size: .47rem;
+  font-size: .45rem;
 }
 .fp-meta span { display: inline-flex; min-width: 0; align-items: center; gap: 3px; white-space: nowrap; }
 .fp-meta span:first-child { overflow: hidden; text-overflow: ellipsis; }
@@ -263,6 +272,12 @@ onUnmounted(() => {
   font-family: var(--font-mono);
   font-size: .44rem;
   white-space: nowrap;
+}
+@media (max-height: 680px) and (min-width: 901px) {
+  .footprints { min-height: 170px; padding-top: 12px; }
+  .fp-head { padding-bottom: 9px; }
+  .fp-head p { display: none; }
+  .fp-item { min-height: 39px; }
 }
 @keyframes fp-item-in {
   from { opacity: 0; transform: translateY(6px); }

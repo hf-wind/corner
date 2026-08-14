@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsOptional,
   IsString,
   MaxLength,
@@ -41,11 +40,6 @@ export class SetVisitorNicknameDto {
   @MinLength(1)
   @MaxLength(VISITOR_NICKNAME_MAX_LENGTH)
   nickname: string;
-
-  @IsOptional()
-  @IsEmail()
-  @MaxLength(255)
-  email?: string;
 
   @IsOptional()
   @IsString()

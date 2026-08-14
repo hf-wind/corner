@@ -70,7 +70,7 @@ const themeConfig = computed(() => ({
 async function guardPanel() {
   readStorage();
   if (!isLoggedIn.value) {
-    router.push("/login");
+    router.push({ path: "/login", query: { redirect: route.fullPath } });
     return;
   }
   try {

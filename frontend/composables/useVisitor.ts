@@ -1,7 +1,6 @@
 import { useApi } from "./useApi";
 
 const NICKNAME_KEY = "corner:visitor:nickname";
-const EMAIL_KEY = "corner:visitor:email";
 
 export function useVisitor() {
   const api = useApi();
@@ -9,20 +8,10 @@ export function useVisitor() {
   const nickname = ref(
     typeof window !== "undefined" ? localStorage.getItem(NICKNAME_KEY) ?? "" : "",
   );
-  const email = ref(
-    typeof window !== "undefined" ? localStorage.getItem(EMAIL_KEY) ?? "" : "",
-  );
-
   const setNickname = (value: string) => {
     const clean = value.trim().slice(0, 20);
     localStorage.setItem(NICKNAME_KEY, clean);
     nickname.value = clean;
-  };
-
-  const setEmail = (value: string) => {
-    const clean = value.trim().slice(0, 255);
-    localStorage.setItem(EMAIL_KEY, clean);
-    email.value = clean;
   };
 
   const visitorId = () => {
@@ -40,14 +29,12 @@ export function useVisitor() {
     return generated;
   };
 
-  const identify = async (name: string, mail?: string, turnstileToken?: string) => {
+  const identify = async (name: string, turnstileToken?: string) => {
     const result = await api.post<any>("/visitor/identify", {
       nickname: name,
-      email: mail || undefined,
       turnstileToken,
     });
     setNickname(result?.nickname ?? name);
-    if (result?.email) setEmail(result.email);
     return result;
   };
 
@@ -69,18 +56,13 @@ export function useVisitor() {
     api.post<any>("/visitor/messages", { content });
   const throwBottle = (content: string, parentId?: string) =>
     api.post<any>("/visitor/bottles", { content, parentId });
-  const fishBottleById = (id: string) =>
-    api.post<any>(`/visitor/bottles/${id}/fish`);
+  const fishBottle = () => api.post<any>("/visitor/bottles/fish");
   const replyBottle = (id: string, content: string) =>
     api.post<any>(`/visitor/bottles/${id}/reply`, { content });
-  const peekBottles = (limit = 8) =>
-    api.get<any>("/visitor/bottles/peek", { limit });
 
   return {
     nickname,
-    email,
     setNickname,
-    setEmail,
     visitorId,
     identify,
     trackVisit,
@@ -90,8 +72,7 @@ export function useVisitor() {
     fetchMessages,
     sendMessage,
     throwBottle,
-    fishBottleById,
+    fishBottle,
     replyBottle,
-    peekBottles,
   };
 }

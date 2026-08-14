@@ -130,7 +130,6 @@ export class VisitorService {
     req: VisitorRequest,
     visitorIdHash: string,
     nickname: string,
-    email?: string,
   ) {
     await this.checkRateLimit(req, 'identify', IDENTIFY_RATE_LIMIT_PER_DAY);
     const clean = nickname.trim().slice(0, 20);
@@ -144,18 +143,15 @@ export class VisitorService {
     if (existing && existing.nickname?.trim()) {
       throw new BadRequestException('已登记的名字不能修改');
     }
-    const cleanEmail = email?.trim().slice(0, 255) || null;
     const profile = await this.prisma.visitorProfile.upsert({
       where: { visitorIdHash },
       update: {
         nickname: clean,
-        email: cleanEmail,
         lastSeenAt: new Date(),
       },
       create: {
         visitorIdHash,
         nickname: clean,
-        email: cleanEmail,
         ipHash: this.ipHash(req),
       },
     });
@@ -163,7 +159,7 @@ export class VisitorService {
       throw new ForbiddenException('该访客已被封禁');
     }
     const unlocked = await this.syncAchievements(visitorIdHash);
-    return { nickname: profile.nickname, email: profile.email, unlocked };
+    return { nickname: profile.nickname, unlocked };
   }
 
   async trackVisit(
@@ -439,35 +435,41 @@ export class VisitorService {
     req: VisitorRequest,
     actor: VisitorActor,
     visitorIdHash: string | null,
-    bottleId: string,
   ) {
     await this.checkRateLimit(req, 'fish', FISH_RATE_LIMIT_PER_DAY);
-    const bottle = await this.prisma.visitorMessage.findUnique({
-      where: { id: bottleId },
-    });
-    if (!bottle || bottle.type !== 'bottle' || bottle.status !== 'approved') {
-      throw new NotFoundException('这只瓶子已经被别人捞走了');
-    }
     const selfHash = await this.resolveSelfVisitorHash(actor, visitorIdHash);
-    const sameUser = !!bottle.userId && bottle.userId === actor?.userId;
-    const sameVisitor =
-      !!bottle.visitorIdHash &&
-      !!selfHash &&
-      bottle.visitorIdHash === selfHash;
-    if (sameUser || sameVisitor) {
-      throw new BadRequestException('不能捞起自己投的瓶子');
-    }
-    const updated = await this.prisma.visitorMessage.updateMany({
-      where: { id: bottle.id, status: 'approved' },
-      data: {
-        status: 'caught',
-        caughtByIdHash: visitorIdHash ?? undefined,
-        caughtAt: new Date(),
+    const not: Record<string, unknown>[] = [];
+    if (selfHash) not.push({ visitorIdHash: selfHash });
+    if (actor?.userId) not.push({ userId: actor.userId });
+    const candidates = await this.prisma.visitorMessage.findMany({
+      where: {
+        type: 'bottle',
+        status: 'approved',
+        ...(not.length > 0 ? { NOT: not } : {}),
       },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
     });
-    if (updated.count === 0) {
-      throw new NotFoundException('这只瓶子已经被别人捞走了');
+
+    let bottle: (typeof candidates)[number] | null = null;
+    while (candidates.length > 0) {
+      const index = Math.floor(Math.random() * candidates.length);
+      const candidate = candidates.splice(index, 1)[0];
+      const updated = await this.prisma.visitorMessage.updateMany({
+        where: { id: candidate.id, status: 'approved' },
+        data: {
+          status: 'caught',
+          caughtByIdHash: visitorIdHash ?? undefined,
+          caughtAt: new Date(),
+        },
+      });
+      if (updated.count > 0) {
+        bottle = candidate;
+        break;
+      }
     }
+    if (!bottle) throw new NotFoundException('海面暂时没有可打捞的瓶子');
+
     const chainRows = await this.prisma.visitorMessage.findMany({
       where: {
         chainId: bottle.chainId ?? bottle.id,
@@ -477,20 +479,6 @@ export class VisitorService {
       orderBy: { createdAt: 'asc' },
       select: { id: true, nickname: true, content: true, createdAt: true },
     });
-    let contactEmail: string | null = null;
-    if (bottle.userId) {
-      const owner = await this.prisma.user.findUnique({
-        where: { id: bottle.userId },
-        select: { email: true },
-      });
-      contactEmail = owner?.email ?? null;
-    } else if (bottle.visitorIdHash) {
-      const owner = await this.prisma.visitorProfile.findUnique({
-        where: { visitorIdHash: bottle.visitorIdHash },
-        select: { email: true },
-      });
-      contactEmail = owner?.email ?? null;
-    }
     if (bottle.userId) {
       try {
         await this.notificationService.create(bottle.userId, {
@@ -513,7 +501,6 @@ export class VisitorService {
         chain: chainRows,
         nickname: bottle.nickname,
         createdAt: bottle.createdAt,
-        contactEmail,
         ownerUserId,
         canReply: !!bottle.userId && (!actor || bottle.userId !== actor.userId),
       },
@@ -629,51 +616,6 @@ export class VisitorService {
     return { ok: true, record, review };
   }
 
-  async peekBottles(
-    limit = 8,
-    excludeVisitorHash: string | null = null,
-    excludeUserId: string | null = null,
-  ) {
-    const where: Record<string, unknown> = {
-      type: 'bottle',
-      status: 'approved',
-    };
-    const not: Record<string, unknown>[] = [];
-    if (excludeVisitorHash) not.push({ visitorIdHash: excludeVisitorHash });
-    if (excludeUserId) not.push({ userId: excludeUserId });
-    if (not.length > 0) where.NOT = not;
-    const candidates = await this.prisma.visitorMessage.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 60,
-      select: { id: true, parentId: true, chainId: true, nickname: true },
-    });
-    const referenced = new Set(
-      candidates.filter((c) => c.parentId).map((c) => c.parentId as string),
-    );
-    const tails = candidates.filter((c) => !referenced.has(c.id));
-    const chainIds = tails
-      .map((t) => t.chainId ?? t.id)
-      .filter((id): id is string => !!id);
-    const chains = chainIds.length
-      ? await this.prisma.visitorMessage.groupBy({
-          by: ['chainId'],
-          where: { chainId: { in: chainIds }, type: 'bottle' },
-          _count: { _all: true },
-        })
-      : [];
-    const depthByChain = new Map(chains.map((c) => [c.chainId, c._count._all]));
-    return tails.slice(0, limit).map((t) => ({
-      id: t.id,
-      nicknameFirstChar: t.nickname.slice(0, 1),
-      chainLength: depthByChain.get(t.chainId ?? t.id) ?? 1,
-      seed: [...t.id].reduce(
-        (acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 997,
-        7,
-      ),
-    }));
-  }
-
   async listMessages(type: 'message' | 'bottle', page: number, pageSize = 20) {
     const where = { type, status: 'approved' };
     const [items, total] = await Promise.all([
@@ -777,11 +719,14 @@ export class VisitorService {
         achievements: [],
       };
     }
-    const [achievements, bottleCount, caughtCount] = await Promise.all([
+    const [achievements, messageCount, bottleCount, caughtCount] = await Promise.all([
       this.prisma.visitorAchievement.findMany({
         where: { visitorIdHash },
         orderBy: { unlockedAt: 'asc' },
         select: { code: true, unlockedAt: true },
+      }),
+      this.prisma.visitorMessage.count({
+        where: { visitorIdHash, type: 'message', status: 'approved' },
       }),
       this.prisma.visitorMessage.count({
         where: {
@@ -797,7 +742,7 @@ export class VisitorService {
     return {
       nickname: profile.nickname,
       visitCount: profile.visitCount,
-      messageCount: profile.messageCount,
+      messageCount,
       bottleCount,
       caughtCount,
       achievements: achievements.map((a) => ({
@@ -901,12 +846,12 @@ export class VisitorService {
 
       const ownedSet = new Set(owned.map((o) => o.code));
       const candidates: Array<[string, boolean]> = [
-        ['first_visit', profile.visitCount >= 1],
-        ['set_nickname', !!profile.nickname?.trim()],
-        ['first_message', msgCount >= 1],
-        ['first_bottle', bottleCount >= 1],
-        ['catch_bottle', caughtCount >= 1],
-        ['visits_5', profile.visitCount >= 5],
+        ['first_visit', profile.visitCount >= 3],
+        ['set_nickname', !!profile.nickname?.trim() && msgCount + bottleCount >= 2],
+        ['first_message', msgCount >= 3],
+        ['first_bottle', bottleCount >= 3],
+        ['catch_bottle', caughtCount >= 3],
+        ['visits_5', profile.visitCount >= 10],
         ['visits_30', profile.visitCount >= 30],
       ];
       const toUnlock = candidates

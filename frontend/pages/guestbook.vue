@@ -11,16 +11,6 @@
         metric-label="条时光留言"
       />
 
-      <PageStatsBar
-        v-if="wall"
-        class="content-reveal"
-        label="时光留言板统计"
-        :items="[
-          { icon: 'ph:users-three-bold', value: wall.todayVisitors, label: '今日访客' },
-          { icon: 'ph:footprints-bold', value: wall.totalVisits, label: '累计足迹' },
-        ]"
-      />
-
       <div class="tabs content-reveal" role="tablist" aria-label="时光留言板分区">
         <span class="tabs-track" :class="`tabs-${activeTab}`" aria-hidden="true" />
         <button
@@ -149,7 +139,6 @@
           <SeaScene
             ref="seaRef"
             class="sea-scene-wrap"
-            :bottles="peekBottles"
             :disabled="fishing"
             @fish="onFishBottle"
           />
@@ -157,7 +146,6 @@
           <div class="sea-copy">
             <span class="sea-kicker">THE TIME SEA · 时光海</span>
             <h2>海面下，漂着来自陌生时刻的信</h2>
-            <p>捞起一只漂流瓶，读一读某个时刻某个旅人的絮语。投下的瓶子，会静静等待下一个有缘人。</p>
           </div>
 
           <Transition name="bottle-pop">
@@ -196,9 +184,6 @@
                   </button>
                 </div>
               </div>
-              <a v-if="caughtBottle.contactEmail && !caughtBottle.canReply" class="caught-mail" :href="`mailto:${caughtBottle.contactEmail}`">
-                <Icon name="ph:envelope-simple-bold" />想认识这位旅人？给他写封信 → {{ caughtBottle.contactEmail }}
-              </a>
             </div>
           </Transition>
         </div>
@@ -255,15 +240,36 @@
             :class="{ locked: !ownedCodes.has(badge.code), fresh: freshCodes.has(badge.code) }"
             :title="badge.description"
           >
+            <span class="badge-status">
+              <span>{{ badge.rarity }}</span>
+              <Icon :name="ownedCodes.has(badge.code) ? 'ph:seal-check-fill' : 'ph:lock-key-bold'" />
+            </span>
             <span class="badge-icon"><BadgeMedal :code="badge.code" :locked="!ownedCodes.has(badge.code)" /></span>
             <strong>{{ badge.title }}</strong>
             <small>{{ badge.description }}</small>
+            <span class="badge-meter" aria-hidden="true"><i :style="{ width: `${badgeProgress(badge).percent}%` }" /></span>
+            <span class="badge-count">{{ ownedCodes.has(badge.code) ? '已典藏' : `${badgeProgress(badge).current} / ${badge.target}` }}</span>
           </div>
         </div>
       </section>
     </main>
 
     <aside class="sidebar-right">
+      <section v-if="wall" class="right-card journey-card" aria-label="时光留言板统计">
+        <div class="right-card-title"><span><Icon name="ph:chart-line-up-bold" /> 今日潮汐</span></div>
+        <div class="journey-stats">
+          <div>
+            <span><Icon name="ph:users-three-bold" /></span>
+            <strong>{{ wall.todayVisitors }}</strong>
+            <small>今日访客</small>
+          </div>
+          <div>
+            <span><Icon name="ph:footprints-bold" /></span>
+            <strong>{{ wall.totalVisits }}</strong>
+            <small>累计足迹</small>
+          </div>
+        </div>
+      </section>
       <section class="right-card my-card">
         <span class="aside-kicker">MY TIME · 我的时光</span>
         <div class="my-avatar" :class="{ 'is-user': isLoggedIn }">
@@ -322,7 +328,6 @@
     <VisitorNameModal
       :visible="nameModalVisible"
       :initial="nickname"
-      :initial-email="email"
       :pending-hint="pendingHint"
       @close="nameModalVisible = false"
       @confirm="handleNameConfirm"
@@ -356,16 +361,14 @@ dayjs.locale("zh-cn");
 
 const {
   nickname,
-  email,
   identify,
   fetchWall,
   fetchMe,
   fetchMessages,
   sendMessage,
   throwBottle,
-  fishBottleById,
+  fishBottle,
   replyBottle,
-  peekBottles: fetchPeek,
 } = useVisitor();
 const toast = useToast();
 const { isLoggedIn, user } = useAuth();
@@ -394,7 +397,6 @@ const bottleText = ref("");
 const sendingBottle = ref(false);
 const fishing = ref(false);
 const caughtBottle = ref<any>(null);
-const peekBottles = ref<any[]>([]);
 
 const seaRef = ref<InstanceType<any> | null>(null);
 const seaCardRef = ref<HTMLElement | null>(null);
@@ -405,6 +407,7 @@ const relaySending = ref(false);
 const replyDialogOpen = ref(false);
 const replyText = ref("");
 const replySending = ref(false);
+const identityCompleting = ref(false);
 const chainReversed = computed(() => [...(caughtBottle.value?.chain ?? [])].reverse());
 
 const canReply = computed(() => {
@@ -477,16 +480,19 @@ function visitorAvatarStyle(msg: any): Record<string, string> {
   };
 }
 
-function scrollToEl(el: HTMLElement | null | undefined) {
+function scrollToEl(el: HTMLElement | null | undefined, align: "start" | "center" = "start") {
   if (!el) return;
   const container = document.querySelector<HTMLElement>(".main-content");
   if (!container) return;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const top =
+  let top =
     el.getBoundingClientRect().top -
     container.getBoundingClientRect().top +
     container.scrollTop -
     18;
+  if (align === "center") {
+    top -= Math.max(0, (container.clientHeight - el.offsetHeight) / 2 - 18);
+  }
   container.scrollTo({ top, behavior: reduced ? "auto" : "smooth" });
 }
 
@@ -510,7 +516,7 @@ function openReplyDialog() {
     hint: "回复漂流瓶主人",
   };
   if (isLoggedIn.value || nickname.value) {
-    void pendingAction.value.fn();
+    void runPendingAction();
     return;
   }
   nameModalVisible.value = true;
@@ -523,16 +529,23 @@ const pendingHint = computed(() =>
   pendingAction.value ? `正在继续：${pendingAction.value.hint}` : "",
 );
 
-const BADGES = [
-  { code: "first_visit", icon: "ph:star-four-fill", title: "初识之旅", description: "第一次踏上这座角落" },
-  { code: "set_nickname", icon: "ph:feather-fill", title: "署名旅人", description: "留下了属于自己的名字" },
-  { code: "first_message", icon: "ph:note-pencil-fill", title: "时光笔迹", description: "在时光留言板写下第一笔" },
-  { code: "first_bottle", icon: "solar:bottle-bold", title: "漂流瓶初航", description: "投下第一只漂流瓶" },
-  { code: "catch_bottle", icon: "ph:anchor-fill", title: "潮汐拾贝", description: "捞起海面上的一只瓶子" },
-  { code: "visits_5", icon: "ph:sparkle-fill", title: "五夜星光", description: "五度归来，星光为引" },
-  { code: "visits_30", icon: "ph:meteor-fill", title: "三十夜长旅", description: "三十次往返，已成默契" },
-  { code: "pages_10", icon: "ph:compass-fill", title: "十页浮光", description: "浏览过十个角落" },
-  { code: "pages_20", icon: "ph:map-trifold-fill", title: "深度游历", description: "足迹踏遍二十页光景" },
+type BadgeDefinition = {
+  code: string;
+  title: string;
+  description: string;
+  rarity: string;
+  target: number;
+  metric: "visits" | "signed_content" | "messages" | "bottles" | "caught";
+};
+
+const BADGES: BadgeDefinition[] = [
+  { code: "first_visit", title: "三度相逢", description: "三次回到这座角落", rarity: "旅途", target: 3, metric: "visits" },
+  { code: "set_nickname", title: "留名成章", description: "署名后留下两次时光内容", rarity: "记录", target: 2, metric: "signed_content" },
+  { code: "first_message", title: "时光成笺", description: "留下三条通过审核的留言", rarity: "创作", target: 3, metric: "messages" },
+  { code: "first_bottle", title: "远海信使", description: "投下三只通过审核的漂流瓶", rarity: "远航", target: 3, metric: "bottles" },
+  { code: "catch_bottle", title: "潮汐守望", description: "从时光海打捞三封来信", rarity: "相遇", target: 3, metric: "caught" },
+  { code: "visits_5", title: "十日回响", description: "十次归来，风声已有回音", rarity: "珍藏", target: 10, metric: "visits" },
+  { code: "visits_30", title: "三十夜长旅", description: "三十次往返，已成默契", rarity: "典藏", target: 30, metric: "visits" },
 ];
 
 const badges = BADGES;
@@ -540,12 +553,27 @@ const ownedCodes = computed(() => new Set((me.value?.achievements ?? []).map((a:
 const ownedBadges = computed(() => BADGES.filter((b) => ownedCodes.value.has(b.code)));
 const freshCodes = ref<Set<string>>(new Set());
 
+function badgeProgress(badge: BadgeDefinition) {
+  const values = {
+    visits: Number(me.value?.visitCount || 0),
+    signed_content: nickname.value || isLoggedIn.value
+      ? Number(me.value?.messageCount || 0) + Number(me.value?.bottleCount || 0)
+      : 0,
+    messages: Number(me.value?.messageCount || 0),
+    bottles: Number(me.value?.bottleCount || 0),
+    caught: Number(me.value?.caughtCount || 0),
+  };
+  const current = Math.min(badge.target, values[badge.metric]);
+  return { current, percent: ownedCodes.value.has(badge.code) ? 100 : (current / badge.target) * 100 };
+}
+
 const msgRelativeTime = (time: string) => dayjs(time).fromNow();
 const dateLabel = (time: string) => dayjs(time).format("YYYY 年 M 月 D 日");
 
 function celebrate(unlocked: string[] | undefined) {
   if (!unlocked?.length) return;
   for (const code of unlocked) {
+    if (freshCodes.value.has(code)) continue;
     const badge = BADGES.find((b) => b.code === code);
     if (!badge) continue;
     freshCodes.value = new Set([...freshCodes.value, code]);
@@ -561,27 +589,28 @@ function askName(rename = false) {
   if (rename) pendingAction.value = null;
 }
 
-async function handleNameConfirm(name: string, mail: string, turnstileToken: string) {
+async function runPendingAction() {
+  const action = pendingAction.value;
+  pendingAction.value = null;
+  if (!action) return;
+  await action.fn();
+}
+
+async function handleNameConfirm(name: string, turnstileToken: string) {
+  if (identityCompleting.value) return;
+  identityCompleting.value = true;
   try {
-    const result = await identify(name, mail, turnstileToken);
+    const result = await identify(name, turnstileToken);
     await refreshMe();
     toast.success(`你好，${name}`);
     celebrate(result?.unlocked);
+    await runPendingAction();
   } catch (err: any) {
     toast.error(err?.message || "署名失败，请稍后再试");
+  } finally {
+    identityCompleting.value = false;
     nameModalVisible.value = false;
-    return;
   }
-  const action = pendingAction.value;
-  pendingAction.value = null;
-  if (action) {
-    try {
-      await action.fn();
-    } catch {
-      /* action 内部已提示错误 */
-    }
-  }
-  nameModalVisible.value = false;
 }
 
 function requireName(action: () => Promise<void>, hint: string): boolean {
@@ -592,10 +621,8 @@ function requireName(action: () => Promise<void>, hint: string): boolean {
 }
 
 async function handleAuthenticated() {
-  const action = pendingAction.value;
-  pendingAction.value = null;
   try {
-    if (action) await action.fn();
+    await runPendingAction();
   } catch {
     /* action 内部已提示错误 */
   }
@@ -603,7 +630,7 @@ async function handleAuthenticated() {
 }
 
 function toProfile() {
-  const { isAdmin, panelHome } = useAuth();
+  const { panelHome } = useAuth();
   navigateTo(panelHome());
 }
 
@@ -638,6 +665,7 @@ async function loadMore() {
 }
 
 async function submitMessage() {
+  if (sendingMessage.value) return;
   const text = composerText.value.trim();
   if (!text) {
     toast.warning("先写下一句话再投入时光吧");
@@ -648,6 +676,7 @@ async function submitMessage() {
 }
 
 async function doSendMessage(text: string) {
+  if (sendingMessage.value) return;
   sendingMessage.value = true;
   const infoToast = toast.info("已提交，AI 审核中…");
   try {
@@ -676,6 +705,7 @@ async function doSendMessage(text: string) {
 }
 
 async function submitBottle() {
+  if (sendingBottle.value) return;
   const text = bottleText.value.trim();
   if (!text) {
     toast.warning("先写下一封信再投入海面吧");
@@ -686,6 +716,7 @@ async function submitBottle() {
 }
 
 async function doThrowBottle(text: string) {
+  if (sendingBottle.value) return;
   sendingBottle.value = true;
   const infoToast = toast.info("已提交，AI 正在审核瓶子…");
   try {
@@ -704,10 +735,10 @@ async function doThrowBottle(text: string) {
     if (result?.review) toast.dismiss(infoToast);
     toast.success("瓶子已通过审核，漂向时光海等待有缘人");
     celebrate(result?.unlocked);
-    seaRef.value?.launch();
-    await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
     await nextTick();
-    scrollToEl(seaCardRef.value);
+    scrollToEl(seaCardRef.value, "center");
+    seaRef.value?.launch();
+    await Promise.all([refreshWall(), refreshMe()]);
   } catch (err: any) {
     toast.dismiss(infoToast);
     toast.error(err?.message || "投瓶失败，请稍后再试");
@@ -716,28 +747,28 @@ async function doThrowBottle(text: string) {
   }
 }
 
-async function onFishBottle(bottle: { id: string }) {
-  if (!requireName(() => doFishBottle(bottle), "正在为你捞起这只瓶子")) return;
-  await doFishBottle(bottle);
+async function onFishBottle() {
+  if (!requireName(() => doFishBottle(), "正在为你打捞一封来信")) return;
+  await doFishBottle();
 }
 
-async function doFishBottle(bottle: { id: string }) {
+async function doFishBottle() {
+  if (fishing.value) return;
   fishing.value = true;
   caughtBottle.value = null;
   relayMode.value = false;
   relayText.value = "";
   replyText.value = "";
   try {
-    const result = await fishBottleById(bottle.id);
+    const result = await fishBottle();
     caughtBottle.value = result?.bottle ?? null;
     toast.success(`捞起了一封来自「${result?.bottle?.nickname ?? "远方"}」的信`);
     celebrate(result?.unlocked);
-    await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
+    await Promise.all([refreshWall(), refreshMe()]);
     await nextTick();
     scrollToEl(caughtRef.value);
   } catch (err: any) {
-    toast.info(err?.message || "这只瓶子似乎已经漂走了");
-    await refreshPeek();
+    toast.info(err?.message || "潮汐暂时没有带来新的信");
   } finally {
     fishing.value = false;
   }
@@ -767,7 +798,7 @@ async function submitRelay() {
     celebrate(result?.unlocked);
     caughtBottle.value = null;
     seaRef.value?.launch();
-    await Promise.all([refreshWall(), refreshPeek(), refreshMe()]);
+    await Promise.all([refreshWall(), refreshMe()]);
   } catch (err: any) {
     toast.error(err?.message || "投瓶失败，请稍后再试");
   } finally {
@@ -811,17 +842,8 @@ async function refreshWall() {
   }
 }
 
-async function refreshPeek() {
-  try {
-    const data = await fetchPeek();
-    peekBottles.value = Array.isArray(data) ? data : [];
-  } catch {
-    peekBottles.value = [];
-  }
-}
-
 onMounted(async () => {
-  await Promise.allSettled([refreshWall(), refreshMe(), loadMessages(true), refreshPeek()]);
+  await Promise.allSettled([refreshWall(), refreshMe(), loadMessages(true)]);
 });
 
 useHead({ title: "时光留言板" });
@@ -837,29 +859,6 @@ useHead({ title: "时光留言板" });
   color: var(--c-text);
   isolation: isolate;
 }
-.page-layout::before,
-.page-layout::after {
-  position: absolute;
-  z-index: -1;
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
-}
-.page-layout::before {
-  top: -210px;
-  right: 60px;
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 11%, transparent), transparent 69%);
-}
-.page-layout::after {
-  bottom: -260px;
-  left: -190px;
-  width: 510px;
-  height: 510px;
-  background: radial-gradient(circle, color-mix(in srgb, #8c72de 9%, transparent), transparent 70%);
-}
-
 .main-content {
   position: relative;
   z-index: 1;
@@ -879,7 +878,7 @@ useHead({ title: "时光留言板" });
   flex-direction: column;
   gap: 14px;
   padding: 24px 16px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* ===== Tabs ===== */
@@ -1344,30 +1343,19 @@ useHead({ title: "时光留言板" });
   flex-direction: column;
   align-items: center;
   margin-bottom: 18px;
-  padding: 34px 26px 26px;
+  padding: 0 0 24px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
-  border-radius: 20px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-primary-soft)), var(--ld-bg-card));
+  border-radius: 12px;
+  background: var(--ld-bg-card);
   box-shadow: var(--ui-shadow-panel);
   text-align: center;
 }
-.sea-card::before {
-  position: absolute;
-  top: -120px;
-  right: -80px;
-  width: 300px;
-  height: 300px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 9%, transparent), transparent 68%);
-  content: "";
-  pointer-events: none;
-}
-
 .sea-copy {
   position: relative;
   z-index: 1;
   max-width: 430px;
+  padding: 22px 20px 0;
 }
 .sea-kicker {
   color: var(--c-primary);
@@ -1380,13 +1368,6 @@ useHead({ title: "时光留言板" });
   color: var(--c-text);
   font-family: var(--font-heading);
   font-size: 1.1rem;
-}
-.sea-copy p {
-  margin: 0 auto;
-  max-width: 400px;
-  color: var(--c-text-2);
-  font-size: 0.66rem;
-  line-height: 1.75;
 }
 
 .bottle-caught {
@@ -1421,27 +1402,6 @@ useHead({ title: "时光留言板" });
   font-size: 0.56rem;
   letter-spacing: 0.04em;
 }
-.caught-mail {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 11px;
-  padding: 6px 11px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 30%, var(--border));
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--c-primary-soft) 55%, var(--ld-bg-card));
-  color: var(--c-primary);
-  font-size: 0.6rem;
-  text-decoration: none;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-.caught-mail:hover {
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 20%, var(--ld-shadow));
-  transform: translateY(-1px);
-}
-.caught-mail > svg {
-  font-size: 0.8rem;
-}
 .bottle-pop-enter-active {
   transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1457,7 +1417,7 @@ useHead({ title: "时光留言板" });
   transform: translateY(-10px) scale(0.98);
 }
 
-.sea-scene-wrap { margin-bottom: 2px; }
+.sea-scene-wrap { width: 100%; margin-bottom: 0; }
 .caught-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .caught-title { display: flex; flex-direction: column; gap: 3px; }
 .caught-title strong { color: var(--c-text); font-size: 0.8rem; }
@@ -1485,14 +1445,28 @@ useHead({ title: "时光留言板" });
 
 /* ===== 徽章 ===== */
 .badges {
+  position: relative;
   margin-top: 34px;
-  padding: 22px 24px 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
-  border-radius: var(--ui-radius-hero);
-  background: var(--ld-bg-card);
-  box-shadow: var(--ui-shadow-panel);
+  padding: 25px 26px 28px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #17191d, #22262a 62%, #191c20);
+  box-shadow: 0 24px 58px rgb(12 14 18 / 28%), inset 0 1px 0 rgb(255 255 255 / 7%);
+}
+.badges::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 2.5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 2.5%) 1px, transparent 1px);
+  background-size: 32px 32px;
+  content: "";
+  pointer-events: none;
 }
 .badges-head {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1500,77 +1474,104 @@ useHead({ title: "时光留言板" });
   margin-bottom: 18px;
 }
 .badges-kicker {
-  color: var(--c-primary);
+  color: #d8b96e;
   font-size: 0.48rem;
   font-weight: 750;
   letter-spacing: 0.18em;
 }
 .badges-head h2 {
   margin: 5px 0 0;
-  color: var(--c-text);
+  color: #f4f1e9;
   font-family: var(--font-heading);
   font-size: 1.15rem;
 }
 .badges-progress {
-  color: var(--c-text-3);
+  padding: 5px 9px;
+  border: 1px solid rgb(216 185 110 / 25%);
+  border-radius: 6px;
+  color: #c9c4b8;
   font-family: var(--font-mono);
   font-size: 0.58rem;
   font-variant-numeric: tabular-nums;
 }
 .badges-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 .badge {
+  --badge-accent: #d8b96e;
+  position: relative;
   display: flex;
+  min-height: 206px;
   flex-direction: column;
   align-items: center;
-  padding: 17px 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 14%, var(--border));
-  border-radius: 15px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--c-primary-soft) 40%, var(--ld-bg-card)), var(--ld-bg-card));
+  padding: 15px 13px 13px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 8px;
+  background: linear-gradient(155deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 2%));
   text-align: center;
-  transition: transform 0.28s var(--ui-ease-out), box-shadow 0.28s ease;
+  transition: border-color 0.28s ease, background 0.28s ease, transform 0.28s var(--ui-ease-out);
   animation: badge-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+.badge:nth-child(2) { --badge-accent: #71c3a1; }
+.badge:nth-child(3) { --badge-accent: #e7a85d; }
+.badge:nth-child(4) { --badge-accent: #67a9e8; }
+.badge:nth-child(5) { --badge-accent: #54c4c6; }
+.badge:nth-child(6) { --badge-accent: #c58fd9; }
+.badge:nth-child(7) { --badge-accent: #e1c36f; }
 .badge:hover {
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--ld-shadow) 44%, transparent);
-  /* transform: translateY(-2px); */
+  border-color: color-mix(in srgb, var(--badge-accent) 50%, transparent);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--badge-accent) 12%, transparent), rgb(255 255 255 / 3%));
+  transform: translateY(-2px);
 }
+.badge-status {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  color: color-mix(in srgb, var(--badge-accent) 78%, #fff);
+  font-size: .48rem;
+  font-weight: 750;
+}
+.badge-status > span { text-transform: uppercase; }
+.badge-status > svg { font-size: .68rem; }
+.badge.locked .badge-status { color: #777d84; }
 .badge-icon {
   position: relative;
   display: grid;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 10px;
+  width: 58px;
+  height: 58px;
+  margin: 9px 0 11px;
   place-items: center;
 }
 .badge-icon::after {
   position: absolute;
   inset: -4px;
-  border: 1px dashed color-mix(in srgb, var(--c-primary) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-accent) 32%, transparent);
   border-radius: 50%;
   content: "";
   animation: badge-orbit 16s linear infinite;
   pointer-events: none;
 }
 .badge strong {
-  color: var(--c-text);
-  font-size: 0.7rem;
+  color: #f4f1e9;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 .badge small {
   margin-top: 3px;
-  color: var(--c-text-3);
+  color: #979da3;
   font-size: 0.56rem;
   line-height: 1.5;
 }
 .badge.locked {
-  border-color: var(--border);
-  background: var(--ld-bg-card);
-  filter: saturate(0);
-  opacity: 0.55;
+  border-color: rgb(255 255 255 / 6%);
+  background: rgb(255 255 255 / 2%);
+  filter: saturate(.25);
+  opacity: 0.72;
 }
 .badge.locked .badge-icon {
   background: transparent;
@@ -1580,7 +1581,7 @@ useHead({ title: "时光留言板" });
   border-color: color-mix(in srgb, var(--border) 90%, transparent);
 }
 .badge.locked strong {
-  color: var(--c-text-3);
+  color: #92979d;
 }
 .badge.fresh .badge-icon {
   animation: badge-unlock 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -1588,6 +1589,32 @@ useHead({ title: "时光留言板" });
 .badge.fresh .badge-icon::after {
   border-color: color-mix(in srgb, var(--c-primary) 46%, transparent);
 }
+.badge-meter {
+  width: 100%;
+  height: 3px;
+  margin-top: auto;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 8%);
+}
+.badge-meter > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--badge-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--badge-accent) 55%, transparent);
+}
+.badge-count {
+  width: 100%;
+  margin-top: 6px;
+  color: #777d84;
+  font-family: var(--font-mono);
+  font-size: .47rem;
+  text-align: right;
+}
+.badge:not(.locked) .badge-count { color: color-mix(in srgb, var(--badge-accent) 74%, #fff); }
+.badge :deep(.badge-medal.locked)::before { background: #2c3035; }
+.badge :deep(.badge-medal.locked)::after { border-color: #4b5158; }
 @keyframes badge-in {
   from { opacity: 0; transform: translateY(10px) scale(0.97); }
 }
@@ -1605,6 +1632,39 @@ useHead({ title: "时光留言板" });
   background: var(--ld-bg-card);
   box-shadow: 0 5px 18px color-mix(in srgb, var(--ld-shadow) 25%, transparent);
 }
+.journey-card { flex: 0 0 auto; }
+.journey-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.journey-stats > div {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 7px;
+  align-items: center;
+  padding: 8px 7px;
+  border-radius: 8px;
+  background: var(--c-bg-1);
+}
+.journey-stats > div > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  grid-row: 1 / 3;
+  border-radius: 7px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  place-items: center;
+}
+.journey-stats strong {
+  align-self: end;
+  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-size: .82rem;
+  line-height: 1;
+}
+.journey-stats small { align-self: start; color: var(--c-text-3); font-size: .45rem; }
 .aside-kicker {
   color: var(--c-primary);
   font-size: 0.48rem;
@@ -1776,7 +1836,7 @@ useHead({ title: "时光留言板" });
     gap: 6px;
   }
   .sea-card {
-    padding: 26px 18px 22px;
+    padding-bottom: 20px;
   }
   .badges-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
