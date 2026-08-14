@@ -51,6 +51,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      TZ: Asia/Shanghai
       DATABASE_URL: postgresql://${POSTGRES_USER:-corner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-corner}
       DB_HOST: postgres
       DB_PORT: 5432
@@ -128,6 +129,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1"]
       interval: 10s
