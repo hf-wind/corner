@@ -345,7 +345,6 @@ function flakeStyle(n: number) {
   align-items: center;
   gap: 12px;
   flex: 1;
-  padding: 15px 0 12px;
 }
 .weather-symbol {
   position: relative;

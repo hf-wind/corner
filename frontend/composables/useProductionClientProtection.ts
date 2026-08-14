@@ -6,7 +6,7 @@ export function useProductionClientProtection(isAdmin: Ref<boolean>) {
   function notifyBlocked() {
     if (Date.now() - lastNoticeAt < 1500) return
     lastNoticeAt = Date.now()
-    useToast().warning('当前账户无权使用调试快捷键')
+    useToast().warning('不许窥探阿风的秘密哦~')
   }
 
   function onKeydown(event: KeyboardEvent) {

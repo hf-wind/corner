@@ -182,8 +182,8 @@ onUnmounted(() => {
 }
 .overview-icon {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   border: 1px solid color-mix(in srgb,var(--c-primary) 12%,transparent);
   border-radius: 10px;
   background: linear-gradient(145deg,var(--c-primary-soft),color-mix(in srgb,var(--ld-bg-card) 72%,transparent));
