@@ -48,11 +48,15 @@
               <a-tag :color="statusColor(record.publishStatus)">{{ statusText(record.publishStatus) }}</a-tag>
             </template>
             <template v-else-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="router.push(`/admin/library/${record.id}`)"><Icon name="ph:pencil-simple-bold" /> 编辑</a-button>
-              <a-button v-if="record.needsPublish" type="link" size="small" @click="publish(record)"><Icon name="ph:paper-plane-tilt-bold" /> 发布</a-button>
-              <a-button v-if="record.publishStatus === 'published'" type="link" size="small" @click="router.push(`/library/${record.slug}`)"><Icon name="ph:eye-bold" /> 预览</a-button>
-              <a-button type="link" size="small" @click="openSettings(record)"><Icon name="ph:gear-six-bold" /> 设置</a-button>
-              <a-button type="link" size="small" danger @click="remove(record)"><Icon name="ph:trash-bold" /> 删除</a-button>
+              <AdminRowActions
+                :record="record"
+                preview-only-published
+                @edit="router.push(`/admin/library/${record.id}`)"
+                @preview="router.push(`/library/${record.slug}`)"
+                @publish="publish(record)"
+                @settings="openSettings(record)"
+                @delete="remove(record)"
+              />
             </template>
           </template>
         </a-table>
@@ -84,7 +88,7 @@ const columns = [
   { title: '评分', key: 'rating', width: 76 }, { title: '排名', key: 'rank', width: 68 },
   { title: '状态', key: 'status', width: 92 }, { title: '浏览', dataIndex: 'viewCount', key: 'views', width: 65 },
   { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 120, customRender: ({ text }: any) => text?.slice(0, 10) || '—' },
-  { title: '操作', key: 'actions', width: 380, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 300, fixed: 'right' as const },
 ]
 
 function creatorLabel(item: LibraryItem) { return item.type === 'book' ? item.creator || '未知作者' : item.director || '未知导演' }

@@ -171,6 +171,7 @@ onUnmounted(() => {
   background: var(--c-bg);
   padding: 20px 24px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   min-height: 0;
   flex: 1;
   min-width: 0;

@@ -48,25 +48,15 @@
           </template>
 
           <template v-else-if="column.key === 'actions'">
-            <div class="table-actions">
-              <a-button type="link" size="small" @click="$router.push(`/admin/moments/${record.slug}`)">
-                编辑
-              </a-button>
-              <a-button
-                v-if="record.needsPublish"
-                type="link"
-                size="small"
-                :loading="publishingSlug === record.slug"
-                @click="publish(record)"
-              >
-                发布
-              </a-button>
-              <a-button type="link" size="small" @click="$router.push(`/admin/moments/preview?slug=${encodeURIComponent(record.slug)}`)">
-                预览
-              </a-button>
-              <a-button type="link" size="small" @click="openSettings(record)">设置</a-button>
-              <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
-            </div>
+            <AdminRowActions
+              :record="record"
+              :publishing="publishingSlug === record.slug"
+              @edit="$router.push(`/admin/moments/${record.slug}`)"
+              @preview="$router.push(`/admin/moments/preview?slug=${encodeURIComponent(record.slug)}`)"
+              @publish="publish(record)"
+              @settings="openSettings(record)"
+              @delete="remove(record)"
+            />
           </template>
         </template>
       </a-table>
@@ -118,7 +108,7 @@ const columns = [
   { title: '点赞', dataIndex: 'likes', key: 'likes', width: 90, align: 'center' as const },
   { title: '评论', dataIndex: 'comments', key: 'comments', width: 90, align: 'center' as const },
   { title: '日期', dataIndex: 'date', key: 'date', width: 110 },
-  { title: '操作', key: 'actions', width: 350, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 260, fixed: 'right' as const },
 ]
 function statusText(status: string) { return status === 'published' ? '已发布' : status === 'private' ? '私密' : '草稿' }
 function statusColor(status: string) { return status === 'published' ? 'green' : status === 'private' ? 'purple' : 'default' }

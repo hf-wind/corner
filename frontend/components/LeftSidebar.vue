@@ -281,6 +281,7 @@ const expandedGroups = ref<Record<string, boolean>>({
   content: true,
   engagement: true,
   intelligence: true,
+  notify: true,
   system: true,
   account: true,
 });
@@ -317,32 +318,31 @@ const navGroups = computed<NavGroup[]>(() => {
         label: "互动与用户",
         items: select([
           "/admin/comments",
-          "/admin/users",
-          "/admin/visitor",
           "/admin/friends",
           "/admin/friend-applications",
+          "/admin/users",
+          "/admin/visitor",
         ]),
       },
       {
         key: "intelligence",
-        label: "智能与通知",
-        items: select([
-          "/admin/ai",
-          "/admin/ai-native",
-          "/admin/email",
-          "/admin/emoji",
-        ]),
+        label: "智能",
+        items: select(["/admin/ai", "/admin/ai-native"]),
+      },
+      {
+        key: "notify",
+        label: "通知",
+        items: select(["/admin/email", "/admin/emoji"]),
       },
       {
         key: "system",
-        label: "系统与账户",
-        items: select([
-          "/admin/about",
-          "/admin/settings",
-          "/admin/info",
-          "/admin/profile",
-          "/admin/messages",
-        ]),
+        label: "系统",
+        items: select(["/admin/settings", "/admin/info", "/admin/about"]),
+      },
+      {
+        key: "account",
+        label: "账户",
+        items: select(["/admin/profile", "/admin/messages"]),
       },
     ].filter((group) => group.items.length);
   }

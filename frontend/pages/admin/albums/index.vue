@@ -23,13 +23,15 @@
           <template v-else-if="column.key === 'status'"><a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag></template>
           <template v-else-if="column.key === 'date'">{{ formatDate(record.happenedAt || record.updatedAt) }}</template>
           <template v-else-if="column.key === 'actions'">
-            <div class="table-actions">
-              <a-button type="link" size="small" @click="router.push(`/admin/albums/${record.id}`)">编辑</a-button>
-              <a-button v-if="record.needsPublish" type="link" size="small" @click="publish(record)">发布</a-button>
-              <a-button v-if="record.status === 'published'" type="link" size="small" @click="router.push(`/albums/${record.slug}`)">预览</a-button>
-              <a-button type="link" size="small" @click="openSettings(record)">设置</a-button>
-              <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
-            </div>
+            <AdminRowActions
+              :record="record"
+              preview-only-published
+              @edit="router.push(`/admin/albums/${record.id}`)"
+              @preview="router.push(`/albums/${record.slug}`)"
+              @publish="publish(record)"
+              @settings="openSettings(record)"
+              @delete="remove(record)"
+            />
           </template>
         </template>
       </a-table>
@@ -60,7 +62,7 @@ const statusOptions = [
 const columns = [
   { title: '相册', key: 'album', minWidth: 320 }, { title: '状态', key: 'status', width: 100 },
   { title: '照片', dataIndex: ['_count', 'items'], key: 'count', width: 80, align: 'center' as const },
-  { title: '日期', key: 'date', width: 120 }, { title: '操作', key: 'actions', width: 360, fixed: 'right' as const },
+  { title: '日期', key: 'date', width: 120 }, { title: '操作', key: 'actions', width: 280, fixed: 'right' as const },
 ]
 
 function formatDate(value?: string) { return value ? value.slice(0, 10) : '未设时间' }
@@ -103,6 +105,6 @@ useHead({ title: '相册管理' })
 </script>
 
 <style scoped>
-.album-admin { width:min(1220px,100%); margin:0 auto; }.admin-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:20px; }.admin-heading h1 { margin:0 0 3px; color:var(--c-text); font-size:1.5rem; }.admin-heading p { margin:0; color:var(--c-text-3); font-size:.76rem; }.album-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }.album-toolbar :deep(.ant-input-search) { width:min(360px,100%); }.table-shell { overflow:hidden; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); }.album-cell { display:flex; min-width:0; align-items:center; gap:10px; }.album-thumb { display:grid; width:64px; height:46px; flex:0 0 64px; overflow:hidden; border-radius:6px; background:var(--c-bg-2); color:var(--c-primary); place-items:center; }.album-thumb img { width:100%; height:100%; object-fit:cover; }.change-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 18%,transparent); }.album-copy { display:flex; min-width:0; flex-direction:column; gap:4px; }.album-copy>div { display:flex; align-items:center; gap:7px; }.album-copy strong,.album-copy span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.album-copy strong { color:var(--c-text); font-size:.82rem; }.album-copy span { color:var(--c-text-3); font-size:.68rem; }.table-actions { display:flex; flex-wrap:nowrap; white-space:nowrap; }.pagination { display:flex; justify-content:center; margin-top:18px; }
+.album-admin { width:100%; margin:0 auto; }.admin-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:20px; }.admin-heading h1 { margin:0 0 3px; color:var(--c-text); font-size:1.5rem; }.admin-heading p { margin:0; color:var(--c-text-3); font-size:.76rem; }.album-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }.album-toolbar :deep(.ant-input-search) { width:min(360px,100%); }.table-shell { overflow:hidden; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); }.album-cell { display:flex; min-width:0; align-items:center; gap:10px; }.album-thumb { display:grid; width:64px; height:46px; flex:0 0 64px; overflow:hidden; border-radius:6px; background:var(--c-bg-2); color:var(--c-primary); place-items:center; }.album-thumb img { width:100%; height:100%; object-fit:cover; }.change-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 18%,transparent); }.album-copy { display:flex; min-width:0; flex-direction:column; gap:4px; }.album-copy>div { display:flex; align-items:center; gap:7px; }.album-copy strong,.album-copy span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.album-copy strong { color:var(--c-text); font-size:.82rem; }.album-copy span { color:var(--c-text-3); font-size:.68rem; }.table-actions { display:flex; flex-wrap:nowrap; white-space:nowrap; }.pagination { display:flex; justify-content:center; margin-top:18px; }
 @media(max-width:680px){.admin-heading,.album-toolbar{align-items:stretch;flex-direction:column}.album-toolbar :deep(.ant-input-search){width:100%}}
 </style>

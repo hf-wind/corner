@@ -1,35 +1,57 @@
 <template>
   <div class="settings-page">
-    <a-space direction="vertical" :size="16" style="width:100%;max-width:640px">
-      <a-card :bordered="false" class="section-card" size="small" title="基本设置">
-        <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
-          <a-form-item label="标题">
-            <a-input v-model:value="settings.site_title" @blur="saveSetting('site_title')" />
-          </a-form-item>
-          <a-form-item label="描述">
-            <a-textarea v-model:value="settings.site_description" :rows="3" @blur="saveSetting('site_description')" />
-          </a-form-item>
-          <a-form-item label="关键词">
-            <a-input v-model:value="keywordText" placeholder="逗号分隔" @blur="saveKeywords" />
-          </a-form-item>
-        </a-form>
-      </a-card>
+    <a-tabs v-model:activeKey="tab" size="small">
+      <a-tab-pane key="basic" tab="基本设置" />
+      <a-tab-pane key="email" tab="邮件配置" />
+      <a-tab-pane key="music" tab="音乐播放器" />
+    </a-tabs>
 
-      <a-card :bordered="false" class="section-card" size="small" title="上传文件">
-        <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '108px' } }">
-          <a-form-item label="文件命名">
-            <a-select v-model:value="mediaNaming" style="width:200px" @change="saveMediaNaming">
-              <a-select-option value="timestamp">时间戳（默认）</a-select-option>
-              <a-select-option value="uuid">UUID</a-select-option>
-              <a-select-option value="original">原始文件名</a-select-option>
-            </a-select>
-            <div class="hint">上传文件时的命名方式，仅对新上传的文件生效</div>
-          </a-form-item>
-        </a-form>
-      </a-card>
+    <div v-show="tab === 'basic'" class="tab-body">
+      <a-space direction="vertical" :size="16" style="width:100%">
+        <AdminCard
+          icon="ph:house-bold"
+          title="站点信息"
+          desc="站点标题、描述与关键词"
+        >
+          <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
+            <a-form-item label="标题">
+              <a-input v-model:value="settings.site_title" @blur="saveSetting('site_title')" />
+            </a-form-item>
+            <a-form-item label="描述">
+              <a-textarea v-model:value="settings.site_description" :rows="3" @blur="saveSetting('site_description')" />
+            </a-form-item>
+            <a-form-item label="关键词">
+              <a-input v-model:value="keywordText" placeholder="逗号分隔" @blur="saveKeywords" />
+            </a-form-item>
+          </a-form>
+        </AdminCard>
 
-      <a-card :bordered="false" class="section-card" size="small" title="邮件配置">
-        <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '108px' } }">
+        <AdminCard
+          icon="ph:upload-bold"
+          title="上传文件"
+          desc="新上传文件的命名方式"
+        >
+          <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '108px' } }">
+            <a-form-item label="文件命名">
+              <a-select v-model:value="mediaNaming" style="width:200px" @change="saveMediaNaming">
+                <a-select-option value="timestamp">时间戳（默认）</a-select-option>
+                <a-select-option value="uuid">UUID</a-select-option>
+                <a-select-option value="original">原始文件名</a-select-option>
+              </a-select>
+              <div class="hint">上传文件时的命名方式，仅对新上传的文件生效</div>
+            </a-form-item>
+          </a-form>
+        </AdminCard>
+      </a-space>
+    </div>
+
+    <div v-show="tab === 'email'" class="tab-body">
+      <AdminCard
+        icon="ph:envelope-bold"
+        title="邮件配置"
+        desc="SMTP 服务器、发信人与测试发送"
+      >
+          <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '108px' } }">
           <a-form-item label="启用邮件">
             <a-switch v-model:checked="email.email_enabled" @change="saveEmailSetting('email_enabled')" />
           </a-form-item>
@@ -67,9 +89,15 @@
             <a-button type="primary" :loading="emailTesting" @click="testEmail">发送测试</a-button>
           </a-form-item>
         </a-form>
-      </a-card>
+      </AdminCard>
+    </div>
 
-      <a-card :bordered="false" class="section-card" size="small" title="音乐播放器">
+    <div v-show="tab === 'music'" class="tab-body">
+      <AdminCard
+        icon="ph:music-notes-bold"
+        title="音乐播放器"
+        desc="播放器行为、默认音源与歌单管理"
+      >
         <a-spin :spinning="musicLoading">
           <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '108px' } }">
             <a-form-item label="启用播放器">
@@ -141,8 +169,8 @@
             </a-form-item>
           </a-form>
         </a-spin>
-      </a-card>
-    </a-space>
+      </AdminCard>
+    </div>
   </div>
 </template>
 
@@ -152,6 +180,7 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 const api = useApi()
 const toast = useToast()
 const { updateSiteSetting } = useSiteSettings()
+const tab = ref('basic')
 const settings = ref({ site_title: '', site_description: '', site_keywords: '' as any })
 const keywordText = ref('')
 const mediaNaming = ref('timestamp')
@@ -436,7 +465,18 @@ async function refreshCache() {
 </script>
 
 <style scoped>
-.section-card { border-radius: 8px; }
+.tab-body {
+  animation: tab-fade 0.18s ease;
+}
+@keyframes tab-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.section-card {
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ld-shadow) 16%, transparent);
+}
 .hint { font-size: 0.72rem; color: var(--c-text-3); margin-top: 4px; }
 .playlist-editor { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .playlist-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

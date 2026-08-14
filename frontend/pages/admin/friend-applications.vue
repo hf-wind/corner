@@ -94,7 +94,7 @@ const detailDialog = reactive({ open: false, record: null as any })
 
 const columns = [
   { title: '站点名称', dataIndex: 'siteName', key: 'siteName', width: 140 },
-  { title: '站点 URL', key: 'siteUrl', minWidth: 190 },
+  { title: '站点 URL', key: 'siteUrl', width: 260 },
   { title: '邮箱', dataIndex: 'contactEmail', key: 'contactEmail', width: 180 },
   { title: '状态', key: 'status', width: 90 },
   { title: 'AI 审核', key: 'aiReviewResult', width: 100 },

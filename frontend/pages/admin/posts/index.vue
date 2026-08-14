@@ -27,27 +27,15 @@
               <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
             </template>
             <template v-if="column.key === 'actions'">
-              <div class="table-actions">
-              <a-button type="link" size="small" @click="$router.push('/admin/posts/' + record.slug)">
-                <EditOutlined /> 编辑
-              </a-button>
-              <a-button type="link" size="small" @click="preview(record.slug)">
-                <EyeOutlined /> 预览
-              </a-button>
-              <a-button
-                v-if="record.needsPublish"
-                type="link"
-                size="small"
-                :loading="publishingSlug === record.slug"
-                @click="publish(record)"
-              >
-                <SendOutlined /> 发布
-              </a-button>
-              <a-button type="link" size="small" danger @click="remove(record.slug, record.title)">
-                <DeleteOutlined /> 删除
-              </a-button>
-              <a-button type="link" size="small" @click="openSettings(record)"><Icon name="ph:gear-six-bold" /> 设置</a-button>
-              </div>
+              <AdminRowActions
+                :record="record"
+                :publishing="publishingSlug === record.slug"
+                @edit="$router.push('/admin/posts/' + record.slug)"
+                @preview="preview(record.slug)"
+                @publish="publish(record)"
+                @settings="openSettings(record)"
+                @delete="remove(record.slug, record.title)"
+              />
             </template>
           </template>
         </a-table>
@@ -74,7 +62,6 @@
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
 import dayjs, { type Dayjs } from 'dayjs'
-import { EditOutlined, DeleteOutlined, EyeOutlined, SendOutlined } from '@ant-design/icons-vue'
 
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
@@ -104,7 +91,7 @@ const columns = [
   { title: '状态', key: 'status', width: 100 },
   { title: '阅读', dataIndex: 'views', key: 'views', width: 60, align: 'center' as const },
   { title: '日期', dataIndex: 'date', key: 'date', width: 100 },
-  { title: '操作', key: 'actions', width: 400, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 300, fixed: 'right' as const },
 ]
 const settingDialog = reactive<{ open: boolean; saving: boolean; record: any | null; scheduledAt: Dayjs | null }>({ open: false, saving: false, record: null, scheduledAt: null })
 

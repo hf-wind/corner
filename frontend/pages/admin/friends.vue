@@ -261,7 +261,7 @@ async function removeFriend(index: number, name: string) {
 </script>
 
 <style scoped>
-.friends-admin { max-width: 1100px; }
+.friends-admin { width: 100%; }
 .table-toolbar { margin-bottom: 12px; }
 .list-card { border-radius: 8px; }
 .site-card { max-width: 640px; margin-top: 8px; }

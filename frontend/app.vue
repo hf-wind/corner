@@ -1,7 +1,10 @@
 <template>
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">
-      <Transition :name="isSpaceRoute ? undefined : 'route-page'">
+      <Transition
+        :name="isSpaceRoute ? undefined : viewRoute.meta.layout === 'admin' ? 'admin-page' : 'route-page'"
+        :mode="viewRoute.meta.layout === 'admin' ? 'out-in' : undefined"
+      >
         <component :is="Component" :key="viewRoute.path" />
       </Transition>
     </RouterView>
@@ -182,6 +185,19 @@ html.space-pending body::after {
 .route-page-enter-from .sidebar-right {
   opacity: 0;
   transform: translate3d(14px, 0, 0);
+}
+
+.admin-page-enter-active {
+  transition: opacity 0.2s ease;
+}
+.admin-page-enter-from {
+  opacity: 0;
+}
+.admin-page-leave-active {
+  transition: opacity 0.12s ease;
+}
+.admin-page-leave-to {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,28 +1,43 @@
 <template>
   <div class="ai-admin">
     <a-tabs v-model:activeKey="tab" size="small">
-      <a-tab-pane key="settings" tab="AI 配置" />
+      <a-tab-pane key="base" tab="基础配置" />
+      <a-tab-pane key="content" tab="内容生成" />
+      <a-tab-pane key="chat" tab="聊天助手" />
+      <a-tab-pane key="moderation" tab="审核" />
       <a-tab-pane key="chats" tab="会话管理" />
     </a-tabs>
 
-    <div v-show="tab === 'settings'" class="tab-body">
+    <div class="page-actions">
+      <a-alert
+        :type="apiConfigured ? 'success' : 'warning'"
+        show-icon
+        class="status-alert"
+        :message="
+          apiConfigured
+            ? 'AI 服务已配置，功能会优先使用后台参数。'
+            : 'AI 服务暂未就绪，保存 API Key 后才能真正调用模型。'
+        "
+      />
+      <a-space class="page-action-buttons" :size="8">
+        <a-button type="primary" :loading="saving" @click="saveConfig"
+          >保存配置</a-button
+        >
+        <a-button :loading="testing" @click="testConnection"
+          >测试连接</a-button
+        >
+        <a-button @click="resetDefaults">恢复默认</a-button>
+      </a-space>
+    </div>
+
+    <div v-show="tab === 'base'" class="tab-body">
       <a-spin :spinning="cfgLoading">
         <a-space direction="vertical" :size="16" style="width: 100%">
-          <a-alert
-            :type="apiConfigured ? 'success' : 'warning'"
-            show-icon
-            :message="
-              apiConfigured
-                ? 'AI 服务已配置，功能会优先使用后台参数。'
-                : 'AI 服务暂未就绪，保存 API Key 后才能真正调用模型。'
-            "
-          />
 
-          <a-card
-            size="small"
+          <AdminCard
+            icon="ph:cpu-bold"
             title="模型接入"
-            :bordered="false"
-            class="section-card"
+            desc="配置服务商与模型，各功能模块可独立选择模型"
           >
             <template #extra>
               <a-button type="primary" size="small" @click="openCreateModel">
@@ -92,117 +107,102 @@
               </div>
               <a-empty v-else description="还没有模型配置" />
             </a-spin>
-          </a-card>
+          </AdminCard>
 
-          <a-card
-            size="small"
+          <AdminCard
+            icon="ph:power-bold"
             title="应用开关"
-            :bordered="false"
-            class="section-card"
+            desc="按功能启用或停用 AI 能力，停用后该模块不再调用模型"
           >
             <div class="switch-grid">
               <div class="switch-item">
-                <span>聊天助手</span>
+                <div class="switch-label">
+                  <Icon name="ph:chat-circle-bold" class="switch-icon" />
+                  <div>
+                    <div class="switch-name">聊天助手</div>
+                    <div class="switch-note">前台哆啦A梦对话</div>
+                  </div>
+                </div>
                 <a-switch v-model:checked="form.ai_pet_chat_enabled" />
               </div>
               <div class="switch-item">
-                <span>文章摘要</span>
+                <div class="switch-label">
+                  <Icon name="ph:article-bold" class="switch-icon" />
+                  <div>
+                    <div class="switch-name">文章摘要</div>
+                    <div class="switch-note">为文章生成导语摘要</div>
+                  </div>
+                </div>
                 <a-switch v-model:checked="form.ai_summarize_enabled" />
               </div>
               <div class="switch-item">
-                <span>文章生成</span>
+                <div class="switch-label">
+                  <Icon name="ph:pen-nib-bold" class="switch-icon" />
+                  <div>
+                    <div class="switch-name">文章生成</div>
+                    <div class="switch-note">根据灵感生成文章草稿</div>
+                  </div>
+                </div>
                 <a-switch v-model:checked="form.ai_article_enabled" />
               </div>
               <div class="switch-item">
-                <span>瞬间润色</span>
+                <div class="switch-label">
+                  <Icon name="ph:sparkle-bold" class="switch-icon" />
+                  <div>
+                    <div class="switch-name">瞬间润色</div>
+                    <div class="switch-note">整理发布瞬间内容</div>
+                  </div>
+                </div>
                 <a-switch v-model:checked="form.ai_moment_enabled" />
               </div>
               <div class="switch-item">
-                <span>评论审核</span>
+                <div class="switch-label">
+                  <Icon name="ph:shield-check-bold" class="switch-icon" />
+                  <div>
+                    <div class="switch-name">评论审核</div>
+                    <div class="switch-note">自动拦截违规评论</div>
+                  </div>
+                </div>
                 <a-switch
                   v-model:checked="form.ai_comment_moderation_enabled"
                 />
               </div>
               <div class="switch-item">
-                <span>友链审核</span>
+                <div class="switch-label">
+                  <Icon name="ph:handshake-bold" class="switch-icon" />
+                  <div>
+                    <div class="switch-name">友链审核</div>
+                    <div class="switch-note">自动审核友链申请</div>
+                  </div>
+                </div>
                 <a-switch v-model:checked="form.ai_friend_moderation_enabled" />
               </div>
               <div class="switch-item">
-                <span>书影资料</span>
+                <div class="switch-label">
+                  <Icon name="ph:books-bold" class="switch-icon" />
+                  <div>
+                    <div class="switch-name">书影资料</div>
+                    <div class="switch-note">整理书影作品信息</div>
+                  </div>
+                </div>
                 <a-switch v-model:checked="form.ai_library_enabled" />
               </div>
             </div>
-          </a-card>
+          </AdminCard>
+        </a-space>
+      </a-spin>
+    </div>
 
-          <a-card
-            size="small"
-            title="人设与兜底"
-            :bordered="false"
-            class="section-card"
+    <div v-show="tab === 'content'" class="tab-body">
+      <a-spin :spinning="cfgLoading">
+        <a-space direction="vertical" :size="16" style="width: 100%">
+          <AdminCard
+            icon="ph:pen-nib-bold"
+            title="文章 AI"
+            desc="根据灵感生成文章正文与元数据，并为文章生成导语摘要"
           >
             <a-form layout="vertical" size="middle">
-              <a-row :gutter="16">
-                <a-col :xs="24" :md="8">
-                  <a-form-item label="显示名称">
-                    <a-input v-model:value="form.ai_pet_display_name" />
-                  </a-form-item>
-                </a-col>
-                <a-col :xs="24" :md="8">
-                  <a-form-item label="简介">
-                    <a-input v-model:value="form.ai_pet_description" />
-                  </a-form-item>
-                </a-col>
-                <a-col :xs="24" :md="8">
-                  <a-form-item label="站长用户名">
-                    <a-input
-                      v-model:value="form.ai_owner_username"
-                      placeholder="例如：阿风"
-                    />
-                  </a-form-item>
-                </a-col>
-              </a-row>
-
-              <a-form-item label="聊天系统提示词">
-                <a-textarea
-                  v-model:value="form.ai_pet_system_prompt"
-                  :rows="7"
-                />
-              </a-form-item>
-
-              <a-form-item label="欢迎语（每行一条）">
-                <a-textarea v-model:value="greetingsText" :rows="4" />
-              </a-form-item>
-
-              <a-row :gutter="16">
-                <a-col :xs="24" :md="12">
-                  <a-form-item label="未配置 API 时回复">
-                    <a-textarea
-                      v-model:value="form.ai_fallback_unconfigured"
-                      :rows="3"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :xs="24" :md="12">
-                  <a-form-item label="请求失败时回复">
-                    <a-textarea
-                      v-model:value="form.ai_fallback_error"
-                      :rows="3"
-                    />
-                  </a-form-item>
-                </a-col>
-              </a-row>
-            </a-form>
-          </a-card>
-
-          <div class="dual-grid">
-            <a-card
-              size="small"
-              title="文章 AI"
-              :bordered="false"
-              class="section-card"
-            >
-              <a-form layout="vertical" size="middle">
-                <a-form-item label="正文生成提示词">
+              <a-form-item label="正文生成提示词">
                   <a-textarea
                     v-model:value="form.ai_article_prompt"
                     :rows="7"
@@ -249,14 +249,56 @@
                     </a-form-item>
                   </a-col>
                 </a-row>
-              </a-form>
-            </a-card>
 
-            <a-card
-              size="small"
+                <a-divider class="sub-divider" orientation="left"
+                  >文章摘要</a-divider
+                >
+                <a-form-item label="文章摘要提示词">
+                  <a-textarea
+                    v-model:value="form.ai_summarize_prompt"
+                    :rows="5"
+                  />
+                </a-form-item>
+                <a-row :gutter="16">
+                  <a-col :xs="24" :sm="8">
+                    <a-form-item label="摘要模型">
+                      <a-select
+                        v-model:value="form.ai_summarize_model_config_id"
+                        :options="modelOptions"
+                        allow-clear
+                        placeholder="默认模型"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :xs="24" :sm="8">
+                    <a-form-item label="摘要 temp">
+                      <a-input-number
+                        v-model:value="form.ai_summarize_temperature"
+                        :min="0"
+                        :max="2"
+                        :step="0.1"
+                        style="width: 100%"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :xs="24" :sm="8">
+                    <a-form-item label="摘要 tokens">
+                      <a-input-number
+                        v-model:value="form.ai_summarize_max_tokens"
+                        :min="64"
+                        :max="1024"
+                        style="width: 100%"
+                      />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+              </a-form>
+            </AdminCard>
+
+            <AdminCard
+              icon="ph:sparkle-bold"
               title="瞬间 AI"
-              :bordered="false"
-              class="section-card"
+              desc="把灵感润色成第一人称的瞬间记录"
             >
               <a-form layout="vertical" size="middle">
                 <a-alert
@@ -313,14 +355,12 @@
                   </a-col>
                 </a-row>
               </a-form>
-            </a-card>
-          </div>
+            </AdminCard>
 
-          <a-card
-            size="small"
+          <AdminCard
+            icon="ph:books-bold"
             title="书影 AI"
-            :bordered="false"
-            class="section-card"
+            desc="为书影记录整理作品资料与阅读/观影体会"
           >
             <a-form layout="vertical" size="middle">
               <a-form-item label="资料整理提示词">
@@ -360,284 +400,210 @@
                 </a-col>
               </a-row>
             </a-form>
-          </a-card>
+          </AdminCard>
+            
+          
 
-          <div class="dual-grid">
-            <a-card
-              size="small"
-              title="摘要与评论审核"
-              :bordered="false"
-              class="section-card"
-            >
-              <a-form layout="vertical" size="middle">
-                <a-form-item label="文章摘要提示词">
-                  <a-textarea
-                    v-model:value="form.ai_summarize_prompt"
-                    :rows="5"
-                  />
-                </a-form-item>
-                <a-row :gutter="16">
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="摘要模型">
-                      <a-select
-                        v-model:value="form.ai_summarize_model_config_id"
-                        :options="modelOptions"
-                        allow-clear
-                        placeholder="默认模型"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="摘要 temp">
-                      <a-input-number
-                        v-model:value="form.ai_summarize_temperature"
-                        :min="0"
-                        :max="2"
-                        :step="0.1"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="摘要 tokens">
-                      <a-input-number
-                        v-model:value="form.ai_summarize_max_tokens"
-                        :min="64"
-                        :max="1024"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="审核模型">
-                      <a-select
-                        v-model:value="form.ai_moderate_model_config_id"
-                        :options="modelOptions"
-                        allow-clear
-                        placeholder="默认模型"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="审核 temp">
-                      <a-input-number
-                        v-model:value="form.ai_moderate_temperature"
-                        :min="0"
-                        :max="2"
-                        :step="0.1"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="审核 tokens">
-                      <a-input-number
-                        v-model:value="form.ai_moderate_max_tokens"
-                        :min="64"
-                        :max="1024"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
-                <a-form-item label="评论审核提示词">
-                  <a-textarea
-                    v-model:value="form.ai_moderate_prompt"
-                    :rows="8"
-                  />
-                </a-form-item>
-              </a-form>
-            </a-card>
+        </a-space>
+      </a-spin>
+    </div>
 
-            <a-card
-              size="small"
-              title="聊天与友链审核"
-              :bordered="false"
-              class="section-card"
-            >
-              <a-form layout="vertical" size="middle">
-                <a-alert
-                  class="cost-limit-alert"
-                  type="info"
-                  show-icon
-                  message="聊天额度在调用模型前扣减；游客同时受浏览器标识和 IP 双重限制。"
+    <div v-show="tab === 'chat'" class="tab-body">
+      <a-spin :spinning="cfgLoading">
+        <a-space direction="vertical" :size="16" style="width: 100%">
+          <AdminCard
+            icon="ph:chat-circle-bold"
+            title="聊天助手"
+            desc="前台哆啦A梦的人设、欢迎语、兜底话术与聊天参数"
+          >
+            <a-form layout="vertical" size="middle">
+              <a-row :gutter="16">
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="显示名称">
+                    <a-input v-model:value="form.ai_pet_display_name" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="简介">
+                    <a-input v-model:value="form.ai_pet_description" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="站长用户名">
+                    <a-input
+                      v-model:value="form.ai_owner_username"
+                      placeholder="例如：阿风"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+
+              <a-form-item label="聊天系统提示词">
+                <a-textarea
+                  v-model:value="form.ai_pet_system_prompt"
+                  :rows="7"
                 />
+              </a-form-item>
 
-                <a-row :gutter="16">
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="聊天模型">
-                      <a-select
-                        v-model:value="form.ai_chat_model_config_id"
-                        :options="modelOptions"
-                        allow-clear
-                        placeholder="默认模型"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="聊天 temp">
-                      <a-input-number
-                        v-model:value="form.ai_chat_temperature"
-                        :min="0"
-                        :max="2"
-                        :step="0.1"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="登录用户输出 tokens">
-                      <a-input-number
-                        v-model:value="form.ai_chat_max_tokens"
-                        :min="64"
-                        :max="1024"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
+              <a-form-item label="欢迎语（每行一条）">
+                <a-textarea v-model:value="greetingsText" :rows="4" />
+              </a-form-item>
 
-                <a-row :gutter="16">
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="登录用户每日额度">
-                      <a-input-number
-                        v-model:value="form.ai_daily_quota"
-                        :min="1"
-                        :max="1000"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="游客每日额度">
-                      <a-input-number
-                        v-model:value="form.ai_guest_daily_quota"
-                        :min="1"
-                        :max="100"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="单 IP 游客每日总额度">
-                      <a-input-number
-                        v-model:value="form.ai_guest_ip_daily_quota"
-                        :min="1"
-                        :max="1000"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
+              <a-row :gutter="16">
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="未配置 API 时回复">
+                    <a-textarea
+                      v-model:value="form.ai_fallback_unconfigured"
+                      :rows="3"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="请求失败时回复">
+                    <a-textarea
+                      v-model:value="form.ai_fallback_error"
+                      :rows="3"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
 
-                <a-row :gutter="16">
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="单条输入字符数">
-                      <a-input-number
-                        v-model:value="form.ai_chat_input_max_chars"
-                        :min="100"
-                        :max="1000"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="游客输出 tokens">
-                      <a-input-number
-                        v-model:value="form.ai_guest_chat_max_tokens"
-                        :min="64"
-                        :max="512"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="8">
-                    <a-form-item label="文章上下文字符数">
-                      <a-input-number
-                        v-model:value="form.ai_chat_article_context_max_chars"
-                        :min="500"
-                        :max="8000"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
+              <a-divider class="sub-divider" orientation="left">聊天参数</a-divider>
+              <a-alert
+                class="cost-limit-alert"
+                type="info"
+                show-icon
+                message="聊天额度在调用模型前扣减；游客同时受浏览器标识和 IP 双重限制。"
+              />
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="聊天模型">
+                    <a-select
+                      v-model:value="form.ai_chat_model_config_id"
+                      :options="modelOptions"
+                      allow-clear
+                      placeholder="默认模型"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="聊天 temp">
+                    <a-input-number
+                      v-model:value="form.ai_chat_temperature"
+                      :min="0"
+                      :max="2"
+                      :step="0.1"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="登录用户输出 tokens">
+                    <a-input-number
+                      v-model:value="form.ai_chat_max_tokens"
+                      :min="64"
+                      :max="1024"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
 
-                <a-row :gutter="16">
-                  <a-col :xs="24" :sm="12">
-                    <a-form-item label="历史条数">
-                      <a-input-number
-                        v-model:value="form.ai_history_limit"
-                        :min="4"
-                        :max="60"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="12">
-                    <a-form-item label="历史字符预算">
-                      <a-input-number
-                        v-model:value="form.ai_history_char_budget"
-                        :min="500"
-                        :max="20000"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="登录用户每日额度">
+                    <a-input-number
+                      v-model:value="form.ai_daily_quota"
+                      :min="1"
+                      :max="1000"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="游客每日额度">
+                    <a-input-number
+                      v-model:value="form.ai_guest_daily_quota"
+                      :min="1"
+                      :max="100"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="单 IP 游客每日总额度">
+                    <a-input-number
+                      v-model:value="form.ai_guest_ip_daily_quota"
+                      :min="1"
+                      :max="1000"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
 
-                <a-form-item label="要求对方先添加本站友链">
-                  <a-switch v-model:checked="form.ai_friend_require_backlink" />
-                </a-form-item>
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="单条输入字符数">
+                    <a-input-number
+                      v-model:value="form.ai_chat_input_max_chars"
+                      :min="100"
+                      :max="1000"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="游客输出 tokens">
+                    <a-input-number
+                      v-model:value="form.ai_guest_chat_max_tokens"
+                      :min="64"
+                      :max="512"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="文章上下文字符数">
+                    <a-input-number
+                      v-model:value="form.ai_chat_article_context_max_chars"
+                      :min="500"
+                      :max="8000"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
 
-                <a-row :gutter="16">
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="友链模型">
-                      <a-select
-                        v-model:value="form.ai_friend_moderate_model_config_id"
-                        :options="modelOptions"
-                        allow-clear
-                        placeholder="默认模型"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="友链 temp">
-                      <a-input-number
-                        v-model:value="form.ai_friend_moderate_temperature"
-                        :min="0"
-                        :max="1"
-                        :step="0.1"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :xs="24" :sm="4">
-                    <a-form-item label="友链 tokens">
-                      <a-input-number
-                        v-model:value="form.ai_friend_moderate_max_tokens"
-                        :min="64"
-                        :max="1024"
-                        style="width: 100%"
-                      />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
-                <a-form-item label="友链审核提示词">
-                  <a-textarea
-                    v-model:value="form.ai_friend_moderate_prompt"
-                    :rows="8"
-                  />
-                </a-form-item>
-              </a-form>
-            </a-card>
-          </div>
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="12">
+                  <a-form-item label="历史条数">
+                    <a-input-number
+                      v-model:value="form.ai_history_limit"
+                      :min="4"
+                      :max="60"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12">
+                  <a-form-item label="历史字符预算">
+                    <a-input-number
+                      v-model:value="form.ai_history_char_budget"
+                      :min="500"
+                      :max="20000"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
+          </AdminCard>
 
-          <a-card
-            size="small"
+          <AdminCard
+            icon="ph:database-bold"
             title="知识库"
-            :bordered="false"
-            class="section-card"
+            desc="聊天助手回答时检索的文章上下文来源"
           >
             <a-form layout="vertical" size="middle">
               <a-row :gutter="16">
@@ -696,13 +662,12 @@
                 previewText
               }}</pre>
             </a-form>
-          </a-card>
+          </AdminCard>
 
-          <a-card
-            size="small"
+          <AdminCard
+            icon="ph:archive-bold"
             title="当前知识库文章"
-            :bordered="false"
-            class="section-card"
+            desc="已发布并纳入知识库检索的文章清单"
           >
             <template #extra>
               <a-button
@@ -740,17 +705,113 @@
               </div>
               <a-empty v-else description="暂无已发布文章" />
             </a-spin>
-          </a-card>
+          </AdminCard>
+        </a-space>
+      </a-spin>
+    </div>
 
-          <div class="actions">
-            <a-button type="primary" :loading="saving" @click="saveConfig"
-              >保存配置</a-button
-            >
-            <a-button :loading="testing" @click="testConnection"
-              >测试连接</a-button
-            >
-            <a-button @click="resetDefaults">恢复默认</a-button>
-          </div>
+    <div v-show="tab === 'moderation'" class="tab-body">
+      <a-spin :spinning="cfgLoading">
+        <a-space direction="vertical" :size="16" style="width: 100%">
+          <AdminCard
+            icon="ph:shield-check-bold"
+            title="评论审核"
+            desc="全站通用：自动拦截违规评论，可接 AI 模型判别"
+          >
+            <a-form layout="vertical" size="middle">
+              <a-form-item label="评论审核提示词">
+                <a-textarea
+                  v-model:value="form.ai_moderate_prompt"
+                  :rows="8"
+                />
+              </a-form-item>
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="审核模型">
+                    <a-select
+                      v-model:value="form.ai_moderate_model_config_id"
+                      :options="modelOptions"
+                      allow-clear
+                      placeholder="默认模型"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="审核 temp">
+                    <a-input-number
+                      v-model:value="form.ai_moderate_temperature"
+                      :min="0"
+                      :max="2"
+                      :step="0.1"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="审核 tokens">
+                    <a-input-number
+                      v-model:value="form.ai_moderate_max_tokens"
+                      :min="64"
+                      :max="1024"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
+          </AdminCard>
+
+          <AdminCard
+            icon="ph:handshake-bold"
+            title="友链审核"
+            desc="自动审核友链申请，支持要求对方先加本站友链"
+          >
+            <a-form layout="vertical" size="middle">
+              <a-form-item label="要求对方先添加本站友链">
+                <a-switch v-model:checked="form.ai_friend_require_backlink" />
+              </a-form-item>
+
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="友链模型">
+                    <a-select
+                      v-model:value="form.ai_friend_moderate_model_config_id"
+                      :options="modelOptions"
+                      allow-clear
+                      placeholder="默认模型"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="友链 temp">
+                    <a-input-number
+                      v-model:value="form.ai_friend_moderate_temperature"
+                      :min="0"
+                      :max="1"
+                      :step="0.1"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <a-form-item label="友链 tokens">
+                    <a-input-number
+                      v-model:value="form.ai_friend_moderate_max_tokens"
+                      :min="64"
+                      :max="1024"
+                      style="width: 100%"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="友链审核提示词">
+                <a-textarea
+                  v-model:value="form.ai_friend_moderate_prompt"
+                  :rows="8"
+                />
+              </a-form-item>
+            </a-form>
+          </AdminCard>
         </a-space>
       </a-spin>
     </div>
@@ -932,7 +993,7 @@ const router = useRouter();
 const api = useApi();
 const toast = useToast();
 
-const tab = ref((route.query.tab as string) === "chats" ? "chats" : "settings");
+const tab = ref((route.query.tab as string) === "chats" ? "chats" : "base");
 watch(tab, (value) => {
   router.replace({ query: value === "settings" ? {} : { tab: value } });
   if (value === "chats" && !conversations.value.length)
@@ -1295,24 +1356,80 @@ useHead({ title: "AI 配置" });
   margin-bottom: 14px;
 }
 
+.sub-divider {
+  margin: 6px 0 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--c-primary);
+}
+.sub-divider::before,
+.sub-divider::after {
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* ===== 顶部操作区 ===== */
+.page-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.status-alert {
+  flex: 1;
+  min-width: 260px;
+}
+.page-action-buttons {
+  flex-shrink: 0;
+}
+
 .switch-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .switch-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   padding: 12px 14px;
   border-radius: 14px;
   background: color-mix(in srgb, var(--c-bg-2) 86%, transparent);
+  transition: border 0.2s;
+  border: 1px solid transparent;
 }
-
-.switch-item span {
-  color: var(--c-text-2);
+.switch-item:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 22%, var(--border));
+}
+.switch-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.switch-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--c-bg-1);
+  color: var(--c-primary);
+  font-size: 1rem;
+}
+.switch-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--c-text);
+  line-height: 1.3;
+}
+.switch-note {
+  font-size: 0.7rem;
+  color: var(--c-text-3);
+  line-height: 1.3;
 }
 
 .model-list {
@@ -1565,8 +1682,14 @@ useHead({ title: "AI 配置" });
     grid-template-columns: 1fr;
   }
 
-  .actions {
+  .page-actions {
     flex-direction: column;
+  }
+  .page-action-buttons {
+    width: 100%;
+  }
+  .page-action-buttons .ant-btn {
+    flex: 1;
   }
 
   .model-row {
