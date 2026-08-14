@@ -99,15 +99,17 @@ function onClickOutside(e: MouseEvent) {
   }
 }
 
+const PANEL_MAX_HEIGHT = 380
+
 function updatePanelPosition() {
   if (!bellRef.value) return
   const rect = bellRef.value.getBoundingClientRect()
   const panelWidth = Math.min(320, window.innerWidth - 24)
   const left = Math.min(Math.max(12, rect.right - panelWidth), window.innerWidth - panelWidth - 12)
-  const panelHeight = panelRef.value?.getBoundingClientRect().height || 240
+  const estHeight = Math.min(PANEL_MAX_HEIGHT, window.innerHeight - 24)
   const below = rect.bottom + 8
-  const above = rect.top - panelHeight - 8
-  const top = below + panelHeight <= window.innerHeight - 12 ? below : Math.max(12, above)
+  const above = rect.top - estHeight - 8
+  const top = below + estHeight <= window.innerHeight - 12 ? below : Math.max(12, above)
   panelPos.value = {
     position: 'fixed',
     top: `${top}px`,

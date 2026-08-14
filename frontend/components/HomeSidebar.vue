@@ -6,12 +6,11 @@
       aria-labelledby="home-overview-title"
     >
       <div class="side-card-head">
-        <span id="home-overview-title"
-          ><Icon name="ph:wind-bold" /> 风隅坐标</span
-        >
-        <AppLink to="/archive" aria-label="查看归档"
-          ><Icon name="ph:arrow-up-right-bold"
-        /></AppLink>
+        <div>
+          <span class="side-kicker">CORNER INDEX</span>
+          <span id="home-overview-title">风隅坐标</span>
+        </div>
+        <AppLink to="/archive" aria-label="查看归档" title="查看归档"><Icon name="ph:arrow-up-right-bold" /></AppLink>
       </div>
       <div class="overview-grid">
         <div
@@ -19,10 +18,9 @@
           :key="item.label"
           class="overview-item"
         >
-          <span class="overview-icon"><Icon :name="item.icon" /></span>
           <span class="overview-copy"
-            ><small>{{ item.label }}</small
-            ><strong>{{ compactNumber(item.value) }}</strong></span
+            ><strong>{{ loading ? "--" : compactNumber(item.value) }}</strong
+            ><small>{{ item.label }}</small></span
           >
           <i aria-hidden="true" />
         </div>
@@ -114,9 +112,13 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   contain: layout;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
+.home-sidebar::-webkit-scrollbar { display: none; }
 
 .side-card,
 .footprints {
@@ -126,11 +128,14 @@ onUnmounted(() => {
 }
 
 .side-card {
-  padding: 10px 12px 9px;
+  min-height: 98px;
+  flex: 0 0 98px;
+  padding: 13px 14px 12px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft));
+  border-radius: 8px;
+  background: var(--ld-bg-card);
+  box-shadow: var(--ui-shadow-soft);
 }
 
 .home-sidebar.ready .side-card,
@@ -161,23 +166,32 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   color: var(--c-text-2);
   font-size: 0.7rem;
   font-weight: 700;
 }
 
-.side-card-head > span:first-child,
+.side-card-head > div,
 .side-card-head a {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
+.side-card-head > div { flex-direction: column; align-items: flex-start; gap: 2px; }
+.side-kicker { color: var(--c-primary); font-family: var(--font-mono); font-size: .44rem; font-weight: 700; }
+#home-overview-title { color: var(--c-text); font-size: .72rem; }
 
 .side-card-head a {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
   color: var(--c-text-3);
   text-decoration: none;
   font-size: 0.62rem;
+  place-items: center;
 }
 
 .side-card-head a:hover {
@@ -187,73 +201,43 @@ onUnmounted(() => {
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
+  gap: 8px;
 }
 
 .overview-item {
   position: relative;
   display: grid;
   min-width: 0;
-  place-items: center;
-  gap: 3px;
-  padding: 3px 2px;
+  align-items: end;
+  padding: 0 0 0 9px;
+  border-left: 2px solid color-mix(in srgb, var(--c-primary) 52%, var(--border));
 }
 
-.overview-card::after {
-  position: absolute;
-  right: -24px;
-  bottom: -35px;
-  width: 96px;
-  height: 96px;
-  border: 1px dashed color-mix(in srgb, var(--c-primary) 14%, transparent);
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
-}
-.overview-icon {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  border: 1px solid color-mix(in srgb,var(--c-primary) 12%,transparent);
-  border-radius: 9px;
-  background: linear-gradient(145deg,var(--c-primary-soft),color-mix(in srgb,var(--ld-bg-card) 72%,transparent));
-  color: var(--c-primary);
-  place-items: center;
-  font-size: 0.92rem;
-}
 .overview-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  align-items: center;
-  gap: 1px;
+  align-items: flex-start;
+  gap: 2px;
 }
 .overview-copy strong {
   color: var(--c-text);
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .overview-copy small {
   color: var(--c-text-3);
-  font-size: 0.46rem;
+  font-size: 0.48rem;
 }
-.overview-item > i {
-  position: absolute;
-  top: 5px;
-  right: 0;
-  bottom: 5px;
-  width: 1px;
-  background: color-mix(in srgb, var(--border) 72%, transparent);
-}
-.overview-item:last-child > i {
-  display: none;
-}
+.overview-item > i { display: none; }
 
 .pet-dock {
   display: flex;
-  height: 108px;
-  min-height: 108px;
-  flex: 0 0 108px;
+  height: 104px;
+  min-height: 104px;
+  flex: 0 0 104px;
   align-items: center;
   justify-content: flex-end;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
@@ -262,7 +246,7 @@ onUnmounted(() => {
 .footprints {
   display: flex;
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 1 0 248px;
   flex-direction: column;
 }
 

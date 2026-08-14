@@ -99,16 +99,15 @@ async function renderWidget() {
 
 async function waitForToken(timeoutMs = 3500) {
   if (!enabled.value) return bypassToken
-  const immediate = props.modelValue || (widgetId && window.turnstile?.getResponse?.(widgetId)) || ''
-  if (immediate) return immediate
-  if (!challengePending.value) return ''
-
+  if (!widgetId && !rendering.value) void renderWidget()
+  const graceDeadline = Date.now() + 650
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    await new Promise(resolve => window.setTimeout(resolve, 80))
     const token = props.modelValue || (widgetId && window.turnstile?.getResponse?.(widgetId)) || ''
     if (token) return token
     if (unavailable.value) return ''
+    if (Date.now() >= graceDeadline && widgetId && !challengePending.value) return ''
+    await new Promise(resolve => window.setTimeout(resolve, 80))
   }
   return ''
 }
@@ -125,7 +124,9 @@ function reset() {
   else void renderWidget()
 }
 
-onMounted(() => void renderWidget())
+onMounted(() => {
+  void renderWidget()
+})
 onBeforeUnmount(() => {
   if (widgetId && window.turnstile) window.turnstile.remove(widgetId)
 })

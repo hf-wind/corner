@@ -155,6 +155,7 @@ const cards = ref<AiContentCard[]>([]);
 const panelOpen = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
 const panelRef = ref<HTMLElement | null>(null);
+let idleHandle: number | null = null;
 const markdown = new MarkdownIt({
   html: false,
   breaks: true,
@@ -293,8 +294,7 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === "Escape" && panelOpen.value) closePanel();
 }
 
-onMounted(async () => {
-  document.addEventListener("keydown", onKeydown);
+async function loadPersonalization() {
   void api
     .post("/ai/events", {
       scene: "home",
@@ -303,20 +303,31 @@ onMounted(async () => {
     })
     .catch(() => undefined);
   try {
-    const personalized = await api.get<AiContentCard[]>("/ai/personalized", {
-      limit: 6,
-    });
+    const personalized = await api.get<AiContentCard[]>("/ai/personalized", { limit: 6 });
     if (personalized.length) {
       cards.value = personalized;
-      answer.value =
-        "根据你最近的阅读与点击，我重新整理了一条更贴近此刻的探索路线。";
+      answer.value = "根据你最近的阅读与点击，我重新整理了一条更贴近此刻的探索路线。";
     }
   } catch {
     /* personalization is optional */
   }
+}
+
+onMounted(() => {
+  document.addEventListener("keydown", onKeydown);
+  if ("requestIdleCallback" in window) {
+    idleHandle = window.requestIdleCallback(() => void loadPersonalization(), { timeout: 1800 });
+  } else {
+    idleHandle = window.setTimeout(() => void loadPersonalization(), 420);
+  }
 });
 
-onUnmounted(() => document.removeEventListener("keydown", onKeydown));
+onUnmounted(() => {
+  document.removeEventListener("keydown", onKeydown);
+  if (idleHandle === null) return;
+  if ("cancelIdleCallback" in window) window.cancelIdleCallback(idleHandle);
+  else window.clearTimeout(idleHandle);
+});
 </script>
 
 <style scoped>

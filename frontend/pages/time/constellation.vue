@@ -321,7 +321,6 @@ type Discovery = {
   description: string;
   signalLabel: string;
   icon: string;
-  accent: string;
   commands: { id: DiscoveryCommandId; label: string; icon: string }[];
 };
 
@@ -394,7 +393,6 @@ const discoveries: Discovery[] = [
       "它不是一颗等待测绘的普通行星，而是风隅随笔的精神坐标：文章化作大陆，瞬间汇成云层，照片与旅途沿着晨昏线缓慢发光。",
     signalLabel: "母星记忆回声",
     icon: "ph:planet-bold",
-    accent: "#69caff",
     commands: [
       { id: "pulse", label: "唤醒星核", icon: "ph:sparkle-bold" },
       { id: "latest", label: "定位最近记忆", icon: "ph:crosshair-bold" },
@@ -410,7 +408,6 @@ const discoveries: Discovery[] = [
       "核心以质子－质子链持续把氢聚变为氦；能量穿过辐射区与对流区，最终以光和太阳风抵达星图。",
     signalLabel: "太阳活动简报",
     icon: "ph:sun-bold",
-    accent: "#ffb95e",
     commands: [
       { id: "sample", label: "刷新聚变遥测", icon: "ph:wave-sine-bold" },
     ],
@@ -425,7 +422,6 @@ const discoveries: Discovery[] = [
       "中央阴影不是实体表面，而是光无法逃逸的事件视界投影；明亮新月来自高速等离子体的相对论性多普勒增亮。",
     signalLabel: "引力透镜重建",
     icon: "ph:circle-half-tilt-bold",
-    accent: "#ff8a4c",
     commands: [{ id: "scan", label: "扫描光子环", icon: "ph:scan-bold" }],
   },
   {
@@ -438,7 +434,6 @@ const discoveries: Discovery[] = [
       "一座长期在轨的记忆实验平台，承担材料暴露、生命支持与深空通信验证任务，每 92 分钟完成一圈轨道。",
     signalLabel: "任务控制中心",
     icon: "ph:broadcast-bold",
-    accent: "#72d9ff",
     commands: [
       { id: "tour", label: "环站视角巡航", icon: "ph:orbit-bold" },
       { id: "log", label: "读取任务日志", icon: "ph:notebook-bold" },
@@ -454,7 +449,6 @@ const discoveries: Discovery[] = [
       "一颗兼具星间激光通信与光学遥感能力的试验卫星，在晨昏轨道上持续为离散记忆寻找同频信标。",
     signalLabel: "星间链路状态",
     icon: "ph:broadcast-duotone",
-    accent: "#70e7cf",
     commands: [
       { id: "signal", label: "发送窄带信号", icon: "ph:broadcast-bold" },
       { id: "orbit", label: "重新锁定轨道", icon: "ph:crosshair-simple-bold" },
@@ -470,7 +464,6 @@ const discoveries: Discovery[] = [
       "以陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰。聚焦会持续跟随航迹，追航将在舰尾上方保持第三人称伴飞。",
     signalLabel: "舰桥航行简报",
     icon: "ph:rocket-launch-bold",
-    accent: "#7ca8ff",
     commands: [
       { id: "bridge", label: "第三人称追航", icon: "ph:steering-wheel-bold" },
       { id: "warp", label: "曲率跃迁", icon: "ph:lightning-bold" },
@@ -1017,12 +1010,18 @@ useHead({ title: "时光星图" });
 
 <style scoped>
 .constellation-page {
+  --space-accent: hsl(var(--hue-theme) 100% 68%);
+  --space-text: #f4f7fb;
+  --space-text-2: #bec7d1;
+  --space-text-3: #8996a4;
+  --space-border: rgb(255 255 255 / 14%);
+  --space-surface: rgb(7 14 27 / 88%);
   position: fixed;
   z-index: 40;
   inset: 0;
   overflow: hidden;
-  background: #030817;
-  color: #ecf7ff;
+  background: #030712;
+  color: var(--space-text);
 }
 .constellation-stage {
   position: absolute;
@@ -1037,7 +1036,7 @@ useHead({ title: "时光星图" });
   height: 100%;
   min-height: 100%;
   border: 0;
-  background: #030817;
+  background: #030712;
 }
 .constellation-stage :deep(svg) {
   width: 100%;
@@ -1052,8 +1051,8 @@ useHead({ title: "时光星图" });
   align-content: center;
   justify-items: center;
   gap: 18px;
-  background: #030817;
-  color: #80b9d8;
+  background: #030712;
+  color: var(--space-text-3);
   pointer-events: none;
 }
 .constellation-loading small {
@@ -1065,14 +1064,14 @@ useHead({ title: "时光星图" });
   display: block;
   width: 62px;
   height: 62px;
-  border: 1px solid rgb(104 200 255 / 0.28);
+  border: 1px solid color-mix(in srgb, var(--space-accent) 42%, transparent);
   border-radius: 50%;
   animation: loading-spin 5s linear infinite;
 }
 .loading-orbit::before {
   position: absolute;
   inset: 12px;
-  border: 1px solid rgb(121 169 255 / 0.34);
+  border: 1px solid color-mix(in srgb, var(--space-accent) 24%, transparent);
   border-radius: 50%;
   content: "";
 }
@@ -1083,24 +1082,26 @@ useHead({ title: "时光星图" });
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #6ed8ff;
-  box-shadow: 0 0 16px #51c8ff;
+  background: var(--space-accent);
+  box-shadow: 0 0 16px var(--space-accent);
   transform: translateX(-50%);
 }
 .loading-orbit i:nth-child(2) {
   top: 50%;
   left: auto;
   right: -4px;
-  background: #9d8cff;
-  box-shadow: 0 0 16px #8c7cff;
+  background: var(--space-accent);
+  box-shadow: 0 0 12px var(--space-accent);
+  opacity: .65;
 }
 .loading-orbit i:nth-child(3) {
   top: auto;
   right: auto;
   bottom: -4px;
   left: 22%;
-  background: #74e0c6;
-  box-shadow: 0 0 16px #57cfb1;
+  background: var(--space-text);
+  box-shadow: 0 0 12px var(--space-accent);
+  opacity: .8;
 }
 .constellation-nav {
   position: absolute;
@@ -1144,7 +1145,7 @@ useHead({ title: "时光星图" });
   padding: 0;
   border: 0;
   background: none;
-  color: #ecf7ff;
+  color: var(--space-text);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -1153,7 +1154,7 @@ useHead({ title: "时光星图" });
   width: 42px;
   height: 42px;
   border: 1px solid rgb(116 207 255 / 0.18);
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 0 26px rgb(73 157 232 / 0.24);
 }
 .brand span {
@@ -1166,7 +1167,7 @@ useHead({ title: "时光星图" });
   letter-spacing: 0;
 }
 .brand small {
-  color: #75c8ef;
+  color: var(--space-accent);
   font-size: 0.48rem;
   letter-spacing: 0.13em;
 }
@@ -1174,15 +1175,15 @@ useHead({ title: "时光星图" });
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #8bb1c9;
+  color: var(--space-text-3);
   font-size: 0.57rem;
 }
 .signal > i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #68d7ef;
-  box-shadow: 0 0 12px #4caee9;
+  background: var(--space-accent);
+  box-shadow: 0 0 12px var(--space-accent);
 }
 .signal.offline > i {
   background: #8298ad;
@@ -1192,10 +1193,10 @@ useHead({ title: "时光星图" });
   display: grid;
   width: 30px;
   height: 30px;
-  border: 1px solid rgb(117 181 236 / 0.2);
-  border-radius: 50%;
-  background: rgb(4 15 31 / 0.5);
-  color: #8fc8f5;
+  border: 1px solid var(--space-border);
+  border-radius: 7px;
+  background: rgb(4 10 22 / 56%);
+  color: var(--space-text-2);
   place-items: center;
   transition:
     background 0.25s ease,
@@ -1226,23 +1227,23 @@ useHead({ title: "时光星图" });
   display: flex;
   align-items: center;
   gap: 9px;
-  color: #73c7ee;
+  color: var(--space-accent);
   font-size: 0.54rem;
   letter-spacing: 0.11em;
 }
 .intro-kicker i {
   width: 42px;
   height: 1px;
-  background: #397fae;
+  background: var(--space-accent);
 }
 .intro-kicker em {
-  color: #8ea9bd;
+  color: var(--space-text-3);
   font-style: normal;
   letter-spacing: 0.04em;
 }
 .constellation-intro h1 {
   margin: 12px 0 8px;
-  color: #f2f8ff;
+  color: var(--space-text);
   font-size: clamp(2.6rem, 6vw, 5.4rem);
   line-height: 0.95;
   letter-spacing: 0;
@@ -1250,7 +1251,7 @@ useHead({ title: "时光星图" });
 }
 .constellation-intro p {
   margin: 0;
-  color: #8da9bf;
+  color: var(--space-text-3);
   font-size: 0.74rem;
   line-height: 1.7;
 }
@@ -1263,7 +1264,7 @@ useHead({ title: "时光星图" });
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #7692a8;
+  color: var(--space-text-3);
   font-size: 0.55rem;
   pointer-events: none;
 }
@@ -1275,14 +1276,14 @@ useHead({ title: "时光星图" });
 .constellation-foot > span i {
   width: 22px;
   height: 1px;
-  background: #397eb8;
+  background: var(--space-accent);
 }
 .constellation-foot > span b {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   margin-left: 8px;
-  color: #64849e;
+  color: var(--space-text-3);
   font-size: 0.49rem;
   font-weight: 400;
   letter-spacing: 0.04em;
@@ -1291,8 +1292,8 @@ useHead({ title: "时光星图" });
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #6acbff;
-  box-shadow: 0 0 10px #4aaef0;
+  background: var(--space-accent);
+  box-shadow: 0 0 10px var(--space-accent);
 }
 .constellation-foot div {
   display: flex;
@@ -1311,9 +1312,9 @@ useHead({ title: "时光星图" });
   align-items: center;
   gap: 8px;
   padding: 0 9px;
-  border: 1px solid rgb(112 194 238/0.2);
+  border: 1px solid var(--space-border);
   border-radius: 6px;
-  background: rgb(4 15 31/0.68);
+  background: rgb(4 10 22 / 68%);
   box-shadow: 0 10px 32px rgb(0 0 0/0.24);
   backdrop-filter: blur(16px);
 }
@@ -1325,13 +1326,13 @@ useHead({ title: "时光星图" });
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #87cdeb;
+  color: var(--space-text-2);
   cursor: pointer;
   place-items: center;
 }
 .constellation-audio button:hover {
-  background: rgb(83 175 224/0.12);
-  color: #dff7ff;
+  background: color-mix(in srgb, var(--space-accent) 12%, transparent);
+  color: var(--space-text);
 }
 .constellation-audio > span {
   display: flex;
@@ -1345,7 +1346,7 @@ useHead({ title: "时光星图" });
   width: 2px;
   height: 5px;
   border-radius: 2px;
-  background: #5c91ae;
+  background: var(--space-text-3);
   transform-origin: center;
 }
 .constellation-audio.playing > span i {
@@ -1363,16 +1364,25 @@ useHead({ title: "时光星图" });
 .constellation-audio input {
   width: 70px;
   height: 3px;
-  accent-color: #69c8ee;
+  accent-color: var(--space-accent);
   cursor: pointer;
 }
 .memory-popup {
-  position: absolute;
+  --c-primary: var(--space-accent);
+  --c-primary-soft: color-mix(in srgb, var(--space-accent) 14%, transparent);
+  --c-text: var(--space-text);
+  --c-text-2: var(--space-text-2);
+  --c-text-3: var(--space-text-3);
+  --c-bg-1: rgb(255 255 255 / 6%);
+  --border: var(--space-border);
+  --ld-bg-card: var(--space-surface);
+  position: fixed;
   z-index: 20;
   top: 50%;
   right: clamp(20px, 4.5vw, 72px);
   width: min(342px, calc(100vw - 40px));
-  height: min(620px, calc(100dvh - 138px));
+  height: auto;
+  max-height: calc(100dvh - 112px);
   box-sizing: border-box;
   contain: layout paint;
   overflow-anchor: none;
@@ -1380,8 +1390,8 @@ useHead({ title: "时光星图" });
   overflow-y: auto;
   padding: 25px 25px 23px 30px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 28%, var(--border));
-  border-radius: 24px 24px 24px 10px;
-  background: color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft));
+  border-radius: 8px;
+  background: var(--space-surface);
   box-shadow:
     0 24px 70px rgb(0 0 0 / 0.42),
     inset 0 1px rgb(191 226 255 / 0.08);
@@ -1427,18 +1437,7 @@ useHead({ title: "时光星图" });
   box-shadow: 0 0 12px color-mix(in srgb, var(--c-primary) 44%, transparent);
 }
 .popup-glow {
-  position: absolute;
-  z-index: -1;
-  top: -100px;
-  right: -74px;
-  width: 240px;
-  height: 190px;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--c-primary) 22%, transparent),
-    transparent 68%
-  );
-  pointer-events: none;
+  display: none;
 }
 .popup-close {
   position: absolute;
@@ -1449,7 +1448,7 @@ useHead({ title: "时光星图" });
   width: 28px;
   height: 28px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 24%, var(--border));
-  border-radius: 50%;
+  border-radius: 6px;
   background: var(--c-bg-1);
   color: var(--c-text-2);
   cursor: pointer;
@@ -1478,7 +1477,7 @@ useHead({ title: "时光星图" });
   height: 32px;
   flex: none;
   border: 1px solid color-mix(in srgb, var(--c-primary) 34%, var(--border));
-  border-radius: 50%;
+  border-radius: 7px;
   background: var(--c-primary-soft);
   box-shadow:
     inset 0 0 16px color-mix(in srgb, var(--c-primary) 10%, transparent),
@@ -1496,7 +1495,7 @@ useHead({ title: "时光星图" });
   aspect-ratio: 1.85;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
-  border-radius: 14px 14px 14px 4px;
+  border-radius: 6px;
   background: var(--c-bg-1);
 }
 .popup-image img {
@@ -1527,7 +1526,7 @@ useHead({ title: "时光星图" });
   margin-top: 16px;
   padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 30%, var(--border));
-  border-radius: 999px;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--c-primary) 8%, transparent);
   color: var(--c-primary);
   font-size: 0.64rem;
@@ -1594,12 +1593,20 @@ useHead({ title: "时光星图" });
 }
 .discovery-popup {
   --discovery-accent: var(--c-primary);
-  position: absolute;
+  --c-primary: var(--space-accent);
+  --c-primary-soft: color-mix(in srgb, var(--space-accent) 14%, transparent);
+  --c-text: var(--space-text);
+  --c-text-2: var(--space-text-2);
+  --c-text-3: var(--space-text-3);
+  --c-bg-1: rgb(255 255 255 / 6%);
+  --border: var(--space-border);
+  --ld-bg-card: var(--space-surface);
+  position: fixed;
   z-index: 20;
   top: 50%;
   right: clamp(20px, 4.5vw, 72px);
   width: min(412px, calc(100vw - 40px));
-  height: min(500px, calc(100dvh - 118px));
+  height: auto;
   max-height: calc(100dvh - 118px);
   box-sizing: border-box;
   padding: 24px;
@@ -1607,14 +1614,13 @@ useHead({ title: "时光星图" });
   overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--c-primary) 30%, var(--border));
   border-radius: 8px;
-  background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-primary-soft));
+  background: var(--space-surface);
   box-shadow:
     0 28px 90px rgb(0 0 0 / 0.52),
     inset 0 1px color-mix(in srgb, var(--c-primary) 10%, transparent);
   backdrop-filter: blur(24px) saturate(1.12);
   transform: translateY(-50%);
   transition:
-    height 0.72s cubic-bezier(0.16, 1, 0.3, 1),
     width 0.65s cubic-bezier(0.16, 1, 0.3, 1),
     padding 0.65s cubic-bezier(0.16, 1, 0.3, 1),
     top 0.65s cubic-bezier(0.16, 1, 0.3, 1),
@@ -1985,8 +1991,8 @@ useHead({ title: "时光星图" });
 @keyframes audio-level {
   to {
     height: 16px;
-    background: #75d4f4;
-    box-shadow: 0 0 7px rgb(89 194 235/0.62);
+    background: var(--space-accent);
+    box-shadow: 0 0 7px var(--space-accent);
   }
 }
 @media (max-width: 700px) {
@@ -2038,9 +2044,10 @@ useHead({ title: "时光星图" });
     bottom: 58px;
     left: 14px;
     width: auto;
-    height: min(52dvh, 440px);
+    height: auto;
+    max-height: min(58dvh, 480px);
     padding: 18px 18px 18px 24px;
-    border-radius: 20px 20px 20px 8px;
+    border-radius: 8px;
     transform: none;
   }
   .discovery-popup {
@@ -2049,7 +2056,7 @@ useHead({ title: "时光星图" });
     bottom: 58px;
     left: 14px;
     width: auto;
-    height: min(560px, 67dvh);
+    height: auto;
     max-height: min(67dvh, 560px);
     padding: 19px;
     transform: none;
