@@ -1,5 +1,5 @@
 <template>
-  <div class="page-layout article-page" :class="{ 'is-immersive': immersiveMode, 'is-traversing': traversing }">
+  <div class="page-layout article-page" :class="{ 'is-immersive': immersiveMode }">
     <main
       id="main-content"
       ref="articleMainRef"
@@ -79,6 +79,7 @@
         </div>
 
         <div
+          v-if="article.excerpt"
           class="md-excerpt gradient-card article-anim"
           ref="excerptRef"
           data-animation="true"
@@ -242,7 +243,6 @@ const adjacentLoaded = ref(false);
 const readingProgress = ref(0);
 const showBackTop = ref(false);
 const immersiveMode = ref(false);
-const traversing = ref(false);
 const articleContext = computed(() => ({
   title: article.value?.title || "",
   content: article.value?.content || "",
@@ -342,18 +342,11 @@ function navigateCatalog(event: MouseEvent, item: { text: string; level: number;
   }
 
   gsap.killTweensOf(container);
-  traversing.value = true;
   gsap.to(container, {
     scrollTop: destination,
-    duration: Math.min(0.66, Math.max(0.34, distance / 4200)),
-    ease: "power3.inOut",
+    duration: Math.min(1.02, Math.max(0.48, distance / 3000)),
+    ease: "power4.inOut",
     overwrite: true,
-    onComplete: () => {
-      traversing.value = false;
-    },
-    onInterrupt: () => {
-      traversing.value = false;
-    },
   });
 }
 
@@ -526,7 +519,9 @@ onUnmounted(() => {
 }
 
 .article-page {
-  --article-inline-pad: clamp(28px, 2.2vw, 56px);
+  --article-aside-w: clamp(216px, 17vw, 232px);
+  --article-inline-pad: clamp(28px, 3vw, 64px);
+  position: relative;
   transition: background-color 0.28s ease;
 }
 
@@ -540,7 +535,7 @@ onUnmounted(() => {
 }
 
 .article-main > * {
-  width: min(100%, 1080px);
+  width: min(100%, 800px);
   margin-right: auto;
   margin-left: auto;
   transition: width 0.32s var(--ui-ease-out);
@@ -574,13 +569,8 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.article-page.is-traversing .article-shell {
-  filter: saturate(0.9) contrast(0.98);
-  transform: scale(0.997);
-}
-
 .article-shell {
-  transition: filter 0.22s ease, transform 0.22s ease;
+  transition: width 0.32s var(--ui-ease-out);
 }
 
 .article-main::-webkit-scrollbar {
@@ -603,17 +593,80 @@ onUnmounted(() => {
 }
 
 .post-header {
-  margin-bottom: 24px;
+  position: relative;
+  margin-bottom: 26px;
 }
 
 .post-cover {
   width: 100%;
-  border-radius: 16px;
+  border-radius: 12px;
   margin-bottom: 20px;
-  max-height: 360px;
+  max-height: 340px;
   object-fit: cover;
   display: block;
   box-shadow: 0 14px 36px var(--ld-shadow);
+}
+
+.post-header.has-cover {
+  aspect-ratio: 10 / 3;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--c-bg-2);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ld-shadow) 76%, transparent);
+}
+
+.post-header.has-cover::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(180deg, rgb(4 9 18 / 18%) 20%, rgb(4 9 18 / 82%) 100%);
+  content: "";
+  pointer-events: none;
+}
+
+.post-header.has-cover .post-cover {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: inherit;
+  box-shadow: none;
+}
+
+.post-header.has-cover .post-nav {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  left: 20px;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.post-header.has-cover .operations { order: 2; }
+.post-header.has-cover .post-info { order: 1; color: rgb(255 255 255 / 84%); }
+.post-header.has-cover .post-info a { color: inherit; }
+.post-header.has-cover .author-capsule { color: #fff; }
+.post-header.has-cover .z-btn {
+  background: rgb(8 14 24 / 54%);
+  color: rgb(255 255 255 / 88%);
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+}
+
+.post-header.has-cover .post-title {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  left: 24px;
+  z-index: 1;
+  color: #fff;
+  text-shadow: 0 3px 18px rgb(0 0 0 / 46%);
 }
 
 .post-nav {
@@ -690,9 +743,10 @@ onUnmounted(() => {
 }
 
 .post-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.4;
+  font-family: var(--font-system-rounded);
+  font-size: 24px;
+  font-weight: 680;
+  line-height: 1.35;
   color: var(--c-text);
   margin: 0;
 }
@@ -703,14 +757,16 @@ onUnmounted(() => {
   gap: 8px;
   padding: 14px 16px;
   margin-bottom: 20px;
-  border-radius: 14px;
-  font-size: 0.78rem;
-  line-height: 1.7;
+  border-left: 3px solid color-mix(in srgb, var(--c-primary) 72%, var(--border));
+  border-radius: 0 8px 8px 0;
+  font-family: var(--font-rounded);
+  font-size: 12px;
+  line-height: 1.8;
   color: var(--c-text-2);
   position: relative;
   overflow: hidden;
   background: var(--ld-bg-card);
-  box-shadow: 0 8px 22px var(--ld-shadow);
+  box-shadow: none;
 }
 
 .md-excerpt::before {
@@ -820,8 +876,7 @@ onUnmounted(() => {
 }
 
 .article-shell {
-  border-radius: 18px;
-  padding: 8px 2px 4px;
+  padding: 10px 0 4px;
 }
 
 .post-footer {
@@ -966,6 +1021,30 @@ onUnmounted(() => {
     margin-bottom: 18px;
   }
 
+  .post-header.has-cover {
+    min-height: 220px;
+    border-radius: 10px;
+  }
+
+  .post-header.has-cover .post-nav {
+    top: 14px;
+    right: 14px;
+    left: 14px;
+  }
+
+  .post-header.has-cover .post-info > span:nth-of-type(2),
+  .post-header.has-cover .post-info > span:nth-of-type(3) {
+    display: none;
+  }
+
+  .post-header.has-cover .operations span { display: none; }
+
+  .post-header.has-cover .post-title {
+    right: 18px;
+    bottom: 18px;
+    left: 18px;
+  }
+
   .post-cover {
     max-height: 240px;
     margin-bottom: 15px;
@@ -988,7 +1067,7 @@ onUnmounted(() => {
   }
 
   .post-title {
-    font-size: clamp(1.25rem, 6vw, 1.5rem);
+    font-size: 1.35rem;
     line-height: 1.45;
   }
 

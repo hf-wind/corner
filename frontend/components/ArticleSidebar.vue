@@ -362,10 +362,11 @@ onUnmounted(() => {
 
 <style scoped>
 .sidebar-right {
-  width: var(--right-w);
+  width: var(--article-aside-w, 236px);
+  flex-basis: var(--article-aside-w, 236px);
   height: 100dvh;
   flex-shrink: 0;
-  padding: 22px 12px 14px;
+  padding: 20px 14px 14px;
   overflow: visible;
   display: flex;
   flex-direction: column;
@@ -379,17 +380,18 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 10px;
   flex-shrink: 0;
-  padding: 0 2px 8px;
+  padding: 0 3px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
 }
 
 .head-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8rem;
+  font-size: 12px;
   font-weight: 700;
   color: var(--c-text);
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   min-width: 0;
 }
 
@@ -406,8 +408,8 @@ onUnmounted(() => {
 }
 
 .progress-track {
-  width: 48px;
-  height: 4px;
+  width: 38px;
+  height: 3px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--border) 90%, transparent);
   overflow: hidden;
@@ -421,7 +423,7 @@ onUnmounted(() => {
 }
 
 .progress-text {
-  font-size: 0.66rem;
+  font-size: 10px;
   font-weight: 700;
   color: var(--c-primary);
   font-variant-numeric: tabular-nums;
@@ -430,11 +432,13 @@ onUnmounted(() => {
 }
 
 .catalog-wrap {
-  flex: 1;
-  min-height: 0;
+  flex: 0 1 auto;
+  min-height: 72px;
+  max-height: min(34dvh, 300px);
   overflow-x: hidden;
   overflow-y: auto;
-  padding-right: 2px;
+  padding: 5px 3px 4px 0;
+  overscroll-behavior: contain;
 }
 
 .catalog-wrap::-webkit-scrollbar {
@@ -464,37 +468,46 @@ onUnmounted(() => {
 /* override default green (#73d13d) with theme primary */
 .catalog-wrap :deep(.md-editor-catalog-indicator) {
   background-color: var(--c-primary) !important;
-  width: 3px;
+  width: 2px;
   border-radius: 999px;
   box-shadow: 0 0 8px color-mix(in srgb, var(--c-primary) 45%, transparent);
 }
 
 .catalog-wrap :deep(.md-editor-catalog-link span) {
   color: var(--c-text-2) !important;
-  font-size: 0.74rem;
-  line-height: 1.45;
-  transition: color 0.2s ease, background 0.2s ease;
-  border-radius: 6px;
-  padding: 2px 6px;
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-family: var(--font-rounded);
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
 
 .catalog-wrap :deep(.md-editor-catalog-link span:hover) {
   color: var(--c-primary) !important;
   background: color-mix(in srgb, var(--c-primary) 8%, transparent);
+  transform: translateX(2px);
 }
 
 .catalog-wrap :deep(.md-editor-catalog-active > span) {
   color: var(--c-primary) !important;
-  font-weight: 700;
+  font-weight: 650;
   background: var(--c-primary-soft);
 }
 
 .pet-dock {
+  margin-top: auto;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 104px;
+  min-height: 92px;
   padding: 10px 0 6px;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
