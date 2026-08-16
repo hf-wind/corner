@@ -1,10 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="风隅随笔标志">
-  <rect x="2.5" y="2.5" width="59" height="59" rx="15" fill="none" stroke="#1a66ff" stroke-width="2.4"/>
   <g fill="none" stroke="#1a66ff" stroke-linecap="round" stroke-linejoin="round">
     <path d="M15 14v35h35" stroke-width="2.8" opacity=".32"/>
-    <path d="M7 25c11 0 12-8 24-8 7 0 10 3 10 7 0 5-4 8-9 8" stroke-width="3.4"/>
-    <path d="M7 36h37c7 0 11-3 11-8" stroke-width="3.4" opacity=".82"/>
-    <path d="M17 46h25c6 0 9 3 9 7" stroke-width="3.4" opacity=".54"/>
+    <path d="M7 25c11 0 12-8 24-8 7 0 10 3 10 7 0 5-4 8-9 8" stroke-width="3.2"/>
+    <path d="M7 36h37c7 0 11-3 11-8" stroke-width="3.2" opacity=".82"/>
+    <path d="M17 46h25c6 0 9 3 9 7" stroke-width="3.2" opacity=".56"/>
   </g>
-  <circle cx="15" cy="14" r="3.2" fill="#d89454" stroke="#fff" stroke-opacity=".8" stroke-width="1.5"/>
+  <circle cx="15" cy="14" r="3" fill="#d89454" stroke="#fff" stroke-width="2"/>
 </svg>

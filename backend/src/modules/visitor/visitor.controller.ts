@@ -1,15 +1,4 @@
-﻿import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Param,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+﻿import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -47,11 +36,7 @@ export class VisitorController {
       headers: { 'x-visitor-id': visitorId },
       ip: req.ip,
     });
-    return this.visitorService.identify(
-      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
-      hash,
-      dto.nickname,
-    );
+    return this.visitorService.identify({ headers: { 'x-visitor-id': visitorId }, ip: req.ip }, hash, dto.nickname);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -70,22 +55,12 @@ export class VisitorController {
       headers: { 'x-visitor-id': visitorId },
       ip: req.ip,
     });
-    return this.visitorService.trackVisit(
-      { headers: req.headers, ip: req.ip },
-      hash,
-      req.user?.id ?? null,
-    );
+    return this.visitorService.trackVisit({ headers: req.headers, ip: req.ip }, hash, req.user?.id ?? null);
   }
 
   @Get('messages')
-  async listMessages(
-    @Query('type') type: string = 'message',
-    @Query('page') page = '1',
-  ) {
-    return this.visitorService.listMessages(
-      type === 'bottle' ? 'bottle' : 'message',
-      Math.max(1, Number(page) || 1),
-    );
+  async listMessages(@Query('type') type: string = 'message', @Query('page') page = '1') {
+    return this.visitorService.listMessages(type === 'bottle' ? 'bottle' : 'message', Math.max(1, Number(page) || 1));
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -95,11 +70,8 @@ export class VisitorController {
     @Headers('x-visitor-id') visitorId: string,
     @Body() dto: CreateVisitorMessageDto,
   ) {
-    const actor: VisitorActor = req.user?.id
-      ? { userId: req.user.id, username: req.user.username ?? '' }
-      : null;
-    const visitorIdHash =
-      this.visitorService.resolveVisitorIdOptional(visitorId);
+    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
+    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
     return this.visitorService.createMessageEntry(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
@@ -109,17 +81,23 @@ export class VisitorController {
   }
 
   @UseGuards(OptionalJwtAuthGuard)
+  @Get('bottles/quota')
+  bottleQuota(@Req() req: { ip: string }, @Headers('x-visitor-id') visitorId: string) {
+    return this.visitorService.bottleQuota({
+      headers: { 'x-visitor-id': visitorId },
+      ip: req.ip,
+    });
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('bottles')
   async throwBottle(
     @Req() req: { ip: string; user?: { id?: string; username?: string } },
     @Headers('x-visitor-id') visitorId: string,
     @Body() dto: CreateVisitorBottleDto,
   ) {
-    const actor: VisitorActor = req.user?.id
-      ? { userId: req.user.id, username: req.user.username ?? '' }
-      : null;
-    const visitorIdHash =
-      this.visitorService.resolveVisitorIdOptional(visitorId);
+    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
+    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
     return this.visitorService.throwBottle(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,
@@ -136,16 +114,9 @@ export class VisitorController {
     @Req() req: { ip: string; user?: { id?: string; username?: string } },
     @Headers('x-visitor-id') visitorId: string,
   ) {
-    const actor: VisitorActor = req.user?.id
-      ? { userId: req.user.id, username: req.user.username ?? '' }
-      : null;
-    const visitorIdHash =
-      this.visitorService.resolveVisitorIdOptional(visitorId);
-    return this.visitorService.fishBottle(
-      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
-      actor,
-      visitorIdHash,
-    );
+    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
+    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
+    return this.visitorService.fishBottle({ headers: { 'x-visitor-id': visitorId }, ip: req.ip }, actor, visitorIdHash);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -156,11 +127,8 @@ export class VisitorController {
     @Headers('x-visitor-id') visitorId: string,
     @Param('id') id: string,
   ) {
-    const actor: VisitorActor = req.user?.id
-      ? { userId: req.user.id, username: req.user.username ?? '' }
-      : null;
-    const visitorIdHash =
-      this.visitorService.resolveVisitorIdOptional(visitorId);
+    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
+    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
     return this.visitorService.releaseBottle(
       { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
       actor,

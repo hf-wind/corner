@@ -2,7 +2,13 @@
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">
       <Transition
-        :name="isSpaceRoute ? undefined : viewRoute.meta.layout === 'admin' ? 'admin-page' : 'route-page'"
+        :name="
+          isSpaceRoute
+            ? undefined
+            : viewRoute.meta.layout === 'admin'
+              ? 'admin-page'
+              : 'route-page'
+        "
         :mode="viewRoute.meta.layout === 'admin' ? 'out-in' : undefined"
       >
         <component :is="Component" :key="viewRoute.path" />
@@ -15,79 +21,100 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
-import DefaultLayout from './layouts/default.vue'
-import AdminLayout from './layouts/admin.vue'
-import WelcomeLayout from './layouts/welcome.vue'
-import LightConfirm from './components/LightConfirm.vue'
-import { useVisitor } from './composables/useVisitor'
+import {
+  computed,
+  defineAsyncComponent,
+  onMounted,
+  onUnmounted,
+  ref,
+} from "vue";
+import { RouterView, useRoute } from "vue-router";
+import DefaultLayout from "./layouts/default.vue";
+import AdminLayout from "./layouts/admin.vue";
+import WelcomeLayout from "./layouts/welcome.vue";
+import LightConfirm from "./components/LightConfirm.vue";
+import { useVisitor } from "./composables/useVisitor";
 
-const GlobalToast = defineAsyncComponent(() => import('./components/GlobalToast.vue'))
+const GlobalToast = defineAsyncComponent(
+  () => import("./components/GlobalToast.vue"),
+);
 // const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/SidebarMusicPlayer.vue'))
 
-const { init: initTypography } = useTypography()
-const { init: initTheme } = useTheme()
-const { readStorage, refreshProfile, isLoggedIn, isAdmin } = useAuth()
-const { connectRealtime, disconnectRealtime, refreshUnread } = useNotifications()
-const { toasts } = useToast()
-const { siteTitle, loadSiteSettings } = useSiteSettings()
-const route = useRoute()
-const isSpaceRoute = computed(() => route.path === '/' || route.path === '/time/constellation')
-const clientProtection = useProductionClientProtection(isAdmin)
+const { init: initTypography } = useTypography();
+const { init: initTheme } = useTheme();
+const { readStorage, refreshProfile, isLoggedIn, isAdmin } = useAuth();
+const { connectRealtime, disconnectRealtime, refreshUnread } =
+  useNotifications();
+const { toasts } = useToast();
+const { siteTitle, loadSiteSettings } = useSiteSettings();
+const route = useRoute();
+const isSpaceRoute = computed(
+  () => route.path === "/" || route.path === "/time/constellation",
+);
+const clientProtection = useProductionClientProtection(isAdmin);
 
-readStorage()
-const sessionReady = ref(isLoggedIn.value)
+readStorage();
+const sessionReady = ref(isLoggedIn.value);
 
 const activeLayout = computed(() => {
-  if (route.meta.layout === false) return WelcomeLayout
-  if (route.meta.layout === 'admin') return AdminLayout
-  if (route.meta.layout === 'welcome') return WelcomeLayout
-  return DefaultLayout
-})
+  if (route.meta.layout === false) return WelcomeLayout;
+  if (route.meta.layout === "admin") return AdminLayout;
+  if (route.meta.layout === "welcome") return WelcomeLayout;
+  return DefaultLayout;
+});
 
-watch(() => route.path, () => {
-  if (typeof document === 'undefined') return
-  document.documentElement.classList.toggle('space-route', isSpaceRoute.value)
-  const themeColor = document.querySelector('meta[name="theme-color"]')
-  if (themeColor) {
-    const dark = document.documentElement.classList.contains('dark')
-    themeColor.setAttribute('content', isSpaceRoute.value ? '#020814' : (dark ? '#030b18' : '#eaf5ff'))
-  }
-}, { immediate: true })
+watch(
+  () => route.path,
+  () => {
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.toggle(
+      "space-route",
+      isSpaceRoute.value,
+    );
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) {
+      const dark = document.documentElement.classList.contains("dark");
+      themeColor.setAttribute(
+        "content",
+        isSpaceRoute.value ? "#030712" : dark ? "#030b18" : "#eaf5ff",
+      );
+    }
+  },
+  { immediate: true },
+);
 
 onMounted(() => {
-  clientProtection.start()
-  void loadSiteSettings()
-  initTheme()
-  initTypography()
-  void useVisitor().trackVisit()
+  clientProtection.start();
+  void loadSiteSettings();
+  initTheme();
+  initTypography();
+  void useVisitor().trackVisit();
   if (sessionReady.value) {
-    void refreshProfile()
-    connectRealtime()
-    void refreshUnread()
+    void refreshProfile();
+    connectRealtime();
+    void refreshUnread();
   }
-})
+});
 
 onUnmounted(() => {
-  clientProtection.stop()
-  disconnectRealtime()
-})
+  clientProtection.stop();
+  disconnectRealtime();
+});
 
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
-    connectRealtime()
-    void refreshUnread()
+    connectRealtime();
+    void refreshUnread();
   } else {
-    disconnectRealtime(true)
+    disconnectRealtime(true);
   }
-})
+});
 
 useHead(() => ({
   titleTemplate: (chunk) => {
-    return chunk ? `${chunk} - ${siteTitle.value}` : siteTitle.value
-  }
-}))
+    return chunk ? `${chunk} - ${siteTitle.value}` : siteTitle.value;
+  },
+}));
 </script>
 
 <style>
@@ -104,29 +131,47 @@ useHead(() => ({
   animation: cosmic-route-in 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-html[data-cosmic-transition='constellation']::view-transition-new(root) {
+html[data-cosmic-transition="constellation"]::view-transition-new(root) {
   animation-name: constellation-route-in;
 }
 
-html[data-cosmic-transition='home']::view-transition-new(root) {
+html[data-cosmic-transition="home"]::view-transition-new(root) {
   animation-name: home-route-in;
 }
 
 @keyframes cosmic-route-out {
-  to { opacity: 0; transform: scale(1.025); filter: blur(3px); }
+  to {
+    opacity: 0;
+    transform: scale(1.025);
+    filter: blur(3px);
+  }
 }
 
 @keyframes cosmic-route-in {
-  from { opacity: 0; transform: scale(0.985); }
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
 }
 
 @keyframes constellation-route-in {
-  from { opacity: 0; clip-path: circle(7% at 66% 50%); transform: scale(1.035); }
-  to { opacity: 1; clip-path: circle(150% at 66% 50%); transform: scale(1); }
+  from {
+    opacity: 0;
+    clip-path: circle(7% at 66% 50%);
+    transform: scale(1.035);
+  }
+  to {
+    opacity: 1;
+    clip-path: circle(150% at 66% 50%);
+    transform: scale(1);
+  }
 }
 
 @keyframes home-route-in {
-  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.99); }
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.99);
+  }
 }
 
 html.space-pending body::after {
@@ -134,7 +179,7 @@ html.space-pending body::after {
   z-index: 2147483647;
   inset: 0;
   background: #020814;
-  content: '';
+  content: "";
   pointer-events: none;
 }
 
@@ -163,11 +208,15 @@ html.space-pending body::after {
 }
 
 .route-page-enter-active {
-  transition: opacity 0.3s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.3s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .route-page-leave-active {
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
 }
 
 .route-page-enter-from {
@@ -181,7 +230,9 @@ html.space-pending body::after {
 }
 
 .route-page-enter-active .sidebar-right {
-  transition: opacity 0.36s ease 0.05s, transform 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
+  transition:
+    opacity 0.36s ease 0.05s,
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
 }
 
 .route-page-enter-from .sidebar-right {

@@ -42,7 +42,7 @@
         title="返回时光门面"
         @click="navigate('/')"
       >
-        <img src="/logo_192.png" alt="" width="42" height="42" />
+        <img src="/logo.png" alt="" width="42" height="42" />
         <span><strong>时光星图</strong><small>TIME CONSTELLATION</small></span>
       </button>
       <div class="signal" :class="{ offline: !!error }">
@@ -156,20 +156,34 @@
         <AppLink v-if="selected.href" :to="selected.href"
           ><span>读取这段时光</span><Icon name="ph:arrow-up-right-bold"
         /></AppLink>
-        <section v-if="neighbors.length">
+        <section class="relations-panel" :class="{ loading: neighborsLoading }">
           <h3>
-            <span>相连轨迹</span><small>{{ neighbors.length }} 条</small>
+            <span>相连轨迹</span
+            ><small>{{
+              neighborsLoading ? "校准中" : `${neighbors.length} 条`
+            }}</small>
           </h3>
-          <button
-            v-for="relation in neighbors.slice(0, 3)"
-            :key="relation.id"
-            type="button"
-            @click="selectNeighbor(relation)"
+          <div
+            v-if="neighborsLoading"
+            class="relation-skeleton"
+            aria-live="polite"
+            aria-label="正在读取相连轨迹"
           >
-            <span>{{ relationText(relation.type) }}</span>
-            <b>{{ otherNode(relation).title }}</b>
-            <small>{{ evidenceText(relation.evidence) }}</small>
-          </button>
+            <i v-for="index in 3" :key="index" />
+          </div>
+          <template v-else-if="neighbors.length">
+            <button
+              v-for="relation in neighbors.slice(0, 3)"
+              :key="relation.id"
+              type="button"
+              @click="selectNeighbor(relation)"
+            >
+              <span>{{ relationText(relation.type) }}</span>
+              <b>{{ otherNode(relation).title }}</b>
+              <small>{{ evidenceText(relation.evidence) }}</small>
+            </button>
+          </template>
+          <p v-else class="relations-empty">这颗星暂时独自发光</p>
         </section>
       </aside>
     </Transition>
@@ -357,6 +371,7 @@ const discoverySequence = ref(0);
 const activeCommandId = ref<DiscoveryCommandId | "">("");
 const telemetryNow = ref(new Date());
 const neighbors = ref<GraphRelation[]>([]);
+const neighborsLoading = ref(false);
 const error = ref("");
 const sceneReady = ref(false);
 const fallbackMode = ref(false);
@@ -369,6 +384,7 @@ const audioPlaying = ref(false);
 const audioMuted = ref(false);
 const audioVolume = ref(0.36);
 let requestSequence = 0;
+let neighborRequestSequence = 0;
 let telemetryTimer: ReturnType<typeof setInterval> | null = null;
 
 const typeOptions = [
@@ -803,20 +819,26 @@ async function loadGraph() {
 }
 
 async function selectNode(node: GraphNode, syncUrl = true) {
+  const sequence = ++neighborRequestSequence;
   activeDiscoveryId.value = "";
   discoveryResult.value = "";
   activeCommandId.value = "";
   selected.value = node;
+  neighbors.value = [];
+  neighborsLoading.value = true;
   selectMemory({ id: node.id, type: node.type, href: node.href });
-  if (syncUrl) await router.replace({ query: { focus: node.id } });
+  if (syncUrl) void router.replace({ query: { focus: node.id } });
   try {
     const result = await api.get<any>(
       `/memories/graph/neighbors/${encodeURIComponent(node.id)}`,
     );
-    if (selected.value?.id === node.id)
+    if (sequence === neighborRequestSequence && selected.value?.id === node.id)
       neighbors.value = result.relations || [];
   } catch {
-    if (selected.value?.id === node.id) neighbors.value = [];
+    if (sequence === neighborRequestSequence && selected.value?.id === node.id)
+      neighbors.value = [];
+  } finally {
+    if (sequence === neighborRequestSequence) neighborsLoading.value = false;
   }
 }
 
@@ -826,9 +848,11 @@ function handleSceneSelect(node: GraphNode) {
 }
 
 function handleDiscovery(id: DiscoveryId) {
+  neighborRequestSequence += 1;
   returnDiscoveryId.value = "";
   selected.value = null;
   neighbors.value = [];
+  neighborsLoading.value = false;
   clearMemory();
   activeDiscoveryId.value = id;
   discoveryClosing.value = false;
@@ -924,9 +948,11 @@ function resetScene() {
 }
 
 async function clearSelected() {
+  neighborRequestSequence += 1;
   const returnTo = returnDiscoveryId.value;
   selected.value = null;
   neighbors.value = [];
+  neighborsLoading.value = false;
   clearMemory();
   void router.replace({ query: {} });
   if (returnTo) {
@@ -1092,7 +1118,7 @@ useHead({ title: "时光星图" });
   right: -4px;
   background: var(--space-accent);
   box-shadow: 0 0 12px var(--space-accent);
-  opacity: .65;
+  opacity: 0.65;
 }
 .loading-orbit i:nth-child(3) {
   top: auto;
@@ -1101,7 +1127,7 @@ useHead({ title: "时光星图" });
   left: 22%;
   background: var(--space-text);
   box-shadow: 0 0 12px var(--space-accent);
-  opacity: .8;
+  opacity: 0.8;
 }
 .constellation-nav {
   position: absolute;
@@ -1381,7 +1407,7 @@ useHead({ title: "时光星图" });
   top: 50%;
   right: clamp(20px, 4.5vw, 72px);
   width: min(342px, calc(100vw - 40px));
-  height: auto;
+  height: min(580px, calc(100dvh - 112px));
   max-height: calc(100dvh - 112px);
   box-sizing: border-box;
   contain: layout paint;
@@ -1542,9 +1568,36 @@ useHead({ title: "时光星图" });
   transform: translateX(2px);
 }
 .memory-popup section {
+  min-height: 170px;
   margin-top: 19px;
   padding-top: 14px;
   border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+.relation-skeleton {
+  display: grid;
+  gap: 5px;
+  padding-top: 6px;
+}
+.relation-skeleton i {
+  display: block;
+  height: 42px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  background: rgb(255 255 255 / 4%);
+  animation: relation-pulse 1.2s ease-in-out infinite alternate;
+}
+.relation-skeleton i:nth-child(2) {
+  animation-delay: -0.35s;
+}
+.relation-skeleton i:nth-child(3) {
+  animation-delay: -0.7s;
+}
+.relations-empty {
+  display: grid;
+  min-height: 132px;
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: 0.56rem;
+  place-items: center;
 }
 .memory-popup h3 {
   display: flex;
@@ -1988,6 +2041,11 @@ useHead({ title: "时光星图" });
     transform: rotate(360deg);
   }
 }
+@keyframes relation-pulse {
+  to {
+    opacity: 0.34;
+  }
+}
 @keyframes audio-level {
   to {
     height: 16px;
@@ -2044,7 +2102,7 @@ useHead({ title: "时光星图" });
     bottom: 58px;
     left: 14px;
     width: auto;
-    height: auto;
+    height: min(58dvh, 480px);
     max-height: min(58dvh, 480px);
     padding: 18px 18px 18px 24px;
     border-radius: 8px;

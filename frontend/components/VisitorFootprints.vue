@@ -14,7 +14,12 @@
         :disabled="refreshing"
         @click="load"
       >
-        <Icon :name="refreshing ? 'ph:circle-notch-bold' : 'ph:arrows-clockwise-bold'" :spin="refreshing" />
+        <Icon
+          :name="
+            refreshing ? 'ph:circle-notch-bold' : 'ph:arrows-clockwise-bold'
+          "
+          :spin="refreshing"
+        />
       </button>
     </header>
 
@@ -36,17 +41,27 @@
         :style="{ '--fp-delay': itemDelay(index) }"
       >
         <span class="fp-avatar" aria-hidden="true">
-          <template v-if="visit.nickname?.trim()">{{ visit.nickname.trim().charAt(0) }}</template>
+          <template v-if="visit.nickname?.trim()">{{
+            visit.nickname.trim().charAt(0)
+          }}</template>
           <Icon v-else name="ph:footprints-bold" />
         </span>
         <div class="fp-copy">
           <p :title="visitorLabel(visit)">{{ visitorLabel(visit) }}</p>
           <div class="fp-meta">
-            <span v-if="visit.region"><Icon name="ph:map-pin-bold" />{{ visit.region }}</span>
-            <span v-if="visit.device"><Icon :name="deviceIcon(visit.device)" />{{ deviceLabel(visit.device) }}</span>
+            <span v-if="visit.region"
+              ><Icon name="ph:map-pin-bold" />{{ visit.region }}</span
+            >
+            <span v-if="visit.device"
+              ><Icon :name="deviceIcon(visit.device)" />{{
+                deviceLabel(visit.device)
+              }}</span
+            >
           </div>
         </div>
-        <time :datetime="visit.time" :title="formatTime(visit.time)">{{ timeLabel(visit.time) }}</time>
+        <time :datetime="visit.time" :title="formatTime(visit.time)">{{
+          timeLabel(visit.time)
+        }}</time>
       </li>
     </ol>
   </section>
@@ -116,7 +131,7 @@ async function load() {
   try {
     const data = await fetchRecent();
     if (seq !== loadSeq) return;
-    items.value = (Array.isArray(data) ? data : []).slice(0, 3);
+    items.value = (Array.isArray(data) ? data : []).slice(0, 5);
     listKey.value += 1;
   } catch {
     // Supplementary content keeps its last successful state on network failure.
@@ -130,7 +145,9 @@ async function load() {
 
 onMounted(() => {
   if ("requestIdleCallback" in window) {
-    idleHandle = window.requestIdleCallback(() => void load(), { timeout: 1400 });
+    idleHandle = window.requestIdleCallback(() => void load(), {
+      timeout: 1400,
+    });
   } else {
     idleHandle = window.setTimeout(() => void load(), 300);
   }
@@ -162,23 +179,25 @@ onUnmounted(() => {
   padding: 0 1px 13px;
   border-bottom: 1px solid var(--border);
 }
-.fp-head > div { min-width: 0; }
+.fp-head > div {
+  min-width: 0;
+}
 .fp-kicker {
   display: block;
   color: var(--c-primary);
   font-family: var(--font-mono);
-  font-size: .46rem;
+  font-size: 0.46rem;
   font-weight: 700;
 }
 .fp-head h4 {
   margin: 5px 0 0;
   color: var(--c-text);
-  font-size: .82rem;
+  font-size: 0.82rem;
 }
 .fp-head p {
   margin: 4px 0 0;
   color: var(--c-text-3);
-  font-size: .54rem;
+  font-size: 0.54rem;
   line-height: 1.45;
 }
 .fp-refresh {
@@ -193,14 +212,20 @@ onUnmounted(() => {
   color: var(--c-text-3);
   cursor: pointer;
   place-items: center;
-  transition: border-color .2s ease, color .2s ease, transform .2s ease;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 .fp-refresh:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--c-primary) 45%, var(--border));
   color: var(--c-primary);
   transform: translateY(-1px);
 }
-.fp-refresh:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.fp-refresh:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
 .fp-state {
   display: grid;
   min-height: 150px;
@@ -209,16 +234,22 @@ onUnmounted(() => {
   justify-items: center;
   gap: 8px;
   color: var(--c-text-3);
-  font-size: .6rem;
+  font-size: 0.6rem;
 }
-.fp-state > svg { color: var(--c-primary); font-size: 1.25rem; }
+.fp-state > svg {
+  color: var(--c-primary);
+  font-size: 1.25rem;
+}
 .fp-list {
   display: grid;
+  min-height: 0;
   flex: 1;
-  align-content: center;
+  grid-auto-rows: minmax(45px, 1fr);
+  align-content: stretch;
   gap: 3px;
   margin: 0;
   padding: 5px 0 0;
+  overflow: hidden;
   list-style: none;
 }
 .fp-item {
@@ -229,10 +260,12 @@ onUnmounted(() => {
   gap: 8px;
   min-height: 45px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  animation: fp-item-in .42s var(--ui-ease-out) both;
+  animation: fp-item-in 0.42s var(--ui-ease-out) both;
   animation-delay: var(--fp-delay);
 }
-.fp-item:last-child { border-bottom: 0; }
+.fp-item:last-child {
+  border-bottom: 0;
+}
 .fp-avatar {
   display: grid;
   width: 28px;
@@ -241,16 +274,18 @@ onUnmounted(() => {
   border-radius: 8px;
   background: color-mix(in srgb, var(--c-primary-soft) 62%, var(--ld-bg-card));
   color: var(--c-primary);
-  font-size: .62rem;
+  font-size: 0.62rem;
   font-weight: 750;
   place-items: center;
 }
-.fp-copy { min-width: 0; }
+.fp-copy {
+  min-width: 0;
+}
 .fp-copy > p {
   margin: 0;
   overflow: hidden;
   color: var(--c-text);
-  font-size: .62rem;
+  font-size: 0.62rem;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -262,28 +297,59 @@ onUnmounted(() => {
   margin-top: 2px;
   overflow: hidden;
   color: var(--c-text-3);
-  font-size: .45rem;
+  font-size: 0.45rem;
 }
-.fp-meta span { display: inline-flex; min-width: 0; align-items: center; gap: 3px; white-space: nowrap; }
-.fp-meta span:first-child { overflow: hidden; text-overflow: ellipsis; }
-.fp-meta svg { flex: none; font-size: .55rem; }
+.fp-meta span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.fp-meta span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fp-meta svg {
+  flex: none;
+  font-size: 0.55rem;
+}
 .fp-item > time {
   color: var(--c-text-3);
   font-family: var(--font-mono);
-  font-size: .44rem;
+  font-size: 0.44rem;
   white-space: nowrap;
 }
 @media (max-height: 680px) and (min-width: 901px) {
-  .footprints { min-height: 170px; padding-top: 12px; }
-  .fp-head { padding-bottom: 9px; }
-  .fp-head p { display: none; }
-  .fp-item { min-height: 39px; }
+  .footprints {
+    min-height: 170px;
+    padding-top: 12px;
+  }
+  .fp-head {
+    padding-bottom: 9px;
+  }
+  .fp-head p {
+    display: none;
+  }
+  .fp-item {
+    min-height: 39px;
+  }
 }
 @keyframes fp-item-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .fp-item, .fp-refresh { animation: none; transition: none; }
+  .fp-item,
+  .fp-refresh {
+    animation: none;
+    transition: none;
+  }
 }
 </style>

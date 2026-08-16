@@ -14,14 +14,9 @@ describe('VisitorController', () => {
       identify: jest.fn().mockResolvedValue({ nickname: dto.nickname }),
     };
     const turnstile = { verify: jest.fn().mockResolvedValue(undefined) };
-    const controller = new VisitorController(
-      visitorService as any,
-      turnstile as any,
-    );
+    const controller = new VisitorController(visitorService as any, turnstile as any);
 
-    await expect(
-      controller.identify(request, 'visitor-id', dto),
-    ).resolves.toEqual({ nickname: dto.nickname });
+    await expect(controller.identify(request, 'visitor-id', dto)).resolves.toEqual({ nickname: dto.nickname });
 
     expect(turnstile.verify).toHaveBeenCalledWith(dto.turnstileToken, request.ip);
     expect(turnstile.verify.mock.invocationCallOrder[0]).toBeLessThan(
@@ -42,10 +37,7 @@ describe('VisitorController', () => {
     const turnstile = {
       verify: jest.fn().mockRejectedValue(new BadRequestException('请完成人机验证')),
     };
-    const controller = new VisitorController(
-      visitorService as any,
-      turnstile as any,
-    );
+    const controller = new VisitorController(visitorService as any, turnstile as any);
 
     await expect(
       controller.identify(request, 'visitor-id', {
@@ -76,5 +68,22 @@ describe('VisitorController', () => {
       { userId: 'user-1', username: '阿风' },
       'hashed-visitor-id',
     );
+  });
+
+  it('returns the current daily bottle quota', async () => {
+    const quota = {
+      throw: { used: 1, limit: 3, remaining: 2 },
+      fish: { used: 2, limit: 8, remaining: 6 },
+    };
+    const visitorService = {
+      bottleQuota: jest.fn().mockResolvedValue(quota),
+    };
+    const controller = new VisitorController(visitorService as any, {} as any);
+
+    await expect(controller.bottleQuota(request, 'visitor-id')).resolves.toEqual(quota);
+    expect(visitorService.bottleQuota).toHaveBeenCalledWith({
+      headers: { 'x-visitor-id': 'visitor-id' },
+      ip: request.ip,
+    });
   });
 });

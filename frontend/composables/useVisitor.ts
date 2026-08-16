@@ -6,7 +6,9 @@ export function useVisitor() {
   const api = useApi();
 
   const nickname = ref(
-    typeof window !== "undefined" ? localStorage.getItem(NICKNAME_KEY) ?? "" : "",
+    typeof window !== "undefined"
+      ? (localStorage.getItem(NICKNAME_KEY) ?? "")
+      : "",
   );
   const setNickname = (value: string) => {
     const clean = value.trim().slice(0, 20);
@@ -56,6 +58,7 @@ export function useVisitor() {
     api.post<any>("/visitor/messages", { content });
   const throwBottle = (content: string, parentId?: string) =>
     api.post<any>("/visitor/bottles", { content, parentId });
+  const fetchBottleQuota = () => api.get<any>("/visitor/bottles/quota");
   const fishBottle = () => api.post<any>("/visitor/bottles/fish");
   const releaseBottle = (id: string) =>
     api.post<any>(`/visitor/bottles/${id}/release`);
@@ -72,6 +75,7 @@ export function useVisitor() {
     fetchMessages,
     sendMessage,
     throwBottle,
+    fetchBottleQuota,
     fishBottle,
     releaseBottle,
   };

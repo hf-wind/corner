@@ -11,8 +11,17 @@
         metric-label="条时光留言"
       />
 
-      <div ref="tabsRef" class="tabs content-reveal" role="tablist" aria-label="时光留言板分区">
-        <span class="tabs-track" :class="`tabs-${activeTab}`" aria-hidden="true" />
+      <div
+        ref="tabsRef"
+        class="tabs content-reveal"
+        role="tablist"
+        aria-label="时光留言板分区"
+      >
+        <span
+          class="tabs-track"
+          :class="`tabs-${activeTab}`"
+          aria-hidden="true"
+        />
         <button
           type="button"
           role="tab"
@@ -50,13 +59,24 @@
         </div>
 
         <div v-else class="msg-masonry content-reveal">
-          <div v-for="(col, ci) in masonryColumns" :key="`col-${ci}`" class="msg-col">
+          <div
+            v-for="(col, ci) in masonryColumns"
+            :key="`col-${ci}`"
+            class="msg-col"
+          >
             <article v-for="msg in col" :key="msg.id" class="msg-card">
               <header class="msg-head">
                 <span
                   class="msg-avatar"
-                  :class="{ 'is-user': !!msg.userId, 'guest-char': !msg.userId && !!msg.visitorIdHash }"
-                  :style="!msg.userId && msg.visitorIdHash ? visitorAvatarStyle(msg) : undefined"
+                  :class="{
+                    'is-user': !!msg.userId,
+                    'guest-char': !msg.userId && !!msg.visitorIdHash,
+                  }"
+                  :style="
+                    !msg.userId && msg.visitorIdHash
+                      ? visitorAvatarStyle(msg)
+                      : undefined
+                  "
                 >
                   <img
                     v-if="msg.userId && !avatarErrors.has(msg.id)"
@@ -67,20 +87,38 @@
                     @error="onAvatarError(msg.id)"
                   />
                   <Icon v-else-if="msg.userId" name="ph:user-bold" />
-                  <template v-else-if="msg.visitorIdHash">{{ (msg.nickname || "访").trim().charAt(0) }}</template>
+                  <template v-else-if="msg.visitorIdHash">{{
+                    (msg.nickname || "访").trim().charAt(0)
+                  }}</template>
                   <Icon v-else name="ph:face-mask-bold" />
                 </span>
                 <div class="msg-meta">
                   <span class="msg-name-row">
                     <span class="msg-name">{{ msg.nickname }}</span>
-                    <span class="msg-role" :class="{ 'role-user': !!msg.userId, 'role-guest': !msg.userId }">
-                      <Icon :name="msg.userId ? 'ph:shield-check-bold' : 'ph:footprints-bold'" />
-                      {{ msg.userId ? '账号' : '访客' }}
+                    <span
+                      class="msg-role"
+                      :class="{
+                        'role-user': !!msg.userId,
+                        'role-guest': !msg.userId,
+                      }"
+                    >
+                      <Icon
+                        :name="
+                          msg.userId
+                            ? 'ph:shield-check-bold'
+                            : 'ph:footprints-bold'
+                        "
+                      />
+                      {{ msg.userId ? "账号" : "访客" }}
                     </span>
                   </span>
-                  <time class="msg-time">{{ msgRelativeTime(msg.createdAt) }}</time>
+                  <time class="msg-time">{{
+                    msgRelativeTime(msg.createdAt)
+                  }}</time>
                 </div>
-                <span class="msg-pin" aria-hidden="true"><Icon name="ph:push-pin-simple-fill" /></span>
+                <span class="msg-pin" aria-hidden="true"
+                  ><Icon name="ph:push-pin-simple-fill"
+                /></span>
               </header>
               <p class="msg-content">{{ msg.content }}</p>
             </article>
@@ -94,40 +132,76 @@
           :disabled="messagesLoading"
           @click="loadMore"
         >
-          <Icon :name="messagesLoading ? 'ph:circle-notch-bold' : 'ph:arrow-down-bold'" :spin="messagesLoading" />
-          {{ messagesLoading ? '打捞中…' : '打捞更早的留言' }}
+          <Icon
+            :name="
+              messagesLoading ? 'ph:circle-notch-bold' : 'ph:arrow-down-bold'
+            "
+            :spin="messagesLoading"
+          />
+          {{ messagesLoading ? "打捞中…" : "打捞更早的留言" }}
         </button>
 
         <div class="composer content-reveal">
           <div class="composer-head">
             <span class="composer-sign">
-              <span v-if="composerName" class="sign-name" :class="{ 'is-user': isLoggedIn }">
-                <Icon :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'" />{{ composerName }}
+              <span
+                v-if="composerName"
+                class="sign-name"
+                :class="{ 'is-user': isLoggedIn }"
+              >
+                <Icon
+                  :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'"
+                />{{ composerName }}
               </span>
               <button v-else type="button" class="sign-anon" @click="askName">
                 <Icon name="ph:face-mask-bold" />尚未署名
               </button>
             </span>
-            <span class="composer-hint"><Icon name="ph:info-bold" />内容会经过 AI 审核后展示</span>
+            <span class="composer-hint"
+              ><Icon name="ph:info-bold" />内容会经过 AI 审核后展示</span
+            >
           </div>
           <textarea
             v-model="composerText"
             class="composer-input"
             :maxlength="200"
             rows="3"
-            :placeholder="composerName ? `把此刻想说的话，留给时光…（${composerName}）` : '先署名，再留下一句话…'"
+            :placeholder="
+              composerName
+                ? `把此刻想说的话，留给时光…（${composerName}）`
+                : '先署名，再留下一句话…'
+            "
             @keydown.ctrl.enter="submitMessage"
             @keydown.meta.enter="submitMessage"
           />
-          <div v-if="sendingMessage" class="ai-reviewing" role="status" aria-live="polite">
+          <div
+            v-if="sendingMessage"
+            class="ai-reviewing"
+            role="status"
+            aria-live="polite"
+          >
             <span class="ai-reviewing-bar" />
-            <span class="ai-reviewing-text"><Icon name="ph:sparkle-fill" />AI 正在审核内容，请稍候…</span>
+            <span class="ai-reviewing-text"
+              ><Icon name="ph:sparkle-fill" />AI 正在审核内容，请稍候…</span
+            >
           </div>
           <div class="composer-foot">
             <span class="composer-count">{{ composerText.length }}/200</span>
-            <button type="button" class="composer-submit" :disabled="sendingMessage" @click="submitMessage">
-              <Icon :name="sendingMessage ? 'ph:circle-notch-bold' : 'ph:paper-plane-tilt-bold'" :spin="sendingMessage" />
-              {{ sendingMessage ? 'AI 审核中…' : '投入时光' }}
+            <button
+              type="button"
+              class="composer-submit"
+              :disabled="sendingMessage"
+              @click="submitMessage"
+            >
+              <Icon
+                :name="
+                  sendingMessage
+                    ? 'ph:circle-notch-bold'
+                    : 'ph:paper-plane-tilt-bold'
+                "
+                :spin="sendingMessage"
+              />
+              {{ sendingMessage ? "AI 审核中…" : "投入时光" }}
             </button>
           </div>
         </div>
@@ -139,63 +213,141 @@
           <SeaScene
             ref="seaRef"
             class="sea-scene-wrap"
-            :disabled="fishing || !!caughtBottle"
+            :disabled="fishing || !!caughtBottle || fishExhausted"
             @fish="onFishBottle"
           />
 
           <div class="sea-copy">
             <span class="sea-kicker">THE TIME SEA · 时光海</span>
             <h2>海面下，漂着来自陌生时刻的信</h2>
+            <div class="sea-quota" aria-live="polite">
+              <span :class="{ exhausted: fishExhausted }"
+                ><Icon name="ph:anchor-bold" />今日打捞
+                {{ bottleQuota.fish.used }}/{{ bottleQuota.fish.limit }}</span
+              >
+              <span :class="{ exhausted: throwExhausted }"
+                ><Icon name="solar:bottle-outline" />今日投入
+                {{ bottleQuota.throw.used }}/{{ bottleQuota.throw.limit }}</span
+              >
+            </div>
           </div>
 
           <Transition name="bottle-pop">
             <div v-if="caughtBottle" class="bottle-caught">
-              <button type="button" class="caught-close" title="合上信纸并放回海里" aria-label="关闭并放回海里" @click="releaseCaughtBottle(false)">
+              <button
+                type="button"
+                class="caught-close"
+                title="合上信纸并放回海里"
+                aria-label="关闭并放回海里"
+                @click="releaseCaughtBottle(false)"
+              >
                 <Icon name="ph:x-bold" />
               </button>
               <div class="caught-head">
                 <span class="caught-seal"><Icon name="ph:anchor-fill" /></span>
                 <div class="caught-title">
-                  <strong>一封漂了 {{ caughtBottle.chain?.length ?? 1 }} 段的信</strong>
+                  <strong
+                    >一封漂了
+                    {{ caughtBottle.chain?.length ?? 1 }} 段的信</strong
+                  >
                   <span class="caught-meta">
-                    <Icon name="ph:user-circle-bold" />{{ caughtBottle.nickname }}
+                    <Icon name="ph:user-circle-bold" />{{
+                      caughtBottle.nickname
+                    }}
                     <i aria-hidden="true" />
-                    <Icon name="ph:map-pin-bold" />{{ caughtBottle.originRegion || '神秘海岸' }}
+                    <Icon name="ph:map-pin-bold" />{{
+                      caughtBottle.originRegion || "神秘海岸"
+                    }}
                     <i aria-hidden="true" />
-                    <Icon name="ph:clock-bold" />{{ minuteLabel(caughtBottle.createdAt) }} 投入
+                    <Icon name="ph:clock-bold" />{{
+                      minuteLabel(caughtBottle.createdAt)
+                    }}
+                    投入
                   </span>
                 </div>
               </div>
               <ol class="chain-list">
-                <li v-for="(seg, i) in chainReversed" :key="seg.id" class="chain-seg">
-                  <span class="chain-tag">{{ i === 0 ? '最新' : `第 ${(caughtBottle?.chain?.length ?? 1) - i} 段` }}</span>
+                <li
+                  v-for="(seg, i) in chainReversed"
+                  :key="seg.id"
+                  class="chain-seg"
+                >
+                  <span class="chain-tag">{{
+                    i === 0
+                      ? "最新"
+                      : `第 ${(caughtBottle?.chain?.length ?? 1) - i} 段`
+                  }}</span>
                   <div class="chain-body">
                     <span class="chain-meta">
                       <Icon name="ph:user-bold" />{{ seg.nickname }}
-                      <Icon name="ph:map-pin-bold" />{{ seg.originRegion || '神秘海岸' }}
-                      <Icon name="ph:clock-bold" />{{ minuteLabel(seg.createdAt) }}
+                      <Icon name="ph:map-pin-bold" />{{
+                        seg.originRegion || "神秘海岸"
+                      }}
+                      <Icon name="ph:clock-bold" />{{
+                        minuteLabel(seg.createdAt)
+                      }}
                     </span>
                     <p>{{ seg.content }}</p>
                   </div>
                 </li>
               </ol>
-              <p class="relay-prompt"><Icon name="ph:arrows-clockwise-bold" />把一句新的话接在信尾，再交给下一位旅人。</p>
+              <p class="relay-prompt">
+                <Icon
+                  name="ph:arrows-clockwise-bold"
+                />把一句新的话接在信尾，再交给下一位旅人。
+              </p>
               <div class="caught-actions">
-                <button v-if="!relayMode" type="button" class="caught-action relay" @click="relayMode = true">
+                <button
+                  v-if="!relayMode"
+                  type="button"
+                  class="caught-action relay"
+                  :disabled="throwExhausted"
+                  @click="relayMode = true"
+                >
                   <Icon name="ph:paper-plane-tilt-bold" />接力下去
                 </button>
-                <button type="button" class="caught-action release" :disabled="releasingBottle" @click="releaseCaughtBottle(true)">
-                  <Icon :name="releasingBottle ? 'ph:circle-notch-bold' : 'ph:arrow-u-down-left-bold'" :spin="releasingBottle" />
-                  {{ releasingBottle ? '交还潮汐…' : '原样扔回海里' }}
+                <button
+                  type="button"
+                  class="caught-action release"
+                  :disabled="releasingBottle"
+                  @click="releaseCaughtBottle(true)"
+                >
+                  <Icon
+                    :name="
+                      releasingBottle
+                        ? 'ph:circle-notch-bold'
+                        : 'ph:arrow-u-down-left-bold'
+                    "
+                    :spin="releasingBottle"
+                  />
+                  {{ releasingBottle ? "交还潮汐…" : "原样扔回海里" }}
                 </button>
               </div>
               <div v-if="relayMode" class="relay-box">
-                <textarea v-model="relayText" class="composer-input" :maxlength="120" rows="3" placeholder="写一段接力的话，塞进瓶子里…" />
+                <textarea
+                  v-model="relayText"
+                  class="composer-input"
+                  :maxlength="120"
+                  rows="3"
+                  placeholder="写一段接力的话，塞进瓶子里…"
+                />
                 <div class="relay-foot">
                   <span class="composer-count">{{ relayText.length }}/120</span>
-                  <button type="button" class="composer-submit sea-submit" :disabled="relaySending" @click="submitRelay">
-                    <Icon :name="relaySending ? 'ph:circle-notch-bold' : 'solar:bottle-outline'" :spin="relaySending" />
-                    {{ relaySending ? '瓶子审核中…' : '写入并接力' }}
+                  <button
+                    type="button"
+                    class="composer-submit sea-submit"
+                    :disabled="relaySending || throwExhausted"
+                    @click="submitRelay"
+                  >
+                    <Icon
+                      :name="
+                        relaySending
+                          ? 'ph:circle-notch-bold'
+                          : 'solar:bottle-outline'
+                      "
+                      :spin="relaySending"
+                    />
+                    {{ relaySending ? "瓶子审核中…" : "写入并接力" }}
                   </button>
                 </div>
               </div>
@@ -206,49 +358,100 @@
         <div class="composer bottle-composer content-reveal">
           <div class="composer-head">
             <span class="composer-sign">
-              <span v-if="composerName" class="sign-name" :class="{ 'is-user': isLoggedIn }">
-                <Icon :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'" />{{ composerName }}
+              <span
+                v-if="composerName"
+                class="sign-name"
+                :class="{ 'is-user': isLoggedIn }"
+              >
+                <Icon
+                  :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'"
+                />{{ composerName }}
               </span>
               <button v-else type="button" class="sign-anon" @click="askName">
                 <Icon name="ph:face-mask-bold" />尚未署名
               </button>
             </span>
-            <span class="composer-hint"><Icon name="ph:info-bold" />每天最多投 3 只瓶子</span>
+            <span class="composer-hint"
+              ><Icon name="ph:info-bold" />今日还可投入
+              {{ bottleQuota.throw.remaining }} 只</span
+            >
           </div>
           <textarea
             v-model="bottleText"
             class="composer-input"
             :maxlength="120"
             rows="3"
+            :disabled="throwExhausted"
             placeholder="写一封信，塞进瓶子里，让它漂向未来的海岸…"
             @keydown.ctrl.enter="submitBottle"
             @keydown.meta.enter="submitBottle"
           />
-          <div v-if="sendingBottle" class="ai-reviewing sea-reviewing" role="status" aria-live="polite">
+          <div
+            v-if="sendingBottle"
+            class="ai-reviewing sea-reviewing"
+            role="status"
+            aria-live="polite"
+          >
             <span class="ai-reviewing-bar" />
-            <span class="ai-reviewing-text"><Icon name="ph:sparkle-fill" />AI 正在审核瓶子，请稍候…</span>
+            <span class="ai-reviewing-text"
+              ><Icon name="ph:sparkle-fill" />AI 正在审核瓶子，请稍候…</span
+            >
           </div>
           <div class="composer-foot">
             <span class="composer-count">{{ bottleText.length }}/120</span>
-            <button type="button" class="composer-submit sea-submit" :disabled="sendingBottle" @click="submitBottle">
-              <Icon :name="sendingBottle ? 'ph:circle-notch-bold' : 'solar:bottle-outline'" :spin="sendingBottle" />
-              {{ sendingBottle ? '瓶子审核中…' : '投入时光海' }}
+            <button
+              type="button"
+              class="composer-submit sea-submit"
+              :disabled="sendingBottle || throwExhausted"
+              @click="submitBottle"
+            >
+              <Icon
+                :name="
+                  sendingBottle
+                    ? 'ph:circle-notch-bold'
+                    : 'solar:bottle-outline'
+                "
+                :spin="sendingBottle"
+              />
+              {{
+                sendingBottle
+                  ? "瓶子审核中…"
+                  : throwExhausted
+                    ? "今日额度已用完"
+                    : "投入时光海"
+              }}
             </button>
           </div>
         </div>
       </section>
 
       <!-- ========== 我的徽章 ========== -->
-      <section class="badges content-reveal" :class="{ expanded: badgesExpanded }">
+      <section
+        class="badges content-reveal"
+        :class="{ expanded: badgesExpanded }"
+      >
         <header class="badges-head">
           <div>
             <span class="badges-kicker">MY CONSTELLATION · 我的徽章</span>
             <h2>旅途中的星光</h2>
           </div>
           <div class="badges-head-actions">
-            <span class="badges-progress">{{ me?.achievements?.length ?? 0 }} / {{ badges.length }} 枚点亮</span>
-            <button type="button" class="badge-toggle" :aria-expanded="badgesExpanded" :title="badgesExpanded ? '收起徽章详情' : '展开徽章详情'" @click="badgesExpanded = !badgesExpanded">
-              <Icon :name="badgesExpanded ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" />
+            <span class="badges-progress"
+              >{{ me?.achievements?.length ?? 0 }} /
+              {{ badges.length }} 枚点亮</span
+            >
+            <button
+              type="button"
+              class="badge-toggle"
+              :aria-expanded="badgesExpanded"
+              :title="badgesExpanded ? '收起徽章详情' : '展开徽章详情'"
+              @click="badgesExpanded = !badgesExpanded"
+            >
+              <Icon
+                :name="
+                  badgesExpanded ? 'ph:caret-up-bold' : 'ph:caret-down-bold'
+                "
+              />
             </button>
           </div>
         </header>
@@ -257,26 +460,52 @@
             v-for="badge in badges"
             :key="badge.code"
             class="badge"
-            :class="{ locked: !ownedCodes.has(badge.code), fresh: freshCodes.has(badge.code) }"
+            :class="{
+              locked: !ownedCodes.has(badge.code),
+              fresh: freshCodes.has(badge.code),
+            }"
             :title="badge.description"
           >
             <span class="badge-status">
               <span>{{ badge.rarity }}</span>
-              <Icon :name="ownedCodes.has(badge.code) ? 'ph:seal-check-fill' : 'ph:lock-key-bold'" />
+              <Icon
+                :name="
+                  ownedCodes.has(badge.code)
+                    ? 'ph:seal-check-fill'
+                    : 'ph:lock-key-bold'
+                "
+              />
             </span>
-            <span class="badge-icon"><BadgeMedal :code="badge.code" :locked="!ownedCodes.has(badge.code)" :size="badgesExpanded ? 58 : 38" /></span>
+            <span class="badge-icon"
+              ><BadgeMedal
+                :code="badge.code"
+                :locked="!ownedCodes.has(badge.code)"
+                :size="badgesExpanded ? 58 : 38"
+            /></span>
             <strong>{{ badge.title }}</strong>
             <small>{{ badge.description }}</small>
-            <span class="badge-meter" aria-hidden="true"><i :style="{ width: `${badgeProgress(badge).percent}%` }" /></span>
-            <span class="badge-count">{{ ownedCodes.has(badge.code) ? '已典藏' : `${badgeProgress(badge).current} / ${badge.target}` }}</span>
+            <span class="badge-meter" aria-hidden="true"
+              ><i :style="{ width: `${badgeProgress(badge).percent}%` }"
+            /></span>
+            <span class="badge-count">{{
+              ownedCodes.has(badge.code)
+                ? "已典藏"
+                : `${badgeProgress(badge).current} / ${badge.target}`
+            }}</span>
           </div>
         </div>
       </section>
     </main>
 
     <aside class="sidebar-right">
-      <section v-if="wall" class="right-card journey-card" aria-label="时光留言板统计">
-        <div class="right-card-title"><span><Icon name="ph:chart-line-up-bold" /> 今日潮汐</span></div>
+      <section
+        v-if="wall"
+        class="right-card journey-card"
+        aria-label="时光留言板统计"
+      >
+        <div class="right-card-title">
+          <span><Icon name="ph:chart-line-up-bold" /> 今日潮汐</span>
+        </div>
         <div class="journey-stats">
           <div>
             <span><Icon name="ph:users-three-bold" /></span>
@@ -306,31 +535,58 @@
         </div>
         <h3>{{ displayName }}</h3>
         <p v-if="isLoggedIn" class="my-sub">
-          <template v-if="(me?.visitCount ?? 0) > 1">第 <strong>{{ me?.visitCount }}</strong> 次</template>
+          <template v-if="(me?.visitCount ?? 0) > 1"
+            >第 <strong>{{ me?.visitCount }}</strong> 次</template
+          >
           <template v-else>初次</template>
           相伴这座角落
         </p>
         <p v-else-if="nickname" class="my-sub">
-          <template v-if="(me?.visitCount ?? 0) > 1">第 <strong>{{ me?.visitCount }}</strong> 次</template>
+          <template v-if="(me?.visitCount ?? 0) > 1"
+            >第 <strong>{{ me?.visitCount }}</strong> 次</template
+          >
           <template v-else>初次</template>
           来到这座角落
         </p>
         <p v-else class="my-sub">还没起名，起个名字开启旅程吧</p>
         <div class="my-stats">
-          <div><strong>{{ me?.messageCount ?? 0 }}</strong><span>留言</span></div>
-          <div><strong>{{ me?.caughtCount ?? 0 }}</strong><span>捞瓶</span></div>
+          <div>
+            <strong>{{ me?.messageCount ?? 0 }}</strong
+            ><span>留言</span>
+          </div>
+          <div>
+            <strong>{{ me?.caughtCount ?? 0 }}</strong
+            ><span>捞瓶</span>
+          </div>
         </div>
-        <button v-if="isLoggedIn" type="button" class="my-rename primary" @click="toProfile">
+        <button
+          v-if="isLoggedIn"
+          type="button"
+          class="my-rename primary"
+          @click="toProfile"
+        >
           <Icon name="ph:user-circle-bold" />查看我的账号
         </button>
-        <button v-else-if="!nickname" type="button" class="my-rename primary" @click="askName()">
+        <button
+          v-else-if="!nickname"
+          type="button"
+          class="my-rename primary"
+          @click="askName()"
+        >
           <Icon name="ph:feather-bold" />现在起名
         </button>
-        <span v-else class="my-signed"><Icon name="ph:check-circle-bold" />已署名「{{ nickname }}」</span>
+        <span v-else class="my-signed"
+          ><Icon name="ph:check-circle-bold" />已署名「{{ nickname }}」</span
+        >
       </section>
 
       <section v-if="ownedBadges.length" class="right-card badge-mini-card">
-        <div class="right-card-title"><span><Icon name="ph:star-four-bold" /> 星光徽章 · 已点亮 {{ ownedBadges.length }} 枚</span></div>
+        <div class="right-card-title">
+          <span
+            ><Icon name="ph:star-four-bold" /> 星光徽章 · 已点亮
+            {{ ownedBadges.length }} 枚</span
+          >
+        </div>
         <div class="badge-mini-grid">
           <span
             v-for="badge in ownedBadges"
@@ -342,7 +598,6 @@
           </span>
         </div>
       </section>
-
     </aside>
 
     <VisitorNameModal
@@ -353,7 +608,6 @@
       @confirm="handleNameConfirm"
       @authenticated="handleAuthenticated"
     />
-
   </div>
 </template>
 
@@ -374,6 +628,7 @@ const {
   fetchMessages,
   sendMessage,
   throwBottle,
+  fetchBottleQuota,
   fishBottle,
   releaseBottle,
 } = useVisitor();
@@ -385,7 +640,9 @@ const composerName = computed(() =>
   isLoggedIn.value ? user.value?.username || "" : nickname.value,
 );
 const displayName = computed(() =>
-  isLoggedIn.value ? user.value?.username || "登录旅人" : nickname.value || "一位旅人",
+  isLoggedIn.value
+    ? user.value?.username || "登录旅人"
+    : nickname.value || "一位旅人",
 );
 
 const activeTab = ref<"messages" | "bottles">("messages");
@@ -404,6 +661,17 @@ const bottleText = ref("");
 const sendingBottle = ref(false);
 const fishing = ref(false);
 const caughtBottle = ref<any>(null);
+const bottleQuota = ref({
+  throw: { used: 0, limit: 3, remaining: 3 },
+  fish: { used: 0, limit: 8, remaining: 8 },
+});
+const quotaLoaded = ref(false);
+const throwExhausted = computed(
+  () => quotaLoaded.value && bottleQuota.value.throw.remaining <= 0,
+);
+const fishExhausted = computed(
+  () => quotaLoaded.value && bottleQuota.value.fish.remaining <= 0,
+);
 
 const seaRef = ref<InstanceType<any> | null>(null);
 const seaCardRef = ref<HTMLElement | null>(null);
@@ -414,7 +682,9 @@ const relaySending = ref(false);
 const releasingBottle = ref(false);
 const badgesExpanded = ref(false);
 const identityCompleting = ref(false);
-const chainReversed = computed(() => [...(caughtBottle.value?.chain ?? [])].reverse());
+const chainReversed = computed(() =>
+  [...(caughtBottle.value?.chain ?? [])].reverse(),
+);
 
 const avatarErrors = ref<Set<string>>(new Set());
 const myAvatarError = ref(false);
@@ -478,7 +748,10 @@ function visitorAvatarStyle(msg: any): Record<string, string> {
   };
 }
 
-function scrollToEl(el: HTMLElement | null | undefined, align: "start" | "center" = "start") {
+function scrollToEl(
+  el: HTMLElement | null | undefined,
+  align: "start" | "center" = "start",
+) {
   if (!el) return;
   const container = document.querySelector<HTMLElement>(".main-content");
   if (!container) return;
@@ -517,36 +790,97 @@ type BadgeDefinition = {
 };
 
 const BADGES: BadgeDefinition[] = [
-  { code: "first_visit", title: "三度相逢", description: "三次回到这座角落", rarity: "旅途", target: 3, metric: "visits" },
-  { code: "set_nickname", title: "留名成章", description: "署名后留下两次时光内容", rarity: "记录", target: 2, metric: "signed_content" },
-  { code: "first_message", title: "时光成笺", description: "留下三条通过审核的留言", rarity: "创作", target: 3, metric: "messages" },
-  { code: "first_bottle", title: "远海信使", description: "投下三只通过审核的漂流瓶", rarity: "远航", target: 3, metric: "bottles" },
-  { code: "catch_bottle", title: "潮汐守望", description: "从时光海打捞三封来信", rarity: "相遇", target: 3, metric: "caught" },
-  { code: "visits_5", title: "十日回响", description: "十次归来，风声已有回音", rarity: "珍藏", target: 10, metric: "visits" },
-  { code: "visits_30", title: "三十夜长旅", description: "三十次往返，已成默契", rarity: "典藏", target: 30, metric: "visits" },
+  {
+    code: "first_visit",
+    title: "三度相逢",
+    description: "三次回到这座角落",
+    rarity: "旅途",
+    target: 3,
+    metric: "visits",
+  },
+  {
+    code: "set_nickname",
+    title: "留名成章",
+    description: "署名后留下两次时光内容",
+    rarity: "记录",
+    target: 2,
+    metric: "signed_content",
+  },
+  {
+    code: "first_message",
+    title: "时光成笺",
+    description: "留下三条通过审核的留言",
+    rarity: "创作",
+    target: 3,
+    metric: "messages",
+  },
+  {
+    code: "first_bottle",
+    title: "远海信使",
+    description: "投下三只通过审核的漂流瓶",
+    rarity: "远航",
+    target: 3,
+    metric: "bottles",
+  },
+  {
+    code: "catch_bottle",
+    title: "潮汐守望",
+    description: "从时光海打捞三封来信",
+    rarity: "相遇",
+    target: 3,
+    metric: "caught",
+  },
+  {
+    code: "visits_5",
+    title: "十日回响",
+    description: "十次归来，风声已有回音",
+    rarity: "珍藏",
+    target: 10,
+    metric: "visits",
+  },
+  {
+    code: "visits_30",
+    title: "三十夜长旅",
+    description: "三十次往返，已成默契",
+    rarity: "典藏",
+    target: 30,
+    metric: "visits",
+  },
 ];
 
 const badges = BADGES;
-const ownedCodes = computed(() => new Set((me.value?.achievements ?? []).map((a: any) => a.code)));
-const ownedBadges = computed(() => BADGES.filter((b) => ownedCodes.value.has(b.code)));
+const ownedCodes = computed(
+  () => new Set((me.value?.achievements ?? []).map((a: any) => a.code)),
+);
+const ownedBadges = computed(() =>
+  BADGES.filter((b) => ownedCodes.value.has(b.code)),
+);
 const freshCodes = ref<Set<string>>(new Set());
 
 function badgeProgress(badge: BadgeDefinition) {
   const values = {
     visits: Number(me.value?.visitCount || 0),
-    signed_content: nickname.value || isLoggedIn.value
-      ? Number(me.value?.messageCount || 0) + Number(me.value?.bottleCount || 0)
-      : 0,
+    signed_content:
+      nickname.value || isLoggedIn.value
+        ? Number(me.value?.messageCount || 0) +
+          Number(me.value?.bottleCount || 0)
+        : 0,
     messages: Number(me.value?.messageCount || 0),
     bottles: Number(me.value?.bottleCount || 0),
     caught: Number(me.value?.caughtCount || 0),
   };
   const current = Math.min(badge.target, values[badge.metric]);
-  return { current, percent: ownedCodes.value.has(badge.code) ? 100 : (current / badge.target) * 100 };
+  return {
+    current,
+    percent: ownedCodes.value.has(badge.code)
+      ? 100
+      : (current / badge.target) * 100,
+  };
 }
 
 const msgRelativeTime = (time: string) => dayjs(time).fromNow();
-const minuteLabel = (time: string) => dayjs(time).format("YYYY 年 M 月 D 日 HH:mm");
+const minuteLabel = (time: string) =>
+  dayjs(time).format("YYYY 年 M 月 D 日 HH:mm");
 
 function celebrate(unlocked: string[] | undefined) {
   if (!unlocked?.length) return;
@@ -649,7 +983,8 @@ async function submitMessage() {
     toast.warning("先写下一句话再投入时光吧");
     return;
   }
-  if (!requireName(() => doSendMessage(text), "留言将通过 AI 审核后上墙")) return;
+  if (!requireName(() => doSendMessage(text), "留言将通过 AI 审核后上墙"))
+    return;
   await doSendMessage(text);
 }
 
@@ -684,12 +1019,15 @@ async function doSendMessage(text: string) {
 
 async function submitBottle() {
   if (sendingBottle.value) return;
+  if (throwExhausted.value)
+    return void toast.warning("今天的投瓶额度已经用完了");
   const text = bottleText.value.trim();
   if (!text) {
     toast.warning("先写下一封信再投入海面吧");
     return;
   }
-  if (!requireName(() => doThrowBottle(text), "瓶子将通过 AI 审核后投入时光海")) return;
+  if (!requireName(() => doThrowBottle(text), "瓶子将通过 AI 审核后投入时光海"))
+    return;
   await doThrowBottle(text);
 }
 
@@ -722,6 +1060,7 @@ async function doThrowBottle(text: string) {
     toast.error(err?.message || "投瓶失败，请稍后再试");
   } finally {
     sendingBottle.value = false;
+    void refreshBottleQuota();
   }
 }
 
@@ -732,6 +1071,8 @@ async function onFishBottle() {
 
 async function doFishBottle() {
   if (fishing.value) return;
+  if (fishExhausted.value)
+    return void toast.warning("今天的打捞额度已经用完了");
   fishing.value = true;
   caughtBottle.value = null;
   relayMode.value = false;
@@ -739,7 +1080,9 @@ async function doFishBottle() {
   try {
     const result = await fishBottle();
     caughtBottle.value = result?.bottle ?? null;
-    toast.success(`捞起了一封来自「${result?.bottle?.nickname ?? "远方"}」的信`);
+    toast.success(
+      `捞起了一封来自「${result?.bottle?.nickname ?? "远方"}」的信`,
+    );
     celebrate(result?.unlocked);
     await Promise.all([refreshWall(), refreshMe()]);
     await nextTick();
@@ -748,10 +1091,13 @@ async function doFishBottle() {
     toast.info(err?.message || "潮汐暂时没有带来新的信");
   } finally {
     fishing.value = false;
+    void refreshBottleQuota();
   }
 }
 
 async function submitRelay() {
+  if (throwExhausted.value)
+    return void toast.warning("今天的投瓶额度已经用完了");
   const text = relayText.value.trim();
   if (!text) {
     toast.warning("先写一段话再投入海面吧");
@@ -780,6 +1126,7 @@ async function submitRelay() {
     toast.error(err?.message || "投瓶失败，请稍后再试");
   } finally {
     relaySending.value = false;
+    void refreshBottleQuota();
   }
 }
 
@@ -811,8 +1158,24 @@ async function refreshWall() {
   }
 }
 
+async function refreshBottleQuota() {
+  try {
+    const result = await fetchBottleQuota();
+    if (result?.throw && result?.fish) bottleQuota.value = result;
+  } catch {
+    /* 配额仍由服务端强制校验 */
+  } finally {
+    quotaLoaded.value = true;
+  }
+}
+
 onMounted(async () => {
-  await Promise.allSettled([refreshWall(), refreshMe(), loadMessages(true)]);
+  await Promise.allSettled([
+    refreshWall(),
+    refreshMe(),
+    refreshBottleQuota(),
+    loadMessages(true),
+  ]);
 });
 
 useHead({ title: "时光留言板" });
@@ -872,8 +1235,14 @@ useHead({ title: "时光留言板" });
   left: 4px;
   width: calc(50% - 4px);
   border-radius: 10px;
-  background: linear-gradient(145deg, var(--c-primary-soft), color-mix(in srgb, var(--c-primary) 22%, var(--ld-bg-card)));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent), 0 4px 14px color-mix(in srgb, var(--c-primary) 18%, transparent);
+  background: linear-gradient(
+    145deg,
+    var(--c-primary-soft),
+    color-mix(in srgb, var(--c-primary) 22%, var(--ld-bg-card))
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent),
+    0 4px 14px color-mix(in srgb, var(--c-primary) 18%, transparent);
   transition: transform 0.34s var(--ui-ease-out);
 }
 .tabs-track.tabs-bottles {
@@ -963,9 +1332,16 @@ useHead({ title: "时光留言板" });
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 64%, transparent);
   border-radius: 15px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft)), var(--ld-bg-card));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--ld-bg-card) 97%, var(--c-primary-soft)),
+    var(--ld-bg-card)
+  );
   box-shadow: 0 6px 20px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
-  transition: transform 0.36s var(--ui-ease-out), box-shadow 0.36s ease, border-color 0.3s ease;
+  transition:
+    transform 0.36s var(--ui-ease-out),
+    box-shadow 0.36s ease,
+    border-color 0.3s ease;
   animation: card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .msg-card::before {
@@ -975,11 +1351,18 @@ useHead({ title: "时光留言板" });
   right: 14%;
   height: 2px;
   border-radius: 99px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c-primary) 52%, transparent), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--c-primary) 52%, transparent),
+    transparent
+  );
   content: "";
   opacity: 0;
   transform: scaleX(0.25);
-  transition: opacity 0.32s ease, transform 0.5s var(--ui-ease-out);
+  transition:
+    opacity 0.32s ease,
+    transform 0.5s var(--ui-ease-out);
   pointer-events: none;
 }
 .msg-card::after {
@@ -989,16 +1372,24 @@ useHead({ title: "时光留言板" });
   width: 110px;
   height: 110px;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 13%, transparent), transparent 68%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--c-primary) 13%, transparent),
+    transparent 68%
+  );
   content: "";
   opacity: 0;
   transform: scale(0.7);
-  transition: opacity 0.36s ease, transform 0.5s var(--ui-ease-out);
+  transition:
+    opacity 0.36s ease,
+    transform 0.5s var(--ui-ease-out);
   pointer-events: none;
 }
 .msg-card:hover {
   border-color: color-mix(in srgb, var(--c-primary) 32%, var(--border));
-  box-shadow: 0 16px 38px color-mix(in srgb, var(--ld-shadow) 48%, transparent), 0 0 0 1px color-mix(in srgb, var(--c-primary) 9%, transparent);
+  box-shadow:
+    0 16px 38px color-mix(in srgb, var(--ld-shadow) 48%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--c-primary) 9%, transparent);
   /* transform: translateY(-5px); */
 }
 .msg-card:hover::before {
@@ -1027,7 +1418,11 @@ useHead({ title: "时光留言板" });
   flex: 0 0 30px;
   overflow: hidden;
   border-radius: 50%;
-  background: linear-gradient(145deg, var(--c-primary-soft), color-mix(in srgb, var(--c-primary) 14%, var(--ld-bg-card)));
+  background: linear-gradient(
+    145deg,
+    var(--c-primary-soft),
+    color-mix(in srgb, var(--c-primary) 14%, var(--ld-bg-card))
+  );
   color: color-mix(in srgb, var(--c-primary) 82%, var(--c-text-2));
   font-size: 0.86rem;
   place-items: center;
@@ -1041,7 +1436,11 @@ useHead({ title: "时光留言板" });
   object-position: center;
 }
 .msg-avatar.is-user {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--c-primary) 18%, var(--ld-bg-card)), color-mix(in srgb, var(--c-primary) 30%, var(--ld-bg-card)));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--c-primary) 18%, var(--ld-bg-card)),
+    color-mix(in srgb, var(--c-primary) 30%, var(--ld-bg-card))
+  );
   color: var(--c-primary);
 }
 .msg-meta {
@@ -1099,7 +1498,9 @@ useHead({ title: "时光留言板" });
   font-size: 0.7rem;
   opacity: 0;
   transform: rotate(-14deg);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 .msg-card:hover .msg-pin {
   opacity: 0.55;
@@ -1113,7 +1514,10 @@ useHead({ title: "时光留言板" });
   overflow-wrap: break-word;
 }
 @keyframes card-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 
 .load-more {
@@ -1131,7 +1535,10 @@ useHead({ title: "时光留言板" });
   font: inherit;
   font-size: 0.68rem;
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 .load-more:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--c-primary) 38%, var(--border));
@@ -1193,7 +1600,10 @@ useHead({ title: "时光留言板" });
   font: inherit;
   font-size: 0.64rem;
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 .sign-anon:hover {
   border-color: var(--c-primary);
@@ -1220,7 +1630,9 @@ useHead({ title: "时光留言板" });
   font-size: 0.74rem;
   line-height: 1.7;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .composer-input::placeholder {
   color: var(--c-text-3);
@@ -1249,13 +1661,22 @@ useHead({ title: "时光留言板" });
 .ai-reviewing-bar {
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--c-primary) 22%, transparent) 50%, transparent 70%);
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--c-primary) 22%, transparent) 50%,
+    transparent 70%
+  );
   background-size: 220% 100%;
   animation: ai-reviewing-sweep 1.6s linear infinite;
 }
 @keyframes ai-reviewing-sweep {
-  from { transform: translateX(-60%); }
-  to { transform: translateX(60%); }
+  from {
+    transform: translateX(-60%);
+  }
+  to {
+    transform: translateX(60%);
+  }
 }
 .ai-reviewing-text {
   position: relative;
@@ -1270,8 +1691,15 @@ useHead({ title: "时光留言板" });
   animation: ai-reviewing-pulse 1.6s ease-in-out infinite;
 }
 @keyframes ai-reviewing-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1.1); }
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 .composer-count {
   color: var(--c-text-3);
@@ -1294,7 +1722,10 @@ useHead({ title: "时光留言板" });
   font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
 }
 .composer-submit:hover:not(:disabled) {
   box-shadow: 0 10px 24px color-mix(in srgb, var(--c-primary) 34%, transparent);
@@ -1341,6 +1772,30 @@ useHead({ title: "时光留言板" });
   font-family: var(--font-heading);
   font-size: 1.1rem;
 }
+.sea-quota {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+.sea-quota span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, var(--border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c-primary-soft) 45%, transparent);
+  color: var(--c-text-2);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+}
+.sea-quota span.exhausted {
+  border-color: var(--border);
+  background: var(--c-bg-1);
+  color: var(--c-text-3);
+}
 
 .bottle-caught {
   position: relative;
@@ -1352,19 +1807,51 @@ useHead({ title: "时光留言板" });
   padding: 16px 18px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 24%, var(--border));
   border-radius: 16px;
-  background: linear-gradient(150deg, color-mix(in srgb, var(--c-primary-soft) 55%, var(--ld-bg-card)), var(--ld-bg-card));
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--c-primary-soft) 55%, var(--ld-bg-card)),
+    var(--ld-bg-card)
+  );
+  box-shadow: 0 14px 34px
+    color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
   text-align: left;
 }
-.caught-close { position: absolute; z-index: 2; top: 10px; right: 10px; display: grid; width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent); color: var(--c-text-3); cursor: pointer; place-items: center; transition: border-color .18s ease, color .18s ease, transform .18s ease; }
-.caught-close:hover { border-color: var(--c-primary); color: var(--c-primary); transform: rotate(8deg); }
+.caught-close {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
+  color: var(--c-text-3);
+  cursor: pointer;
+  place-items: center;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+.caught-close:hover {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+  transform: rotate(8deg);
+}
 .caught-seal {
   display: grid;
   width: 38px;
   height: 38px;
   flex: 0 0 38px;
   border-radius: 50%;
-  background: linear-gradient(145deg, var(--c-primary), color-mix(in srgb, var(--c-primary) 55%, #4a5bd0));
+  background: linear-gradient(
+    145deg,
+    var(--c-primary),
+    color-mix(in srgb, var(--c-primary) 55%, #4a5bd0)
+  );
   box-shadow: 0 8px 18px color-mix(in srgb, var(--c-primary) 34%, transparent);
   color: #fff;
   font-size: 1rem;
@@ -1378,7 +1865,10 @@ useHead({ title: "时光留言板" });
   color: var(--c-text-3);
   font-size: 0.56rem;
 }
-.caught-meta > svg { color: var(--c-primary); font-size: .66rem; }
+.caught-meta > svg {
+  color: var(--c-primary);
+  font-size: 0.66rem;
+}
 .caught-meta > i {
   width: 2px;
   height: 2px;
@@ -1387,10 +1877,14 @@ useHead({ title: "时光留言板" });
   background: var(--c-text-3);
 }
 .bottle-pop-enter-active {
-  transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.4s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .bottle-pop-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 .bottle-pop-enter-from {
   opacity: 0;
@@ -1401,33 +1895,154 @@ useHead({ title: "时光留言板" });
   transform: translateY(-10px) scale(0.98);
 }
 
-.sea-scene-wrap { width: 100%; margin-bottom: 0; }
-.caught-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.caught-title { display: flex; flex-direction: column; gap: 3px; }
-.caught-title strong { color: var(--c-text); font-size: 0.8rem; }
-.chain-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
-.chain-seg { display: flex; gap: 9px; align-items: flex-start; }
-.chain-tag { flex: 0 0 auto; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--c-primary) 14%, transparent); color: var(--c-primary); font-size: 0.52rem; font-weight: 700; }
-.chain-body { min-width: 0; flex: 1; padding: 8px 11px; border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 11px; background: var(--ld-bg-card); }
-.chain-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; color: var(--c-text-3); font-size: 0.54rem; }
-.chain-meta > svg { color: color-mix(in srgb, var(--c-primary) 72%, var(--c-text-3)); font-size: .62rem; }
-.chain-body p { margin: 4px 0 0; color: var(--c-text); font-size: 0.74rem; line-height: 1.7; overflow-wrap: break-word; }
-.relay-prompt { display: flex; align-items: center; gap: 7px; margin: 13px 0 0; padding: 9px 11px; border-left: 3px solid var(--c-primary); background: color-mix(in srgb, var(--c-primary-soft) 54%, transparent); color: var(--c-text-2); font-size: .62rem; line-height: 1.6; }
-.relay-prompt > svg { flex: 0 0 auto; color: var(--c-primary); font-size: .76rem; }
-.caught-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
-.caught-action { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 7px; font: inherit; font-size: 0.64rem; font-weight: 700; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease; text-decoration: none; }
-.caught-action:hover { transform: translateY(-1px); }
-.caught-action.relay { border: 1px solid var(--c-primary); background: var(--c-primary); color: #fff; box-shadow: 0 7px 18px color-mix(in srgb, var(--c-primary) 28%, transparent); }
-.caught-action.release { border: 1px solid color-mix(in srgb, var(--c-text-3) 34%, var(--border)); background: var(--ld-bg-card); color: var(--c-text-2); }
-.caught-action:disabled { cursor: not-allowed; opacity: .62; transform: none; }
-.relay-box { margin-top: 13px; padding-top: 13px; border-top: 1px dashed color-mix(in srgb, var(--border) 78%, transparent); }
-.relay-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.sea-scene-wrap {
+  width: 100%;
+  margin-bottom: 0;
+}
+.caught-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.caught-title {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.caught-title strong {
+  color: var(--c-text);
+  font-size: 0.8rem;
+}
+.chain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.chain-seg {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.chain-tag {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-primary) 14%, transparent);
+  color: var(--c-primary);
+  font-size: 0.52rem;
+  font-weight: 700;
+}
+.chain-body {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 11px;
+  background: var(--ld-bg-card);
+}
+.chain-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  color: var(--c-text-3);
+  font-size: 0.54rem;
+}
+.chain-meta > svg {
+  color: color-mix(in srgb, var(--c-primary) 72%, var(--c-text-3));
+  font-size: 0.62rem;
+}
+.chain-body p {
+  margin: 4px 0 0;
+  color: var(--c-text);
+  font-size: 0.74rem;
+  line-height: 1.7;
+  overflow-wrap: break-word;
+}
+.relay-prompt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 13px 0 0;
+  padding: 9px 11px;
+  border-left: 3px solid var(--c-primary);
+  background: color-mix(in srgb, var(--c-primary-soft) 54%, transparent);
+  color: var(--c-text-2);
+  font-size: 0.62rem;
+  line-height: 1.6;
+}
+.relay-prompt > svg {
+  flex: 0 0 auto;
+  color: var(--c-primary);
+  font-size: 0.76rem;
+}
+.caught-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+.caught-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+  text-decoration: none;
+}
+.caught-action:hover {
+  transform: translateY(-1px);
+}
+.caught-action.relay {
+  border: 1px solid var(--c-primary);
+  background: var(--c-primary);
+  color: #fff;
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--c-primary) 28%, transparent);
+}
+.caught-action.release {
+  border: 1px solid color-mix(in srgb, var(--c-text-3) 34%, var(--border));
+  background: var(--ld-bg-card);
+  color: var(--c-text-2);
+}
+.caught-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+.relay-box {
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 78%, transparent);
+}
+.relay-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
 .sea-submit {
   background: linear-gradient(145deg, hsl(215deg 92% 58%), hsl(222deg 92% 44%));
   border-color: transparent;
 }
 .sea-submit:hover:not(:disabled) {
-  box-shadow: 0 10px 24px color-mix(in srgb, hsl(220deg 90% 50%) 40%, transparent);
+  box-shadow: 0 10px 24px
+    color-mix(in srgb, hsl(220deg 90% 50%) 40%, transparent);
 }
 
 /* ===== 徽章 ===== */
@@ -1438,15 +2053,28 @@ useHead({ title: "时光留言板" });
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
   border-radius: 10px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--c-bg-2) 72%, var(--ld-bg-card)), var(--ld-bg-card));
-  box-shadow: var(--ui-shadow-panel), inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--c-bg-2) 72%, var(--ld-bg-card)),
+    var(--ld-bg-card)
+  );
+  box-shadow:
+    var(--ui-shadow-panel),
+    inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
 }
 .badges::before {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(color-mix(in srgb, var(--c-text-3) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--c-text-3) 6%, transparent) 1px, transparent 1px);
+    linear-gradient(
+      color-mix(in srgb, var(--c-text-3) 6%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--c-text-3) 6%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 32px 32px;
   content: "";
   pointer-events: none;
@@ -1481,9 +2109,27 @@ useHead({ title: "时光留言板" });
   font-size: 0.58rem;
   font-variant-numeric: tabular-nums;
 }
-.badges-head-actions { display: flex; align-items: center; gap: 7px; }
-.badge-toggle { display: grid; width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--ld-bg-card); color: var(--c-text-2); cursor: pointer; place-items: center; }
-.badge-toggle:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.badges-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.badge-toggle {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--ld-bg-card);
+  color: var(--c-text-2);
+  cursor: pointer;
+  place-items: center;
+}
+.badge-toggle:hover {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
 .badges-grid {
   position: relative;
   z-index: 1;
@@ -1503,18 +2149,37 @@ useHead({ title: "时光留言板" });
   border-radius: 8px;
   background: color-mix(in srgb, var(--ld-bg-card) 86%, var(--badge-accent) 4%);
   text-align: center;
-  transition: border-color 0.28s ease, background 0.28s ease, transform 0.28s var(--ui-ease-out);
+  transition:
+    border-color 0.28s ease,
+    background 0.28s ease,
+    transform 0.28s var(--ui-ease-out);
   animation: badge-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.badge:nth-child(2) { --badge-accent: #71c3a1; }
-.badge:nth-child(3) { --badge-accent: #e7a85d; }
-.badge:nth-child(4) { --badge-accent: #67a9e8; }
-.badge:nth-child(5) { --badge-accent: #54c4c6; }
-.badge:nth-child(6) { --badge-accent: #c58fd9; }
-.badge:nth-child(7) { --badge-accent: #e1c36f; }
+.badge:nth-child(2) {
+  --badge-accent: #71c3a1;
+}
+.badge:nth-child(3) {
+  --badge-accent: #e7a85d;
+}
+.badge:nth-child(4) {
+  --badge-accent: #67a9e8;
+}
+.badge:nth-child(5) {
+  --badge-accent: #54c4c6;
+}
+.badge:nth-child(6) {
+  --badge-accent: #c58fd9;
+}
+.badge:nth-child(7) {
+  --badge-accent: #e1c36f;
+}
 .badge:hover {
   border-color: color-mix(in srgb, var(--badge-accent) 50%, transparent);
-  background: linear-gradient(155deg, color-mix(in srgb, var(--badge-accent) 12%, transparent), rgb(255 255 255 / 3%));
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--badge-accent) 12%, transparent),
+    rgb(255 255 255 / 3%)
+  );
   transform: translateY(-2px);
 }
 .badge-status {
@@ -1523,12 +2188,18 @@ useHead({ title: "时光留言板" });
   align-items: center;
   justify-content: space-between;
   color: color-mix(in srgb, var(--badge-accent) 78%, var(--c-text));
-  font-size: .48rem;
+  font-size: 0.48rem;
   font-weight: 750;
 }
-.badge-status > span { text-transform: uppercase; }
-.badge-status > svg { font-size: .68rem; }
-.badge.locked .badge-status { color: #777d84; }
+.badge-status > span {
+  text-transform: uppercase;
+}
+.badge-status > svg {
+  font-size: 0.68rem;
+}
+.badge.locked .badge-status {
+  color: #777d84;
+}
 .badge-icon {
   position: relative;
   display: grid;
@@ -1560,7 +2231,7 @@ useHead({ title: "时光留言板" });
 .badge.locked {
   border-color: color-mix(in srgb, var(--border) 72%, transparent);
   background: color-mix(in srgb, var(--c-bg-2) 72%, transparent);
-  filter: saturate(.25);
+  filter: saturate(0.25);
   opacity: 0.72;
 }
 .badge.locked .badge-icon {
@@ -1599,31 +2270,82 @@ useHead({ title: "时光留言板" });
   margin-top: 6px;
   color: #777d84;
   font-family: var(--font-mono);
-  font-size: .47rem;
+  font-size: 0.47rem;
   text-align: right;
 }
-.badge:not(.locked) .badge-count { color: color-mix(in srgb, var(--badge-accent) 74%, #fff); }
-.badge :deep(.badge-medal.locked)::before { background: var(--c-bg-3); }
-.badge :deep(.badge-medal.locked)::after { border-color: var(--border); }
+.badge:not(.locked) .badge-count {
+  color: color-mix(in srgb, var(--badge-accent) 74%, #fff);
+}
+.badge :deep(.badge-medal.locked)::before {
+  background: var(--c-bg-3);
+}
+.badge :deep(.badge-medal.locked)::after {
+  border-color: var(--border);
+}
 .badges:not(.expanded) .badge-status > span,
 .badges:not(.expanded) .badge small,
 .badges:not(.expanded) .badge-meter,
-.badges:not(.expanded) .badge-count { display: none; }
-.badges:not(.expanded) .badge-status { position: absolute; top: 7px; right: 7px; width: auto; }
-.badges.expanded { padding: 25px 26px 28px; }
-.badges.expanded .badges-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.badges.expanded .badge { min-height: 206px; padding: 15px 13px 13px; }
-.badges.expanded .badge-icon { width: 58px; height: 58px; margin: 9px 0 11px; }
-.badges.expanded .badge strong { font-size: .74rem; }
-:global(.dark) .badges { background: linear-gradient(145deg, #17191d, #22262a 62%, #191c20); border-color: rgb(255 255 255 / 9%); box-shadow: 0 24px 58px rgb(12 14 18 / 28%), inset 0 1px 0 rgb(255 255 255 / 7%); }
-:global(.dark) .badge { background: linear-gradient(155deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 2%)); border-color: rgb(255 255 255 / 9%); }
+.badges:not(.expanded) .badge-count {
+  display: none;
+}
+.badges:not(.expanded) .badge-status {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: auto;
+}
+.badges.expanded {
+  padding: 25px 26px 28px;
+}
+.badges.expanded .badges-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.badges.expanded .badge {
+  min-height: 206px;
+  padding: 15px 13px 13px;
+}
+.badges.expanded .badge-icon {
+  width: 58px;
+  height: 58px;
+  margin: 9px 0 11px;
+}
+.badges.expanded .badge strong {
+  font-size: 0.74rem;
+}
+:global(.dark) .badges {
+  background: linear-gradient(145deg, #17191d, #22262a 62%, #191c20);
+  border-color: rgb(255 255 255 / 9%);
+  box-shadow:
+    0 24px 58px rgb(12 14 18 / 28%),
+    inset 0 1px 0 rgb(255 255 255 / 7%);
+}
+:global(.dark) .badge {
+  background: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 7%),
+    rgb(255 255 255 / 2%)
+  );
+  border-color: rgb(255 255 255 / 9%);
+}
 @keyframes badge-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
 }
 @keyframes badge-unlock {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-primary) 42%, transparent); transform: scale(1); }
-  55% { box-shadow: 0 0 0 14px transparent; transform: scale(1.18); }
-  100% { transform: scale(1); }
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-primary) 42%, transparent);
+    transform: scale(1);
+  }
+  55% {
+    box-shadow: 0 0 0 14px transparent;
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* ===== 右侧栏 ===== */
@@ -1634,7 +2356,9 @@ useHead({ title: "时光留言板" });
   background: var(--ld-bg-card);
   box-shadow: 0 5px 18px color-mix(in srgb, var(--ld-shadow) 25%, transparent);
 }
-.journey-card { flex: 0 0 auto; }
+.journey-card {
+  flex: 0 0 auto;
+}
 .journey-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1663,10 +2387,14 @@ useHead({ title: "时光留言板" });
   align-self: end;
   color: var(--c-text);
   font-family: var(--font-mono);
-  font-size: .82rem;
+  font-size: 0.82rem;
   line-height: 1;
 }
-.journey-stats small { align-self: start; color: var(--c-text-3); font-size: .45rem; }
+.journey-stats small {
+  align-self: start;
+  color: var(--c-text-3);
+  font-size: 0.45rem;
+}
 .aside-kicker {
   color: var(--c-primary);
   font-size: 0.48rem;
@@ -1677,7 +2405,11 @@ useHead({ title: "时光留言板" });
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(155deg, var(--c-primary-soft), var(--ld-bg-card) 64%);
+  background: linear-gradient(
+    155deg,
+    var(--c-primary-soft),
+    var(--ld-bg-card) 64%
+  );
   text-align: center;
 }
 .my-avatar {
@@ -1688,7 +2420,11 @@ useHead({ title: "时光留言板" });
   overflow: hidden;
   border: 4px solid var(--ld-bg-card);
   border-radius: 50%;
-  background: linear-gradient(145deg, var(--c-primary), color-mix(in srgb, var(--c-primary) 52%, #4a5bd0));
+  background: linear-gradient(
+    145deg,
+    var(--c-primary),
+    color-mix(in srgb, var(--c-primary) 52%, #4a5bd0)
+  );
   box-shadow: 0 8px 22px color-mix(in srgb, var(--c-primary) 30%, transparent);
   color: #fff;
   font-size: 1.5rem;
@@ -1702,7 +2438,11 @@ useHead({ title: "时光留言板" });
   object-position: center;
 }
 .my-avatar.is-user {
-  background: linear-gradient(145deg, #3a63c9, color-mix(in srgb, var(--c-primary) 40%, #243a75));
+  background: linear-gradient(
+    145deg,
+    #3a63c9,
+    color-mix(in srgb, var(--c-primary) 40%, #243a75)
+  );
 }
 .my-card h3 {
   margin: 0;
@@ -1757,7 +2497,9 @@ useHead({ title: "时光留言板" });
   font: inherit;
   font-size: 0.6rem;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 .my-rename:hover {
   box-shadow: 0 6px 16px color-mix(in srgb, var(--ld-shadow) 30%, transparent);
@@ -1804,7 +2546,9 @@ useHead({ title: "时光留言板" });
   border-radius: 11px;
   background: var(--c-primary-soft);
   place-items: center;
-  transition: transform 0.2s var(--ui-ease-out), box-shadow 0.2s ease;
+  transition:
+    transform 0.2s var(--ui-ease-out),
+    box-shadow 0.2s ease;
 }
 .badge-mini:hover {
   box-shadow: 0 8px 18px color-mix(in srgb, var(--ld-shadow) 40%, transparent);
@@ -1813,7 +2557,9 @@ useHead({ title: "时光留言板" });
 
 /* ===== 动画 ===== */
 @keyframes badge-orbit {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===== 响应式 ===== */
@@ -1843,7 +2589,9 @@ useHead({ title: "时光留言板" });
   .badges-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  .badges.expanded .badges-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .badges.expanded .badges-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .tabs {
     width: 100%;
   }
@@ -1853,8 +2601,12 @@ useHead({ title: "时光留言板" });
   }
 }
 @media (max-width: 480px) {
-  .badges-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .badges.expanded { padding: 20px 16px; }
+  .badges-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .badges.expanded {
+    padding: 20px 16px;
+  }
   .badges-head {
     flex-direction: column;
     align-items: flex-start;
