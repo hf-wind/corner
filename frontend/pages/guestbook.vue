@@ -355,74 +355,79 @@
           </Transition>
         </div>
 
-        <div class="composer bottle-composer content-reveal">
-          <div class="composer-head">
-            <span class="composer-sign">
-              <span
-                v-if="composerName"
-                class="sign-name"
-                :class="{ 'is-user': isLoggedIn }"
+        <Transition name="bottle-composer">
+          <div
+            v-if="!caughtBottle"
+            class="composer bottle-composer content-reveal"
+          >
+            <div class="composer-head">
+              <span class="composer-sign">
+                <span
+                  v-if="composerName"
+                  class="sign-name"
+                  :class="{ 'is-user': isLoggedIn }"
+                >
+                  <Icon
+                    :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'"
+                  />{{ composerName }}
+                </span>
+                <button v-else type="button" class="sign-anon" @click="askName">
+                  <Icon name="ph:face-mask-bold" />尚未署名
+                </button>
+              </span>
+              <span class="composer-hint"
+                ><Icon name="ph:info-bold" />今日还可投入
+                {{ bottleQuota.throw.remaining }} 只</span
+              >
+            </div>
+            <textarea
+              v-model="bottleText"
+              class="composer-input"
+              :maxlength="120"
+              rows="3"
+              :disabled="throwExhausted"
+              placeholder="写一封信，塞进瓶子里，让它漂向未来的海岸…"
+              @keydown.ctrl.enter="submitBottle"
+              @keydown.meta.enter="submitBottle"
+            />
+            <div
+              v-if="sendingBottle"
+              class="ai-reviewing sea-reviewing"
+              role="status"
+              aria-live="polite"
+            >
+              <span class="ai-reviewing-bar" />
+              <span class="ai-reviewing-text"
+                ><Icon name="ph:sparkle-fill" />AI 正在审核瓶子，请稍候…</span
+              >
+            </div>
+            <div class="composer-foot">
+              <span class="composer-count">{{ bottleText.length }}/120</span>
+              <button
+                type="button"
+                class="composer-submit sea-submit"
+                :disabled="sendingBottle || throwExhausted"
+                @click="submitBottle"
               >
                 <Icon
-                  :name="isLoggedIn ? 'ph:user-bold' : 'ph:feather-bold'"
-                />{{ composerName }}
-              </span>
-              <button v-else type="button" class="sign-anon" @click="askName">
-                <Icon name="ph:face-mask-bold" />尚未署名
-              </button>
-            </span>
-            <span class="composer-hint"
-              ><Icon name="ph:info-bold" />今日还可投入
-              {{ bottleQuota.throw.remaining }} 只</span
-            >
-          </div>
-          <textarea
-            v-model="bottleText"
-            class="composer-input"
-            :maxlength="120"
-            rows="3"
-            :disabled="throwExhausted"
-            placeholder="写一封信，塞进瓶子里，让它漂向未来的海岸…"
-            @keydown.ctrl.enter="submitBottle"
-            @keydown.meta.enter="submitBottle"
-          />
-          <div
-            v-if="sendingBottle"
-            class="ai-reviewing sea-reviewing"
-            role="status"
-            aria-live="polite"
-          >
-            <span class="ai-reviewing-bar" />
-            <span class="ai-reviewing-text"
-              ><Icon name="ph:sparkle-fill" />AI 正在审核瓶子，请稍候…</span
-            >
-          </div>
-          <div class="composer-foot">
-            <span class="composer-count">{{ bottleText.length }}/120</span>
-            <button
-              type="button"
-              class="composer-submit sea-submit"
-              :disabled="sendingBottle || throwExhausted"
-              @click="submitBottle"
-            >
-              <Icon
-                :name="
+                  :name="
+                    sendingBottle
+                      ? 'ph:circle-notch-bold'
+                      : 'solar:bottle-outline'
+                  "
+                  :spin="sendingBottle"
+                />
+                {{
                   sendingBottle
-                    ? 'ph:circle-notch-bold'
-                    : 'solar:bottle-outline'
-                "
-                :spin="sendingBottle"
-              />
-              {{
-                sendingBottle
-                  ? "瓶子审核中…"
-                  : throwExhausted
-                    ? "今日额度已用完"
-                    : "投入时光海"
-              }}
-            </button>
+                    ? "瓶子审核中…"
+                    : throwExhausted
+                      ? "今日额度已用完"
+                      : "投入时光海"
+                }}
+              </button>
+            </div>
           </div>
-        </div>
+        </Transition>
       </section>
 
       <!-- ========== 我的徽章 ========== -->
@@ -751,6 +756,7 @@ function visitorAvatarStyle(msg: any): Record<string, string> {
 function scrollToEl(
   el: HTMLElement | null | undefined,
   align: "start" | "center" = "start",
+  offset = 18,
 ) {
   if (!el) return;
   const container = document.querySelector<HTMLElement>(".main-content");
@@ -760,7 +766,7 @@ function scrollToEl(
     el.getBoundingClientRect().top -
     container.getBoundingClientRect().top +
     container.scrollTop -
-    18;
+    offset;
   if (align === "center") {
     top -= Math.max(0, (container.clientHeight - el.offsetHeight) / 2 - 18);
   }
@@ -1052,7 +1058,7 @@ async function doThrowBottle(text: string) {
     toast.success("瓶子已通过审核，漂向时光海等待有缘人");
     celebrate(result?.unlocked);
     await nextTick();
-    scrollToEl(tabsRef.value);
+    scrollToEl(tabsRef.value, "start", 0);
     seaRef.value?.launch();
     await Promise.all([refreshWall(), refreshMe()]);
   } catch (err: any) {
@@ -1086,9 +1092,9 @@ async function doFishBottle() {
     celebrate(result?.unlocked);
     await Promise.all([refreshWall(), refreshMe()]);
     await nextTick();
-    scrollToEl(tabsRef.value);
+    scrollToEl(tabsRef.value, "start", 0);
   } catch (err: any) {
-    toast.info(err?.message || "潮汐暂时没有带来新的信");
+    toast.info(err?.message || "这会儿还没等到新的相遇，过一会儿再来看看吧");
   } finally {
     fishing.value = false;
     void refreshBottleQuota();
@@ -1122,6 +1128,8 @@ async function submitRelay() {
     caughtBottle.value = null;
     seaRef.value?.launch();
     await Promise.all([refreshWall(), refreshMe()]);
+    await nextTick();
+    scrollToEl(tabsRef.value, "start", 0);
   } catch (err: any) {
     toast.error(err?.message || "投瓶失败，请稍后再试");
   } finally {
@@ -1894,6 +1902,17 @@ useHead({ title: "时光留言板" });
   opacity: 0;
   transform: translateY(-10px) scale(0.98);
 }
+.bottle-composer-enter-active,
+.bottle-composer-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bottle-composer-enter-from,
+.bottle-composer-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
 
 .sea-scene-wrap {
   width: 100%;
@@ -2618,6 +2637,8 @@ useHead({ title: "时光留言板" });
   .badge,
   .bottle-pop-enter-active,
   .bottle-pop-leave-active,
+  .bottle-composer-enter-active,
+  .bottle-composer-leave-active,
   .tabs-track {
     animation: none;
     transition: none;

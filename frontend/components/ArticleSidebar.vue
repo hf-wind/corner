@@ -41,7 +41,9 @@
         :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
         @click="emit('toggle-immersive')"
       >
-        <Icon :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'" />
+        <Icon
+          :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'"
+        />
       </button>
       <button
         type="button"
@@ -77,7 +79,9 @@
         <span class="bar-title">文章目录</span>
         <span class="bar-progress">{{ percent }}%</span>
         <Icon
-          :name="immersiveCatalogOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'"
+          :name="
+            immersiveCatalogOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'
+          "
           class="bar-caret"
         />
       </button>
@@ -107,7 +111,10 @@
               </button>
             </div>
           </header>
-          <div ref="immersiveCatalogWrapRef" class="immersive-catalog-content catalog-wrap">
+          <div
+            ref="immersiveCatalogWrapRef"
+            class="immersive-catalog-content catalog-wrap"
+          >
             <ClientOnly>
               <MdCatalog
                 v-if="resolvedScrollEl"
@@ -159,7 +166,11 @@
     </div>
   </Transition>
 
-  <div class="mobile-article-tools" :class="{ expanded: mobileActionsOpen }" v-show="!immersive">
+  <div
+    class="mobile-article-tools"
+    :class="{ expanded: mobileActionsOpen }"
+    v-show="!immersive"
+  >
     <Transition name="catalog-backdrop">
       <button
         v-if="mobileCatalogOpen"
@@ -171,23 +182,38 @@
     </Transition>
 
     <Transition name="mobile-catalog">
-      <section v-if="mobileCatalogOpen" class="mobile-catalog-panel" role="dialog" aria-label="文章目录">
+      <section
+        v-if="mobileCatalogOpen"
+        class="mobile-catalog-panel"
+        role="dialog"
+        aria-label="文章目录"
+      >
         <header class="mobile-catalog-head">
           <div>
-            <span class="mobile-catalog-icon"><Icon name="ph:list-bullets-bold" /></span>
+            <span class="mobile-catalog-icon"
+              ><Icon name="ph:list-bullets-bold"
+            /></span>
             <div>
               <strong>文章目录</strong>
               <span>已阅读 {{ percent }}%</span>
             </div>
           </div>
-          <button type="button" aria-label="关闭目录" @click="mobileCatalogOpen = false">
+          <button
+            type="button"
+            aria-label="关闭目录"
+            @click="mobileCatalogOpen = false"
+          >
             <Icon name="ph:x-bold" />
           </button>
         </header>
         <div class="mobile-catalog-progress" aria-hidden="true">
           <i :style="{ width: `${percent}%` }" />
         </div>
-        <div ref="mobileCatalogWrapRef" class="mobile-catalog-content" @click="handleMobileCatalogClick">
+        <div
+          ref="mobileCatalogWrapRef"
+          class="mobile-catalog-content"
+          @click="handleMobileCatalogClick"
+        >
           <ClientOnly>
             <MdCatalog
               v-if="resolvedScrollEl"
@@ -208,16 +234,40 @@
 
     <Transition name="mobile-tool-menu">
       <div v-if="mobileActionsOpen" class="mobile-tool-menu">
-        <button type="button" aria-label="文章目录" title="文章目录" @click="openMobileCatalog">
+        <button
+          type="button"
+          aria-label="文章目录"
+          title="文章目录"
+          @click="openMobileCatalog"
+        >
           <i><Icon name="ph:list-bullets-bold" /></i>
         </button>
-        <button type="button" :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'" :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'" @click="runMobileAction('immersive')">
-          <i><Icon :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'" /></i>
+        <button
+          type="button"
+          :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+          :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+          @click="runMobileAction('immersive')"
+        >
+          <i
+            ><Icon
+              :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'"
+          /></i>
         </button>
-        <button type="button" aria-label="去评论区" title="去评论区" @click="runMobileAction('comment')">
+        <button
+          type="button"
+          aria-label="去评论区"
+          title="去评论区"
+          @click="runMobileAction('comment')"
+        >
           <i><Icon name="ph:chat-circle-text-bold" /></i>
         </button>
-        <button type="button" aria-label="回到顶部" title="回到顶部" :class="{ muted: !showTop }" @click="runMobileAction('top')">
+        <button
+          type="button"
+          aria-label="回到顶部"
+          title="回到顶部"
+          :class="{ muted: !showTop }"
+          @click="runMobileAction('top')"
+        >
           <i><Icon name="ph:arrow-up-bold" /></i>
         </button>
       </div>
@@ -240,124 +290,150 @@
 </template>
 
 <script setup lang="ts">
-import { MdCatalog } from 'md-editor-v3'
-import 'md-editor-v3/lib/preview.css'
+import { MdCatalog } from "md-editor-v3";
+import "md-editor-v3/lib/preview.css";
 
-const props = withDefaults(defineProps<{
-  editorId?: string
-  scrollElement?: string
-  progress?: number
-  showTop?: boolean
-  immersive?: boolean
-}>(), {
-  editorId: 'article-preview',
-  scrollElement: '#main-content',
-  progress: 0,
-  showTop: false,
-  immersive: false,
-})
+const props = withDefaults(
+  defineProps<{
+    editorId?: string;
+    scrollElement?: string;
+    progress?: number;
+    showTop?: boolean;
+    immersive?: boolean;
+  }>(),
+  {
+    editorId: "article-preview",
+    scrollElement: "#main-content",
+    progress: 0,
+    showTop: false,
+    immersive: false,
+  },
+);
 
 const emit = defineEmits<{
-  'scroll-top': []
-  'scroll-comment': []
-  'catalog-navigate': [event: MouseEvent, item: { text: string; level: number; index: number }]
-  'toggle-immersive': []
-}>()
+  "scroll-top": [];
+  "scroll-comment": [];
+  "catalog-navigate": [
+    event: MouseEvent,
+    item: { text: string; level: number; index: number },
+  ];
+  "toggle-immersive": [];
+}>();
 
-const catalogWrapRef = ref<HTMLElement | null>(null)
-const mobileCatalogWrapRef = ref<HTMLElement | null>(null)
-const immersiveCatalogWrapRef = ref<HTMLElement | null>(null)
-const immersiveCatalogOpen = ref(false)
-const resolvedScrollEl = ref<string | HTMLElement | null>(null)
-const isDark = ref(false)
-const mobileActionsOpen = ref(false)
-const mobileCatalogOpen = ref(false)
-const mdTheme = computed(() => (isDark.value ? 'dark' : 'light'))
-const percent = computed(() => Math.round(Math.min(1, Math.max(0, props.progress)) * 100))
-const catalogKey = computed(() => `${props.editorId}-${mdTheme.value}`)
+const catalogWrapRef = ref<HTMLElement | null>(null);
+const mobileCatalogWrapRef = ref<HTMLElement | null>(null);
+const immersiveCatalogWrapRef = ref<HTMLElement | null>(null);
+const immersiveCatalogOpen = ref(false);
+const resolvedScrollEl = ref<string | HTMLElement | null>(null);
+const isDark = ref(false);
+const mobileActionsOpen = ref(false);
+const mobileCatalogOpen = ref(false);
+const mdTheme = computed(() => (isDark.value ? "dark" : "light"));
+const percent = computed(() =>
+  Math.round(Math.min(1, Math.max(0, props.progress)) * 100),
+);
+const catalogKey = computed(() => `${props.editorId}-${mdTheme.value}`);
 
-let observer: MutationObserver | null = null
+let observer: MutationObserver | null = null;
 
 function onCatalogActive(_heading: unknown, activeElement?: HTMLElement) {
-  const wrap = activeElement?.closest('.catalog-wrap, .mobile-catalog-content') as HTMLElement | null
-    || catalogWrapRef.value
-    || immersiveCatalogWrapRef.value
-  if (!activeElement || !wrap) return
-  const wrapRect = wrap.getBoundingClientRect()
-  const elRect = activeElement.getBoundingClientRect()
+  const wrap =
+    (activeElement?.closest(
+      ".catalog-wrap, .mobile-catalog-content",
+    ) as HTMLElement | null) ||
+    catalogWrapRef.value ||
+    immersiveCatalogWrapRef.value;
+  if (!activeElement || !wrap) return;
+  const wrapRect = wrap.getBoundingClientRect();
+  const elRect = activeElement.getBoundingClientRect();
   if (elRect.top < wrapRect.top + 8) {
-    wrap.scrollBy({ top: elRect.top - wrapRect.top - 20, behavior: 'smooth' })
+    wrap.scrollBy({ top: elRect.top - wrapRect.top - 20, behavior: "smooth" });
   } else if (elRect.bottom > wrapRect.bottom - 8) {
-    wrap.scrollBy({ top: elRect.bottom - wrapRect.bottom + 20, behavior: 'smooth' })
+    wrap.scrollBy({
+      top: elRect.bottom - wrapRect.bottom + 20,
+      behavior: "smooth",
+    });
   }
 }
 
 function openMobileCatalog() {
-  mobileActionsOpen.value = false
-  mobileCatalogOpen.value = true
+  mobileActionsOpen.value = false;
+  mobileCatalogOpen.value = true;
 }
 
-function runMobileAction(action: 'top' | 'comment' | 'immersive') {
-  mobileActionsOpen.value = false
-  if (action === 'top') emit('scroll-top')
-  else if (action === 'comment') emit('scroll-comment')
-  else emit('toggle-immersive')
+function runMobileAction(action: "top" | "comment" | "immersive") {
+  mobileActionsOpen.value = false;
+  if (action === "top") emit("scroll-top");
+  else if (action === "comment") emit("scroll-comment");
+  else emit("toggle-immersive");
 }
 
-function onCatalogClick(event: MouseEvent, item: { text: string; level: number; index: number }) {
-  event.preventDefault()
-  emit('catalog-navigate', event, item)
-  window.setTimeout(() => { mobileCatalogOpen.value = false }, 180)
+function onCatalogClick(
+  event: MouseEvent,
+  item: { text: string; level: number; index: number },
+) {
+  event.preventDefault();
+  emit("catalog-navigate", event, item);
+  window.setTimeout(() => {
+    mobileCatalogOpen.value = false;
+  }, 180);
 }
 
 function handleMobileCatalogClick(event: MouseEvent) {
-  const target = event.target as HTMLElement
-  if (target.closest('.md-editor-catalog-link')) {
-    window.setTimeout(() => { mobileCatalogOpen.value = false }, 120)
+  const target = event.target as HTMLElement;
+  if (target.closest(".md-editor-catalog-link")) {
+    window.setTimeout(() => {
+      mobileCatalogOpen.value = false;
+    }, 120);
   }
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return
-  mobileCatalogOpen.value = false
-  mobileActionsOpen.value = false
+  if (event.key !== "Escape") return;
+  mobileCatalogOpen.value = false;
+  mobileActionsOpen.value = false;
 }
 
 function resolveScrollElement() {
-  if (typeof props.scrollElement === 'string') {
-    const el = document.querySelector(props.scrollElement) as HTMLElement | null
-    resolvedScrollEl.value = el || props.scrollElement
+  if (typeof props.scrollElement === "string") {
+    const el = document.querySelector(
+      props.scrollElement,
+    ) as HTMLElement | null;
+    resolvedScrollEl.value = el || props.scrollElement;
   } else {
-    resolvedScrollEl.value = props.scrollElement
+    resolvedScrollEl.value = props.scrollElement;
   }
 }
 
 watch(
   () => props.immersive,
   (v) => {
-    immersiveCatalogOpen.value = false
-    mobileCatalogOpen.value = false
-    mobileActionsOpen.value = false
+    immersiveCatalogOpen.value = false;
+    mobileCatalogOpen.value = false;
+    mobileActionsOpen.value = false;
   },
-)
+);
 
 onMounted(async () => {
   const sync = () => {
-    isDark.value = document.documentElement.classList.contains('dark')
-  }
-  sync()
-  observer = new MutationObserver(sync)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    isDark.value = document.documentElement.classList.contains("dark");
+  };
+  sync();
+  observer = new MutationObserver(sync);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
 
-  await nextTick()
-  resolveScrollElement()
-  document.addEventListener('keydown', onKeydown)
-})
+  await nextTick();
+  resolveScrollElement();
+  document.addEventListener("keydown", onKeydown);
+});
 
 onUnmounted(() => {
-  observer?.disconnect()
-  document.removeEventListener('keydown', onKeydown)
-})
+  observer?.disconnect();
+  document.removeEventListener("keydown", onKeydown);
+});
 </script>
 
 <style scoped>
@@ -432,9 +508,9 @@ onUnmounted(() => {
 }
 
 .catalog-wrap {
-  flex: 0 1 auto;
+  flex: 1 1 0;
   min-height: 72px;
-  max-height: min(34dvh, 300px);
+  max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
   padding: 5px 3px 4px 0;
@@ -486,7 +562,10 @@ onUnmounted(() => {
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .catalog-wrap :deep(.md-editor-catalog-link span:hover) {
@@ -533,7 +612,11 @@ onUnmounted(() => {
   color: var(--c-text-3);
   font-size: 0.95rem;
   cursor: pointer;
-  transition: color 0.18s ease, background 0.18s ease, opacity 0.2s ease, transform 0.18s ease;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    opacity 0.2s ease,
+    transform 0.18s ease;
   opacity: 0.65;
 }
 
@@ -590,7 +673,8 @@ onUnmounted(() => {
   transform: translateX(-50%) translateY(-1px);
   color: var(--c-primary);
   border-color: color-mix(in srgb, var(--c-primary) 32%, transparent);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--c-primary) 10%, var(--ld-shadow));
+  box-shadow: 0 10px 26px
+    color-mix(in srgb, var(--c-primary) 10%, var(--ld-shadow));
 }
 
 .immersive-catalog-bar .bar-title {
@@ -777,7 +861,8 @@ onUnmounted(() => {
 .im-action:hover {
   transform: translateY(-2px);
   color: var(--c-primary);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--c-primary) 14%, var(--ld-shadow));
+  box-shadow: 0 10px 24px
+    color-mix(in srgb, var(--c-primary) 14%, var(--ld-shadow));
 }
 
 .im-action.im-exit {
@@ -875,11 +960,22 @@ onUnmounted(() => {
 @media (max-width: 900px) {
   .immersive-catalog-bar {
     top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    z-index: 12020;
+    transform: none;
+  }
+
+  .immersive-catalog-bar:hover {
+    transform: translateY(-1px);
   }
 
   .immersive-catalog-panel {
+    top: max(60px, calc(env(safe-area-inset-top) + 58px));
+    left: max(12px, env(safe-area-inset-left));
+    z-index: 12019;
     width: calc(100vw - 24px);
     max-height: min(68dvh, 540px);
+    transform: none;
   }
 
   .immersive-actions {
@@ -918,10 +1014,15 @@ onUnmounted(() => {
     border: 0;
     border-radius: 50%;
     color: var(--c-primary);
-    background: conic-gradient(var(--c-primary) var(--reading-progress), color-mix(in srgb, var(--border) 58%, transparent) 0);
+    background: conic-gradient(
+      var(--c-primary) var(--reading-progress),
+      color-mix(in srgb, var(--border) 58%, transparent) 0
+    );
     box-shadow: 0 6px 18px color-mix(in srgb, #000 12%, var(--ld-shadow));
     cursor: pointer;
-    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+    transition:
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.2s ease;
   }
 
   .mobile-tool-trigger > span {
@@ -940,7 +1041,8 @@ onUnmounted(() => {
 
   .mobile-tool-trigger.active {
     transform: rotate(90deg) scale(0.94);
-    box-shadow: 0 5px 14px color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
+    box-shadow: 0 5px 14px
+      color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
   }
 
   .mobile-tool-menu {
@@ -1046,7 +1148,9 @@ onUnmounted(() => {
     border: 1px solid color-mix(in srgb, var(--c-primary) 12%, var(--border));
     border-radius: 16px;
     background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-bg-1));
-    box-shadow: 0 24px 64px rgb(0 0 0 / 28%), 0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset;
+    box-shadow:
+      0 24px 64px rgb(0 0 0 / 28%),
+      0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset;
     transform: translateY(-50%);
   }
 
@@ -1153,7 +1257,7 @@ onUnmounted(() => {
   }
 
   .mobile-catalog-content :deep(.md-editor-catalog-active > span::before) {
-    content: '';
+    content: "";
     position: absolute;
     top: 6px;
     bottom: 6px;
@@ -1175,7 +1279,9 @@ onUnmounted(() => {
 
   .mobile-tool-menu-enter-active button,
   .mobile-tool-menu-leave-active button {
-    transition: opacity 0.22s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    transition:
+      opacity 0.22s ease,
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .mobile-tool-menu-enter-active button:nth-child(2) {
@@ -1194,7 +1300,9 @@ onUnmounted(() => {
 
   .mobile-catalog-enter-active,
   .mobile-catalog-leave-active {
-    transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    transition:
+      opacity 0.2s ease,
+      transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .mobile-catalog-enter-from,
@@ -1211,6 +1319,14 @@ onUnmounted(() => {
   .catalog-backdrop-enter-from,
   .catalog-backdrop-leave-to {
     opacity: 0;
+  }
+
+  .immersive-catalog-enter-from {
+    transform: translateY(-12px) scale(0.97);
+  }
+
+  .immersive-catalog-leave-to {
+    transform: translateY(-7px) scale(0.98);
   }
 }
 

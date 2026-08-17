@@ -12,7 +12,7 @@
         :title="refreshing ? '刷新中' : '刷新足迹'"
         :aria-label="refreshing ? '刷新中' : '刷新足迹'"
         :disabled="refreshing"
-        @click="load"
+        @click="load(true)"
       >
         <Icon
           :name="
@@ -41,10 +41,13 @@
         :style="{ '--fp-delay': itemDelay(index) }"
       >
         <span class="fp-avatar" aria-hidden="true">
-          <template v-if="visit.nickname?.trim()">{{
-            visit.nickname.trim().charAt(0)
-          }}</template>
-          <Icon v-else name="ph:footprints-bold" />
+          <span>
+            <template v-if="visit.nickname?.trim()">{{
+              visit.nickname.trim().charAt(0)
+            }}</template>
+            <Icon v-else name="ph:footprints-bold" />
+          </span>
+          <i>{{ String(index + 1).padStart(2, "0") }}</i>
         </span>
         <div class="fp-copy">
           <p :title="visitorLabel(visit)">{{ visitorLabel(visit) }}</p>
@@ -59,9 +62,12 @@
             >
           </div>
         </div>
-        <time :datetime="visit.time" :title="formatTime(visit.time)">{{
-          timeLabel(visit.time)
-        }}</time>
+        <span class="fp-arrival">
+          <i aria-hidden="true" />
+          <time :datetime="visit.time" :title="formatTime(visit.time)">{{
+            timeLabel(visit.time)
+          }}</time>
+        </span>
       </li>
     </ol>
   </section>
@@ -91,6 +97,7 @@ const refreshing = ref(false);
 const listKey = ref(0);
 let loadSeq = 0;
 let idleHandle: number | null = null;
+let refreshTimer: number | null = null;
 
 function visitorLabel(visit: RecentVisit) {
   const nickname = visit.nickname?.trim();
@@ -123,13 +130,13 @@ function formatTime(time: string) {
   return dayjs(time).format("YYYY-MM-DD HH:mm");
 }
 
-async function load() {
+async function load(fresh = false) {
   if (loading.value) return;
   loading.value = true;
   refreshing.value = items.value.length > 0;
   const seq = ++loadSeq;
   try {
-    const data = await fetchRecent();
+    const data = await fetchRecent(fresh);
     if (seq !== loadSeq) return;
     items.value = (Array.isArray(data) ? data : []).slice(0, 5);
     listKey.value += 1;
@@ -143,19 +150,30 @@ async function load() {
   }
 }
 
+function refreshWhenVisible() {
+  if (document.visibilityState === "visible") void load(true);
+}
+
 onMounted(() => {
   if ("requestIdleCallback" in window) {
-    idleHandle = window.requestIdleCallback(() => void load(), {
+    idleHandle = window.requestIdleCallback(() => void load(true), {
       timeout: 1400,
     });
   } else {
-    idleHandle = window.setTimeout(() => void load(), 300);
+    idleHandle = window.setTimeout(() => void load(true), 300);
   }
+  refreshTimer = window.setInterval(refreshWhenVisible, 30_000);
+  document.addEventListener("visibilitychange", refreshWhenVisible);
+  window.addEventListener("focus", refreshWhenVisible);
 });
 onUnmounted(() => {
-  if (idleHandle === null) return;
-  if ("cancelIdleCallback" in window) window.cancelIdleCallback(idleHandle);
-  else window.clearTimeout(idleHandle);
+  if (idleHandle !== null) {
+    if ("cancelIdleCallback" in window) window.cancelIdleCallback(idleHandle);
+    else window.clearTimeout(idleHandle);
+  }
+  if (refreshTimer !== null) window.clearInterval(refreshTimer);
+  document.removeEventListener("visibilitychange", refreshWhenVisible);
+  window.removeEventListener("focus", refreshWhenVisible);
 });
 </script>
 
@@ -246,37 +264,72 @@ onUnmounted(() => {
   flex: 1;
   grid-auto-rows: minmax(45px, 1fr);
   align-content: stretch;
-  gap: 3px;
+  gap: 4px;
   margin: 0;
   padding: 5px 0 0;
   overflow: hidden;
   list-style: none;
 }
 .fp-item {
+  position: relative;
   display: grid;
   min-width: 0;
   grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-height: 45px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  padding: 3px 5px 3px 3px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c-bg-1) 48%, transparent);
   animation: fp-item-in 0.42s var(--ui-ease-out) both;
   animation-delay: var(--fp-delay);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
 }
-.fp-item:last-child {
-  border-bottom: 0;
+.fp-item:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 16%, var(--border));
+  background: color-mix(in srgb, var(--c-primary-soft) 42%, var(--ld-bg-card));
+  transform: translateX(2px);
 }
 .fp-avatar {
+  position: relative;
   display: grid;
   width: 28px;
   height: 28px;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 22%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
   border-radius: 8px;
-  background: color-mix(in srgb, var(--c-primary-soft) 62%, var(--ld-bg-card));
+  background: var(--ld-bg-card);
+  place-items: center;
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--ld-shadow) 34%, transparent);
+}
+.fp-avatar > span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c-primary-soft) 72%, var(--ld-bg-card));
   color: var(--c-primary);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 750;
   place-items: center;
+}
+.fp-avatar > i {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  padding: 1px 3px;
+  border: 1px solid var(--ld-bg-card);
+  border-radius: 4px;
+  background: var(--c-primary);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.32rem;
+  font-style: normal;
+  line-height: 1.2;
 }
 .fp-copy {
   min-width: 0;
@@ -314,7 +367,19 @@ onUnmounted(() => {
   flex: none;
   font-size: 0.55rem;
 }
-.fp-item > time {
+.fp-arrival {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fp-arrival > i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #47b985;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #47b985 12%, transparent);
+}
+.fp-arrival > time {
   color: var(--c-text-3);
   font-family: var(--font-mono);
   font-size: 0.44rem;

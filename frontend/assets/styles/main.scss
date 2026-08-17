@@ -374,6 +374,12 @@ html.article-immersive .layout > .sidebar-shell {
   pointer-events: none;
 }
 
+html.article-immersive .layout > .mobile-menu-trigger {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 @media (max-width: 900px) {
   html,
   body {

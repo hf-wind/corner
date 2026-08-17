@@ -21,17 +21,19 @@
       </span>
     </button>
 
-    <Transition name="reading-body">
-  <div v-if="expanded" class="reading-body">
-        <p>{{ insight.summary }}</p>
-        <ul v-if="points.length">
-          <li v-for="(point, index) in points" :key="point">
-            <span>{{ String(index + 1).padStart(2, "0") }}</span
-            >{{ point }}
-          </li>
-        </ul>
+    <div class="reading-body-wrap" :aria-hidden="!expanded" :inert="!expanded">
+      <div class="reading-body-clip">
+        <div class="reading-body">
+          <p>{{ insight.summary }}</p>
+          <ul v-if="points.length">
+            <li v-for="(point, index) in points" :key="point">
+              <span>{{ String(index + 1).padStart(2, "0") }}</span
+              >{{ point }}
+            </li>
+          </ul>
+        </div>
       </div>
-    </Transition>
+    </div>
   </section>
 </template>
 
@@ -185,6 +187,22 @@ watch(() => props.slug, load);
   gap: 11px;
   padding: 0 13px 13px 55px;
 }
+.reading-body-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease;
+}
+.reading-body-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.reading-strip.is-expanded .reading-body-wrap {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
 .reading-body > p {
   margin: 0;
   color: var(--c-text-2);
@@ -212,17 +230,6 @@ watch(() => props.slug, load);
   font-family: var(--font-accent);
   font-size: 0.53rem;
 }
-.reading-body-enter-active,
-.reading-body-leave-active {
-  transition:
-    opacity 0.38s ease,
-    transform 0.52s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.reading-body-enter-from,
-.reading-body-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
-}
 @keyframes reading-scan {
   from {
     transform: translateX(-100%);
@@ -245,12 +252,10 @@ watch(() => props.slug, load);
     transform: none;
     transition: none;
   }
-  .reading-strip.is-ready::before,
-  .reading-body-enter-active,
-  .reading-body-leave-active {
+  .reading-strip.is-ready::before {
     animation: none;
-    transition: none;
   }
+  .reading-body-wrap,
   .reading-toggle :deep(svg) {
     transition: none;
   }

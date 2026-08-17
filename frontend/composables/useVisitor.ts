@@ -51,7 +51,12 @@ export function useVisitor() {
 
   const fetchWall = () => api.get<any>("/visitor/wall");
   const fetchMe = () => api.get<any>("/visitor/me");
-  const fetchRecent = () => api.get<any>("/visitor/recent");
+  const fetchRecent = (fresh = false) =>
+    api.get<any>(
+      "/visitor/recent",
+      fresh ? { refresh: 1 } : undefined,
+      fresh ? { cache: "no-store" } : undefined,
+    );
   const fetchMessages = (page = 1) =>
     api.get<any>("/visitor/messages", { type: "message", page });
   const sendMessage = (content: string) =>

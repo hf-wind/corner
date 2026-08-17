@@ -1,5 +1,8 @@
 <template>
-  <div class="page-layout article-page" :class="{ 'is-immersive': immersiveMode }">
+  <div
+    class="page-layout article-page"
+    :class="{ 'is-immersive': immersiveMode }"
+  >
     <main
       id="main-content"
       ref="articleMainRef"
@@ -78,21 +81,37 @@
           <h1 class="post-title text-creative">{{ article.title }}</h1>
         </div>
 
-        <div
+        <section
           v-if="article.excerpt"
-          class="md-excerpt gradient-card article-anim"
-          ref="excerptRef"
-          data-animation="true"
-          data-speed="30"
+          class="article-lead article-anim"
+          aria-label="文章导读"
         >
-          <Icon name="ph:highlighter-bold" />
-          <span class="excerpt-copy">
-            <span ref="excerptTextRef" :data-text="article.excerpt"></span>
-            <span ref="excerptCaretRef" class="excerpt-caret" aria-hidden="true"
-              >_</span
-            >
-          </span>
-        </div>
+          <div
+            v-if="article.excerpt"
+            class="md-excerpt"
+            ref="excerptRef"
+            data-animation="true"
+            data-speed="30"
+          >
+            <span class="excerpt-mark"
+              ><Icon name="ph:highlighter-bold"
+            /></span>
+            <span class="excerpt-content">
+              <small>文章摘要</small>
+              <span class="excerpt-copy">
+                <span ref="excerptTextRef" :data-text="article.excerpt"></span>
+                <span
+                  ref="excerptCaretRef"
+                  class="excerpt-caret"
+                  aria-hidden="true"
+                  >_</span
+                >
+              </span>
+            </span>
+          </div>
+
+          <!-- <AiReadingStrip type="post" :slug="slug" /> -->
+        </section>
 
         <div
           class="outdated-notice article-anim"
@@ -104,8 +123,6 @@
           <Icon name="ph:warning-circle-bold" />
           <span class="notice-text"></span>
         </div>
-
-        <AiReadingStrip type="post" :slug="slug" />
 
         <div ref="articleContentRef" class="article-shell article-anim">
           <ArticleMarkdown :content="article.content" :editor-id="editorId" />
@@ -323,7 +340,10 @@ function catalogHeading(item: { text: string; index: number }) {
   return headings[item.index - 1] || null;
 }
 
-function navigateCatalog(event: MouseEvent, item: { text: string; level: number; index: number }) {
+function navigateCatalog(
+  event: MouseEvent,
+  item: { text: string; level: number; index: number },
+) {
   event.preventDefault();
   const container = articleMainRef.value;
   const target = catalogHeading(item);
@@ -352,10 +372,7 @@ function navigateCatalog(event: MouseEvent, item: { text: string; level: number;
 
 function setImmersive(active: boolean) {
   immersiveMode.value = active;
-  document.documentElement.classList.toggle(
-    "article-immersive",
-    active,
-  );
+  document.documentElement.classList.toggle("article-immersive", active);
 }
 
 async function toggleImmersive() {
@@ -620,7 +637,11 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(180deg, rgb(4 9 18 / 18%) 20%, rgb(4 9 18 / 82%) 100%);
+  background: linear-gradient(
+    180deg,
+    rgb(4 9 18 / 18%) 20%,
+    rgb(4 9 18 / 82%) 100%
+  );
   content: "";
   pointer-events: none;
 }
@@ -648,10 +669,19 @@ onUnmounted(() => {
   gap: 16px;
 }
 
-.post-header.has-cover .operations { order: 2; }
-.post-header.has-cover .post-info { order: 1; color: rgb(255 255 255 / 84%); }
-.post-header.has-cover .post-info a { color: inherit; }
-.post-header.has-cover .author-capsule { color: #fff; }
+.post-header.has-cover .operations {
+  order: 2;
+}
+.post-header.has-cover .post-info {
+  order: 1;
+  color: rgb(255 255 255 / 84%);
+}
+.post-header.has-cover .post-info a {
+  color: inherit;
+}
+.post-header.has-cover .author-capsule {
+  color: #fff;
+}
 .post-header.has-cover .z-btn {
   background: rgb(8 14 24 / 54%);
   color: rgb(255 255 255 / 88%);
@@ -751,49 +781,87 @@ onUnmounted(() => {
   margin: 0;
 }
 
+.article-lead {
+  position: relative;
+  margin-bottom: 22px;
+  border-top: 1px solid color-mix(in srgb, var(--c-text) 12%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--c-text) 12%, var(--border));
+}
+
+.article-lead::before {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 72px;
+  height: 2px;
+  background: var(--c-primary);
+  content: "";
+}
+
 .md-excerpt {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-  border-left: 3px solid color-mix(in srgb, var(--c-primary) 72%, var(--border));
-  border-radius: 0 8px 8px 0;
+  align-items: stretch;
+  gap: 16px;
+  padding: 19px 8px 21px;
   font-family: var(--font-rounded);
-  font-size: 12px;
-  line-height: 1.8;
+  font-size: 13px;
+  line-height: 1.95;
   color: var(--c-text-2);
   position: relative;
-  overflow: hidden;
-  background: var(--ld-bg-card);
-  box-shadow: none;
+  background: transparent;
 }
 
-.md-excerpt::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--c-primary-soft), transparent 60%);
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-.md-excerpt :deep(.icon),
+.excerpt-mark,
+.excerpt-content,
 .excerpt-copy,
 .excerpt-caret {
   position: relative;
-  z-index: 0;
+  z-index: 1;
 }
 
-.md-excerpt :deep(.icon) {
+.excerpt-mark {
+  display: grid;
+  width: 34px;
   flex-shrink: 0;
-  font-size: 0.9rem;
+  padding-top: 3px;
+  border-right: 1px solid
+    color-mix(in srgb, var(--c-primary) 24%, var(--border));
+  color: color-mix(in srgb, var(--c-primary) 84%, var(--c-text));
+  font-size: 1rem;
+  place-items: start center;
+}
+
+.excerpt-content {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 7px;
+}
+
+.excerpt-content > small {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-weight: 700;
+}
+
+.excerpt-content > small::after {
+  width: min(80px, 22vw);
+  height: 1px;
+  background: color-mix(in srgb, var(--c-primary) 22%, transparent);
+  content: "";
 }
 
 .excerpt-copy {
   flex: 1;
   min-width: 0;
+  color: color-mix(in srgb, var(--c-text) 84%, var(--c-text-2));
+  font-family: var(--font-summary);
+  font-weight: 500;
+  text-wrap: pretty;
 }
 
 .excerpt-caret {
@@ -862,11 +930,20 @@ onUnmounted(() => {
   gap: 8px;
   padding: 12px 14px;
   margin-bottom: 20px;
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(245, 158, 11, 0.1);
   color: #b45309;
   font-size: 0.75rem;
   box-shadow: 0 6px 16px rgba(245, 158, 11, 0.12);
+}
+
+.article-lead :deep(.reading-strip) {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 :root.dark .outdated-notice,
@@ -1037,7 +1114,9 @@ onUnmounted(() => {
     display: none;
   }
 
-  .post-header.has-cover .operations span { display: none; }
+  .post-header.has-cover .operations span {
+    display: none;
+  }
 
   .post-header.has-cover .post-title {
     right: 18px;
@@ -1072,9 +1151,16 @@ onUnmounted(() => {
   }
 
   .md-excerpt {
-    padding: 12px;
-    margin-bottom: 16px;
-    border-radius: 12px;
+    gap: 12px;
+    padding: 17px 3px 18px;
+  }
+
+  .article-lead {
+    margin-bottom: 18px;
+  }
+
+  .excerpt-mark {
+    width: 29px;
   }
 
   .article-shell {

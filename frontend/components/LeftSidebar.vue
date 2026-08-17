@@ -22,18 +22,33 @@
       </div>
     </div>
 
-    <div class="sidebar-scroll">
-      <div v-if="!isPanel" class="search-box" @click="openSearch">
-        <input type="text" placeholder="搜索文章..." readonly />
-        <Icon name="ph:magnifying-glass-bold" class="search-suffix" />
-      </div>
+    <div v-if="!isPanel" class="search-box" @click="openSearch">
+      <input type="text" placeholder="搜索文章..." readonly />
+      <Icon name="ph:magnifying-glass-bold" class="search-suffix" />
+    </div>
 
+    <div class="sidebar-scroll">
       <nav class="nav-menu">
-        <section v-for="group in navGroups" :key="group.key" class="nav-group" :class="{ 'is-open': isGroupOpen(group) }">
-          <button v-if="!collapsed" type="button" class="nav-group-toggle" :aria-expanded="isGroupOpen(group)" @click="toggleGroup(group.key)">
-            <span>{{ group.label }}</span><Icon name="ph:caret-down-bold" />
+        <section
+          v-for="group in navGroups"
+          :key="group.key"
+          class="nav-group"
+          :class="{ 'is-open': isGroupOpen(group) }"
+        >
+          <button
+            v-if="!collapsed"
+            type="button"
+            class="nav-group-toggle"
+            :aria-expanded="isGroupOpen(group)"
+            @click="toggleGroup(group.key)"
+          >
+            <span>{{ group.label }}</span
+            ><Icon name="ph:caret-down-bold" />
           </button>
-          <div class="nav-group-items" :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }">
+          <div
+            class="nav-group-items"
+            :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }"
+          >
             <div class="nav-group-inner">
               <AppLink
                 v-for="item in group.items"
@@ -43,13 +58,15 @@
                 :class="{ active: isNavActive(item.to) }"
                 :title="collapsed ? item.label : undefined"
               >
-                <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
+                <Icon :name="item.icon" class="nav-icon" /><span
+                  class="nav-label"
+                  >{{ item.label }}</span
+                >
               </AppLink>
             </div>
           </div>
         </section>
       </nav>
-
     </div>
 
     <div class="sidebar-bottom">
@@ -187,8 +204,13 @@ const router = useRouter();
 const isPanel = computed(() => props.variant === "admin");
 const collapsed = computed(() => props.collapsed && isPanel.value);
 const allowCollapse = computed(() => props.allowCollapse);
-const { albumsEnabled, mapEnabled, constellationEnabled, storiesEnabled, guestbookEnabled } =
-  useFeatureFlags();
+const {
+  albumsEnabled,
+  mapEnabled,
+  constellationEnabled,
+  storiesEnabled,
+  guestbookEnabled,
+} = useFeatureFlags();
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar));
 const playerSlotRef = ref<HTMLElement | null>(null);
 let registeredSlot: HTMLElement | null = null;
@@ -347,7 +369,8 @@ const navGroups = computed<NavGroup[]>(() => {
       },
     ].filter((group) => group.items.length);
   }
-  const select = (paths: string[]) => items.filter((item) => paths.includes(item.to));
+  const select = (paths: string[]) =>
+    items.filter((item) => paths.includes(item.to));
   return [
     { key: "articles", label: "文章", items: select(["/home"]) },
     {
@@ -428,7 +451,9 @@ async function handleLogout() {
     danger: true,
   });
   if (!accepted) return;
-  const returnPath = route.meta.requiresAuth ? lastPublicPath() : route.fullPath;
+  const returnPath = route.meta.requiresAuth
+    ? lastPublicPath()
+    : route.fullPath;
   clearSession();
   try {
     const toast = useToast();
@@ -683,7 +708,8 @@ watch(
 
 /* ===== Search ===== */
 .search-box {
-  margin-top: 0;
+  flex: 0 0 auto;
+  margin-top: 11px;
   position: relative;
   display: flex;
   align-items: center;
@@ -730,23 +756,59 @@ watch(
 
 /* ===== Nav ===== */
 .nav-menu {
-  margin-top: 12px;
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.nav-group { display: flex; flex-direction: column; gap: 2px; }
-.nav-group + .nav-group { margin-top: 8px; }
-.nav-group-toggle {
-  display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 5px 10px;
-  border: 0; background: transparent; color: var(--c-text-3); cursor: pointer; font: inherit; font-size: .56rem; letter-spacing: .12em; text-align: left;
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.nav-group-toggle svg { font-size: .62rem; transition: transform .36s cubic-bezier(.22,1,.36,1); }
-.nav-group.is-open .nav-group-toggle svg { transform: rotate(0deg); }
-.nav-group:not(.is-open) .nav-group-toggle svg { transform: rotate(-90deg); }
-.nav-group-items { display: grid; grid-template-rows: 1fr; overflow: hidden; transition: grid-template-rows .42s cubic-bezier(.22,1,.36,1), opacity .28s ease; }
-.nav-group-inner { min-height: 0; }
-.nav-group-items.is-collapsed-group { grid-template-rows: 0fr; opacity: 0; }
+.nav-group + .nav-group {
+  margin-top: 8px;
+}
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--c-text-3);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-align: left;
+}
+.nav-group-toggle svg {
+  font-size: 0.62rem;
+  transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-group.is-open .nav-group-toggle svg {
+  transform: rotate(0deg);
+}
+.nav-group:not(.is-open) .nav-group-toggle svg {
+  transform: rotate(-90deg);
+}
+.nav-group-items {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  transition:
+    grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease;
+}
+.nav-group-inner {
+  min-height: 0;
+}
+.nav-group-items.is-collapsed-group {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
 
 .nav-item {
   display: flex;
@@ -997,10 +1059,42 @@ watch(
   border-radius: 1.2rem;
   isolation: isolate;
 }
-.theme-pill::after { position:absolute; z-index:-1; inset:0; border-radius:inherit; background:color-mix(in srgb,var(--c-bg-2) 88%,transparent); content:''; transition:inset .25s ease, box-shadow .25s ease; }
-.theme-pill::before { position:absolute; z-index:0; top:var(--theme-pill-pad); bottom:var(--theme-pill-pad); left:var(--theme-pill-pad); width:34px; border-radius:1rem; background:var(--ld-bg-card); box-shadow:inset 0 1px 1px color-mix(in srgb,#fff 32%,transparent),.1em .2em .5em var(--ld-shadow); content:''; transform:translate3d(0,0,0); transition:transform .5s var(--theme-pill-ease),background-color .5s ease,box-shadow .5s ease; }
-.theme-pill.theme-dark::before { transform:translate3d(37px,0,0); }
-.theme-pill.theme-auto::before { transform:translate3d(74px,0,0); }
+.theme-pill::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--c-bg-2) 88%, transparent);
+  content: "";
+  transition:
+    inset 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.theme-pill::before {
+  position: absolute;
+  z-index: 0;
+  top: var(--theme-pill-pad);
+  bottom: var(--theme-pill-pad);
+  left: var(--theme-pill-pad);
+  width: 34px;
+  border-radius: 1rem;
+  background: var(--ld-bg-card);
+  box-shadow:
+    inset 0 1px 1px color-mix(in srgb, #fff 32%, transparent),
+    0.1em 0.2em 0.5em var(--ld-shadow);
+  content: "";
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 0.5s var(--theme-pill-ease),
+    background-color 0.5s ease,
+    box-shadow 0.5s ease;
+}
+.theme-pill.theme-dark::before {
+  transform: translate3d(37px, 0, 0);
+}
+.theme-pill.theme-auto::before {
+  transform: translate3d(74px, 0, 0);
+}
 /* .theme-pill:focus-within::after { inset:-3px; box-shadow:0 0 0 3px color-mix(in srgb,var(--c-primary) 14%,transparent); } */
 
 .theme-pill button {
@@ -1024,9 +1118,15 @@ watch(
   color: var(--c-text);
 }
 
-.theme-pill.theme-light:hover::before { transform: translate3d(2px, 0, 0); }
-.theme-pill.theme-dark:hover::before { transform: translate3d(39px, 0, 0); }
-.theme-pill.theme-auto:hover::before { transform: translate3d(76px, 0, 0); }
+.theme-pill.theme-light:hover::before {
+  transform: translate3d(2px, 0, 0);
+}
+.theme-pill.theme-dark:hover::before {
+  transform: translate3d(39px, 0, 0);
+}
+.theme-pill.theme-auto:hover::before {
+  transform: translate3d(76px, 0, 0);
+}
 
 .theme-pill button.active {
   background: transparent;
@@ -1154,9 +1254,19 @@ watch(
   width: 34px;
   padding: 7px 0;
 }
-.is-collapsed .theme-pill::before { top:3px; left:4px; width:34px; height:31px; bottom:auto; }
-.is-collapsed .theme-pill.theme-dark::before { transform:translate3d(0,34px,0); }
-.is-collapsed .theme-pill.theme-auto::before { transform:translate3d(0,68px,0); }
+.is-collapsed .theme-pill::before {
+  top: 3px;
+  left: 4px;
+  width: 34px;
+  height: 31px;
+  bottom: auto;
+}
+.is-collapsed .theme-pill.theme-dark::before {
+  transform: translate3d(0, 34px, 0);
+}
+.is-collapsed .theme-pill.theme-auto::before {
+  transform: translate3d(0, 68px, 0);
+}
 .is-collapsed .admin-collapse-button {
   width: 42px;
   padding: 8px 0;
