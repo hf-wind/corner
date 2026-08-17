@@ -61,16 +61,6 @@ function appIconsPlugin(): Plugin {
   }
 }
 
-function stripUmamiInDev(): Plugin {
-  return {
-    name: 'corner-strip-umami',
-    apply: 'serve',
-    transformIndexHtml(html) {
-      return html.replace(/<script\s+defer\s+src="https:\/\/cloud\.umami\.is\/script\.js"[^>]*>\s*<\/script>\s*/i, '')
-    },
-  }
-}
-
 function pascalCase(value: string) {
   return value.split('-').map((part) => part ? part[0].toUpperCase() + part.slice(1) : '').join('')
 }
@@ -133,7 +123,6 @@ export default defineConfig(({ mode }) => {
     envDir: envRoot,
     plugins: [
       appIconsPlugin(),
-      stripUmamiInDev(),
       autoComponentsPlugin(),
       vue(),
       Unimport.vite({

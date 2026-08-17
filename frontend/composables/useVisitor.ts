@@ -1,6 +1,7 @@
 import { useApi } from "./useApi";
 
 const NICKNAME_KEY = "corner:visitor:nickname";
+let activeVisit: Promise<any> | null = null;
 
 export function useVisitor() {
   const api = useApi();
@@ -42,21 +43,26 @@ export function useVisitor() {
 
   const trackVisit = async () => {
     if (!visitorId()) return null;
+    if (activeVisit) return activeVisit;
+    const visit = api.post<any>("/visitor/track").catch(() => null);
+    activeVisit = visit;
     try {
-      return await api.post<any>("/visitor/track");
-    } catch {
-      return null;
+      return await visit;
+    } finally {
+      if (activeVisit === visit) activeVisit = null;
     }
   };
 
   const fetchWall = () => api.get<any>("/visitor/wall");
   const fetchMe = () => api.get<any>("/visitor/me");
-  const fetchRecent = (fresh = false) =>
-    api.get<any>(
+  const fetchRecent = async (fresh = false) => {
+    if (activeVisit) await activeVisit;
+    return api.get<any>(
       "/visitor/recent",
       fresh ? { refresh: 1 } : undefined,
       fresh ? { cache: "no-store" } : undefined,
     );
+  };
   const fetchMessages = (page = 1) =>
     api.get<any>("/visitor/messages", { type: "message", page });
   const sendMessage = (content: string) =>

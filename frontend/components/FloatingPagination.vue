@@ -2,7 +2,9 @@
   <nav
     v-if="total > 1"
     class="corner-pagination"
+    :class="{ 'is-hidden': hidden }"
     aria-label="分页导航"
+    :aria-hidden="hidden"
   >
     <button
       type="button"
@@ -37,33 +39,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from "vue";
 
-const props = withDefaults(defineProps<{
-  modelValue: number
-  total: number
-}>(), {
-  modelValue: 1,
-  total: 1,
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue: number;
+    total: number;
+    hidden?: boolean;
+  }>(),
+  {
+    modelValue: 1,
+    total: 1,
+    hidden: false,
+  },
+);
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: number): void
-  (e: 'change', value: number): void
-}>()
+  (e: "update:modelValue", value: number): void;
+  (e: "change", value: number): void;
+}>();
 
-const slideDir = ref<'page-up' | 'page-down'>('page-up')
-let previousPage = props.modelValue
+const slideDir = ref<"page-up" | "page-down">("page-up");
+let previousPage = props.modelValue;
 
-watch(() => props.modelValue, (page) => {
-  slideDir.value = page > previousPage ? 'page-up' : 'page-down'
-  previousPage = page
-})
+watch(
+  () => props.modelValue,
+  (page) => {
+    slideDir.value = page > previousPage ? "page-up" : "page-down";
+    previousPage = page;
+  },
+);
 
 function goTo(page: number) {
-  if (page < 1 || page > props.total || page === props.modelValue) return
-  emit('update:modelValue', page)
-  emit('change', page)
+  if (page < 1 || page > props.total || page === props.modelValue) return;
+  emit("update:modelValue", page);
+  emit("change", page);
 }
 </script>
 
@@ -72,25 +82,30 @@ function goTo(page: number) {
 .corner-pagination {
   position: fixed;
   z-index: 70;
-  bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
+  bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px));
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate3d(-50%, 0, 0);
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 42px;
-  padding: 0 6px;
-  border-radius: 21px;
+  height: 32px;
+  padding: 0 4px;
+  border-radius: 16px;
   background: var(--ld-bg-card);
   border: 1px solid var(--border);
   box-shadow: var(--ui-shadow-soft);
   color: var(--c-text);
-  animation: pagination-in 0.4s ease both;
+  transition:
+    opacity 0.26s ease,
+    transform 0.32s var(--ui-ease-out),
+    border-color 0.2s ease;
+  will-change: opacity, transform;
 }
 
-@keyframes pagination-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.corner-pagination.is-hidden {
+  opacity: 0;
+  transform: translate3d(-50%, 12px, 0) scale(0.96);
+  pointer-events: none;
 }
 
 .corner-pagination:hover {
@@ -101,15 +116,18 @@ function goTo(page: number) {
 .step-btn {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--c-text-2);
   cursor: pointer;
   font-size: 0.85rem;
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s var(--ui-ease-out);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s var(--ui-ease-out);
 }
 
 .step-btn:hover:not(:disabled) {
@@ -158,7 +176,9 @@ function goTo(page: number) {
 .page-up-leave-active,
 .page-down-enter-active,
 .page-down-leave-active {
-  transition: opacity 0.22s ease, transform 0.28s var(--ui-ease-out);
+  transition:
+    opacity 0.22s ease,
+    transform 0.28s var(--ui-ease-out);
 }
 
 .page-up-enter-from {
@@ -195,7 +215,7 @@ function goTo(page: number) {
 
 @media (prefers-reduced-motion: reduce) {
   .corner-pagination {
-    animation: none;
+    transition: none;
   }
   .page-up-enter-active,
   .page-up-leave-active,
@@ -208,12 +228,11 @@ function goTo(page: number) {
 
 @media (max-width: 640px) {
   .corner-pagination {
-    bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px));
-    height: 38px;
+    bottom: max(10px, calc(env(safe-area-inset-bottom) + 8px));
   }
   .step-btn {
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
   }
   .page-indicator {
     min-width: 36px;

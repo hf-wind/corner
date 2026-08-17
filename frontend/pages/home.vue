@@ -1,10 +1,16 @@
 <template>
   <div class="page-layout" :class="{ 'home-ready': homeReady }">
-    <main class="main-content">
-      <div class="featured-module-slot home-module" style="--home-enter-order: 0">
+    <main ref="mainContentRef" class="main-content">
+      <div
+        class="featured-module-slot home-module"
+        style="--home-enter-order: 0"
+      >
         <FeaturedSwiper />
       </div>
-      <div class="discovery-module-slot home-module" style="--home-enter-order: 1">
+      <div
+        class="discovery-module-slot home-module"
+        style="--home-enter-order: 1"
+      >
         <AiDiscoveryPanel />
       </div>
 
@@ -41,9 +47,41 @@
       <FloatingPagination
         v-model="page"
         :total="totalPages"
+        :hidden="paginationHidden"
         variant="articles"
         @change="changePage"
       />
+
+      <footer
+        ref="recordsRef"
+        class="site-records home-module"
+        style="--home-enter-order: 4"
+      >
+        <a
+          href="https://beian.miit.gov.cn/"
+          target="_blank"
+          rel="noopener noreferrer"
+          ><img src="/records/miit.png" alt="" />浙ICP备2026002544号</a
+        >
+        <i aria-hidden="true" />
+        <a
+          href="http://www.beian.gov.cn/portal/registerSystemInfo"
+          target="_blank"
+          rel="noopener noreferrer"
+          ><img src="/records/mps.png" alt="" />浙公网安备33060202001987号</a
+        >
+        <i aria-hidden="true" />
+        <a
+          href="https://icp.gov.moe/?keyword=corner.ink"
+          target="_blank"
+          rel="noopener noreferrer"
+          ><img
+            src="/records/moe.svg"
+            alt=""
+            loading="lazy"
+          />萌ICP备20266886号</a
+        >
+      </footer>
     </main>
 
     <aside class="sidebar-right">
@@ -55,9 +93,15 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
 
-const FeaturedSwiper = defineAsyncComponent(() => import("~/components/FeaturedSwiper.vue"));
-const AiDiscoveryPanel = defineAsyncComponent(() => import("~/components/AiDiscoveryPanel.vue"));
-const HomeSidebar = defineAsyncComponent(() => import("~/components/HomeSidebar.vue"));
+const FeaturedSwiper = defineAsyncComponent(
+  () => import("~/components/FeaturedSwiper.vue"),
+);
+const AiDiscoveryPanel = defineAsyncComponent(
+  () => import("~/components/AiDiscoveryPanel.vue"),
+);
+const HomeSidebar = defineAsyncComponent(
+  () => import("~/components/HomeSidebar.vue"),
+);
 import SectionHead from "~/components/SectionHead.vue";
 const api = useApi();
 const articles = ref<any[]>([]);
@@ -66,8 +110,12 @@ const refreshing = ref(false);
 const page = ref(1);
 const totalPages = ref(1);
 const homeReady = ref(false);
+const mainContentRef = ref<HTMLElement>();
+const recordsRef = ref<HTMLElement>();
+const paginationHidden = ref(false);
 let requestId = 0;
 let enterFrame = 0;
+let recordsObserver: IntersectionObserver | null = null;
 
 async function loadArticles() {
   const id = ++requestId;
@@ -147,10 +195,22 @@ onMounted(() => {
     homeReady.value = true;
   });
   loadArticles().then(restoreScroll);
+
+  recordsObserver = new IntersectionObserver(
+    ([entry]) => {
+      paginationHidden.value = entry?.isIntersecting ?? false;
+    },
+    {
+      root: mainContentRef.value,
+      threshold: 0.12,
+    },
+  );
+  if (recordsRef.value) recordsObserver.observe(recordsRef.value);
 });
 
 onUnmounted(() => {
   window.cancelAnimationFrame(enterFrame);
+  recordsObserver?.disconnect();
 });
 </script>
 
@@ -253,6 +313,42 @@ onUnmounted(() => {
   font-size: 1.8rem;
 }
 
+.site-records {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 10px 12px 2px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  color: var(--c-text-3);
+  font-size: 0.52rem;
+}
+.site-records a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.site-records a:hover {
+  color: var(--c-primary);
+}
+.site-records a > svg,
+.site-records a > img {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  object-fit: contain;
+}
+.site-records > i {
+  width: 1px;
+  height: 10px;
+  background: var(--border);
+}
+
 @keyframes article-loading {
   from {
     transform: translateX(-10%);
@@ -270,8 +366,12 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
-  .featured-module-slot { min-height: 206px; }
-  .discovery-module-slot { min-height: 96px; }
+  .featured-module-slot {
+    min-height: 206px;
+  }
+  .discovery-module-slot {
+    min-height: 96px;
+  }
 }
 
 .sidebar-right {
@@ -307,6 +407,15 @@ onUnmounted(() => {
   }
   .article-list {
     gap: 9px;
+  }
+  .site-records {
+    flex-wrap: wrap;
+    gap: 7px 10px;
+    padding-inline: 2px;
+    line-height: 1.5;
+  }
+  .site-records > i {
+    display: none;
   }
 }
 </style>

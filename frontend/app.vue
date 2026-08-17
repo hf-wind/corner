@@ -34,6 +34,7 @@ import AdminLayout from "./layouts/admin.vue";
 import WelcomeLayout from "./layouts/welcome.vue";
 import LightConfirm from "./components/LightConfirm.vue";
 import { useVisitor } from "./composables/useVisitor";
+import { trackUmamiPageview } from "./composables/useUmamiAnalytics";
 
 const GlobalToast = defineAsyncComponent(
   () => import("./components/GlobalToast.vue"),
@@ -80,6 +81,12 @@ watch(
       );
     }
   },
+  { immediate: true },
+);
+
+watch(
+  () => route.fullPath,
+  (path) => void trackUmamiPageview(path),
   { immediate: true },
 );
 

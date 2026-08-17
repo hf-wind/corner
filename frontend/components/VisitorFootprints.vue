@@ -47,10 +47,14 @@
             }}</template>
             <Icon v-else name="ph:footprints-bold" />
           </span>
-          <i>{{ String(index + 1).padStart(2, "0") }}</i>
         </span>
         <div class="fp-copy">
-          <p :title="visitorLabel(visit)">{{ visitorLabel(visit) }}</p>
+          <p :title="visitorTitle(visit)">
+            <span>{{ visitorLabel(visit) }}</span>
+            <small v-if="visit.browser" class="fp-browser">
+              <Icon :name="browserIcon(visit.browser)" />{{ visit.browser }}
+            </small>
+          </p>
           <div class="fp-meta">
             <span v-if="visit.region"
               ><Icon name="ph:map-pin-bold" />{{ visit.region }}</span
@@ -86,6 +90,7 @@ type RecentVisit = {
   id: string;
   nickname: string;
   region?: string | null;
+  browser?: string | null;
   device?: string | null;
   time: string;
 };
@@ -97,11 +102,14 @@ const refreshing = ref(false);
 const listKey = ref(0);
 let loadSeq = 0;
 let idleHandle: number | null = null;
-let refreshTimer: number | null = null;
 
 function visitorLabel(visit: RecentVisit) {
   const nickname = visit.nickname?.trim();
   return nickname || "途经风隅的旅人";
+}
+
+function visitorTitle(visit: RecentVisit) {
+  return [visitorLabel(visit), visit.browser].filter(Boolean).join(" · ");
 }
 
 function itemDelay(index: number) {
@@ -113,6 +121,19 @@ const DEVICE_META: Record<string, { icon: string; label: string }> = {
   tablet: { icon: "ph:device-tablet-bold", label: "平板" },
   desktop: { icon: "ph:desktop-bold", label: "桌面端" },
 };
+
+const BROWSER_ICONS: Record<string, string> = {
+  Chrome: "ph:google-chrome-logo-fill",
+  Edge: "ph:microsoft-edge-logo-fill",
+  Firefox: "ph:firefox-logo-fill",
+  Safari: "ph:safari-logo-fill",
+  Opera: "ph:browser-bold",
+  微信: "ph:wechat-logo-fill",
+};
+
+function browserIcon(browser: string) {
+  return BROWSER_ICONS[browser] ?? "ph:browser-bold";
+}
 
 function deviceIcon(device: string) {
   return DEVICE_META[device]?.icon ?? "ph:devices-bold";
@@ -150,10 +171,6 @@ async function load(fresh = false) {
   }
 }
 
-function refreshWhenVisible() {
-  if (document.visibilityState === "visible") void load(true);
-}
-
 onMounted(() => {
   if ("requestIdleCallback" in window) {
     idleHandle = window.requestIdleCallback(() => void load(true), {
@@ -162,18 +179,12 @@ onMounted(() => {
   } else {
     idleHandle = window.setTimeout(() => void load(true), 300);
   }
-  refreshTimer = window.setInterval(refreshWhenVisible, 30_000);
-  document.addEventListener("visibilitychange", refreshWhenVisible);
-  window.addEventListener("focus", refreshWhenVisible);
 });
 onUnmounted(() => {
   if (idleHandle !== null) {
     if ("cancelIdleCallback" in window) window.cancelIdleCallback(idleHandle);
     else window.clearTimeout(idleHandle);
   }
-  if (refreshTimer !== null) window.clearInterval(refreshTimer);
-  document.removeEventListener("visibilitychange", refreshWhenVisible);
-  window.removeEventListener("focus", refreshWhenVisible);
 });
 </script>
 
@@ -182,7 +193,7 @@ onUnmounted(() => {
   display: flex;
   min-height: 190px;
   flex-direction: column;
-  padding: 15px 14px 10px;
+  padding: 13px 13px 9px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
   border-radius: 8px;
@@ -194,7 +205,7 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 1px 13px;
+  padding: 0 1px 10px;
   border-bottom: 1px solid var(--border);
 }
 .fp-head > div {
@@ -208,12 +219,12 @@ onUnmounted(() => {
   font-weight: 700;
 }
 .fp-head h4 {
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: var(--c-text);
   font-size: 0.82rem;
 }
 .fp-head p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--c-text-3);
   font-size: 0.54rem;
   line-height: 1.45;
@@ -262,9 +273,9 @@ onUnmounted(() => {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-auto-rows: minmax(45px, 1fr);
+  grid-auto-rows: minmax(39px, 1fr);
   align-content: stretch;
-  gap: 4px;
+  gap: 0;
   margin: 0;
   padding: 5px 0 0;
   overflow: hidden;
@@ -274,15 +285,14 @@ onUnmounted(() => {
   position: relative;
   display: grid;
   min-width: 0;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-height: 45px;
-  padding: 3px 5px 3px 3px;
+  min-height: 39px;
+  padding: 2px 4px;
   overflow: hidden;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--c-bg-1) 48%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+  background: transparent;
   animation: fp-item-in 0.42s var(--ui-ease-out) both;
   animation-delay: var(--fp-delay);
   transition:
@@ -291,57 +301,68 @@ onUnmounted(() => {
     transform 0.18s ease;
 }
 .fp-item:hover {
-  border-color: color-mix(in srgb, var(--c-primary) 16%, var(--border));
-  background: color-mix(in srgb, var(--c-primary-soft) 42%, var(--ld-bg-card));
-  transform: translateX(2px);
+  background: color-mix(in srgb, var(--c-primary-soft) 32%, transparent);
+  transform: translateX(1px);
+}
+.fp-item:last-child {
+  border-bottom: 0;
 }
 .fp-avatar {
   position: relative;
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
-  border-radius: 8px;
+  border-radius: 50%;
   background: var(--ld-bg-card);
   place-items: center;
   box-shadow: 0 3px 9px color-mix(in srgb, var(--ld-shadow) 34%, transparent);
 }
 .fp-avatar > span {
   display: grid;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   background: color-mix(in srgb, var(--c-primary-soft) 72%, var(--ld-bg-card));
   color: var(--c-primary);
   font-size: 0.58rem;
   font-weight: 750;
   place-items: center;
 }
-.fp-avatar > i {
-  position: absolute;
-  right: -4px;
-  bottom: -3px;
-  padding: 1px 3px;
-  border: 1px solid var(--ld-bg-card);
-  border-radius: 4px;
-  background: var(--c-primary);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 0.32rem;
-  font-style: normal;
-  line-height: 1.2;
-}
 .fp-copy {
   min-width: 0;
 }
 .fp-copy > p {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
   margin: 0;
-  overflow: hidden;
   color: var(--c-text);
   font-size: 0.62rem;
   font-weight: 650;
+}
+.fp-copy > p > span {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.fp-browser {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-primary-soft) 55%, transparent);
+  color: var(--c-text-3);
+  font-size: 0.43rem;
+  font-weight: 550;
+}
+.fp-browser svg {
+  color: var(--c-primary);
+  font-size: 0.55rem;
 }
 .fp-meta {
   display: flex;
