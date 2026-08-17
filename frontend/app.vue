@@ -17,7 +17,6 @@
   </component>
   <GlobalToast v-if="toasts.length" />
   <LightConfirm />
-  <!-- SidebarMusicPlayer 暂停挂载，保留组件供后续二次开发。 -->
 </template>
 
 <script setup lang="ts">
@@ -39,8 +38,6 @@ import { trackUmamiPageview } from "./composables/useUmamiAnalytics";
 const GlobalToast = defineAsyncComponent(
   () => import("./components/GlobalToast.vue"),
 );
-// const SidebarMusicPlayer = defineAsyncComponent(() => import('./components/SidebarMusicPlayer.vue'))
-
 const { init: initTypography } = useTypography();
 const { init: initTheme } = useTheme();
 const { readStorage, refreshProfile, isLoggedIn, isAdmin } = useAuth();

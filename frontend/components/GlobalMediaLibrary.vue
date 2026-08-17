@@ -3,6 +3,7 @@
     v-model="state.visible"
     :multiple="state.multiple"
     :folder="state.folder"
+    :type="state.type"
     :compress-animated="state.compressAnimated"
     :return-items="state.returnItems"
     @confirm="onConfirm"
@@ -11,5 +12,5 @@
 </template>
 
 <script setup lang="ts">
-const { state, onConfirm, onCancel } = useMediaLibrary()
+const { state, onConfirm, onCancel } = useMediaLibrary();
 </script>

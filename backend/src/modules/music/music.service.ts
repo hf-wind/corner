@@ -89,11 +89,14 @@ export class MusicService {
 
   async getPublicConfig() {
     const cfg = await this.getConfig();
+    const playlists = cfg.music_playlists.filter(
+      (playlist) => playlist.visible !== false,
+    );
     return {
       enabled: cfg.music_enabled,
       autoplay: cfg.music_autoplay,
       volume: cfg.music_volume,
-      playlists: cfg.music_playlists.map((p, i) => ({
+      playlists: playlists.map((p, i) => ({
         index: i,
         name: p.name,
         server: p.server,
@@ -131,11 +134,11 @@ export class MusicService {
       sort: 0,
     };
 
-    if (
-      opts?.playlistIndex != null &&
-      cfg.music_playlists[opts.playlistIndex]
-    ) {
-      source = { ...cfg.music_playlists[opts.playlistIndex] };
+    const publicPlaylists = cfg.music_playlists.filter(
+      (playlist) => playlist.visible !== false,
+    );
+    if (opts?.playlistIndex != null && publicPlaylists[opts.playlistIndex]) {
+      source = { ...publicPlaylists[opts.playlistIndex] };
     }
 
     const allTracks = await this.fetchTracks(
@@ -149,7 +152,7 @@ export class MusicService {
       Number.isFinite(opts?.page) ? Math.floor(opts!.page!) : 1,
     );
     const limit = Math.max(
-      10,
+      1,
       Math.min(
         100,
         Number.isFinite(opts?.limit) ? Math.floor(opts!.limit!) : 50,
@@ -179,6 +182,40 @@ export class MusicService {
       .incr('corner:music:cache-version')
       .catch(() => undefined);
     return this.getPlaylist({ refresh: true });
+  }
+
+  async getAdminSourceTracks(server: string, type: string, id: string) {
+    const cfg = await this.getConfig();
+    const source: MusicPlaylistSource = {
+      name: '选曲来源',
+      server: String(server || 'netease')
+        .trim()
+        .slice(0, 20),
+      type: String(type || 'playlist')
+        .trim()
+        .slice(0, 20),
+      id: String(id || '')
+        .trim()
+        .slice(0, 64),
+      sort: 0,
+    };
+    if (!source.id) throw new BadRequestException('请填写歌单 ID');
+    const tracks = await this.fetchTracks(
+      source,
+      cfg.music_api,
+      cfg.music_cache_ttl,
+      false,
+    );
+    return {
+      source,
+      total: tracks.length,
+      tracks: tracks.map((track) => ({
+        ...track,
+        key: this.trackKey(track.url),
+        previewUrl: this.presentMediaUrl(track.url),
+        previewPic: track.pic ? this.presentMediaUrl(track.pic) : '',
+      })),
+    };
   }
 
   async getRecommendationCandidates(query: string, limit = 10) {
@@ -360,16 +397,25 @@ export class MusicService {
   }
 
   private cacheKey(source: MusicPlaylistSource, api: string) {
-    return `${api}|${source.server}|${source.type}|${source.id}`;
+    const localVersion = createHash('sha256')
+      .update(JSON.stringify(source.tracks || []))
+      .digest('hex');
+    return `${api}|${source.server}|${source.type}|${source.id}|${localVersion}`;
   }
 
   private presentTrack(track: MusicTrack): MusicTrack {
     return {
       ...track,
-      url: this.createMediaProxyUrl(track.url),
-      pic: track.pic ? this.createMediaProxyUrl(track.pic) : '',
+      url: this.presentMediaUrl(track.url),
+      pic: track.pic ? this.presentMediaUrl(track.pic) : '',
       key: this.trackKey(track.url),
     };
+  }
+
+  private presentMediaUrl(url: string) {
+    const normalized = String(url || '').trim();
+    if (this.isLocalMediaPath(normalized)) return normalized;
+    return this.createMediaProxyUrl(normalized);
   }
 
   private trackKey(url: string) {
@@ -377,6 +423,8 @@ export class MusicService {
   }
 
   private extractSignedMediaUrl(raw: string, required = true) {
+    const normalized = String(raw || '').trim();
+    if (this.isLocalMediaPath(normalized)) return normalized;
     let parsed: URL;
     try {
       parsed = new URL(String(raw || ''), 'https://corner.local');
@@ -429,6 +477,15 @@ export class MusicService {
       signature: this.signMediaUrl(url, expires),
     });
     return `/api/music/proxy?${params.toString()}`;
+  }
+
+  private isLocalMediaPath(url: string) {
+    return (
+      url.startsWith('/uploads/') &&
+      !url.includes('..') &&
+      !url.includes('\\') &&
+      !/[\u0000-\u001f]/.test(url)
+    );
   }
 
   private signMediaUrl(url: string, expires: number) {
@@ -488,6 +545,9 @@ export class MusicService {
     ttlSec: number,
     force: boolean,
   ): Promise<MusicTrack[]> {
+    const localTracks = this.normalizeTracks(source.tracks || []);
+    if (source.type === 'custom' || !source.id) return localTracks;
+
     const key = this.cacheKey(source, api);
     const now = Date.now();
     const hit = this.cache.get(key);
@@ -526,7 +586,8 @@ export class MusicService {
         throw new Error(`meting ${res.status}`);
       }
       const data = await res.json();
-      const tracks = this.normalizeTracks(data);
+      const remoteTracks = this.normalizeTracks(data);
+      const tracks = this.mergeLocalTracks(remoteTracks, localTracks);
       if (!tracks.length && hit?.tracks?.length) {
         return hit.tracks;
       }
@@ -541,6 +602,7 @@ export class MusicService {
     } catch (e) {
       this.logger.warn(`fetch playlist failed: ${e}`);
       if (hit?.tracks?.length) return hit.tracks;
+      if (localTracks.length) return localTracks;
       throw new ServiceUnavailableException('歌单拉取失败，请稍后重试');
     }
   }
@@ -570,6 +632,24 @@ export class MusicService {
       .filter(Boolean) as MusicTrack[];
   }
 
+  private mergeLocalTracks(remote: MusicTrack[], local: MusicTrack[]) {
+    if (!local.length) return remote;
+    const replacements = new Map(
+      local.map((track) => [this.trackIdentity(track), track]),
+    );
+    const merged = remote.map((track) => {
+      const replacement = replacements.get(this.trackIdentity(track));
+      if (!replacement) return track;
+      replacements.delete(this.trackIdentity(track));
+      return replacement;
+    });
+    return [...merged, ...replacements.values()];
+  }
+
+  private trackIdentity(track: Pick<MusicTrack, 'name' | 'artist'>) {
+    return `${track.name}\u0000${track.artist}`.trim().toLocaleLowerCase();
+  }
+
   private coerce(
     key: keyof MusicConfig,
     value: unknown,
@@ -593,12 +673,37 @@ export class MusicService {
             server: String(v?.server || 'netease').slice(0, 20),
             type: String(v?.type || 'playlist').slice(0, 20),
             id: String(v?.id || '').slice(0, 64),
+            tracks: Array.isArray(v?.tracks)
+              ? v.tracks
+                  .map((track: any) => ({
+                    name: String(track?.name || '')
+                      .trim()
+                      .slice(0, 255),
+                    artist: String(track?.artist || '未知音乐人')
+                      .trim()
+                      .slice(0, 255),
+                    url: String(track?.url || '')
+                      .trim()
+                      .slice(0, 2000),
+                    pic: String(track?.pic || '')
+                      .trim()
+                      .slice(0, 2000),
+                    lrc: track?.lrc
+                      ? String(track.lrc).slice(0, 200000)
+                      : undefined,
+                    mediaId: track?.mediaId
+                      ? String(track.mediaId).slice(0, 64)
+                      : undefined,
+                  }))
+                  .filter((track: MusicTrack) => track.name && track.url)
+              : [],
             sort: Number.isFinite(Number(v?.sort))
               ? Math.trunc(Number(v.sort))
               : (index + 1) * 10,
+            visible: v?.visible !== false,
             originalIndex: index,
           }))
-          .filter((v) => v.id)
+          .filter((v) => v.id || v.tracks.length)
           .sort((a, b) => a.sort - b.sort || a.originalIndex - b.originalIndex)
           .map(({ originalIndex: _originalIndex, ...playlist }) => playlist);
       }

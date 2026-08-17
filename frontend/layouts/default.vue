@@ -27,6 +27,7 @@
     <div class="layout-page">
       <slot />
     </div>
+    <ClientOnly><GlobalBottomDock /></ClientOnly>
     <SearchModal :visible="showSearch" @close="showSearch = false" />
     <ClientOnly
       ><AiPet v-if="showContextAi" mode="context" :article="pageContext"

@@ -1263,13 +1263,13 @@ onUnmounted(() => {
   top: 50%;
   transform: translateY(-50%);
   width: max-content;
-  max-width: min(196px, calc(100vw - 132px));
-  padding: 6px 9px;
-  border-radius: 10px;
+  max-width: min(168px, calc(100vw - 132px));
+  padding: 5px 8px;
+  border-radius: 9px;
   background: var(--ld-bg-card);
   color: var(--c-text-1);
-  font-size: 0.68rem;
-  line-height: 1.45;
+  font-size: 0.63rem;
+  line-height: 1.4;
   overflow-wrap: anywhere;
   text-align: left;
   white-space: normal;
@@ -1442,10 +1442,10 @@ onUnmounted(() => {
 
 .pet-bubble {
   max-width: 88%;
-  padding: 10px 13px;
+  padding: 8px 11px;
   border-radius: 8px;
-  font-size: 0.81rem;
-  line-height: 1.65;
+  font-size: 0.76rem;
+  line-height: 1.58;
   word-break: break-word;
 }
 
@@ -1912,6 +1912,7 @@ onUnmounted(() => {
     height: 92px;
     margin: 0;
   }
+
 
   .ai-pet.docked .pet-fab {
     position: absolute;

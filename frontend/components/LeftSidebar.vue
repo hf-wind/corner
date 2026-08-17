@@ -70,7 +70,6 @@
     </div>
 
     <div class="sidebar-bottom">
-      <div ref="playerSlotRef" class="sidebar-player-slot" />
       <div class="sidebar-bottom-scroll">
         <div class="sidebar-divider"></div>
         <AppLink v-if="!isLoggedIn && !isPanel" to="/login" class="login-link">
@@ -186,7 +185,6 @@ const { theme, setTheme } = useTheme();
 const { confirm } = useConfirm();
 const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings();
 // 字体切换入口暂时隐藏：const { fontPreset, fontPresets, setFontPreset } = useTypography()
-const { registerSlot, unregisterSlot } = useMusicPlayerSlot();
 const {
   user,
   isLoggedIn,
@@ -212,25 +210,6 @@ const {
   guestbookEnabled,
 } = useFeatureFlags();
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar));
-const playerSlotRef = ref<HTMLElement | null>(null);
-let registeredSlot: HTMLElement | null = null;
-
-watch(
-  playerSlotRef,
-  (el) => {
-    if (registeredSlot && registeredSlot !== el) unregisterSlot(registeredSlot);
-    registeredSlot = el;
-    if (el) registerSlot(el);
-  },
-  { immediate: true },
-);
-
-onBeforeUnmount(() => {
-  if (registeredSlot) {
-    unregisterSlot(registeredSlot);
-    registeredSlot = null;
-  }
-});
 
 const siteNav = [
   { to: "/home", icon: "ph:house-bold", label: "首页" },
@@ -505,19 +484,6 @@ watch(
   overflow-x: hidden;
   padding: 11px 2px 8px 0;
   overscroll-behavior: contain;
-}
-
-.sidebar-player-slot {
-  position: relative;
-  z-index: 50;
-  overflow: visible;
-  width: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-
-.sidebar-player-slot:empty {
-  display: none;
 }
 
 /* ===== Hero ===== */
@@ -1217,9 +1183,6 @@ watch(
 }
 .is-collapsed .sidebar-bottom {
   align-items: center;
-}
-.is-collapsed .sidebar-player-slot {
-  display: none;
 }
 .is-collapsed .login-link {
   width: 42px;

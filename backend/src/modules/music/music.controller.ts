@@ -126,6 +126,21 @@ export class MusicController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
+  @Get('admin/source-tracks')
+  sourceTracks(
+    @Query('server') server?: string,
+    @Query('type') type?: string,
+    @Query('id') id?: string,
+  ) {
+    return this.music.getAdminSourceTracks(
+      server || 'netease',
+      type || 'playlist',
+      id || '',
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Get('admin/config')
   async adminConfig() {
     const config = await this.music.getConfig();

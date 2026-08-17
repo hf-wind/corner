@@ -24,7 +24,6 @@ declare global {
   const useIconPicker: typeof import('./composables/useIconPicker').useIconPicker
   const useMediaLibrary: typeof import('./composables/useMediaLibrary').useMediaLibrary
   const useMediaUrl: typeof import('./composables/useMediaUrl').useMediaUrl
-  const useMusicPlayerSlot: typeof import('./composables/useMusicPlayerSlot').useMusicPlayerSlot
   const useMusicPlayerState: typeof import('./composables/useMusicPlayerState').useMusicPlayerState
   const useTheme: typeof import('./composables/useTheme').useTheme
   const useToast: typeof import('./composables/useToast').useToast

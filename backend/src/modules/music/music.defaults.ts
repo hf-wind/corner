@@ -1,9 +1,20 @@
+export type MusicPlaylistTrack = {
+  name: string;
+  artist: string;
+  url: string;
+  pic: string;
+  lrc?: string;
+  mediaId?: string;
+};
+
 export type MusicPlaylistSource = {
   name: string;
   server: string;
   type: string;
   id: string;
   sort: number;
+  visible?: boolean;
+  tracks?: MusicPlaylistTrack[];
 };
 
 export type MusicConfig = {

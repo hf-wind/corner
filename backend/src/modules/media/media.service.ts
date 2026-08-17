@@ -471,7 +471,12 @@ export class MediaService implements OnModuleInit {
     const ext =
       (extname(originalName) || '').toLowerCase() ||
       this.extFromMime(file.mimetype);
-    const nameBase = await this.generateNameBase(originalName);
+    const isAudio =
+      !!file.mimetype?.startsWith('audio/') ||
+      ['.mp3', '.flac', '.m4a', '.wav', '.ogg', '.aac'].includes(ext);
+    const nameBase = isAudio
+      ? this.audioNameBase(originalName)
+      : await this.generateNameBase(originalName);
     const buffer = file.buffer?.length
       ? file.buffer
       : readFileSync((file as any).path);
@@ -522,7 +527,9 @@ export class MediaService implements OnModuleInit {
       mimeType = 'image/webp';
       size = webpBuf.length;
     } else {
-      filename = `${nameBase}${ext || ''}`;
+      filename = isAudio
+        ? this.uniqueUploadFilename(folder, nameBase, ext || '.mp3')
+        : `${nameBase}${ext || ''}`;
       const fsPath = join(UPLOAD_ROOT, folder, filename);
       writeFileSync(fsPath, buffer);
       path = `/uploads/${folder}/${filename}`;
@@ -627,6 +634,34 @@ export class MediaService implements OnModuleInit {
       'application/pdf': '.pdf',
     };
     return map[mime] || '';
+  }
+
+  private audioNameBase(originalName: string) {
+    const extension = extname(originalName);
+    const base = extension
+      ? originalName.slice(0, -extension.length)
+      : originalName;
+    return (
+      base
+        .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
+        .replace(/[. ]+$/g, '')
+        .trim()
+        .slice(0, 160) || 'audio'
+    );
+  }
+
+  private uniqueUploadFilename(
+    folder: string,
+    base: string,
+    extension: string,
+  ) {
+    let filename = `${base}${extension}`;
+    let suffix = 2;
+    while (existsSync(join(UPLOAD_ROOT, folder, filename))) {
+      filename = `${base} (${suffix})${extension}`;
+      suffix += 1;
+    }
+    return filename;
   }
 
   async remove(id: string) {

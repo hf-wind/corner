@@ -1,71 +1,84 @@
 <template>
-  <nav
-    v-if="total > 1"
-    class="corner-pagination"
-    :class="{ 'is-hidden': hidden }"
-    aria-label="分页导航"
-    :aria-hidden="hidden"
-  >
-    <button
-      type="button"
-      class="step-btn"
-      title="上一页"
-      aria-label="上一页"
-      :disabled="modelValue <= 1"
-      @click="goTo(modelValue - 1)"
-    >
-      <Icon name="ph:caret-left-bold" />
-    </button>
+  <Teleport to="#corner-pagination-dock" defer>
+    <Transition name="dock-pagination">
+      <nav
+        v-if="total > 1 && !hidden"
+        class="corner-pagination"
+        aria-label="分页导航"
+      >
+        <button
+          type="button"
+          class="page-step"
+          title="上一页"
+          aria-label="上一页"
+          :disabled="modelValue <= 1"
+          @click="goTo(modelValue - 1)"
+        >
+          <Icon name="ph:caret-left-bold" />
+        </button>
 
-    <div class="page-indicator" aria-live="polite">
-      <Transition :name="slideDir" mode="out-in">
-        <span :key="modelValue" class="current-page">{{ modelValue }}</span>
-      </Transition>
-      <span class="divider">/</span>
-      <span class="total-page">{{ total }}</span>
-    </div>
+        <div class="page-indicator" aria-live="polite">
+          <Transition :name="slideDirection" mode="out-in">
+            <strong :key="modelValue">{{ modelValue }}</strong>
+          </Transition>
+          <span aria-hidden="true">/</span>
+          <small>{{ total }}</small>
+        </div>
 
-    <button
-      type="button"
-      class="step-btn"
-      title="下一页"
-      aria-label="下一页"
-      :disabled="modelValue >= total"
-      @click="goTo(modelValue + 1)"
-    >
-      <Icon name="ph:caret-right-bold" />
-    </button>
-  </nav>
+        <button
+          type="button"
+          class="page-step"
+          title="下一页"
+          aria-label="下一页"
+          :disabled="modelValue >= total"
+          @click="goTo(modelValue + 1)"
+        >
+          <Icon name="ph:caret-right-bold" />
+        </button>
+      </nav>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { useBottomDockState } from "~/composables/useBottomDockState";
 
 const props = withDefaults(
   defineProps<{
     modelValue: number;
     total: number;
     hidden?: boolean;
+    variant?: string;
   }>(),
   {
     modelValue: 1,
     total: 1,
     hidden: false,
+    variant: "default",
   },
 );
 
 const emit = defineEmits<{
-  (e: "update:modelValue", value: number): void;
-  (e: "change", value: number): void;
+  (event: "update:modelValue", value: number): void;
+  (event: "change", value: number): void;
 }>();
 
-const slideDir = ref<"page-up" | "page-down">("page-up");
+const slideDirection = ref<"page-up" | "page-down">("page-up");
+const { setPaginationVisible } = useBottomDockState();
 let previousPage = props.modelValue;
+
+watch(
+  () => props.total > 1 && !props.hidden,
+  (visible) => setPaginationVisible(visible),
+  { immediate: true },
+);
+
+onUnmounted(() => setPaginationVisible(false));
 
 watch(
   () => props.modelValue,
   (page) => {
-    slideDir.value = page > previousPage ? "page-up" : "page-down";
+    slideDirection.value = page > previousPage ? "page-up" : "page-down";
     previousPage = page;
   },
 );
@@ -78,164 +91,148 @@ function goTo(page: number) {
 </script>
 
 <style scoped>
-/* ===== 定位 ===== */
 .corner-pagination {
-  position: fixed;
-  z-index: 70;
-  bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px));
-  left: 50%;
-  transform: translate3d(-50%, 0, 0);
   display: flex;
+  height: var(--capsule-height);
   align-items: center;
-  gap: 2px;
-  height: 32px;
-  padding: 0 4px;
-  border-radius: 16px;
-  background: var(--ld-bg-card);
-  border: 1px solid var(--border);
-  box-shadow: var(--ui-shadow-soft);
+  gap: 1px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--ld-bg-card) 90%, transparent);
   color: var(--c-text);
-  transition:
-    opacity 0.26s ease,
-    transform 0.32s var(--ui-ease-out),
-    border-color 0.2s ease;
-  will-change: opacity, transform;
+  box-shadow:
+    0 10px 30px color-mix(in srgb, #000 12%, var(--ld-shadow)),
+    0 1px 0 color-mix(in srgb, #fff 68%, transparent) inset;
+  backdrop-filter: blur(18px) saturate(1.28);
+  -webkit-backdrop-filter: blur(18px) saturate(1.28);
+  transition: box-shadow 0.25s ease;
 }
 
-.corner-pagination.is-hidden {
-  opacity: 0;
-  transform: translate3d(-50%, 12px, 0) scale(0.96);
-  pointer-events: none;
-}
-
-.corner-pagination:hover {
-  border-color: color-mix(in srgb, var(--c-primary) 25%, var(--border));
-}
-
-/* ===== 步进按钮 ===== */
-.step-btn {
+.page-step {
   display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--c-text-2);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.76rem;
+  place-items: center;
   transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s var(--ui-ease-out);
+    color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.step-btn:hover:not(:disabled) {
+.page-step:hover:not(:disabled) {
   background: var(--c-primary-soft);
   color: var(--c-primary);
-  transform: scale(1.08);
+  transform: translateY(-1px);
 }
 
-.step-btn:active:not(:disabled) {
-  transform: scale(0.94);
+.page-step:active:not(:disabled) {
+  transform: scale(0.92);
 }
-
-.step-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+.page-step:disabled {
+  cursor: default;
+  opacity: 0.28;
 }
-
-.step-btn:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--c-primary) 60%, transparent);
+.page-step:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--c-primary) 58%, transparent);
   outline-offset: 2px;
 }
 
-/* ===== 页码指示 ===== */
 .page-indicator {
   display: flex;
+  min-width: 37px;
   align-items: baseline;
   justify-content: center;
-  min-width: 40px;
-  gap: 2px;
+  gap: 3px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-.current-page {
-  display: inline-block;
-  min-width: 1.2em;
-  text-align: center;
-  font-size: 0.88rem;
-  font-weight: 800;
-  line-height: 1;
+.page-indicator strong {
+  min-width: 1.1em;
   color: var(--c-primary);
+  font-size: 0.76rem;
+  font-weight: 760;
+  line-height: 1;
+  text-align: center;
 }
 
-/* 翻页方向动画 */
+.page-indicator span,
+.page-indicator small {
+  color: var(--c-text-3);
+  font-size: 0.54rem;
+  font-weight: 520;
+}
+
 .page-up-enter-active,
 .page-up-leave-active,
 .page-down-enter-active,
 .page-down-leave-active {
   transition:
-    opacity 0.22s ease,
-    transform 0.28s var(--ui-ease-out);
+    opacity 0.18s ease,
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .page-up-enter-from {
   opacity: 0;
-  transform: translateY(60%);
+  transform: translateY(55%);
 }
-
 .page-up-leave-to {
   opacity: 0;
-  transform: translateY(-60%);
+  transform: translateY(-55%);
 }
-
 .page-down-enter-from {
   opacity: 0;
-  transform: translateY(-60%);
+  transform: translateY(-55%);
 }
-
 .page-down-leave-to {
   opacity: 0;
-  transform: translateY(60%);
+  transform: translateY(55%);
 }
 
-.divider {
-  font-size: 0.65rem;
-  color: var(--c-text-3);
-  transform: translateY(-1px);
+.dock-pagination-enter-active,
+.dock-pagination-leave-active {
+  transition:
+    opacity 0.24s ease,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.total-page {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--c-text-3);
+.dock-pagination-enter-from,
+.dock-pagination-leave-to {
+  opacity: 0;
+  transform: translate3d(0, 9px, 0) scale(0.96);
+}
+
+@media (max-width: 390px) {
+  .corner-pagination {
+    height: var(--capsule-height);
+    padding: 0 3px;
+  }
+  .page-step {
+    width: 24px;
+    height: 24px;
+  }
+  .page-indicator {
+    min-width: 35px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .corner-pagination {
-    transition: none;
-  }
+  .corner-pagination,
+  .page-step,
   .page-up-enter-active,
   .page-up-leave-active,
   .page-down-enter-active,
   .page-down-leave-active,
-  .step-btn {
+  .dock-pagination-enter-active,
+  .dock-pagination-leave-active {
     transition: none !important;
-  }
-}
-
-@media (max-width: 640px) {
-  .corner-pagination {
-    bottom: max(10px, calc(env(safe-area-inset-bottom) + 8px));
-  }
-  .step-btn {
-    width: 26px;
-    height: 26px;
-  }
-  .page-indicator {
-    min-width: 36px;
   }
 }
 </style>

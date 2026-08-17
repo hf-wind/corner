@@ -47,7 +47,6 @@
       <FloatingPagination
         v-model="page"
         :total="totalPages"
-        :hidden="paginationHidden"
         variant="articles"
         @change="changePage"
       />
@@ -92,6 +91,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
+import { useBottomDockState } from "~/composables/useBottomDockState";
 
 const FeaturedSwiper = defineAsyncComponent(
   () => import("~/components/FeaturedSwiper.vue"),
@@ -113,6 +113,11 @@ const homeReady = ref(false);
 const mainContentRef = ref<HTMLElement>();
 const recordsRef = ref<HTMLElement>();
 const paginationHidden = ref(false);
+const {
+  setHidden: setBottomDockHidden,
+  setContentReady: setBottomDockContentReady,
+} = useBottomDockState();
+setBottomDockContentReady(false);
 let requestId = 0;
 let enterFrame = 0;
 let recordsObserver: IntersectionObserver | null = null;
@@ -156,6 +161,7 @@ async function loadArticles() {
     if (id === requestId) {
       loading.value = false;
       refreshing.value = false;
+      setBottomDockContentReady(true);
     }
   }
 }
@@ -199,6 +205,7 @@ onMounted(() => {
   recordsObserver = new IntersectionObserver(
     ([entry]) => {
       paginationHidden.value = entry?.isIntersecting ?? false;
+      setBottomDockHidden(paginationHidden.value);
     },
     {
       root: mainContentRef.value,
@@ -211,6 +218,8 @@ onMounted(() => {
 onUnmounted(() => {
   window.cancelAnimationFrame(enterFrame);
   recordsObserver?.disconnect();
+  setBottomDockHidden(false);
+  setBottomDockContentReady(true);
 });
 </script>
 
