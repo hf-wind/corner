@@ -77,6 +77,10 @@
     color-mix(in srgb, var(--ld-shadow) 25%, transparent);
   --ui-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --app-transition-bg: #eaf5ff;
+  --devtools-widget-bg: #fff;
+  --devtools-widget-fg: #111;
+  --devtools-widget-border: #efefef;
+  --devtools-widget-shadow: rgb(128 128 128 / 10%);
 }
 
 :root[data-font="ayuan"] {
@@ -135,7 +139,8 @@
   --font-letter-spacing: 0.015em;
 }
 
-.dark {
+.dark,
+.constellation-route {
   --app-transition-bg: #030b18;
   --c-bg: hsl(var(--hue-theme) 0% 7%);
   --c-bg-1: hsl(var(--hue-theme) 10% 10%);
@@ -165,6 +170,10 @@
   --border: hsl(var(--hue-theme) 10% 20%);
   --card: var(--ld-bg-card);
   --code-bg: hsl(var(--hue-theme) 10% 16%);
+  --devtools-widget-bg: #111;
+  --devtools-widget-fg: #f5f5f5;
+  --devtools-widget-border: #3336;
+  --devtools-widget-shadow: rgb(0 0 0 / 30%);
 }
 
 html.space-route,

@@ -215,43 +215,103 @@
         desc="播放器行为、默认音源与歌单管理"
       >
         <a-spin :spinning="musicLoading">
-          <a-form
-            labelAlign="left"
-            size="middle"
-            :label-col="{ style: { width: '108px' } }"
-          >
-            <a-form-item label="启用播放器">
-              <a-switch v-model:checked="music.music_enabled" />
-            </a-form-item>
-            <a-form-item label="自动播放">
-              <a-switch v-model:checked="music.music_autoplay" />
-              <div class="hint">受浏览器策略限制，可能需用户先点一次页面</div>
-            </a-form-item>
-            <a-form-item label="默认音量">
-              <a-slider
-                v-model:value="volumePercent"
-                :min="0"
-                :max="100"
-                style="max-width: 240px"
-              />
-            </a-form-item>
-            <a-form-item label="Meting API">
-              <a-input
-                v-model:value="music.music_api"
-                placeholder="https://api.i-meto.com/meting/api"
-              />
-            </a-form-item>
-            <a-form-item label="缓存 TTL(秒)">
-              <a-input-number
-                v-model:value="music.music_cache_ttl"
-                :min="60"
-                :max="86400"
-                style="width: 160px"
-              />
-            </a-form-item>
-            <a-form-item label="站内歌单">
+          <div class="music-config">
+            <section
+              class="music-preferences"
+              aria-labelledby="music-behavior-title"
+            >
+              <header class="config-section-head">
+                <div>
+                  <span>PLAYER BEHAVIOR</span>
+                  <h3 id="music-behavior-title">播放设置</h3>
+                </div>
+                <small>应用于全站悬浮播放器</small>
+              </header>
+
+              <div class="preference-grid">
+                <label class="preference-row">
+                  <span class="preference-icon"
+                    ><Icon name="ph:power-bold"
+                  /></span>
+                  <span class="preference-copy">
+                    <strong>启用播放器</strong>
+                    <small>关闭后前台不加载音乐资源</small>
+                  </span>
+                  <a-switch v-model:checked="music.music_enabled" />
+                </label>
+                <label class="preference-row">
+                  <span class="preference-icon"
+                    ><Icon name="ph:play-circle-bold"
+                  /></span>
+                  <span class="preference-copy">
+                    <strong>自动播放</strong>
+                    <small>浏览器可能要求首次交互后播放</small>
+                  </span>
+                  <a-switch v-model:checked="music.music_autoplay" />
+                </label>
+                <div class="preference-row volume-row">
+                  <span class="preference-icon"
+                    ><Icon name="ph:speaker-high-bold"
+                  /></span>
+                  <span class="preference-copy">
+                    <strong>默认音量</strong>
+                    <small>新访客首次播放时使用</small>
+                  </span>
+                  <div class="volume-control">
+                    <a-slider
+                      v-model:value="volumePercent"
+                      :min="0"
+                      :max="100"
+                    />
+                    <output>{{ volumePercent }}%</output>
+                  </div>
+                </div>
+              </div>
+
+              <details class="advanced-music-settings">
+                <summary>
+                  <span
+                    ><Icon name="ph:sliders-horizontal-bold" /> 音源与缓存</span
+                  >
+                  <Icon name="ph:caret-down-bold" />
+                </summary>
+                <div class="advanced-fields">
+                  <label>
+                    <span>Meting API</span>
+                    <a-input
+                      v-model:value="music.music_api"
+                      placeholder="https://api.i-meto.com/meting/api"
+                    />
+                  </label>
+                  <label>
+                    <span>缓存有效期</span>
+                    <a-input-number
+                      v-model:value="music.music_cache_ttl"
+                      :min="60"
+                      :max="86400"
+                      addon-after="秒"
+                    />
+                  </label>
+                </div>
+              </details>
+            </section>
+
+            <section
+              class="playlist-workspace"
+              aria-labelledby="playlist-workspace-title"
+            >
+              <header class="config-section-head playlist-workspace-head">
+                <div>
+                  <span>PLAYLIST WORKSPACE</span>
+                  <h3 id="playlist-workspace-title">站内歌单</h3>
+                </div>
+                <a-button type="primary" @click="addPlaylist">
+                  <Icon name="ph:plus-bold" /> 新建歌单
+                </a-button>
+              </header>
+
               <div class="playlist-editor">
-                <div
+                <article
                   v-for="(p, i) in music.music_playlists"
                   :key="p.key"
                   class="playlist-item"
@@ -259,7 +319,7 @@
                   @dragover.prevent
                   @drop="dropPlaylist(i)"
                 >
-                  <div class="playlist-row">
+                  <header class="playlist-row">
                     <button
                       class="playlist-drag"
                       type="button"
@@ -271,63 +331,73 @@
                     >
                       <Icon name="ph:dots-six-vertical-bold" />
                     </button>
+                    <span class="playlist-order">{{
+                      String(i + 1).padStart(2, "0")
+                    }}</span>
                     <a-input
                       v-model:value="p.name"
                       placeholder="歌单名称"
                       class="playlist-name"
                     />
-                    <a-checkbox v-model:checked="p.visible"
-                      >前台展示</a-checkbox
-                    >
+                    <label class="playlist-visible">
+                      <a-checkbox v-model:checked="p.visible" />
+                      <span>前台展示</span>
+                    </label>
                     <span class="playlist-track-count"
                       >{{ p.tracks.length }} 首</span
                     >
-                    <a-button
-                      type="text"
-                      size="small"
-                      class="playlist-toggle"
-                      :class="{ expanded: p.expanded }"
-                      :title="p.expanded ? '收起歌曲' : '展开歌曲'"
-                      :aria-label="p.expanded ? '收起歌曲' : '展开歌曲'"
-                      :aria-expanded="p.expanded"
-                      @click="p.expanded = !p.expanded"
-                    >
-                      <Icon name="ph:caret-down-bold" />
-                    </a-button>
-                    <a-button size="small" @click="openSourcePicker(p)">
-                      <Icon name="ph:cloud-arrow-down-bold" /> 从歌单 ID 选曲
-                    </a-button>
-                    <a-button size="small" @click="addMediaTracks(p)">
-                      <Icon name="ph:folder-open-bold" /> 从媒体库添加
-                    </a-button>
-                    <a-button
-                      type="text"
-                      size="small"
-                      :disabled="i === 0"
-                      title="上移"
-                      @click="movePlaylist(i, -1)"
-                    >
-                      <Icon name="ph:arrow-up-bold" />
-                    </a-button>
-                    <a-button
-                      type="text"
-                      size="small"
-                      :disabled="i === music.music_playlists.length - 1"
-                      title="下移"
-                      @click="movePlaylist(i, 1)"
-                    >
-                      <Icon name="ph:arrow-down-bold" />
-                    </a-button>
-                    <a-button
-                      type="text"
-                      danger
-                      size="small"
-                      title="删除歌单"
-                      @click="removePlaylist(i)"
-                    >
-                      <Icon name="ph:trash-bold" />
-                    </a-button>
-                  </div>
+                    <div class="playlist-actions">
+                      <a-button
+                        type="text"
+                        title="从歌单 ID 选曲"
+                        @click="openSourcePicker(p)"
+                      >
+                        <Icon name="ph:cloud-arrow-down-bold" />
+                      </a-button>
+                      <a-button
+                        type="text"
+                        title="从媒体库添加"
+                        @click="addMediaTracks(p)"
+                      >
+                        <Icon name="ph:folder-open-bold" />
+                      </a-button>
+                      <a-button
+                        type="text"
+                        :disabled="i === 0"
+                        title="上移歌单"
+                        @click="movePlaylist(i, -1)"
+                      >
+                        <Icon name="ph:arrow-up-bold" />
+                      </a-button>
+                      <a-button
+                        type="text"
+                        :disabled="i === music.music_playlists.length - 1"
+                        title="下移歌单"
+                        @click="movePlaylist(i, 1)"
+                      >
+                        <Icon name="ph:arrow-down-bold" />
+                      </a-button>
+                      <a-button
+                        type="text"
+                        danger
+                        title="删除歌单"
+                        @click="removePlaylist(i)"
+                      >
+                        <Icon name="ph:trash-bold" />
+                      </a-button>
+                      <a-button
+                        type="text"
+                        class="playlist-toggle"
+                        :class="{ expanded: p.expanded }"
+                        :title="p.expanded ? '收起歌曲' : '展开歌曲'"
+                        :aria-label="p.expanded ? '收起歌曲' : '展开歌曲'"
+                        :aria-expanded="p.expanded"
+                        @click="p.expanded = !p.expanded"
+                      >
+                        <Icon name="ph:caret-down-bold" />
+                      </a-button>
+                    </div>
+                  </header>
 
                   <Transition
                     @before-enter="beforePlaylistEnter"
@@ -338,6 +408,11 @@
                     @after-leave="afterPlaylistTransition"
                   >
                     <div v-if="p.expanded" class="playlist-content">
+                      <div class="playlist-content-head">
+                        <span>歌曲</span>
+                        <span>歌手</span>
+                        <span>排序与移除</span>
+                      </div>
                       <div v-if="p.tracks.length" class="playlist-tracks">
                         <div
                           v-for="(track, trackIndex) in p.tracks"
@@ -357,64 +432,63 @@
                             size="small"
                             placeholder="歌手"
                           />
-                          <a-button
-                            type="text"
-                            size="small"
-                            :disabled="trackIndex === 0"
-                            title="上移"
-                            @click="moveTrack(p, trackIndex, -1)"
-                          >
-                            <Icon name="ph:caret-up-bold" />
-                          </a-button>
-                          <a-button
-                            type="text"
-                            size="small"
-                            :disabled="trackIndex === p.tracks.length - 1"
-                            title="下移"
-                            @click="moveTrack(p, trackIndex, 1)"
-                          >
-                            <Icon name="ph:caret-down-bold" />
-                          </a-button>
-                          <a-button
-                            type="text"
-                            danger
-                            size="small"
-                            title="移除歌曲"
-                            @click="p.tracks.splice(trackIndex, 1)"
-                          >
-                            <Icon name="ph:x-bold" />
-                          </a-button>
+                          <div class="track-actions">
+                            <a-button
+                              type="text"
+                              size="small"
+                              :disabled="trackIndex === 0"
+                              title="上移"
+                              @click="moveTrack(p, trackIndex, -1)"
+                            >
+                              <Icon name="ph:caret-up-bold" />
+                            </a-button>
+                            <a-button
+                              type="text"
+                              size="small"
+                              :disabled="trackIndex === p.tracks.length - 1"
+                              title="下移"
+                              @click="moveTrack(p, trackIndex, 1)"
+                            >
+                              <Icon name="ph:caret-down-bold" />
+                            </a-button>
+                            <a-button
+                              type="text"
+                              danger
+                              size="small"
+                              title="移除歌曲"
+                              @click="p.tracks.splice(trackIndex, 1)"
+                            >
+                              <Icon name="ph:x-bold" />
+                            </a-button>
+                          </div>
                         </div>
                       </div>
                       <div v-else class="playlist-empty">
-                        从网易云歌单或媒体库添加歌曲
+                        <Icon name="ph:music-notes-simple-bold" />
+                        <span>从在线歌单或媒体库添加歌曲</span>
                       </div>
                     </div>
                   </Transition>
-                </div>
-                <a-button
-                  size="small"
-                  class="playlist-add"
-                  @click="addPlaylist"
-                >
-                  <Icon name="ph:plus-bold" /> 新建站内歌单
-                </a-button>
+                </article>
               </div>
-            </a-form-item>
-            <a-form-item>
-              <a-space>
+            </section>
+
+            <footer class="music-config-actions">
+              <span>保存后前台播放器将在下次加载时读取新配置</span>
+              <div>
+                <a-button :loading="refreshing" @click="refreshCache">
+                  <Icon name="ph:arrows-clockwise-bold" /> 刷新缓存
+                </a-button>
                 <a-button
                   type="primary"
                   :loading="musicSaving"
                   @click="saveMusic"
-                  >保存音乐配置</a-button
                 >
-                <a-button :loading="refreshing" @click="refreshCache"
-                  >刷新歌单缓存</a-button
-                >
-              </a-space>
-            </a-form-item>
-          </a-form>
+                  <Icon name="ph:floppy-disk-bold" /> 保存配置
+                </a-button>
+              </div>
+            </footer>
+          </div>
         </a-spin>
       </AdminCard>
 
@@ -1175,52 +1249,174 @@ async function refreshCache() {
   color: var(--c-text-3);
   margin-top: 4px;
 }
-.playlist-editor {
+.music-config {
+  display: grid;
+  gap: 24px;
+}
+.config-section-head {
   display: flex;
-  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.config-section-head span {
+  color: var(--c-primary);
+  font-size: 0.54rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+.config-section-head h3 {
+  margin: 3px 0 0;
+  color: var(--c-text);
+  font-size: 0.94rem;
+}
+.config-section-head small {
+  color: var(--c-text-3);
+  font-size: 0.62rem;
+}
+.preference-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.preference-row {
+  display: grid;
+  min-width: 0;
+  min-height: 66px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
   gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-bg-1) 74%, transparent);
+}
+.preference-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-size: 0.88rem;
+  place-items: center;
+}
+.preference-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.preference-copy strong {
+  color: var(--c-text-2);
+  font-size: 0.72rem;
+}
+.preference-copy small {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: 0.6rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.volume-row {
+  grid-column: 1 / -1;
+}
+.volume-control {
+  display: grid;
+  width: min(320px, 42vw);
+  grid-template-columns: minmax(120px, 1fr) 42px;
+  align-items: center;
+  gap: 10px;
+}
+.volume-control output {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-align: right;
+}
+.advanced-music-settings {
+  margin-top: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.advanced-music-settings summary {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  color: var(--c-text-3);
+  cursor: pointer;
+  font-size: 0.66rem;
+  list-style: none;
+}
+.advanced-music-settings summary::-webkit-details-marker {
+  display: none;
+}
+.advanced-music-settings summary span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.advanced-music-settings summary > svg {
+  transition: transform 0.2s ease;
+}
+.advanced-music-settings[open] summary > svg {
+  transform: rotate(180deg);
+}
+.advanced-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 12px;
+  padding: 4px 4px 14px;
+}
+.advanced-fields label {
+  display: grid;
+  gap: 5px;
+  color: var(--c-text-3);
+  font-size: 0.62rem;
+}
+.playlist-workspace {
+  padding-top: 20px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.playlist-workspace-head {
+  align-items: center;
+}
+.playlist-editor {
+  display: grid;
+  gap: 8px;
   width: 100%;
 }
 .playlist-item {
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--c-bg-1) 62%, transparent);
+  background: var(--ld-bg-card);
   transition:
+    border-color 0.18s ease,
     opacity 0.18s ease,
     box-shadow 0.22s ease;
 }
-.playlist-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 8px;
+.playlist-item:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 28%, var(--border));
 }
 .playlist-item.dragging {
   opacity: 0.48;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 40%, transparent);
 }
-.playlist-name {
-  width: 160px;
-}
-.playlist-track-count {
-  min-width: 42px;
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  text-align: center;
-}
-.playlist-toggle {
-  transition: transform 0.26s cubic-bezier(0.22, 0.8, 0.24, 1);
-}
-.playlist-toggle.expanded {
-  transform: rotate(180deg);
+.playlist-row {
+  display: grid;
+  min-height: 54px;
+  grid-template-columns: 28px 24px minmax(150px, 1fr) auto 52px auto;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
 }
 .playlist-drag {
   display: grid;
   width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+  height: 32px;
   border: 0;
   background: transparent;
   color: var(--c-text-3);
@@ -1230,43 +1426,115 @@ async function refreshCache() {
 .playlist-drag:active {
   cursor: grabbing;
 }
-.playlist-sort {
-  width: 76px;
+.playlist-order,
+.playlist-track-order {
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-align: center;
+}
+.playlist-name {
+  min-width: 0;
+}
+.playlist-visible {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--c-text-2);
+  font-size: 0.64rem;
+  white-space: nowrap;
+}
+.playlist-track-count {
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.playlist-actions,
+.track-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+}
+.playlist-actions :deep(.ant-btn),
+.track-actions :deep(.ant-btn) {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+.playlist-toggle {
+  transition: transform 0.26s cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+.playlist-toggle.expanded {
+  transform: rotate(180deg);
 }
 .playlist-content {
   overflow: hidden;
+  background: color-mix(in srgb, var(--c-bg-1) 52%, transparent);
   transition:
     height 0.28s cubic-bezier(0.22, 0.8, 0.24, 1),
     opacity 0.2s ease;
 }
+.playlist-content-head {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.25fr) minmax(100px, 0.8fr) 92px;
+  gap: 7px;
+  margin-left: 34px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  color: var(--c-text-3);
+  font-size: 0.56rem;
+}
+.playlist-content-head span:last-child {
+  text-align: right;
+}
 .playlist-tracks {
-  border-top: 1px solid color-mix(in srgb, var(--border) 56%, transparent);
-  padding: 4px 8px 7px;
+  padding: 2px 8px 8px;
 }
 .playlist-track-row {
   display: grid;
-  min-height: 40px;
-  grid-template-columns:
-    25px minmax(120px, 1.25fr) minmax(100px, 0.8fr)
-    28px 28px 28px;
+  min-height: 42px;
+  grid-template-columns: 25px minmax(120px, 1.25fr) minmax(100px, 0.8fr) 92px;
   align-items: center;
-  gap: 5px;
-}
-.playlist-track-order {
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  text-align: center;
+  gap: 7px;
 }
 .playlist-empty {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border-top: 1px solid color-mix(in srgb, var(--border) 56%, transparent);
-  padding: 12px;
   color: var(--c-text-3);
-  font-size: 0.68rem;
-  text-align: center;
+  font-size: 0.66rem;
 }
-.playlist-add {
-  align-self: flex-start;
+.playlist-empty > svg {
+  color: var(--c-primary);
+  font-size: 1rem;
+}
+.music-config-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: -1px;
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  background: var(--ld-bg-card);
+}
+.music-config-actions > span {
+  color: var(--c-text-3);
+  font-size: 0.61rem;
+}
+.music-config-actions > div {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
 }
 .source-toolbar {
   display: grid;
@@ -1386,7 +1654,60 @@ async function refreshCache() {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
 }
+@media (max-width: 760px) {
+  .preference-grid {
+    grid-template-columns: 1fr;
+  }
+  .volume-row {
+    grid-column: auto;
+  }
+  .volume-control {
+    width: min(280px, 40vw);
+  }
+  .advanced-fields {
+    grid-template-columns: 1fr;
+  }
+  .playlist-row {
+    grid-template-columns: 28px 24px minmax(0, 1fr) auto;
+  }
+  .playlist-visible {
+    grid-column: 3;
+  }
+  .playlist-track-count {
+    grid-column: 4;
+    grid-row: 2;
+  }
+  .playlist-actions {
+    grid-column: 1 / -1;
+    padding-top: 5px;
+    border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  }
+}
 @media (max-width: 520px) {
+  .config-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .playlist-workspace-head {
+    align-items: stretch;
+  }
+  .playlist-workspace-head :deep(.ant-btn) {
+    align-self: flex-end;
+  }
+  .preference-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    padding-inline: 9px;
+  }
+  .volume-row {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .volume-control {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+  .playlist-content-head {
+    display: none;
+  }
   .secret-field {
     grid-template-columns: 1fr;
   }
@@ -1397,10 +1718,32 @@ async function refreshCache() {
     grid-template-columns: 1fr;
   }
   .playlist-track-row {
-    grid-template-columns: 22px minmax(100px, 1fr) 26px 26px 26px;
+    min-height: 70px;
+    grid-template-columns: 22px minmax(0, 1fr) 92px;
+    grid-template-rows: 30px 30px;
   }
-  .playlist-track-row :deep(.ant-input):nth-of-type(2) {
+  .playlist-track-order {
+    grid-row: 1 / 3;
+  }
+  .playlist-track-row > :deep(.ant-input):nth-of-type(2) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .track-actions {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+  .music-config-actions {
+    align-items: stretch;
+    flex-direction: column;
+    padding-bottom: 4px;
+  }
+  .music-config-actions > span {
     display: none;
+  }
+  .music-config-actions > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

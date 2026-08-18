@@ -1,219 +1,229 @@
 <template>
   <Teleport to="body" :disabled="!teleportToBody">
-    <div class="ai-pet" :class="{ open: chatOpen, 'is-article': isArticleMode, docked }">
-    <Transition name="pet-panel">
-      <div
-        v-if="chatOpen"
-        class="pet-chat"
-        role="dialog"
-        aria-label="和哆啦A梦聊天"
-      >
-        <header class="pet-chat-head">
-          <div class="pet-chat-title">
-            <span class="pet-chat-avatar" aria-hidden="true">
-              <span class="dora-avatar-image" :style="{ backgroundImage: `url(${spriteUrl})` }" />
-            </span>
-            <div>
-              <div class="pet-name-row">
-                <strong>{{ displayName }}</strong>
-                <span class="pet-online">在线</span>
+    <div
+      class="ai-pet"
+      :class="{ open: chatOpen, 'is-article': isArticleMode, docked }"
+    >
+      <Transition name="pet-panel">
+        <div
+          v-if="chatOpen"
+          class="pet-chat"
+          role="dialog"
+          aria-label="和哆啦A梦聊天"
+        >
+          <header class="pet-chat-head">
+            <div class="pet-chat-title">
+              <span class="pet-chat-avatar" aria-hidden="true">
+                <span
+                  class="dora-avatar-image"
+                  :style="{ backgroundImage: `url(${spriteUrl})` }"
+                />
+              </span>
+              <div>
+                <div class="pet-name-row">
+                  <strong>{{ displayName }}</strong>
+                  <span class="pet-online">在线</span>
+                </div>
+                <p>{{ description }}</p>
+                <span v-if="isContentMode" class="pet-context-label">{{
+                  contextLabel
+                }}</span>
               </div>
-              <p>{{ description }}</p>
-              <span v-if="isContentMode" class="pet-context-label">{{
-                contextLabel
-              }}</span>
             </div>
-          </div>
-          <button
-            type="button"
-            class="pet-icon-btn"
-            aria-label="关闭"
-            @click="closeChat"
-          >
-            <Icon name="ph:x-bold" />
-          </button>
-        </header>
+            <button
+              type="button"
+              class="pet-icon-btn"
+              aria-label="关闭"
+              @click="closeChat"
+            >
+              <Icon name="ph:x-bold" />
+            </button>
+          </header>
 
-        <div ref="listRef" class="pet-chat-list">
-          <div v-if="historyLoading" class="pet-history-loading" aria-label="正在加载历史消息">
-            <span /><span /><span />
-          </div>
-          <div
-            v-for="(m, i) in messages"
-            :key="i"
-            class="pet-msg"
-            :class="m.role"
-          >
-            <template v-if="m.role === 'assistant'">
-              <div
-                v-if="m.streaming && m.renderedHtml"
-                class="pet-bubble pet-markdown pet-streaming"
-                v-html="m.renderedHtml"
-              />
-              <div
-                v-else-if="!m.streaming"
-                class="pet-bubble pet-markdown"
-                v-html="renderMarkdown(m.content)"
-              />
-              <div
-                v-if="!m.streaming && m.cards?.length"
-                class="pet-source-cards"
-              >
-                <AppLink
-                  v-for="card in m.cards"
-                  :key="`${card.type}:${card.sourceId}`"
-                  :to="card.href"
-                  @click="trackCard(card)"
+          <div ref="listRef" class="pet-chat-list">
+            <div
+              v-if="historyLoading"
+              class="pet-history-loading"
+              aria-label="正在加载历史消息"
+            >
+              <span /><span /><span />
+            </div>
+            <div
+              v-for="(m, i) in messages"
+              :key="i"
+              class="pet-msg"
+              :class="m.role"
+            >
+              <template v-if="m.role === 'assistant'">
+                <div
+                  v-if="m.streaming && m.renderedHtml"
+                  class="pet-bubble pet-markdown pet-streaming"
+                  v-html="m.renderedHtml"
+                />
+                <div
+                  v-else-if="!m.streaming"
+                  class="pet-bubble pet-markdown"
+                  v-html="renderMarkdown(m.content)"
+                />
+                <div
+                  v-if="!m.streaming && m.cards?.length"
+                  class="pet-source-cards"
                 >
-                  <span class="pet-source-media">
-                    <img
-                      v-if="sourceImage(card)"
-                      :src="sourceImage(card)"
-                      :alt="card.title"
-                      loading="lazy"
+                  <AppLink
+                    v-for="card in m.cards"
+                    :key="`${card.type}:${card.sourceId}`"
+                    :to="card.href"
+                    @click="trackCard(card)"
+                  >
+                    <span class="pet-source-media">
+                      <img
+                        v-if="sourceImage(card)"
+                        :src="sourceImage(card)"
+                        :alt="card.title"
+                        loading="lazy"
+                      />
+                      <Icon v-else :name="sourceIcon(card.type)" />
+                    </span>
+                    <span class="pet-source-copy">
+                      <small>{{ sourceLabel(card.type) }}</small>
+                      <strong>{{ sourceTitle(card) }}</strong>
+                      <span v-if="sourceExcerpt(card)">{{
+                        sourceExcerpt(card)
+                      }}</span>
+                    </span>
+                    <Icon
+                      name="ph:arrow-up-right-bold"
+                      class="pet-source-arrow"
                     />
-                    <Icon v-else :name="sourceIcon(card.type)" />
-                  </span>
-                  <span class="pet-source-copy">
-                    <small>{{ sourceLabel(card.type) }}</small>
-                    <strong>{{ sourceTitle(card) }}</strong>
-                    <span v-if="sourceExcerpt(card)">{{
-                      sourceExcerpt(card)
-                    }}</span>
-                  </span>
-                  <Icon
-                    name="ph:arrow-up-right-bold"
-                    class="pet-source-arrow"
-                  />
-                </AppLink>
-              </div>
-              <div
-                v-if="!m.streaming && m.music?.length"
-                class="pet-music-cards"
-              >
-                <button
-                  v-for="track in m.music"
-                  :key="`${track.name}:${track.artist}`"
-                  type="button"
-                  @click="playTrack(track)"
+                  </AppLink>
+                </div>
+                <div
+                  v-if="!m.streaming && m.music?.length"
+                  class="pet-music-cards"
                 >
-                  <span class="pet-music-cover">
-                    <img
-                      v-if="track.pic"
-                      :src="track.pic"
-                      :alt="track.name"
-                      loading="lazy"
-                    />
-                    <Icon v-else name="ph:music-notes-fill" />
-                  </span>
-                  <span
-                    ><strong>{{ track.name }}</strong
-                    ><small>{{ track.artist }}</small></span
-                  >
-                  <Icon name="ph:play-fill" />
-                </button>
-              </div>
-              <div v-if="shouldAskFeedback(m, i)" class="pet-feedback">
-                <span>这次有帮到你吗？</span>
-                <div>
                   <button
+                    v-for="track in m.music"
+                    :key="`${track.name}:${track.artist}`"
                     type="button"
-                    title="有帮助"
-                    :disabled="m.feedbackPending"
-                    @click="feedback(m, true)"
+                    @click="playTrack(track)"
                   >
-                    <Icon name="ph:thumbs-up-bold" /><span>有</span>
-                  </button>
-                  <button
-                    type="button"
-                    title="没帮助"
-                    :disabled="m.feedbackPending"
-                    @click="feedback(m, false)"
-                  >
-                    <Icon name="ph:thumbs-down-bold" /><span>没有</span>
+                    <span class="pet-music-cover">
+                      <img
+                        v-if="track.pic"
+                        :src="track.pic"
+                        :alt="track.name"
+                        loading="lazy"
+                      />
+                      <Icon v-else name="ph:music-notes-fill" />
+                    </span>
+                    <span
+                      ><strong>{{ track.name }}</strong
+                      ><small>{{ track.artist }}</small></span
+                    >
+                    <Icon name="ph:play-fill" />
                   </button>
                 </div>
-              </div>
-              <div
-                v-else-if="m.feedbackRecorded && i === latestFeedbackIndex"
-                class="pet-feedback-confirmed"
-              >
-                <Icon name="ph:check-circle-fill" />
-                <span>谢谢，我记下了</span>
-              </div>
-            </template>
-            <div v-else class="pet-bubble">{{ m.content }}</div>
+                <div v-if="shouldAskFeedback(m, i)" class="pet-feedback">
+                  <span>这次有帮到你吗？</span>
+                  <div>
+                    <button
+                      type="button"
+                      title="有帮助"
+                      :disabled="m.feedbackPending"
+                      @click="feedback(m, true)"
+                    >
+                      <Icon name="ph:thumbs-up-bold" /><span>有</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="没帮助"
+                      :disabled="m.feedbackPending"
+                      @click="feedback(m, false)"
+                    >
+                      <Icon name="ph:thumbs-down-bold" /><span>没有</span>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  v-else-if="m.feedbackRecorded && i === latestFeedbackIndex"
+                  class="pet-feedback-confirmed"
+                >
+                  <Icon name="ph:check-circle-fill" />
+                  <span>谢谢，我记下了</span>
+                </div>
+              </template>
+              <div v-else class="pet-bubble">{{ m.content }}</div>
+            </div>
+            <div v-if="sending && !streamStarted" class="pet-msg assistant">
+              <div class="pet-bubble typing"><span /><span /><span /></div>
+            </div>
           </div>
-          <div v-if="sending && !streamStarted" class="pet-msg assistant">
-            <div class="pet-bubble typing"><span /><span /><span /></div>
-          </div>
-        </div>
 
-        <div class="pet-suggestions">
+          <div class="pet-suggestions">
+            <button
+              v-for="action in quickActions"
+              :key="action.label"
+              type="button"
+              :disabled="sending"
+              @click="runQuickAction(action)"
+            >
+              <Icon :name="action.icon" />
+              <span>{{ action.label }}</span>
+            </button>
+          </div>
+
+          <form class="pet-chat-form" @submit.prevent="send">
+            <Icon name="ph:sparkle-bold" class="pet-input-mark" />
+            <textarea
+              ref="inputRef"
+              v-model="input"
+              class="pet-input"
+              rows="1"
+              :maxlength="inputMaxChars"
+              :placeholder="inputPlaceholder"
+              :disabled="sending"
+              @input="resizeInput"
+              @keydown.enter.exact.prevent="send"
+            />
+            <button
+              type="submit"
+              class="pet-send"
+              :disabled="sending || !input.trim()"
+              aria-label="发送"
+            >
+              <Icon name="ph:paper-plane-right-fill" />
+            </button>
+          </form>
+        </div>
+      </Transition>
+
+      <Transition name="pet-actions">
+        <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
           <button
-            v-for="action in quickActions"
+            v-for="action in quickActions.slice(0, 3)"
             :key="action.label"
             type="button"
-            :disabled="sending"
             @click="runQuickAction(action)"
           >
             <Icon :name="action.icon" />
             <span>{{ action.label }}</span>
           </button>
         </div>
-
-        <form class="pet-chat-form" @submit.prevent="send">
-          <Icon name="ph:sparkle-bold" class="pet-input-mark" />
-          <textarea
-            ref="inputRef"
-            v-model="input"
-            class="pet-input"
-            rows="1"
-            :maxlength="inputMaxChars"
-            :placeholder="inputPlaceholder"
-            :disabled="sending"
-            @input="resizeInput"
-            @keydown.enter.exact.prevent="send"
-          />
-          <button
-            type="submit"
-            class="pet-send"
-            :disabled="sending || !input.trim()"
-            aria-label="发送"
-          >
-            <Icon name="ph:paper-plane-right-fill" />
-          </button>
-        </form>
-      </div>
-    </Transition>
-
-    <Transition name="pet-actions">
-      <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
-        <button
-          v-for="action in quickActions.slice(0, 3)"
-          :key="action.label"
-          type="button"
-          @click="runQuickAction(action)"
-        >
-          <Icon :name="action.icon" />
-          <span>{{ action.label }}</span>
-        </button>
-      </div>
-    </Transition>
-
-    <button
-      type="button"
-      class="pet-fab"
-      :title="chatOpen ? '收起' : '和哆啦A梦聊天'"
-      @click="toggleChat"
-    >
-      <span class="pet-sprite-wrap" :style="wrapStyle">
-        <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
-      </span>
-      <Transition name="pet-hint" appear>
-        <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
       </Transition>
-    </button>
+
+      <button
+        type="button"
+        class="pet-fab"
+        :title="chatOpen ? '收起' : '和哆啦A梦聊天'"
+        @click="toggleChat"
+      >
+        <span class="pet-sprite-wrap" :style="wrapStyle">
+          <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
+        </span>
+        <Transition name="pet-hint" appear>
+          <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
+        </Transition>
+      </button>
     </div>
   </Teleport>
 </template>
@@ -329,6 +339,7 @@ const { isLoggedIn } = useAuth();
 const { mediaUrl } = useMediaUrl();
 const toast = useToast();
 const { requestTrack } = useMusicPlayerState();
+const { activeBottomDock } = useBottomDockState();
 const chatOpen = ref(false);
 const sending = ref(false);
 const streamStarted = ref(false);
@@ -361,9 +372,7 @@ const isContentMode = computed(
   () => props.mode === "article" || props.mode === "context",
 );
 const isMobileView = ref(false);
-const teleportToBody = computed(
-  () => props.docked && isMobileView.value,
-);
+const teleportToBody = computed(() => props.docked && isMobileView.value);
 function syncViewport() {
   isMobileView.value = window.matchMedia("(max-width: 900px)").matches;
 }
@@ -634,7 +643,11 @@ const inputPlaceholder = computed(() =>
   isContentMode.value ? activeProfile.value.placeholder : "想从这里发现什么？",
 );
 const actionsVisible = computed(
-  () => !chatOpen.value && !suppressActions.value && !showHint.value,
+  () =>
+    !chatOpen.value &&
+    !suppressActions.value &&
+    !showHint.value &&
+    activeBottomDock.value !== "pagination",
 );
 
 watch(isLoggedIn, () => {
@@ -909,7 +922,7 @@ async function sendMessage(text: string) {
     enqueueTyping(responseMarkdown || "……", assistantIndex);
     await waitForTypingDrain();
     if (pendingCards.length) {
-      await new Promise(resolve => window.setTimeout(resolve, 180));
+      await new Promise((resolve) => window.setTimeout(resolve, 180));
       const message = messages.value[assistantIndex];
       if (message) message.cards = pendingCards;
     }
@@ -1208,7 +1221,6 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-
 .pet-fab {
   position: absolute;
   right: 0;
@@ -1314,7 +1326,17 @@ onUnmounted(() => {
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   position: relative;
 }
-.pet-chat-head::after { content: ""; position: absolute; left: 14px; bottom: -1px; width: 32px; height: 3px; border-radius: 999px; background: var(--c-primary); opacity: .65; }
+.pet-chat-head::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  bottom: -1px;
+  width: 32px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--c-primary);
+  opacity: 0.65;
+}
 
 .pet-chat-title {
   display: flex;
@@ -1338,7 +1360,16 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.dora-avatar-image { display: block; width: 100%; height: 100%; background-repeat: no-repeat; background-size: 288px 312px; background-position: 0 0; transform: scale(1.18); transform-origin: center; }
+.dora-avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: 288px 312px;
+  background-position: 0 0;
+  transform: scale(1.18);
+  transform-origin: center;
+}
 
 .pet-chat-avatar :deep(.icon) {
   font-size: 1rem;
@@ -1672,11 +1703,38 @@ onUnmounted(() => {
     box-shadow 0.2s ease;
 }
 
-.pet-history-loading { display: grid; gap: 8px; width: 74%; padding: 4px 0 10px; }
-.pet-history-loading span { display: block; height: 34px; border-radius: 14px 14px 14px 4px; background: linear-gradient(90deg, var(--c-bg-2), color-mix(in srgb, var(--c-primary-soft) 65%, var(--c-bg-2)), var(--c-bg-2)); background-size: 220% 100%; animation: pet-loading 1.2s ease-in-out infinite; }
-.pet-history-loading span:nth-child(2) { width: 86%; margin-left: 14%; border-radius: 14px 14px 4px 14px; }
-.pet-history-loading span:nth-child(3) { width: 62%; }
-@keyframes pet-loading { to { background-position: -120% 0; } }
+.pet-history-loading {
+  display: grid;
+  gap: 8px;
+  width: 74%;
+  padding: 4px 0 10px;
+}
+.pet-history-loading span {
+  display: block;
+  height: 34px;
+  border-radius: 14px 14px 14px 4px;
+  background: linear-gradient(
+    90deg,
+    var(--c-bg-2),
+    color-mix(in srgb, var(--c-primary-soft) 65%, var(--c-bg-2)),
+    var(--c-bg-2)
+  );
+  background-size: 220% 100%;
+  animation: pet-loading 1.2s ease-in-out infinite;
+}
+.pet-history-loading span:nth-child(2) {
+  width: 86%;
+  margin-left: 14%;
+  border-radius: 14px 14px 4px 14px;
+}
+.pet-history-loading span:nth-child(3) {
+  width: 62%;
+}
+@keyframes pet-loading {
+  to {
+    background-position: -120% 0;
+  }
+}
 
 .pet-chat-form:focus-within {
   border-color: color-mix(in srgb, var(--c-primary) 58%, var(--border));
@@ -1913,7 +1971,6 @@ onUnmounted(() => {
     margin: 0;
   }
 
-
   .ai-pet.docked .pet-fab {
     position: absolute;
     right: 0;
@@ -2034,7 +2091,7 @@ onUnmounted(() => {
   gap: 6px;
   width: 94%;
   margin-top: 7px;
-  animation: pet-source-in .48s cubic-bezier(.16,1,.3,1) both;
+  animation: pet-source-in 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .pet-source-cards a {
   position: relative;
@@ -2067,7 +2124,12 @@ onUnmounted(() => {
   color: var(--c-primary);
   place-items: center;
 }
-@keyframes pet-source-in { from { opacity: 0; transform: translateY(7px); } }
+@keyframes pet-source-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
 .pet-source-media img {
   width: 100%;
   height: 100%;

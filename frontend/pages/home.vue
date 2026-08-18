@@ -112,11 +112,8 @@ const totalPages = ref(1);
 const homeReady = ref(false);
 const mainContentRef = ref<HTMLElement>();
 const recordsRef = ref<HTMLElement>();
-const paginationHidden = ref(false);
-const {
-  setHidden: setBottomDockHidden,
-  setContentReady: setBottomDockContentReady,
-} = useBottomDockState();
+const { setRecordsIntersecting, setContentReady: setBottomDockContentReady } =
+  useBottomDockState();
 setBottomDockContentReady(false);
 let requestId = 0;
 let enterFrame = 0;
@@ -204,8 +201,7 @@ onMounted(() => {
 
   recordsObserver = new IntersectionObserver(
     ([entry]) => {
-      paginationHidden.value = entry?.isIntersecting ?? false;
-      setBottomDockHidden(paginationHidden.value);
+      setRecordsIntersecting(entry?.isIntersecting ?? false);
     },
     {
       root: mainContentRef.value,
@@ -218,7 +214,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.cancelAnimationFrame(enterFrame);
   recordsObserver?.disconnect();
-  setBottomDockHidden(false);
+  setRecordsIntersecting(false);
   setBottomDockContentReady(true);
 });
 </script>

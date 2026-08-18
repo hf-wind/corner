@@ -2,14 +2,16 @@
   <div
     class="global-bottom-dock"
     :class="[
-      `phase-${phase}`,
+      { 'is-ready': dockReady },
       {
         'has-pagination': paginationVisible,
         'has-music': musicVisible,
       },
     ]"
     aria-label="页面快捷控制"
-    :aria-hidden="phase === 'hidden' || phase === 'waiting'"
+    :aria-hidden="!dockReady"
+    @pointerenter="onDockPointerEnter"
+    @pointerleave="onDockPointerLeave"
   >
     <div id="corner-pagination-dock" class="pagination-dock" />
     <div class="music-dock">
@@ -22,86 +24,78 @@
 import MusicCapsule from "~/components/MusicCapsule.vue";
 import { useBottomDockState } from "~/composables/useBottomDockState";
 
-type DockPhase =
-  | "waiting"
-  | "fused"
-  | "separated"
-  | "merging"
-  | "solo"
-  | "hidden";
-
-const { hidden, contentReady, paginationVisible } = useBottomDockState();
-const phase = ref<DockPhase>("waiting");
+const { contentReady, paginationVisible, setAutoCollapsed } =
+  useBottomDockState();
 const musicReady = ref(false);
 const musicVisible = ref(false);
-let phaseTimer = 0;
+const dockHovered = ref(false);
+let autoCollapseTimer = 0;
+const dockReady = computed(() => contentReady.value && musicReady.value);
 
 function onMusicReady(payload: { visible: boolean }) {
   musicReady.value = true;
   musicVisible.value = payload.visible;
 }
 
-function clearPhaseTimer() {
-  window.clearTimeout(phaseTimer);
-  phaseTimer = 0;
+function clearAutoCollapseTimer() {
+  window.clearTimeout(autoCollapseTimer);
+  autoCollapseTimer = 0;
 }
 
-function revealDock() {
-  clearPhaseTimer();
-  if (!contentReady.value || !musicReady.value) {
-    phase.value = "waiting";
+function scheduleAutoCollapse() {
+  clearAutoCollapseTimer();
+  if (
+    dockHovered.value ||
+    !contentReady.value ||
+    !musicReady.value ||
+    (!paginationVisible.value && !musicVisible.value)
+  ) {
     return;
   }
-  if (paginationVisible.value && musicVisible.value) {
-    phase.value = "fused";
-    phaseTimer = window.setTimeout(() => {
-      if (!hidden.value) phase.value = "separated";
-    }, 280);
-    return;
-  }
-  phase.value = "solo";
+  setAutoCollapsed(false);
+  autoCollapseTimer = window.setTimeout(() => {
+    setAutoCollapsed(true);
+  }, 5000);
+}
+
+function canHoverDock(event: PointerEvent) {
+  return (
+    event.pointerType === "mouse" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches
+  );
+}
+
+function onDockPointerEnter(event: PointerEvent) {
+  if (!canHoverDock(event)) return;
+  dockHovered.value = true;
+  clearAutoCollapseTimer();
+}
+
+function onDockPointerLeave(event: PointerEvent) {
+  if (!canHoverDock(event)) return;
+  dockHovered.value = false;
+  scheduleAutoCollapse();
 }
 
 watch(
-  [contentReady, musicReady, paginationVisible],
-  () => {
-    if (!hidden.value) revealDock();
-  },
+  [contentReady, musicReady, paginationVisible, musicVisible],
+  scheduleAutoCollapse,
   { immediate: true },
 );
 
-watch(
-  hidden,
-  (isHidden) => {
-    clearPhaseTimer();
-    if (!isHidden) {
-      revealDock();
-      return;
-    }
-    if (phase.value === "waiting" || phase.value === "hidden") {
-      phase.value = "hidden";
-      return;
-    }
-    phase.value = "merging";
-    phaseTimer = window.setTimeout(
-      () => {
-        phase.value = "hidden";
-      },
-      paginationVisible.value && musicVisible.value ? 480 : 220,
-    );
-  },
-  { immediate: true },
-);
-
-onUnmounted(clearPhaseTimer);
+onUnmounted(() => {
+  clearAutoCollapseTimer();
+  dockHovered.value = false;
+  setAutoCollapsed(false);
+});
 </script>
 
 <style scoped>
 .global-bottom-dock {
-  --capsule-height: 34px;
+  --capsule-height: 30px;
   position: fixed;
-  z-index: 900;
-  bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px));
+  z-index: 1200;
+  bottom: max(10px, env(safe-area-inset-bottom));
   left: 50%;
   display: flex;
   width: max-content;
@@ -110,54 +104,19 @@ onUnmounted(clearPhaseTimer);
   justify-content: center;
   gap: 7px;
   pointer-events: none;
-  transform: translate3d(-50%, 0, 0);
-  transition:
-    gap 0.48s cubic-bezier(0.22, 1.25, 0.36, 1),
-    opacity 0.24s ease,
-    transform 0.48s cubic-bezier(0.16, 1, 0.3, 1),
-    visibility 0.24s;
-}
-
-.global-bottom-dock.phase-waiting,
-.global-bottom-dock.phase-hidden {
   opacity: 0;
   visibility: hidden;
-  pointer-events: none;
-  transform: translate3d(-50%, 13px, 0) scale(0.94);
-}
-
-.global-bottom-dock.phase-fused {
-  gap: 0;
-  animation: dock-condense-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.18) both;
-}
-
-.global-bottom-dock.phase-merging {
-  gap: 0;
-  transform: translate3d(-50%, 3px, 0) scale(0.985);
-}
-
-.pagination-dock,
-.music-dock {
+  transform: translate3d(-50%, 10px, 0);
   transition:
-    transform 0.5s cubic-bezier(0.22, 1.25, 0.36, 1),
-    filter 0.28s ease;
+    opacity 0.2s ease,
+    transform 0.4s ease,
+    visibility 0.2s;
 }
 
-.phase-fused .pagination-dock,
-.phase-merging .pagination-dock {
-  transform: translateX(5px) scaleX(1.018);
-}
-
-.phase-fused .music-dock,
-.phase-merging .music-dock {
-  transform: translateX(-5px) scaleX(1.018);
-}
-
-.phase-separated .pagination-dock,
-.phase-separated .music-dock,
-.phase-solo .pagination-dock,
-.phase-solo .music-dock {
-  transform: none;
+.global-bottom-dock.is-ready {
+  opacity: 1;
+  visibility: visible;
+  transform: translate3d(-50%, 0, 0);
 }
 
 .global-bottom-dock > * {
@@ -178,30 +137,42 @@ onUnmounted(clearPhaseTimer);
   display: none;
 }
 
-@keyframes dock-condense-in {
-  from {
-    opacity: 0;
-    transform: translate3d(-50%, 10px, 0) scale(0.9, 0.82);
-  }
-  62% {
-    opacity: 1;
-    transform: translate3d(-50%, -1px, 0) scale(1.018, 1.035);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(-50%, 0, 0) scale(1);
-  }
-}
-
 @media (max-width: 640px) {
   .global-bottom-dock {
-    bottom: max(9px, calc(env(safe-area-inset-bottom) + 7px));
+    bottom: max(10px, env(safe-area-inset-bottom));
     max-width: calc(100vw - 16px);
     gap: 6px;
   }
 
-  .global-bottom-dock:has(.music-capsule.is-expanded) .pagination-dock {
-    display: none;
+  .global-bottom-dock.has-pagination.has-music {
+    width: 70px;
+    max-width: 70px;
+  }
+
+  .global-bottom-dock.has-pagination.has-music .pagination-dock,
+  .global-bottom-dock.has-pagination.has-music .music-dock {
+    position: relative;
+    display: block;
+    width: 32px;
+    height: var(--capsule-height);
+    flex: 0 0 32px;
+    overflow: visible;
+  }
+
+  .global-bottom-dock.has-pagination.has-music
+    .pagination-dock
+    > :deep(.pagination-anchor) {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+  }
+
+  .global-bottom-dock.has-pagination.has-music
+    .music-dock
+    > :deep(.music-capsule) {
+    position: absolute;
+    bottom: 0;
+    left: 0;
   }
 }
 

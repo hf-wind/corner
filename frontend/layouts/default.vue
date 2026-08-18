@@ -27,7 +27,6 @@
     <div class="layout-page">
       <slot />
     </div>
-    <ClientOnly><GlobalBottomDock /></ClientOnly>
     <SearchModal :visible="showSearch" @close="showSearch = false" />
     <ClientOnly
       ><AiPet v-if="showContextAi" mode="context" :article="pageContext"
@@ -68,8 +67,12 @@ const pageContext = computed(() => {
           title: "当前页面",
         };
   const selected = selectedMemory.value;
-  const selectedType = section === "albums" && selected?.type === "photo" ? "photo" : profile.type;
-  const selectedId = selectedType === "photo" ? String(selected?.id || "").replace(/^photo:/, "") : "";
+  const selectedType =
+    section === "albums" && selected?.type === "photo" ? "photo" : profile.type;
+  const selectedId =
+    selectedType === "photo"
+      ? String(selected?.id || "").replace(/^photo:/, "")
+      : "";
   return {
     type: selectedType,
     scene: selectedType,

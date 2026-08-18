@@ -1,4 +1,7 @@
 <template>
+  <ClientOnly>
+    <GlobalBottomDock v-show="route.path !== '/'" />
+  </ClientOnly>
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">
       <Transition
@@ -68,6 +71,10 @@ watch(
     document.documentElement.classList.toggle(
       "space-route",
       isSpaceRoute.value,
+    );
+    document.documentElement.classList.toggle(
+      "constellation-route",
+      route.path === "/time/constellation",
     );
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) {

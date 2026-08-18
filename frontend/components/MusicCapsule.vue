@@ -19,12 +19,15 @@
     :class="{
       'is-ready': ready,
       'is-expanded': expanded,
+      'is-devtools-collapsed': isDevtoolsCollapsed,
       'is-playing': playing,
       'is-queue-open': queueOpen,
       'has-auth': isLoggedIn,
     }"
     aria-label="音乐播放器"
   >
+    <span class="devtools-glowing" aria-hidden="true" />
+
     <Transition name="queue-panel">
       <div
         v-if="queueOpen"
@@ -184,6 +187,21 @@
     </Transition>
 
     <div class="capsule-shell">
+      <button
+        type="button"
+        class="devtools-toggle"
+        :aria-expanded="!isDevtoolsCollapsed"
+        :title="isDevtoolsCollapsed ? '展开音乐播放器' : '折叠音乐播放器'"
+        :aria-label="isDevtoolsCollapsed ? '展开音乐播放器' : '折叠音乐播放器'"
+        @click="toggleDevtoolsCollapsed"
+      >
+        <Icon
+          class="devtools-mark"
+          name="ph:waveform-bold"
+          aria-hidden="true"
+        />
+      </button>
+
       <span class="water-progress" aria-hidden="true">
         <span
           class="water-level"
@@ -192,119 +210,127 @@
             'is-empty': progress <= 0.1,
             'is-full': progress >= 99.5,
           }"
-          :style="{ height: `${progress}%` }"
+          :style="{ height: `${waterProgress}%` }"
         >
           <i class="water-wave water-wave-front" />
           <i class="water-wave water-wave-back" />
         </span>
       </span>
 
-      <div class="cover-cluster">
+      <div
+        class="capsule-content"
+        :inert="isDevtoolsCollapsed"
+        :aria-hidden="isDevtoolsCollapsed"
+      >
+        <div class="cover-cluster">
+          <button
+            type="button"
+            class="cover-button"
+            :title="expanded ? '收起播放器' : '展开播放器'"
+            :aria-label="expanded ? '收起播放器' : '展开播放器'"
+            @click="toggleExpanded"
+          >
+            <span class="current-cover">
+              <img
+                v-if="current && hasCover(current.pic)"
+                :src="current.pic"
+                alt=""
+                draggable="false"
+                @error="markCoverBroken(current.pic)"
+              />
+              <Icon v-else name="ph:music-note-bold" />
+            </span>
+          </button>
+          <button
+            type="button"
+            class="cover-play"
+            :title="playing ? '暂停' : '播放'"
+            :aria-label="playing ? '暂停' : '播放'"
+            :disabled="!current"
+            @click="togglePlay"
+          >
+            <Icon :name="playing ? 'ph:pause-fill' : 'ph:play-fill'" />
+          </button>
+        </div>
+
         <button
           type="button"
-          class="cover-button"
+          class="title-button"
+          :title="current?.name || '暂无可播放歌曲'"
+          :aria-expanded="expanded"
+          @click="toggleExpanded"
+        >
+          {{ current?.name || "暂无歌曲" }}
+        </button>
+
+        <button
+          type="button"
+          class="expand-button"
           :title="expanded ? '收起播放器' : '展开播放器'"
           :aria-label="expanded ? '收起播放器' : '展开播放器'"
           @click="toggleExpanded"
         >
-          <span class="current-cover">
-            <img
-              v-if="current && hasCover(current.pic)"
-              :src="current.pic"
-              alt=""
-              draggable="false"
-              @error="markCoverBroken(current.pic)"
+          <Icon name="ph:caret-left-bold" />
+        </button>
+
+        <div
+          class="capsule-controls"
+          :class="{ 'is-visible': expanded }"
+          :aria-hidden="!expanded"
+        >
+          <button
+            type="button"
+            class="control-button"
+            title="上一首"
+            aria-label="上一首"
+            :disabled="!current"
+            @click="previous"
+          >
+            <Icon name="ph:skip-back-fill" />
+          </button>
+          <button
+            type="button"
+            class="control-button"
+            title="下一首"
+            aria-label="下一首"
+            :disabled="!current"
+            @click="next()"
+          >
+            <Icon name="ph:skip-forward-fill" />
+          </button>
+          <button
+            v-if="isLoggedIn && current"
+            type="button"
+            class="control-button favorite-control"
+            :class="{ active: isFavorite(current) }"
+            :title="isFavorite(current) ? '取消收藏' : '收藏到我的歌单'"
+            :aria-label="isFavorite(current) ? '取消收藏' : '收藏到我的歌单'"
+            @click="toggleFavorite(current)"
+          >
+            <Icon
+              :name="isFavorite(current) ? 'ph:heart-fill' : 'ph:heart-bold'"
             />
-            <Icon v-else name="ph:music-note-bold" />
-          </span>
-        </button>
-        <button
-          type="button"
-          class="cover-play"
-          :title="playing ? '暂停' : '播放'"
-          :aria-label="playing ? '暂停' : '播放'"
-          :disabled="!current"
-          @click="togglePlay"
-        >
-          <Icon :name="playing ? 'ph:pause-fill' : 'ph:play-fill'" />
-        </button>
-      </div>
-
-      <button
-        type="button"
-        class="title-button"
-        :title="current?.name || '暂无可播放歌曲'"
-        :aria-expanded="expanded"
-        @click="toggleExpanded"
-      >
-        {{ current?.name || "暂无歌曲" }}
-      </button>
-
-      <button
-        type="button"
-        class="expand-button"
-        :title="expanded ? '收起播放器' : '展开播放器'"
-        :aria-label="expanded ? '收起播放器' : '展开播放器'"
-        @click="toggleExpanded"
-      >
-        <Icon name="ph:caret-left-bold" />
-      </button>
-
-      <div
-        class="capsule-controls"
-        :class="{ 'is-visible': expanded }"
-        :aria-hidden="!expanded"
-      >
-        <button
-          type="button"
-          class="control-button"
-          title="上一首"
-          aria-label="上一首"
-          :disabled="!current"
-          @click="previous"
-        >
-          <Icon name="ph:skip-back-fill" />
-        </button>
-        <button
-          type="button"
-          class="control-button"
-          title="下一首"
-          aria-label="下一首"
-          :disabled="!current"
-          @click="next()"
-        >
-          <Icon name="ph:skip-forward-fill" />
-        </button>
-        <button
-          v-if="isLoggedIn && current"
-          type="button"
-          class="control-button favorite-control"
-          :class="{ active: isFavorite(current) }"
-          :title="isFavorite(current) ? '取消收藏' : '收藏到我的歌单'"
-          :aria-label="isFavorite(current) ? '取消收藏' : '收藏到我的歌单'"
-          @click="toggleFavorite(current)"
-        >
-          <Icon
-            :name="isFavorite(current) ? 'ph:heart-fill' : 'ph:heart-bold'"
-          />
-        </button>
-        <button
-          type="button"
-          class="control-button queue-button"
-          :class="{ active: queueOpen }"
-          title="展开歌单"
-          aria-label="展开歌单"
-          :aria-expanded="queueOpen"
-          @click="toggleQueue"
-        >
-          <Icon name="ph:list-bullets-bold" />
-        </button>
+          </button>
+          <button
+            type="button"
+            class="control-button queue-button"
+            :class="{ active: queueOpen }"
+            title="展开歌单"
+            aria-label="展开歌单"
+            :aria-expanded="queueOpen"
+            @click="toggleQueue"
+          >
+            <Icon name="ph:list-bullets-bold" />
+          </button>
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { useBottomDockState } from "~/composables/useBottomDockState";
+
 const emit = defineEmits<{
   (event: "ready", payload: { visible: boolean }): void;
 }>();
@@ -332,6 +358,13 @@ const api = useApi();
 const toast = useToast();
 const { isLoggedIn } = useAuth();
 const { setPlaying, playRequest } = useMusicPlayerState();
+const {
+  autoCollapsed: dockAutoCollapsed,
+  activeBottomDock,
+  recordsIntersecting,
+  clearAutoCollapse,
+  setActiveBottomDock,
+} = useBottomDockState();
 
 const rootRef = ref<HTMLElement | null>(null);
 const audioRef = ref<HTMLAudioElement | null>(null);
@@ -339,6 +372,9 @@ const queueBodyRef = ref<HTMLElement | null>(null);
 const enabled = ref(false);
 const ready = ref(false);
 const expanded = ref(false);
+const devtoolsCollapsed = ref(false);
+const autoCollapseDismissed = ref(false);
+const mobileViewport = ref(false);
 const queueOpen = ref(false);
 const queueLoading = ref(false);
 const autoplay = ref(false);
@@ -368,6 +404,7 @@ const visibleQueueCovers = ref(new Set<string>());
 let playlistRequestId = 0;
 let playRequestId = 0;
 let coverObserver: IntersectionObserver | null = null;
+let mobileMedia: MediaQueryList | null = null;
 
 const vLazyCover = {
   mounted(element: HTMLElement, binding: { value?: string }) {
@@ -392,9 +429,39 @@ const progress = computed(() =>
     ? Math.min(100, Math.max(0, (currentTime.value / duration.value) * 100))
     : 0,
 );
+const waterProgress = computed(() =>
+  playing.value ? Math.max(6, progress.value) : progress.value,
+);
 const activePlaylistName = computed(() => {
   if (playlistTab.value === "favorites") return "我的歌单";
   return playlists.value[playlistIndex.value]?.name || "站点歌单";
+});
+const isDevtoolsCollapsed = computed(
+  () =>
+    devtoolsCollapsed.value ||
+    (dockAutoCollapsed.value && !autoCollapseDismissed.value) ||
+    (mobileViewport.value && activeBottomDock.value === "pagination") ||
+    recordsIntersecting.value,
+);
+
+watch(dockAutoCollapsed, (collapsed) => {
+  if (!collapsed) autoCollapseDismissed.value = false;
+});
+
+watch(isDevtoolsCollapsed, (collapsed) => {
+  if (collapsed) {
+    expanded.value = false;
+    queueOpen.value = false;
+    if (activeBottomDock.value === "music") {
+      setActiveBottomDock(null);
+    }
+  }
+});
+
+watch(expanded, (value) => {
+  if (value && !isDevtoolsCollapsed.value) {
+    setActiveBottomDock("music");
+  }
 });
 
 watch(playing, (value) => setPlaying(value), { immediate: true });
@@ -413,12 +480,17 @@ watch(isLoggedIn, (loggedIn) => {
 onMounted(async () => {
   document.addEventListener("pointerdown", onDocumentPointerDown);
   document.addEventListener("keydown", onDocumentKeydown);
+  mobileMedia = window.matchMedia("(max-width: 640px)");
+  syncMobileViewport();
+  mobileMedia.addEventListener("change", syncMobileViewport);
   await bootstrap();
 });
 
 onUnmounted(() => {
   document.removeEventListener("pointerdown", onDocumentPointerDown);
   document.removeEventListener("keydown", onDocumentKeydown);
+  mobileMedia?.removeEventListener("change", syncMobileViewport);
+  if (activeBottomDock.value === "music") setActiveBottomDock(null);
   setPlaying(false);
   coverObserver?.disconnect();
   coverObserver = null;
@@ -494,8 +566,6 @@ async function loadPlaylist(position: number, initial = false) {
     hasMoreTracks.value = Boolean(response.hasMore);
 
     if (initial) {
-      await preloadCovers(nextTracks.slice(0, 1));
-      if (requestId !== playlistRequestId) return;
       tracks.value = [...nextTracks];
       playbackPlaylistTab.value = "preset";
       playbackPlaylistIndex.value = position;
@@ -503,6 +573,7 @@ async function loadPlaylist(position: number, initial = false) {
       playbackHasMore.value = hasMoreTracks.value;
       index.value = 0;
       resetProgress();
+      void preloadCovers(nextTracks.slice(0, 1));
       await prepareCurrentTrack(false);
     }
   } catch (error) {
@@ -631,6 +702,25 @@ function toggleExpanded() {
   if (!expanded.value) {
     queueOpen.value = false;
   }
+}
+
+function toggleDevtoolsCollapsed() {
+  const wasCollapsed = isDevtoolsCollapsed.value;
+  if (dockAutoCollapsed.value && !recordsIntersecting.value) {
+    autoCollapseDismissed.value = true;
+  } else {
+    clearAutoCollapse();
+  }
+  devtoolsCollapsed.value = !wasCollapsed;
+  if (!wasCollapsed) {
+    expanded.value = false;
+    queueOpen.value = false;
+  }
+  setActiveBottomDock(wasCollapsed ? "music" : null);
+}
+
+function syncMobileViewport() {
+  mobileViewport.value = mobileMedia?.matches ?? false;
 }
 
 function toggleQueue() {
@@ -788,29 +878,8 @@ async function prepareCurrentTrack(shouldPlay: boolean) {
   const audio = audioRef.value;
   if (!audio || !current.value) return;
   applyVolume();
-  const metadataReady = waitForAudioMetadata(audio);
   audio.load();
-  await metadataReady;
   if (shouldPlay) await play();
-}
-
-function waitForAudioMetadata(audio: HTMLAudioElement) {
-  if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
-    onMetadata();
-    return Promise.resolve();
-  }
-  return new Promise<void>((resolve) => {
-    let timer = 0;
-    const finish = () => {
-      window.clearTimeout(timer);
-      audio.removeEventListener("loadedmetadata", finish);
-      audio.removeEventListener("error", finish);
-      resolve();
-    };
-    audio.addEventListener("loadedmetadata", finish, { once: true });
-    audio.addEventListener("error", finish, { once: true });
-    timer = window.setTimeout(finish, 10_000);
-  });
 }
 
 async function tryAutoplay() {
@@ -1029,20 +1098,21 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 .music-capsule {
-  --capsule-height: 34px;
+  --capsule-height: 30px;
   position: relative;
   display: flex;
-  width: 166px;
-  min-width: 166px;
+  width: 198px;
+  min-width: 198px;
   height: var(--capsule-height);
-  flex: 0 0 166px;
-  align-items: flex-end;
+  flex: 0 0 198px;
+  align-items: center;
   opacity: 0;
   visibility: hidden;
   transform: translate3d(0, 9px, 0) scale(0.97);
   transition:
-    width 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    flex-basis 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.6s ease,
+    min-width 0.6s ease,
+    flex-basis 0.6s ease,
     opacity 0.32s ease,
     visibility 0.32s,
     transform 0.52s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1055,15 +1125,63 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 .music-capsule.is-expanded {
-  width: 200px;
-  min-width: 200px;
-  flex-basis: 200px;
+  width: 232px;
+  min-width: 232px;
+  flex-basis: 232px;
 }
 
 .music-capsule.has-auth.is-expanded {
-  width: 223px;
-  min-width: 223px;
-  flex-basis: 223px;
+  width: 255px;
+  min-width: 255px;
+  flex-basis: 255px;
+}
+
+.music-capsule.is-devtools-collapsed {
+  width: 32px;
+  min-width: 32px;
+  flex-basis: 32px;
+}
+
+.music-capsule.is-ready.is-devtools-collapsed {
+  transform: translateY(15px);
+}
+
+.devtools-toggle {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 100%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.devtools-mark {
+  width: 16px;
+  height: 16px;
+  color: var(--c-primary);
+}
+
+.devtools-toggle:hover {
+  opacity: 1;
+}
+
+.devtools-toggle:active {
+  opacity: 0.7;
+}
+
+.devtools-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--c-primary) 58%, transparent);
+  outline-offset: 2px;
 }
 
 .capsule-shell {
@@ -1071,30 +1189,95 @@ function clamp(value: number, minimum: number, maximum: number) {
   z-index: 2;
   display: flex;
   width: 100%;
-  min-width: 0;
+  max-width: 100%;
   height: var(--capsule-height);
   box-sizing: border-box;
   align-items: center;
   gap: 2px;
-  padding: 3px;
-  overflow: visible;
-  border: 0;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--ld-bg-card) 90%, transparent);
-  box-shadow:
-    0 10px 30px color-mix(in srgb, #000 12%, var(--ld-shadow)),
-    0 1px 0 color-mix(in srgb, #fff 68%, transparent) inset;
-  backdrop-filter: blur(18px) saturate(1.28);
-  -webkit-backdrop-filter: blur(18px) saturate(1.28);
+  padding: 2px 2px 2px 2.5px;
+  overflow: hidden;
+  border: 1px solid var(--devtools-widget-border);
+  border-radius: 100px;
+  background-color: var(--devtools-widget-bg);
+  color: var(--devtools-widget-fg);
+  box-shadow: 2px 2px 8px var(--devtools-widget-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  user-select: none;
+  touch-action: none;
   transition:
-    background-color 0.3s ease,
-    box-shadow 0.3s ease;
+    all 0.6s,
+    max-width 0.6s,
+    padding 0.5s,
+    transform 0.4s,
+    opacity 0.2s;
 }
 
-.music-capsule.is-expanded .capsule-shell {
-  box-shadow:
-    0 12px 32px color-mix(in srgb, #000 14%, var(--ld-shadow)),
-    0 1px 0 color-mix(in srgb, #fff 72%, transparent) inset;
+.music-capsule.is-devtools-collapsed .capsule-shell {
+  max-width: 32px;
+  padding: 2px 0;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.music-capsule.is-devtools-collapsed .devtools-toggle {
+  position: absolute;
+  top: 50%;
+  left: 2.5px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  transform: translateY(-50%);
+  place-items: center;
+}
+
+.capsule-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  height: 30px;
+  align-items: center;
+  gap: 2px;
+  opacity: 1;
+  transition: opacity 0.4s;
+}
+
+.music-capsule.is-devtools-collapsed .capsule-content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.devtools-glowing {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 160px;
+  height: 160px;
+  border-radius: 9999px;
+  background-image: linear-gradient(
+    45deg,
+    var(--c-primary),
+    var(--c-primary),
+    var(--c-primary)
+  );
+  opacity: 0;
+  filter: blur(60px);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: all 1s;
+}
+
+.music-capsule:hover .devtools-glowing {
+  opacity: 0.22;
+}
+
+.music-capsule.is-devtools-collapsed .queue-panel {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 10px, 0) scale(0.97);
 }
 
 .control-button:focus-visible,
@@ -1118,6 +1301,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   overflow: hidden;
   border-radius: inherit;
   pointer-events: none;
+  transition: opacity 0.4s;
 }
 
 .water-level {
@@ -1125,7 +1309,11 @@ function clamp(value: number, minimum: number, maximum: number) {
   right: 0;
   bottom: 0;
   left: 0;
-  background: color-mix(in srgb, var(--c-primary) 10%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c-primary) 12%, transparent),
+    color-mix(in srgb, var(--c-primary) 20%, transparent)
+  );
   transition:
     height 0.45s linear,
     opacity 0.24s ease;
@@ -1137,34 +1325,40 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 .water-wave {
   position: absolute;
-  top: -5px;
-  left: -14%;
-  width: 128%;
-  height: 10px;
-  border-radius: 48% 52% 43% 57%;
-  background: color-mix(in srgb, var(--c-primary) 13%, var(--ld-bg-card));
-  opacity: 0.62;
-  transform-origin: center;
-  animation: water-wave 8s ease-in-out infinite alternate;
+  top: -7px;
+  left: -24px;
+  width: calc(200% + 48px);
+  height: 12px;
+  background: radial-gradient(
+      ellipse at 50% 100%,
+      color-mix(in srgb, var(--c-primary) 28%, var(--devtools-widget-bg)) 0 54%,
+      transparent 56%
+    )
+    0 0 / 24px 11px repeat-x;
+  opacity: 0.76;
+  animation: water-wave-front 2.4s linear infinite;
 }
 
 .water-wave-back {
-  top: -3px;
-  left: -20%;
-  width: 140%;
-  height: 8px;
-  background: color-mix(in srgb, var(--c-primary) 15%, transparent);
-  opacity: 0.42;
-  animation-duration: 10s;
-  animation-direction: alternate-reverse;
+  top: -5px;
+  left: -18px;
+  height: 10px;
+  background: radial-gradient(
+      ellipse at 50% 100%,
+      color-mix(in srgb, var(--c-primary) 20%, var(--devtools-widget-bg)) 0 52%,
+      transparent 55%
+    )
+    0 0 / 18px 9px repeat-x;
+  opacity: 0.5;
+  animation: water-wave-back 3.2s linear infinite;
 }
 
 .water-level.active .water-wave-front {
-  animation-duration: 3.4s;
+  animation-duration: 1.65s;
 }
 
 .water-level.active .water-wave-back {
-  animation-duration: 4.6s;
+  animation-duration: 2.2s;
 }
 
 .water-level.is-full .water-wave {
@@ -1191,22 +1385,22 @@ function clamp(value: number, minimum: number, maximum: number) {
 .cover-cluster {
   position: relative;
   z-index: 2;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
 }
 
 .cover-button {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   place-items: center;
 }
 
 .current-cover {
   position: relative;
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   overflow: hidden;
   border-radius: 50%;
   background: var(--c-bg-2);
@@ -1228,11 +1422,11 @@ function clamp(value: number, minimum: number, maximum: number) {
 .cover-play {
   position: absolute;
   z-index: 3;
-  top: 5px;
-  left: 5px;
+  top: 4px;
+  left: 4px;
   display: grid;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -1274,7 +1468,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   display: block;
   width: 110px;
   overflow: hidden;
-  color: var(--c-text);
+  color: inherit;
   font-size: 0.64rem;
   font-weight: 660;
   line-height: 30px;
@@ -1395,21 +1589,22 @@ function clamp(value: number, minimum: number, maximum: number) {
   position: absolute;
   right: 0;
   bottom: calc(100% + 9px);
-  z-index: 1;
+  z-index: 4;
   display: flex;
-  width: 100%;
-  max-height: min(348px, calc(100dvh - 110px));
+  width: min(292px, calc(100vw - 24px));
+  height: min(360px, calc(100dvh - 96px));
   flex-direction: column;
   overflow: hidden;
-  border: 0;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--ld-bg-card) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ld-bg-card) 97%, transparent);
   box-shadow:
     0 24px 60px color-mix(in srgb, #000 18%, var(--ld-shadow)),
     0 1px 0 color-mix(in srgb, #fff 68%, transparent) inset;
   backdrop-filter: blur(22px) saturate(1.22);
   -webkit-backdrop-filter: blur(22px) saturate(1.22);
   transform-origin: bottom right;
+  will-change: opacity, transform;
 }
 
 .queue-header {
@@ -1456,6 +1651,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 .playlist-tab:hover {
+  background: color-mix(in srgb, var(--c-primary-soft) 72%, transparent);
   color: var(--c-text);
 }
 
@@ -1552,7 +1748,8 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 .queue-track:hover {
-  background: color-mix(in srgb, var(--c-bg-2) 82%, transparent);
+  background: color-mix(in srgb, var(--c-primary-soft) 58%, var(--c-bg-2));
+  transform: translateX(2px);
 }
 
 .queue-track.active {
@@ -1706,14 +1903,14 @@ function clamp(value: number, minimum: number, maximum: number) {
 .queue-panel-enter-active,
 .queue-panel-leave-active {
   transition:
-    opacity 0.25s ease,
-    transform 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 0.22s ease,
+    transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .queue-panel-enter-from,
 .queue-panel-leave-to {
   opacity: 0;
-  transform: translate3d(0, 12px, 0) scale(0.975);
+  transform: translate3d(0, 10px, 0) scale(0.985);
 }
 
 .queue-loading-enter-active,
@@ -1734,15 +1931,15 @@ function clamp(value: number, minimum: number, maximum: number) {
   }
 }
 
-@keyframes water-wave {
-  0% {
-    transform: translate3d(-2%, 0, 0) rotate(-1deg) scaleY(0.88);
+@keyframes water-wave-front {
+  to {
+    transform: translate3d(24px, 0, 0);
   }
-  50% {
-    transform: translate3d(1.5%, -1px, 0) rotate(1deg) scaleY(1.08);
-  }
-  100% {
-    transform: translate3d(3%, 0, 0) rotate(-0.5deg) scaleY(0.94);
+}
+
+@keyframes water-wave-back {
+  to {
+    transform: translate3d(-18px, 0, 0);
   }
 }
 
@@ -1760,21 +1957,32 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 @media (max-width: 640px) {
   .music-capsule {
-    width: 166px;
-    min-width: 166px;
-    flex-basis: 166px;
+    width: 162px;
+    min-width: 162px;
+    flex-basis: 162px;
   }
 
   .music-capsule.is-expanded,
   .music-capsule.has-auth.is-expanded {
-    width: 194px;
-    min-width: 194px;
-    flex-basis: 194px;
+    width: 186px;
+    min-width: 186px;
+    flex-basis: 186px;
+  }
+
+  .music-capsule.is-devtools-collapsed,
+  .music-capsule.has-auth.is-expanded.is-devtools-collapsed {
+    width: 32px;
+    min-width: 32px;
+    flex-basis: 32px;
+  }
+
+  .title-button {
+    display: block;
+    width: 74px;
   }
 
   .music-capsule.is-expanded .title-button {
-    display: block;
-    width: 70px;
+    width: 34px;
   }
 
   .music-capsule.is-expanded .favorite-control {
@@ -1787,8 +1995,26 @@ function clamp(value: number, minimum: number, maximum: number) {
 
   .queue-panel {
     right: 0;
-    width: 100%;
-    max-height: min(332px, calc(100dvh - 140px));
+    width: min(292px, calc(100vw - 16px));
+    height: min(340px, calc(100dvh - 124px));
+  }
+}
+
+@media (max-width: 360px) {
+  .music-capsule,
+  .music-capsule.is-expanded,
+  .music-capsule.has-auth.is-expanded {
+    width: 150px;
+    min-width: 150px;
+    flex-basis: 150px;
+  }
+
+  .title-button {
+    width: 62px;
+  }
+
+  .music-capsule.is-expanded .title-button {
+    display: none;
   }
 }
 
@@ -1808,6 +2034,10 @@ function clamp(value: number, minimum: number, maximum: number) {
 @media (prefers-reduced-motion: reduce) {
   .music-capsule,
   .capsule-shell,
+  .capsule-content,
+  .devtools-glowing,
+  .devtools-toggle,
+  .water-progress,
   .queue-panel-enter-active,
   .queue-panel-leave-active,
   .water-wave,
@@ -1815,6 +2045,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   .loading-disc,
   .loading-spinner {
     animation: none !important;
+    transition: none !important;
   }
 }
 </style>
