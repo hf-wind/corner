@@ -56,7 +56,7 @@ describe('AiService chat usage controls', () => {
   };
 
   it('allows guest chat with the guest output cap and returns remaining quota', async () => {
-    const { service, redis, pipeline } = createService();
+    const { service, prisma, redis } = createService();
     const onToken = jest.fn();
     const chatStream = jest
       .spyOn(service, 'chatStream')
@@ -87,7 +87,13 @@ describe('AiService chat usage controls', () => {
       source: 'ai',
       usage: { audience: 'guest', limit: 12, remaining: 11 },
     });
-    expect(pipeline.exec).toHaveBeenCalledTimes(2);
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(2);
+    expect(prisma.chatMessage.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: undefined,
+        guestIdHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    });
   });
 
   it('blocks a guest before calling the model when daily quota is exhausted', async () => {

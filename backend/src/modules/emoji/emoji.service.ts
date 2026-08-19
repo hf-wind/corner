@@ -9,22 +9,21 @@ import { UpdateEmojiItemDto } from './dto/update-emoji-item.dto';
 export class EmojiService {
   constructor(private prisma: PrismaService) {}
 
-  async getPacks(includeDisabled = false, itemLimit?: number) {
+  async getPacks(includeDisabled = false) {
     const packs = await this.prisma.emojiPack.findMany({
       where: includeDisabled ? {} : { enabled: true },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        enabled: true,
+        sort: true,
+        compressAnimated: true,
         _count: { select: { items: true } },
-        items: {
-          orderBy: { sort: 'asc' },
-          ...(itemLimit ? { take: itemLimit } : {}),
-        },
       },
       orderBy: { sort: 'asc' },
     });
-    return packs.map((pack) => ({
-      ...pack,
-      items: pack.items.map((item) => this.presentItem(item)),
-    }));
+    return packs;
   }
 
   async getPackItems(id: string, page = 1, limit = 48) {
@@ -34,7 +33,7 @@ export class EmojiService {
     const [items, total] = await Promise.all([
       this.prisma.emojiItem.findMany({
         where: { packId: id },
-        orderBy: { sort: 'asc' },
+        orderBy: [{ sort: 'asc' }, { id: 'asc' }],
         skip: (safePage - 1) * safeLimit,
         take: safeLimit,
       }),
@@ -51,7 +50,6 @@ export class EmojiService {
   async getPack(id: string) {
     const pack = await this.prisma.emojiPack.findUnique({
       where: { id },
-      include: { items: { orderBy: { sort: 'asc' } } },
     });
     if (!pack) throw new NotFoundException('Emoji pack not found');
     return pack;

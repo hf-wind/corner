@@ -762,6 +762,7 @@ export class AiNativeService {
           return {
             actorType: 'user',
             actorId: item.userId,
+            conversationId: item.userId,
             name: user?.username || '已注销用户',
             email: user?.email || '',
             calls: item._count._all,
@@ -771,6 +772,7 @@ export class AiNativeService {
         ...guestGroups.map((item) => ({
           actorType: 'guest',
           actorId: item.guestIdHash?.slice(0, 12),
+          conversationId: `guest:${item.guestIdHash}`,
           name: `访客 ${item.guestIdHash?.slice(0, 8)}`,
           email: '',
           calls: item._count._all,

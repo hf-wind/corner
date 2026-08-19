@@ -3,6 +3,11 @@
     class="global-bottom-dock"
     :class="[
       { 'is-ready': dockReady },
+      { 'is-space-theme': isSpaceTheme },
+      {
+        'is-music-active': activeBottomDock === 'music',
+        'is-pagination-active': activeBottomDock === 'pagination',
+      },
       {
         'has-pagination': paginationVisible,
         'has-music': musicVisible,
@@ -24,10 +29,20 @@
 import MusicCapsule from "~/components/MusicCapsule.vue";
 import { useBottomDockState } from "~/composables/useBottomDockState";
 
-const { contentReady, paginationVisible, setAutoCollapsed } =
-  useBottomDockState();
+const {
+  activeBottomDock,
+  contentReady,
+  paginationVisible,
+  setActiveBottomDock,
+  setAutoCollapsed,
+} = useBottomDockState();
 const musicReady = ref(false);
+const route = useRoute();
+const isSpaceTheme = computed(
+  () => route.path === "/" || route.path === "/time/constellation",
+);
 const musicVisible = ref(false);
+const initialDockPriorityApplied = ref(false);
 const dockHovered = ref(false);
 let autoCollapseTimer = 0;
 const dockReady = computed(() => contentReady.value && musicReady.value);
@@ -35,6 +50,20 @@ const dockReady = computed(() => contentReady.value && musicReady.value);
 function onMusicReady(payload: { visible: boolean }) {
   musicReady.value = true;
   musicVisible.value = payload.visible;
+}
+
+function applyInitialDockPriority() {
+  if (
+    initialDockPriorityApplied.value ||
+    !musicReady.value ||
+    !paginationVisible.value ||
+    !musicVisible.value
+  ) {
+    return;
+  }
+  initialDockPriorityApplied.value = true;
+  setAutoCollapsed(false);
+  setActiveBottomDock("pagination");
 }
 
 function clearAutoCollapseTimer() {
@@ -83,6 +112,18 @@ watch(
   { immediate: true },
 );
 
+watch([musicReady, paginationVisible, musicVisible], applyInitialDockPriority, {
+  immediate: true,
+});
+
+watch(
+  () => route.path,
+  () => {
+    initialDockPriorityApplied.value = false;
+    void nextTick(applyInitialDockPriority);
+  },
+);
+
 onUnmounted(() => {
   clearAutoCollapseTimer();
   dockHovered.value = false;
@@ -93,6 +134,7 @@ onUnmounted(() => {
 <style scoped>
 .global-bottom-dock {
   --capsule-height: 30px;
+  view-transition-name: none;
   position: fixed;
   z-index: 1200;
   bottom: max(10px, env(safe-area-inset-bottom));
@@ -108,6 +150,7 @@ onUnmounted(() => {
   visibility: hidden;
   transform: translate3d(-50%, 10px, 0);
   transition:
+    gap 0.42s cubic-bezier(0.16, 1, 0.3, 1),
     opacity 0.2s ease,
     transform 0.4s ease,
     visibility 0.2s;
@@ -119,14 +162,46 @@ onUnmounted(() => {
   transform: translate3d(-50%, 0, 0);
 }
 
+.global-bottom-dock.is-space-theme {
+  --devtools-widget-bg: rgb(12 17 27 / 94%);
+  --devtools-widget-fg: #f4f7fb;
+  --devtools-widget-border: rgb(255 255 255 / 14%);
+  --devtools-widget-shadow: rgb(0 0 0 / 38%);
+  --ld-bg-card: #111827;
+  --c-bg-2: #182235;
+  --c-text: #f4f7fb;
+  --c-text-2: #c5cfdd;
+  --c-text-3: #8793a5;
+  --border: rgb(255 255 255 / 12%);
+}
+
 .global-bottom-dock > * {
   pointer-events: auto;
 }
 
-.pagination-dock {
+.pagination-dock,
+.music-dock {
   display: flex;
+  min-width: 0;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
+  opacity: 1;
+  visibility: visible;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition:
+    max-width 0.52s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.24s ease,
+    visibility 0.24s,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pagination-dock {
+  max-width: 132px;
+}
+
+.music-dock {
+  max-width: 255px;
 }
 
 .pagination-dock:empty {
@@ -137,6 +212,23 @@ onUnmounted(() => {
   display: none;
 }
 
+.global-bottom-dock.has-pagination.has-music.is-music-active .pagination-dock,
+.global-bottom-dock.has-pagination.has-music.is-pagination-active .music-dock {
+  max-width: 0;
+  overflow: clip;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate3d(0, 4px, 0) scale(0.88);
+}
+
+.global-bottom-dock.has-pagination.has-music:is(
+    .is-music-active,
+    .is-pagination-active
+  ) {
+  gap: 0;
+}
+
 @media (max-width: 640px) {
   .global-bottom-dock {
     bottom: max(10px, env(safe-area-inset-bottom));
@@ -144,35 +236,8 @@ onUnmounted(() => {
     gap: 6px;
   }
 
-  .global-bottom-dock.has-pagination.has-music {
-    width: 70px;
-    max-width: 70px;
-  }
-
-  .global-bottom-dock.has-pagination.has-music .pagination-dock,
-  .global-bottom-dock.has-pagination.has-music .music-dock {
-    position: relative;
-    display: block;
-    width: 32px;
-    height: var(--capsule-height);
-    flex: 0 0 32px;
-    overflow: visible;
-  }
-
-  .global-bottom-dock.has-pagination.has-music
-    .pagination-dock
-    > :deep(.pagination-anchor) {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-  }
-
-  .global-bottom-dock.has-pagination.has-music
-    .music-dock
-    > :deep(.music-capsule) {
-    position: absolute;
-    bottom: 0;
-    left: 0;
+  .music-dock {
+    max-width: 186px;
   }
 }
 

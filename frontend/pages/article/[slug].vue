@@ -86,26 +86,17 @@
           class="article-lead article-anim"
           aria-label="文章导读"
         >
-          <div
-            v-if="article.excerpt"
-            class="md-excerpt"
-            ref="excerptRef"
-            data-animation="true"
-            data-speed="30"
-          >
-            <span class="excerpt-mark"
-              ><Icon name="ph:highlighter-bold"
-            /></span>
+          <div v-if="article.excerpt" class="md-excerpt">
+            <span class="excerpt-mark"><Icon name="ph:quotes-bold" /></span>
             <span class="excerpt-content">
-              <small>文章摘要</small>
+              <small><b>文章导读</b><i>READING NOTE</i></small>
               <span class="excerpt-copy">
-                <span ref="excerptTextRef" :data-text="article.excerpt"></span>
+                <span>{{ typedExcerpt }}</span>
                 <span
-                  ref="excerptCaretRef"
+                  v-if="excerptTyping"
                   class="excerpt-caret"
                   aria-hidden="true"
-                  >_</span
-                >
+                />
               </span>
             </span>
           </div>
@@ -247,9 +238,6 @@ const nextArticle = ref<any>(null);
 const shareOpen = ref(false);
 const posterOpen = ref(false);
 
-const excerptRef = ref<HTMLElement | null>(null);
-const excerptTextRef = ref<HTMLElement | null>(null);
-const excerptCaretRef = ref<HTMLElement | null>(null);
 const noticeRef = ref<HTMLElement | null>(null);
 const articleMainRef = ref<HTMLElement | null>(null);
 const articleContentRef = ref<HTMLElement | null>(null);
@@ -260,6 +248,16 @@ const adjacentLoaded = ref(false);
 const readingProgress = ref(0);
 const showBackTop = ref(false);
 const immersiveMode = ref(false);
+const excerptVisibleCount = ref(0);
+const excerptCharacters = computed(() =>
+  Array.from(String(article.value?.excerpt || "")),
+);
+const typedExcerpt = computed(() =>
+  excerptCharacters.value.slice(0, excerptVisibleCount.value).join(""),
+);
+const excerptTyping = computed(
+  () => excerptVisibleCount.value < excerptCharacters.value.length,
+);
 const articleContext = computed(() => ({
   title: article.value?.title || "",
   content: article.value?.content || "",
@@ -414,7 +412,7 @@ function onPageKeydown(event: KeyboardEvent) {
 
 let scrollFrame: number | null = null;
 let articleResizeObserver: ResizeObserver | null = null;
-let excerptTimer: ReturnType<typeof setTimeout> | null = null;
+let excerptFrame: number | null = null;
 
 function updateArticleScrollState() {
   const container = articleMainRef.value;
@@ -449,34 +447,29 @@ function handleArticleScroll() {
 }
 
 function typeExcerpt() {
-  const container = excerptRef.value;
-  if (!container || container.dataset.animation === "false") return;
-  const el = excerptTextRef.value;
-  const caret = excerptCaretRef.value;
-  if (!el) return;
-  const text = el.dataset.text || "";
-  const speed = parseInt(container.dataset.speed || "30");
-  const characters = Array.from(text);
-  if (excerptTimer) clearTimeout(excerptTimer);
-  el.textContent = "";
-  if (caret) caret.style.visibility = "visible";
+  if (excerptFrame !== null) cancelAnimationFrame(excerptFrame);
+  const characters = excerptCharacters.value;
+  excerptVisibleCount.value = 0;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    el.textContent = text;
-    if (caret) caret.style.visibility = "hidden";
+    excerptVisibleCount.value = characters.length;
     return;
   }
-  let index = 0;
-  function type() {
-    if (index < characters.length) {
-      el!.textContent += characters[index];
-      index++;
-      excerptTimer = setTimeout(type, speed);
-    } else if (caret) {
-      caret.style.visibility = "hidden";
-      excerptTimer = null;
+  let previous = performance.now();
+  let delay = 28;
+  const tick = (now: number) => {
+    if (now - previous >= delay) {
+      excerptVisibleCount.value += 1;
+      const character = characters[excerptVisibleCount.value - 1] || "";
+      delay = /[，。！？；：,.!?;:]/.test(character) ? 118 : 28;
+      previous = now;
     }
-  }
-  type();
+    if (excerptVisibleCount.value < characters.length) {
+      excerptFrame = requestAnimationFrame(tick);
+    } else {
+      excerptFrame = null;
+    }
+  };
+  excerptFrame = requestAnimationFrame(tick);
 }
 
 function checkOutdated() {
@@ -524,7 +517,7 @@ onUnmounted(() => {
   if (articleMainRef.value) gsap.killTweensOf(articleMainRef.value);
   articleResizeObserver?.disconnect();
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
-  if (excerptTimer) clearTimeout(excerptTimer);
+  if (excerptFrame !== null) cancelAnimationFrame(excerptFrame);
 });
 </script>
 
@@ -784,16 +777,18 @@ onUnmounted(() => {
 .article-lead {
   position: relative;
   margin-bottom: 22px;
-  border-top: 1px solid color-mix(in srgb, var(--c-text) 12%, var(--border));
-  border-bottom: 1px solid color-mix(in srgb, var(--c-text) 12%, var(--border));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-primary-soft) 28%, var(--ld-bg-card));
 }
 
 .article-lead::before {
   position: absolute;
-  top: -1px;
+  top: 0;
+  bottom: 0;
   left: 0;
-  width: 72px;
-  height: 2px;
+  width: 3px;
   background: var(--c-primary);
   content: "";
 }
@@ -801,8 +796,8 @@ onUnmounted(() => {
 .md-excerpt {
   display: flex;
   align-items: stretch;
-  gap: 16px;
-  padding: 19px 8px 21px;
+  gap: 15px;
+  padding: 18px 20px 19px 18px;
   font-family: var(--font-rounded);
   font-size: 13px;
   line-height: 1.95;
@@ -821,14 +816,15 @@ onUnmounted(() => {
 
 .excerpt-mark {
   display: grid;
-  width: 34px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
-  padding-top: 3px;
-  border-right: 1px solid
-    color-mix(in srgb, var(--c-primary) 24%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c-primary-soft) 72%, transparent);
   color: color-mix(in srgb, var(--c-primary) 84%, var(--c-text));
   font-size: 1rem;
-  place-items: start center;
+  place-items: center;
 }
 
 .excerpt-content {
@@ -841,32 +837,50 @@ onUnmounted(() => {
 .excerpt-content > small {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   color: var(--c-primary);
   font-family: var(--font-mono);
   font-size: 0.5rem;
   font-weight: 700;
+  line-height: 1;
+}
+
+.excerpt-content > small b,
+.excerpt-content > small i {
+  font: inherit;
+  font-style: normal;
+}
+
+.excerpt-content > small i {
+  color: var(--c-text-3);
+  font-weight: 500;
 }
 
 .excerpt-content > small::after {
-  width: min(80px, 22vw);
+  width: min(92px, 18vw);
   height: 1px;
   background: color-mix(in srgb, var(--c-primary) 22%, transparent);
   content: "";
 }
 
 .excerpt-copy {
+  display: inline;
   flex: 1;
   min-width: 0;
   color: color-mix(in srgb, var(--c-text) 84%, var(--c-text-2));
   font-family: var(--font-summary);
   font-weight: 500;
+  overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 
 .excerpt-caret {
   display: inline-block;
-  width: 0.65em;
+  width: 1px;
+  height: 1.05em;
+  margin-left: 3px;
+  border-left: 1px solid var(--c-primary);
+  vertical-align: -0.16em;
   animation: blink 0.8s infinite;
 }
 
@@ -1151,8 +1165,9 @@ onUnmounted(() => {
   }
 
   .md-excerpt {
-    gap: 12px;
-    padding: 17px 3px 18px;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 15px 14px 16px 13px;
   }
 
   .article-lead {
@@ -1160,7 +1175,18 @@ onUnmounted(() => {
   }
 
   .excerpt-mark {
-    width: 29px;
+    width: 28px;
+    height: 28px;
+    font-size: 0.86rem;
+  }
+
+  .excerpt-content {
+    gap: 8px;
+  }
+
+  .excerpt-copy {
+    font-size: 0.76rem;
+    line-height: 1.85;
   }
 
   .article-shell {

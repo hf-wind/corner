@@ -1,455 +1,603 @@
 <template>
-  <div>
+  <div class="emoji-admin">
     <div class="table-toolbar">
-      <a-button type="primary" @click="openAddPack"><PlusOutlined /> 添加表情包</a-button>
+      <a-button type="primary" @click="openAddPack">
+        <PlusOutlined /> 添加表情包
+      </a-button>
     </div>
 
-    <div class="emoji-body" v-if="!loading">
-      <a-spin :spinning="saving" class="table-spin">
-        <div v-for="pack in packs" :key="pack.id" class="emoji-pack-card">
-          <div class="pack-header" @click="togglePackExpand(pack.id)">
-            <div class="pack-info">
-              <Icon :name="expandedPacks[pack.id] ? 'ph:caret-down-bold' : 'ph:caret-right-bold'" class="pack-collapse-icon" />
-              <span class="pack-name">{{ pack.name }}</span>
-              <span class="pack-type" :class="pack.type">{{ pack.type === 'animated' ? '动态' : '静态' }}</span>
-              <span class="pack-count">{{ pack.items?.length || 0 }} 个表情</span>
-              <a-switch v-model:checked="pack.enabled" size="small" @click.stop @change="togglePack(pack)" checked-children="启" un-checked-children="关" />
-            </div>
-            <div class="pack-actions" @click.stop>
-              <a-button type="link" size="small" @click="openAddItem(pack)"><PlusOutlined /> 添加表情</a-button>
-              <a-button type="link" size="small" @click="openEditPack(pack)"><EditOutlined /></a-button>
-              <a-button type="link" size="small" danger @click="removePack(pack)"><DeleteOutlined /></a-button>
-            </div>
+    <a-table
+      row-key="id"
+      :columns="packColumns"
+      :data-source="packs"
+      :loading="loading"
+      :pagination="false"
+      :expanded-row-keys="expandedPackIds"
+      :scroll="{ x: 760 }"
+      @expand="onPackExpand"
+    >
+      <template #bodyCell="{ column, record: pack }">
+        <template v-if="column.key === 'name'">
+          <strong class="pack-name">{{ pack.name }}</strong>
+        </template>
+        <template v-else-if="column.key === 'type'">
+          <a-tag :color="pack.type === 'animated' ? 'orange' : 'blue'">
+            {{ pack.type === "animated" ? "动态图片" : "Unicode" }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'count'">
+          {{ pack._count?.items || 0 }} 个
+        </template>
+        <template v-else-if="column.key === 'enabled'">
+          <a-switch
+            v-model:checked="pack.enabled"
+            size="small"
+            checked-children="启"
+            un-checked-children="关"
+            @change="togglePack(pack)"
+          />
+        </template>
+        <template v-else-if="column.key === 'actions'">
+          <div class="table-actions">
+            <a-button
+              type="link"
+              size="small"
+              title="添加表情"
+              @click="openAddItem(pack)"
+            >
+              <PlusOutlined /> 添加
+            </a-button>
+            <a-button
+              type="text"
+              size="small"
+              title="编辑表情包"
+              @click="openEditPack(pack)"
+            >
+              <EditOutlined />
+            </a-button>
+            <a-button
+              type="text"
+              size="small"
+              danger
+              title="删除表情包"
+              @click="removePack(pack)"
+            >
+              <DeleteOutlined />
+            </a-button>
           </div>
-          <div v-show="expandedPacks[pack.id]" class="pack-items">
-            <div v-for="item in pack.items" :key="item.id" class="emoji-item-card" @click="openEditItem(pack, item)">
-              <div v-if="pack.type === 'animated' && item.imageUrl" class="emoji-item-img">
-                <img :src="mediaUrl(item.imageUrl)" :alt="item.label" loading="lazy" :data-fallback="item.char || '?'" @error="onImgError" />
-              </div>
-              <div v-else-if="item.char" class="emoji-item-char">{{ item.char }}</div>
-              <div v-else class="emoji-item-char">❓</div>
-              <div class="emoji-item-label">{{ item.label || item.char }}</div>
-            </div>
+        </template>
+      </template>
+
+      <template #expandedRowRender="{ record: pack }">
+        <div class="items-table-wrap">
+          <div class="items-heading">
+            <span>{{ pack.name }} / 表情明细</span>
+            <a-button size="small" @click="openAddItem(pack)"
+              ><PlusOutlined /> 添加表情</a-button
+            >
           </div>
+          <a-table
+            row-key="id"
+            size="small"
+            :columns="itemColumns"
+            :data-source="itemStates[pack.id]?.items || []"
+            :loading="itemStates[pack.id]?.loading"
+            :scroll="{ x: 660 }"
+            :pagination="{
+              current: itemStates[pack.id]?.page || 1,
+              pageSize: itemStates[pack.id]?.pageSize || 20,
+              total: itemStates[pack.id]?.total || 0,
+              showSizeChanger: false,
+              showTotal: (total: number) => `共 ${total} 条`,
+            }"
+            @change="
+              (pagination: any) => changeItemPage(pack, pagination.current || 1)
+            "
+          >
+            <template #bodyCell="{ column, record: item }">
+              <template v-if="column.key === 'preview'">
+                <span v-if="pack.type === 'static'" class="emoji-char">{{
+                  item.char || "?"
+                }}</span>
+                <span v-else class="emoji-image">
+                  <img
+                    v-if="item.imageUrl"
+                    :src="mediaUrl(item.imageUrl)"
+                    :alt="item.label || '表情'"
+                    loading="lazy"
+                  />
+                  <Icon v-else name="ph:image-broken-bold" />
+                </span>
+              </template>
+              <template v-else-if="column.key === 'content'">
+                <code class="item-content">{{
+                  item.char || item.imageUrl || "-"
+                }}</code>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <div class="table-actions">
+                  <a-button
+                    type="link"
+                    size="small"
+                    @click="openEditItem(pack, item)"
+                    >编辑</a-button
+                  >
+                  <a-button
+                    type="link"
+                    size="small"
+                    danger
+                    @click="removeItem(pack, item)"
+                    >删除</a-button
+                  >
+                </div>
+              </template>
+            </template>
+          </a-table>
         </div>
-      </a-spin>
-    </div>
+      </template>
+    </a-table>
 
-    <a-modal v-model:open="packDialog.open" :title="packDialog.editing ? '编辑表情包' : '添加表情包'" width="420px" @ok="confirmPack">
+    <a-modal
+      v-model:open="packDialog.open"
+      :title="packDialog.editing ? '编辑表情包' : '添加表情包'"
+      width="420px"
+      @ok="confirmPack"
+    >
       <div class="add-field">
-        <label class="add-label">名称</label>
-        <a-input v-model:value="packDialog.name" placeholder="如：笑脸·静态" />
+        <label class="add-label">名称</label
+        ><a-input v-model:value="packDialog.name" placeholder="如：笑脸·静态" />
       </div>
       <div class="add-field">
         <label class="add-label">类型</label>
-        <a-select v-model:value="packDialog.type" style="width:100%">
+        <a-select v-model:value="packDialog.type" style="width: 100%">
           <a-select-option value="static">静态（Unicode 字符）</a-select-option>
           <a-select-option value="animated">动态（图片 URL）</a-select-option>
         </a-select>
       </div>
-      <div class="add-field" v-if="packDialog.type === 'animated'">
+      <div v-if="packDialog.type === 'animated'" class="add-field">
         <label class="add-label">GIF 压缩</label>
-        <a-switch v-model:checked="packDialog.compressAnimated" checked-children="开" un-checked-children="关" />
+        <a-switch
+          v-model:checked="packDialog.compressAnimated"
+          checked-children="开"
+          un-checked-children="关"
+        />
         <div class="add-hint">上传 GIF 时自动压缩为动画 WebP</div>
       </div>
       <div class="add-field">
-        <label class="add-label">排序</label>
-        <a-input-number v-model:value="packDialog.sort" :min="0" style="width:100%" />
+        <label class="add-label">排序</label
+        ><a-input-number
+          v-model:value="packDialog.sort"
+          :min="0"
+          style="width: 100%"
+        />
       </div>
     </a-modal>
 
-    <a-modal v-model:open="itemDialog.open" :title="itemDialog.editing ? '编辑表情' : '添加表情'" width="480px" @ok="confirmItem">
+    <a-modal
+      v-model:open="itemDialog.open"
+      :title="itemDialog.editing ? '编辑表情' : '添加表情'"
+      width="480px"
+      @ok="confirmItem"
+    >
       <div class="add-field">
-        <label class="add-label">标签</label>
-        <a-input v-model:value="itemDialog.label" placeholder="表情描述文字" />
+        <label class="add-label">标签</label
+        ><a-input v-model:value="itemDialog.label" placeholder="表情描述文字" />
       </div>
-      <template v-if="selectedPackType === 'static'">
-        <div class="add-field">
-          <label class="add-label">字符</label>
-          <a-input v-model:value="itemDialog.char" placeholder="如：😀" maxlength="4" />
-          <div class="add-hint">输入 Unicode 表情字符</div>
-        </div>
-      </template>
+      <div v-if="selectedPackType === 'static'" class="add-field">
+        <label class="add-label">字符</label
+        ><a-input
+          v-model:value="itemDialog.char"
+          placeholder="如：😀"
+          maxlength="4"
+        />
+        <div class="add-hint">输入 Unicode 表情字符</div>
+      </div>
       <template v-else>
         <div class="add-field">
-          <label class="add-label">图片 URL</label>
-          <a-input v-model:value="itemDialog.imageUrl" placeholder="https://..." />
+          <label class="add-label">图片 URL</label
+          ><a-input
+            v-model:value="itemDialog.imageUrl"
+            placeholder="https://..."
+          />
         </div>
         <div class="add-field">
-          <label class="add-label">或从媒体库选择</label>
-          <a-button @click="openMediaLibrary"><FolderOutlined /> 选择图片</a-button>
+          <label class="add-label">或从媒体库选择</label
+          ><a-button @click="openMediaLibrary"
+            ><FolderOutlined /> 选择图片</a-button
+          >
         </div>
         <div v-if="itemDialog.imageUrl" class="emoji-item-preview">
-          <img :src="mediaUrl(itemDialog.imageUrl)" alt="preview" loading="lazy" :data-fallback="itemDialog.char || '?'" @error="onImgError" />
+          <img
+            :src="mediaUrl(itemDialog.imageUrl)"
+            alt="preview"
+            loading="lazy"
+          />
         </div>
       </template>
       <div class="add-field">
-        <label class="add-label">排序</label>
-        <a-input-number v-model:value="itemDialog.sort" :min="0" style="width:100%" />
+        <label class="add-label">排序</label
+        ><a-input-number
+          v-model:value="itemDialog.sort"
+          :min="0"
+          style="width: 100%"
+        />
       </div>
       <div v-if="itemDialog.editing" class="dialog-footer">
-        <a-button danger @click="deleteItemFromDialog"><DeleteOutlined /> 删除</a-button>
+        <a-button danger @click="deleteItemFromDialog"
+          ><DeleteOutlined /> 删除</a-button
+        >
       </div>
     </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
+definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
 
-const api = useApi()
-const toast = useToast()
-const { mediaUrl } = useMediaUrl()
-const loading = ref(true)
-const saving = ref(false)
-const packs = ref<any[]>([])
-const expandedPacks = ref<Record<string, boolean>>({})
+type ItemState = {
+  items: any[];
+  page: number;
+  pageSize: number;
+  total: number;
+  loading: boolean;
+  loaded: boolean;
+};
 
-const packDialog = reactive({ open: false, editing: false, id: '', name: '', type: 'static', sort: 0, compressAnimated: false })
-const itemDialog = reactive({ open: false, editing: false, id: '', packId: '', label: '', char: '', imageUrl: '', sort: 0 })
-const selectedPackType = ref('static')
+const api = useApi();
+const toast = useToast();
+const { mediaUrl } = useMediaUrl();
+const loading = ref(true);
+const saving = ref(false);
+const packs = ref<any[]>([]);
+const expandedPackIds = ref<string[]>([]);
+const itemStates = reactive<Record<string, ItemState>>({});
+const packColumns = [
+  { title: "表情包", key: "name", dataIndex: "name" },
+  { title: "类型", key: "type", width: 120 },
+  { title: "数量", key: "count", width: 100 },
+  { title: "排序", key: "sort", dataIndex: "sort", width: 80 },
+  { title: "状态", key: "enabled", width: 90 },
+  { title: "操作", key: "actions", width: 170, fixed: "right" },
+];
+const itemColumns = [
+  { title: "预览", key: "preview", width: 76 },
+  { title: "标签", key: "label", dataIndex: "label", width: 140 },
+  { title: "字符 / URL", key: "content" },
+  { title: "排序", key: "sort", dataIndex: "sort", width: 80 },
+  { title: "操作", key: "actions", width: 110, fixed: "right" },
+];
 
-async function loadPacks() {
-  try {
-    const data = await api.get<any[]>('/emoji-packs/all')
-    packs.value = data
-  } catch { toast.error('加载表情包失败') }
-  loading.value = false
+const packDialog = reactive({
+  open: false,
+  editing: false,
+  id: "",
+  name: "",
+  type: "static",
+  sort: 0,
+  compressAnimated: false,
+});
+const itemDialog = reactive({
+  open: false,
+  editing: false,
+  id: "",
+  packId: "",
+  label: "",
+  char: "",
+  imageUrl: "",
+  sort: 0,
+});
+const selectedPackType = ref("static");
+
+function ensureItemState(packId: string) {
+  itemStates[packId] ||= {
+    items: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    loading: false,
+    loaded: false,
+  };
+  return itemStates[packId];
 }
 
-function togglePackExpand(id: string) {
-  expandedPacks.value[id] = !expandedPacks.value[id]
+async function loadPacks() {
+  loading.value = true;
+  try {
+    packs.value = (await api.get<any[]>("/emoji-packs/all")) || [];
+    for (const pack of packs.value) ensureItemState(pack.id);
+  } catch {
+    toast.error("加载表情包失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadPackItems(packId: string, page = 1) {
+  const state = ensureItemState(packId);
+  if (state.loading) return;
+  state.loading = true;
+  try {
+    const data = await api.get<any>(`/emoji-packs/${packId}/items`, {
+      page,
+      limit: state.pageSize,
+    });
+    state.items = Array.isArray(data?.items) ? data.items : [];
+    state.page = Number(data?.page) || page;
+    state.total = Number(data?.total) || 0;
+    state.loaded = true;
+  } catch {
+    toast.error("加载表情明细失败");
+  } finally {
+    state.loading = false;
+  }
+}
+
+function onPackExpand(expanded: boolean, pack: any) {
+  expandedPackIds.value = expanded
+    ? [...new Set([...expandedPackIds.value, pack.id])]
+    : expandedPackIds.value.filter((id) => id !== pack.id);
+  const state = ensureItemState(pack.id);
+  if (expanded && !state.loaded) void loadPackItems(pack.id, 1);
+}
+
+function changeItemPage(pack: any, page: number) {
+  void loadPackItems(pack.id, page);
 }
 
 function openAddPack() {
-  packDialog.editing = false
-  packDialog.id = ''
-  packDialog.name = ''
-  packDialog.type = 'static'
-  packDialog.sort = 0
-  packDialog.compressAnimated = true
-  packDialog.open = true
+  Object.assign(packDialog, {
+    editing: false,
+    id: "",
+    name: "",
+    type: "static",
+    sort: 0,
+    compressAnimated: true,
+    open: true,
+  });
 }
-
 function openEditPack(pack: any) {
-  packDialog.editing = true
-  packDialog.id = pack.id
-  packDialog.name = pack.name
-  packDialog.type = pack.type
-  packDialog.sort = pack.sort
-  packDialog.compressAnimated = pack.compressAnimated ?? true
-  packDialog.open = true
+  Object.assign(packDialog, {
+    editing: true,
+    id: pack.id,
+    name: pack.name,
+    type: pack.type,
+    sort: pack.sort,
+    compressAnimated: pack.compressAnimated ?? true,
+    open: true,
+  });
 }
-
 async function confirmPack() {
-  if (!packDialog.name.trim()) { toast.warning('请输入名称'); return }
-  saving.value = true
+  if (!packDialog.name.trim()) return toast.warning("请输入名称");
+  saving.value = true;
   try {
-      if (packDialog.editing) {
-        await api.put(`/emoji-packs/${packDialog.id}`, {
-          name: packDialog.name,
-          type: packDialog.type,
-          sort: packDialog.sort,
-          compressAnimated: packDialog.compressAnimated,
-        })
-        toast.success('已更新')
-      } else {
-        await api.post('/emoji-packs', {
-          name: packDialog.name,
-          type: packDialog.type,
-          sort: packDialog.sort,
-          compressAnimated: packDialog.compressAnimated && packDialog.type === 'animated',
-        })
-        toast.success('已创建')
-      }
-    packDialog.open = false
-    await loadPacks()
-  } catch { toast.error('操作失败') }
-  saving.value = false
+    const payload = {
+      name: packDialog.name,
+      type: packDialog.type,
+      sort: packDialog.sort,
+      compressAnimated:
+        packDialog.compressAnimated && packDialog.type === "animated",
+    };
+    if (packDialog.editing)
+      await api.put(`/emoji-packs/${packDialog.id}`, payload);
+    else await api.post("/emoji-packs", payload);
+    packDialog.open = false;
+    toast.success(packDialog.editing ? "已更新" : "已创建");
+    await loadPacks();
+  } catch {
+    toast.error("操作失败");
+  } finally {
+    saving.value = false;
+  }
 }
-
 async function togglePack(pack: any) {
   try {
-    await api.put(`/emoji-packs/${pack.id}`, { enabled: pack.enabled })
-  } catch { pack.enabled = !pack.enabled }
+    await api.put(`/emoji-packs/${pack.id}`, { enabled: pack.enabled });
+  } catch {
+    pack.enabled = !pack.enabled;
+    toast.error("状态更新失败");
+  }
 }
-
 async function removePack(pack: any) {
   try {
-    await api.delete(`/emoji-packs/${pack.id}`)
-    toast.success('已删除')
-    await loadPacks()
-  } catch { toast.error('删除失败') }
+    await api.delete(`/emoji-packs/${pack.id}`);
+    delete itemStates[pack.id];
+    toast.success("已删除");
+    await loadPacks();
+  } catch {
+    toast.error("删除失败");
+  }
 }
 
 function openAddItem(pack: any) {
-  selectedPackType.value = pack.type
-  itemDialog.editing = false
-  itemDialog.id = ''
-  itemDialog.packId = pack.id
-  itemDialog.label = ''
-  itemDialog.char = ''
-  itemDialog.imageUrl = ''
-  itemDialog.sort = 0
-  itemDialog.open = true
+  selectedPackType.value = pack.type;
+  Object.assign(itemDialog, {
+    editing: false,
+    id: "",
+    packId: pack.id,
+    label: "",
+    char: "",
+    imageUrl: "",
+    sort: 0,
+    open: true,
+  });
 }
-
 function openEditItem(pack: any, item: any) {
-  selectedPackType.value = pack.type
-  itemDialog.editing = true
-  itemDialog.id = item.id
-  itemDialog.packId = pack.id
-  itemDialog.label = item.label || ''
-  itemDialog.char = item.char || ''
-  itemDialog.imageUrl = item.imageUrl || ''
-  itemDialog.sort = item.sort || 0
-  itemDialog.open = true
+  selectedPackType.value = pack.type;
+  Object.assign(itemDialog, {
+    editing: true,
+    id: item.id,
+    packId: pack.id,
+    label: item.label || "",
+    char: item.char || "",
+    imageUrl: item.imageUrl || "",
+    sort: item.sort || 0,
+    open: true,
+  });
 }
-
 async function confirmItem() {
-  if (selectedPackType.value === 'static' && !itemDialog.char.trim()) { toast.warning('请输入表情字符'); return }
-  if (selectedPackType.value === 'animated' && !itemDialog.imageUrl.trim()) { toast.warning('请输入图片 URL'); return }
-  saving.value = true
+  if (selectedPackType.value === "static" && !itemDialog.char.trim())
+    return toast.warning("请输入表情字符");
+  if (selectedPackType.value === "animated" && !itemDialog.imageUrl.trim())
+    return toast.warning("请输入图片 URL");
+  saving.value = true;
   try {
-    if (itemDialog.editing) {
-      await api.put(`/emoji-packs/items/${itemDialog.id}`, {
-        label: itemDialog.label,
-        char: itemDialog.char,
-        imageUrl: itemDialog.imageUrl,
-        sort: itemDialog.sort,
-      })
-      toast.success('已更新')
-    } else {
-      await api.post('/emoji-packs/items', {
+    const payload = {
+      label: itemDialog.label,
+      char: itemDialog.char,
+      imageUrl: itemDialog.imageUrl,
+      sort: itemDialog.sort,
+    };
+    if (itemDialog.editing)
+      await api.put(`/emoji-packs/items/${itemDialog.id}`, payload);
+    else
+      await api.post("/emoji-packs/items", {
+        ...payload,
         packId: itemDialog.packId,
-        label: itemDialog.label,
-        char: itemDialog.char,
-        imageUrl: itemDialog.imageUrl,
-        sort: itemDialog.sort,
-      })
-      toast.success('已添加')
-    }
-    itemDialog.open = false
-    await loadPacks()
-  } catch { toast.error('操作失败') }
-  saving.value = false
+      });
+    itemDialog.open = false;
+    toast.success(itemDialog.editing ? "已更新" : "已添加");
+    await refreshPack(itemDialog.packId);
+  } catch {
+    toast.error("操作失败");
+  } finally {
+    saving.value = false;
+  }
 }
-
-async function deleteItemFromDialog() {
-  const pack = packs.value.find((p) => p.id === itemDialog.packId)
-  if (!pack) return
-  try {
-    await api.delete(`/emoji-packs/items/${itemDialog.id}`)
-    pack.items = pack.items.filter((i: any) => i.id !== itemDialog.id)
-    itemDialog.open = false
-    toast.success('已删除')
-  } catch { toast.error('删除失败') }
+async function refreshPack(packId: string) {
+  const state = ensureItemState(packId);
+  await Promise.all([loadPackItems(packId, state.page), loadPacks()]);
 }
-
 async function removeItem(pack: any, item: any) {
   try {
-    await api.delete(`/emoji-packs/items/${item.id}`)
-    pack.items = pack.items.filter((i: any) => i.id !== item.id)
-    toast.success('已删除')
-  } catch { toast.error('删除失败') }
+    await api.delete(`/emoji-packs/items/${item.id}`);
+    toast.success("已删除");
+    const state = ensureItemState(pack.id);
+    const targetPage =
+      state.items.length === 1 && state.page > 1 ? state.page - 1 : state.page;
+    await refreshPack(pack.id);
+    if (targetPage !== state.page) await loadPackItems(pack.id, targetPage);
+  } catch {
+    toast.error("删除失败");
+  }
 }
-
+async function deleteItemFromDialog() {
+  const pack = packs.value.find((entry) => entry.id === itemDialog.packId);
+  if (!pack) return;
+  await removeItem(pack, { id: itemDialog.id });
+  itemDialog.open = false;
+}
 async function openMediaLibrary() {
-  const { open } = useMediaLibrary()
-  const currentPack = packs.value.find((p) => p.id === itemDialog.packId)
-  const compressAnimated = currentPack?.compressAnimated && currentPack?.type === 'animated'
-  const urls = await open({ folder: 'emoji', compressAnimated: !!compressAnimated })
-  if (urls.length) {
-    itemDialog.imageUrl = urls[0]
-  }
+  const { open } = useMediaLibrary();
+  const pack = packs.value.find((entry) => entry.id === itemDialog.packId);
+  const urls = await open({
+    folder: "emoji",
+    compressAnimated: Boolean(
+      pack?.compressAnimated && pack?.type === "animated",
+    ),
+  });
+  if (urls.length) itemDialog.imageUrl = urls[0];
 }
 
-function onImgError(e: Event) {
-  const img = e.target as HTMLImageElement
-  const fallback = img.getAttribute('data-fallback')
-  if (fallback) {
-    const span = document.createElement('span')
-    span.className = 'emoji-char-fallback'
-    span.textContent = fallback
-    img.parentNode?.replaceChild(span, img)
-  } else {
-    img.style.display = 'none'
-  }
-}
-
-onMounted(loadPacks)
+onMounted(loadPacks);
 </script>
 
 <style scoped>
-.table-toolbar { margin-bottom: 14px; }
-
-.emoji-body {
+.emoji-admin {
+  min-width: 0;
+}
+.table-toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
-
-.emoji-pack-card {
-  background: var(--ld-bg-card);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 4px 14px var(--ld-shadow);
+.pack-name {
+  color: var(--c-text);
+  font-size: 0.82rem;
 }
-
-.pack-collapse-icon {
-  font-size: 0.75rem;
-  color: var(--c-text-3);
-  flex-shrink: 0;
-  transition: transform 0.2s;
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
 }
-
-.pack-header {
+.items-table-wrap {
+  padding: 4px 4px 10px 24px;
+}
+.items-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: var(--c-text-2);
+  font-size: 0.72rem;
 }
-
-.pack-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pack-name {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--c-text);
-}
-
-.pack-type {
-  font-size: 0.6rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-
-.pack-type.static {
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-}
-
-.pack-type.animated {
-  background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
-}
-
-.pack-count {
-  font-size: 0.7rem;
-  color: var(--c-text-3);
-  font-weight: 500;
-}
-
-.pack-actions {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.pack-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  overflow: hidden;
-}
-
-.pack-items-enter-active,
-.pack-items-leave-active {
-  transition: all 0.2s ease;
-}
-
-.emoji-item-card {
-  width: 88px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 6px 6px;
-  border-radius: 10px;
-  background: var(--c-bg-1);
-  position: relative;
-  transition: background 0.15s;
-  cursor: pointer;
-}
-
-.emoji-item-card:hover {
-  background: var(--c-bg-2);
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-  margin-top: 8px;
-}
-
-.emoji-item-img img {
-  width: 48px;
-  height: 48px;
-  display: block;
-}
-
-.emoji-item-img .emoji-char-fallback {
-  font-size: 1.6rem;
-  line-height: 48px;
-  text-align: center;
-  display: block;
-}
-
-.emoji-item-char {
-  font-size: 1.6rem;
+.emoji-char {
+  font-size: 1.45rem;
   line-height: 1;
 }
-
-.emoji-item-label {
-  font-size: 0.55rem;
-  color: var(--c-text-3);
-  white-space: nowrap;
+.emoji-image {
+  display: grid;
+  width: 38px;
+  height: 38px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 64px;
-  text-align: center;
+  border-radius: 6px;
+  background: var(--c-bg-2);
+  color: var(--c-text-3);
+  place-items: center;
 }
-
+.emoji-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.item-content {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  color: var(--c-text-2);
+  font-size: 0.65rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .add-field {
   margin-bottom: 14px;
 }
-
 .add-label {
   display: block;
+  margin-bottom: 4px;
+  color: var(--c-text);
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--c-text);
-  margin-bottom: 4px;
 }
-
 .add-hint {
-  font-size: 0.65rem;
-  color: var(--c-text-3);
   margin-top: 3px;
+  color: var(--c-text-3);
+  font-size: 0.65rem;
 }
-
 .emoji-item-preview {
-  margin-top: 8px;
-  padding: 12px;
-  background: var(--c-bg-1);
-  border-radius: 8px;
   display: flex;
   justify-content: center;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--c-bg-1);
 }
-
 .emoji-item-preview img {
   max-width: 128px;
   max-height: 128px;
+  object-fit: contain;
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 640px) {
+  .items-table-wrap {
+    padding-left: 0;
+  }
 }
 </style>

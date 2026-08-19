@@ -374,7 +374,7 @@ const ready = ref(false);
 const expanded = ref(false);
 const devtoolsCollapsed = ref(false);
 const autoCollapseDismissed = ref(false);
-const mobileViewport = ref(false);
+const recordsCollapseDismissed = ref(false);
 const queueOpen = ref(false);
 const queueLoading = ref(false);
 const autoplay = ref(false);
@@ -404,7 +404,6 @@ const visibleQueueCovers = ref(new Set<string>());
 let playlistRequestId = 0;
 let playRequestId = 0;
 let coverObserver: IntersectionObserver | null = null;
-let mobileMedia: MediaQueryList | null = null;
 
 const vLazyCover = {
   mounted(element: HTMLElement, binding: { value?: string }) {
@@ -440,12 +439,21 @@ const isDevtoolsCollapsed = computed(
   () =>
     devtoolsCollapsed.value ||
     (dockAutoCollapsed.value && !autoCollapseDismissed.value) ||
-    (mobileViewport.value && activeBottomDock.value === "pagination") ||
-    recordsIntersecting.value,
+    (recordsIntersecting.value && !recordsCollapseDismissed.value),
 );
 
 watch(dockAutoCollapsed, (collapsed) => {
   if (!collapsed) autoCollapseDismissed.value = false;
+});
+
+watch(recordsIntersecting, (intersecting) => {
+  if (!intersecting) recordsCollapseDismissed.value = false;
+});
+
+watch(activeBottomDock, (activeDock) => {
+  if (activeDock === "pagination") {
+    devtoolsCollapsed.value = true;
+  }
 });
 
 watch(isDevtoolsCollapsed, (collapsed) => {
@@ -480,16 +488,12 @@ watch(isLoggedIn, (loggedIn) => {
 onMounted(async () => {
   document.addEventListener("pointerdown", onDocumentPointerDown);
   document.addEventListener("keydown", onDocumentKeydown);
-  mobileMedia = window.matchMedia("(max-width: 640px)");
-  syncMobileViewport();
-  mobileMedia.addEventListener("change", syncMobileViewport);
   await bootstrap();
 });
 
 onUnmounted(() => {
   document.removeEventListener("pointerdown", onDocumentPointerDown);
   document.removeEventListener("keydown", onDocumentKeydown);
-  mobileMedia?.removeEventListener("change", syncMobileViewport);
   if (activeBottomDock.value === "music") setActiveBottomDock(null);
   setPlaying(false);
   coverObserver?.disconnect();
@@ -704,23 +708,31 @@ function toggleExpanded() {
   }
 }
 
-function toggleDevtoolsCollapsed() {
+async function toggleDevtoolsCollapsed() {
   const wasCollapsed = isDevtoolsCollapsed.value;
+  if (wasCollapsed && recordsIntersecting.value) {
+    const scrollContainer =
+      document.querySelector<HTMLElement>(".main-content");
+    if (scrollContainer) {
+      scrollContainer.scrollBy({
+        top: -Math.min(240, window.innerHeight * 0.3),
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
+    }
+    recordsCollapseDismissed.value = true;
+    await nextTick();
+  }
   if (dockAutoCollapsed.value && !recordsIntersecting.value) {
     autoCollapseDismissed.value = true;
   } else {
     clearAutoCollapse();
   }
   devtoolsCollapsed.value = !wasCollapsed;
-  if (!wasCollapsed) {
-    expanded.value = false;
-    queueOpen.value = false;
-  }
+  expanded.value = false;
+  queueOpen.value = false;
   setActiveBottomDock(wasCollapsed ? "music" : null);
-}
-
-function syncMobileViewport() {
-  mobileViewport.value = mobileMedia?.matches ?? false;
 }
 
 function toggleQueue() {
@@ -1099,6 +1111,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 .music-capsule {
   --capsule-height: 30px;
+  view-transition-name: none;
   position: relative;
   display: flex;
   width: 198px;
@@ -1185,6 +1198,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 .capsule-shell {
+  view-transition-name: none;
   position: relative;
   z-index: 2;
   display: flex;
@@ -1205,29 +1219,29 @@ function clamp(value: number, minimum: number, maximum: number) {
   -webkit-backdrop-filter: blur(10px);
   user-select: none;
   touch-action: none;
+  outline: none;
   transition:
-    all 0.6s,
     max-width 0.6s,
     padding 0.5s,
+    border-color 0.24s ease,
+    background-color 0.24s ease,
+    box-shadow 0.24s ease,
     transform 0.4s,
     opacity 0.2s;
 }
 
 .music-capsule.is-devtools-collapsed .capsule-shell {
   max-width: 32px;
-  padding: 2px 0;
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
+  padding: 0;
 }
 
 .music-capsule.is-devtools-collapsed .devtools-toggle {
   position: absolute;
-  top: 50%;
-  left: 2.5px;
+  inset: 0;
   display: grid;
   width: 30px;
   height: 30px;
-  transform: translateY(-50%);
+  margin: auto;
   place-items: center;
 }
 
@@ -1587,11 +1601,12 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 .queue-panel {
   position: absolute;
-  right: 0;
+  right: auto;
   bottom: calc(100% + 9px);
+  left: 50%;
   z-index: 4;
   display: flex;
-  width: min(292px, calc(100vw - 24px));
+  width: min(320px, calc(100vw - 24px));
   height: min(360px, calc(100dvh - 96px));
   flex-direction: column;
   overflow: hidden;
@@ -1603,7 +1618,9 @@ function clamp(value: number, minimum: number, maximum: number) {
     0 1px 0 color-mix(in srgb, #fff 68%, transparent) inset;
   backdrop-filter: blur(22px) saturate(1.22);
   -webkit-backdrop-filter: blur(22px) saturate(1.22);
-  transform-origin: bottom right;
+  transform: translateX(-50%);
+  transform-origin: bottom center;
+  view-transition-name: none;
   will-change: opacity, transform;
 }
 
@@ -1910,7 +1927,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 .queue-panel-enter-from,
 .queue-panel-leave-to {
   opacity: 0;
-  transform: translate3d(0, 10px, 0) scale(0.985);
+  transform: translate3d(-50%, 10px, 0) scale(0.985);
 }
 
 .queue-loading-enter-active,
@@ -1994,10 +2011,18 @@ function clamp(value: number, minimum: number, maximum: number) {
   }
 
   .queue-panel {
-    right: 0;
-    width: min(292px, calc(100vw - 16px));
+    right: auto;
+    left: 50%;
+    width: min(320px, calc(100vw - 16px));
     height: min(340px, calc(100dvh - 124px));
   }
+}
+
+:global(html.constellation-route) .capsule-shell,
+:global(html.constellation-route) .queue-panel {
+  border-color: rgb(255 255 255 / 14%);
+  outline: none;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
 }
 
 @media (max-width: 360px) {

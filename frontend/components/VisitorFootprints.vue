@@ -50,28 +50,37 @@
         </span>
         <div class="fp-copy">
           <p :title="visitorTitle(visit)">
-            <span>{{ visitorLabel(visit) }}</span>
-            <small v-if="visit.browser" class="fp-browser">
-              <Icon :name="browserIcon(visit.browser)" />{{ visit.browser }}
-            </small>
+            <span class="fp-name">{{ visitorLabel(visit) }}</span>
+            <span class="fp-welcome">欢迎路过风隅</span>
           </p>
           <div class="fp-meta">
-            <span v-if="visit.region"
+            <span v-if="visit.region" class="fp-region" :title="visit.region"
               ><Icon name="ph:map-pin-bold" />{{ visit.region }}</span
             >
-            <span v-if="visit.device"
-              ><Icon :name="deviceIcon(visit.device)" />{{
-                deviceLabel(visit.device)
+            <span v-if="visit.browser" class="fp-browser" :title="visit.browser"
+              ><Icon :name="browserIcon(visit.browser)" />{{
+                visit.browser
               }}</span
             >
+            <span
+              v-if="visit.device"
+              class="fp-device"
+              :title="deviceLabel(visit.device)"
+              :aria-label="deviceLabel(visit.device)"
+              ><Icon :name="deviceIcon(visit.device)" /><b>{{
+                deviceLabel(visit.device)
+              }}</b>
+            </span>
+            <time
+              class="fp-time"
+              :datetime="visit.time"
+              :title="formatTime(visit.time)"
+            >
+              <Icon name="ph:clock-counter-clockwise-bold" />
+              <b>{{ timeLabel(visit.time) }}</b>
+            </time>
           </div>
         </div>
-        <span class="fp-arrival">
-          <i aria-hidden="true" />
-          <time :datetime="visit.time" :title="formatTime(visit.time)">{{
-            timeLabel(visit.time)
-          }}</time>
-        </span>
       </li>
     </ol>
   </section>
@@ -105,11 +114,19 @@ let idleHandle: number | null = null;
 
 function visitorLabel(visit: RecentVisit) {
   const nickname = visit.nickname?.trim();
-  return nickname || "途经风隅的旅人";
+  return nickname || "远方旅人";
 }
 
 function visitorTitle(visit: RecentVisit) {
-  return [visitorLabel(visit), visit.browser].filter(Boolean).join(" · ");
+  return [
+    `${visitorLabel(visit)}，欢迎路过风隅`,
+    visit.region,
+    visit.browser,
+    visit.device ? deviceLabel(visit.device) : "",
+    formatTime(visit.time),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function itemDelay(index: number) {
@@ -124,10 +141,17 @@ const DEVICE_META: Record<string, { icon: string; label: string }> = {
 
 const BROWSER_ICONS: Record<string, string> = {
   Chrome: "ph:google-chrome-logo-fill",
-  Edge: "ph:microsoft-edge-logo-fill",
-  Firefox: "ph:firefox-logo-fill",
-  Safari: "ph:safari-logo-fill",
-  Opera: "ph:browser-bold",
+  Edge: "ph:globe-hemisphere-west-fill",
+  Firefox: "ph:fire-fill",
+  Safari: "ph:compass-fill",
+  Opera: "ph:circle-half-fill",
+  Vivaldi: "ph:triangle-fill",
+  Yandex: "ph:globe-simple-fill",
+  "Samsung Internet": "ph:planet-fill",
+  UC: "ph:globe-simple-fill",
+  QQ: "ph:qq-logo-fill",
+  搜狗: "ph:magnifying-glass-fill",
+  "360": "ph:circles-three-plus-fill",
   微信: "ph:wechat-logo-fill",
 };
 
@@ -273,7 +297,7 @@ onUnmounted(() => {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-auto-rows: minmax(39px, 1fr);
+  grid-auto-rows: minmax(46px, 1fr);
   align-content: stretch;
   gap: 0;
   margin: 0;
@@ -285,11 +309,11 @@ onUnmounted(() => {
   position: relative;
   display: grid;
   min-width: 0;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  min-height: 39px;
-  padding: 2px 4px;
+  min-height: 46px;
+  padding: 4px;
   overflow: hidden;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
   background: transparent;
@@ -336,29 +360,34 @@ onUnmounted(() => {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 1px 4px;
   margin: 0;
   color: var(--c-text);
   font-size: 0.62rem;
   font-weight: 650;
 }
-.fp-copy > p > span {
+.fp-name {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+.fp-welcome {
+  color: var(--c-text-2);
+  font-weight: 560;
 }
 .fp-browser {
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: 2px;
-  padding: 1px 4px;
-  border-radius: 999px;
+  max-width: 82px;
   background: color-mix(in srgb, var(--c-primary-soft) 55%, transparent);
   color: var(--c-text-3);
-  font-size: 0.43rem;
+  font-size: 0.44rem;
   font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .fp-browser svg {
   color: var(--c-primary);
@@ -367,8 +396,9 @@ onUnmounted(() => {
 .fp-meta {
   display: flex;
   min-width: 0;
-  gap: 7px;
-  margin-top: 2px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
   overflow: hidden;
   color: var(--c-text-3);
   font-size: 0.45rem;
@@ -380,7 +410,8 @@ onUnmounted(() => {
   gap: 3px;
   white-space: nowrap;
 }
-.fp-meta span:first-child {
+.fp-region {
+  max-width: min(112px, 42%);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -388,23 +419,34 @@ onUnmounted(() => {
   flex: none;
   font-size: 0.55rem;
 }
-.fp-arrival {
+.fp-device {
+  flex: none;
+  padding: 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--c-bg-2) 72%, transparent);
+  color: var(--c-text-2);
+}
+.fp-device b,
+.fp-time b {
+  font: inherit;
+  font-weight: 650;
+}
+.fp-meta > time {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  gap: 4px;
-}
-.fp-arrival > i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #47b985;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #47b985 12%, transparent);
-}
-.fp-arrival > time {
-  color: var(--c-text-3);
+  gap: 3px;
+  margin-left: auto;
+  padding-left: 5px;
+  border-left: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  color: var(--c-text-2);
   font-family: var(--font-mono);
   font-size: 0.44rem;
   white-space: nowrap;
+}
+.fp-time svg {
+  color: var(--c-primary);
 }
 @media (max-height: 680px) and (min-width: 901px) {
   .footprints {

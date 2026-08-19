@@ -64,9 +64,6 @@ end
 return {1, primary, tonumber(ARGV[2]), 0}
 `;
 
-const GUEST_HISTORY_TTL_SECONDS = 24 * 60 * 60;
-const GUEST_HISTORY_MAX_ITEMS = 24;
-
 const MODEL_CONFIG_SETTING_KEYS = [
   'ai_chat_model_config_id',
   'ai_summarize_model_config_id',
@@ -1767,13 +1764,7 @@ export class AiService {
   private guestIdentity(actor: AiChatActor) {
     if (!actor.guestId)
       throw new BadRequestException('游客会话标识缺失，请刷新页面后重试');
-    return createHash('sha256')
-      .update(`${actor.guestId}|${actor.ip || 'unknown'}`)
-      .digest('hex');
-  }
-
-  private guestHistoryKey(actor: AiChatActor) {
-    return `corner:ai:guest-history:${this.guestIdentity(actor)}`;
+    return createHash('sha256').update(actor.guestId).digest('hex');
   }
 
   async saveMessage(
@@ -1781,83 +1772,49 @@ export class AiService {
     role: 'user' | 'assistant',
     content: string,
   ) {
-    if (actor.userId) {
-      return this.prisma.chatMessage.create({
-        data: { userId: actor.userId, role, content },
-      });
-    }
-
-    const key = this.guestHistoryKey(actor);
-    const item = JSON.stringify({
-      id: createHash('sha256')
-        .update(`${Date.now()}|${role}|${content}`)
-        .digest('hex')
-        .slice(0, 24),
-      role,
-      content,
-      createdAt: new Date().toISOString(),
+    return this.prisma.chatMessage.create({
+      data: {
+        userId: actor.userId,
+        guestIdHash: actor.userId ? undefined : this.guestIdentity(actor),
+        role,
+        content,
+      },
     });
-    const pipeline = this.redis.client.pipeline();
-    pipeline.rpush(key, item);
-    pipeline.ltrim(key, -GUEST_HISTORY_MAX_ITEMS, -1);
-    pipeline.expire(key, GUEST_HISTORY_TTL_SECONDS);
-    await pipeline.exec();
-    return { role, content };
   }
 
   async getHistory(actor: AiChatActor, limit = 30) {
     const take = Math.max(1, Math.min(200, limit));
-    if (actor.userId) {
-      const rows = await this.prisma.chatMessage.findMany({
-        where: { userId: actor.userId },
-        orderBy: { createdAt: 'desc' },
-        take,
-        select: { id: true, role: true, content: true, createdAt: true },
-      });
-      return rows.reverse();
-    }
-
-    const rows = await this.redis.client.lrange(
-      this.guestHistoryKey(actor),
-      -Math.min(take, GUEST_HISTORY_MAX_ITEMS),
-      -1,
-    );
-    return rows.flatMap((row) => {
-      try {
-        const parsed = JSON.parse(row) as {
-          id?: string;
-          role?: string;
-          content?: string;
-          createdAt?: string;
-        };
-        if (
-          !['user', 'assistant'].includes(String(parsed.role)) ||
-          !parsed.content
-        )
-          return [];
-        return [
-          {
-            id: parsed.id || '',
-            role: parsed.role as 'user' | 'assistant',
-            content: String(parsed.content),
-            createdAt: parsed.createdAt || '',
-          },
-        ];
-      } catch {
-        return [];
-      }
+    const rows = await this.prisma.chatMessage.findMany({
+      where: actor.userId
+        ? { userId: actor.userId }
+        : { guestIdHash: this.guestIdentity(actor) },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: { id: true, role: true, content: true, createdAt: true },
     });
+    return rows.reverse();
   }
 
   async clearHistory(actor: AiChatActor) {
-    if (actor.userId) {
-      const result = await this.prisma.chatMessage.deleteMany({
-        where: { userId: actor.userId },
-      });
-      return { deleted: result.count };
+    const result = await this.prisma.chatMessage.deleteMany({
+      where: actor.userId
+        ? { userId: actor.userId }
+        : { guestIdHash: this.guestIdentity(actor) },
+    });
+    return { deleted: result.count };
+  }
+
+  async clearConversation(actorId: string) {
+    const guestIdHash = actorId.startsWith('guest:')
+      ? actorId.slice('guest:'.length)
+      : null;
+    if (guestIdHash && !/^[a-f0-9]{64}$/.test(guestIdHash)) {
+      throw new NotFoundException('访客会话不存在');
     }
-    const deleted = await this.redis.client.del(this.guestHistoryKey(actor));
-    return { deleted };
+    const result = await this.prisma.chatMessage.deleteMany({
+      where: guestIdHash ? { guestIdHash } : { userId: actorId },
+    });
+    return { deleted: result.count };
   }
 
   private quotaWindow() {
@@ -2024,7 +1981,7 @@ export class AiService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return users
+    const userConversations = users
       .filter((u) => u._count.chatMessages > 0)
       .map((u) => ({
         userId: u.id,
@@ -2039,31 +1996,94 @@ export class AiService {
               createdAt: u.chatMessages[0].createdAt,
             }
           : null,
-      }))
-      .sort((a, b) => {
-        const ta = a.lastMessage?.createdAt
-          ? new Date(a.lastMessage.createdAt).getTime()
-          : 0;
-        const tb = b.lastMessage?.createdAt
-          ? new Date(b.lastMessage.createdAt).getTime()
-          : 0;
-        return tb - ta;
+      }));
+    const guestGroups = await this.prisma.chatMessage.groupBy({
+      by: ['guestIdHash'],
+      where: { guestIdHash: { not: null } },
+      _count: { _all: true },
+      _max: { createdAt: true },
+      orderBy: { _max: { createdAt: 'desc' } },
+      take: 100,
+    });
+    const guestHashes = guestGroups
+      .map((item) => item.guestIdHash)
+      .filter(Boolean) as string[];
+    const guestLastMessages = await this.prisma.chatMessage.findMany({
+      where: { guestIdHash: { in: guestHashes } },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['guestIdHash'],
+      select: {
+        guestIdHash: true,
+        role: true,
+        content: true,
+        createdAt: true,
+      },
+    });
+    const guestLastMap = new Map(
+      guestLastMessages.map((item) => [item.guestIdHash, item]),
+    );
+    const normalizedQuery = String(q || '')
+      .trim()
+      .toLowerCase();
+    const guestConversations = guestGroups
+      .filter((item) => {
+        if (!normalizedQuery) return true;
+        return String(item.guestIdHash).toLowerCase().includes(normalizedQuery);
+      })
+      .map((item) => {
+        const hash = item.guestIdHash!;
+        const last = guestLastMap.get(hash);
+        return {
+          userId: `guest:${hash}`,
+          username: `访客 ${hash.slice(0, 8)}`,
+          email: hash.slice(0, 16),
+          avatar: null,
+          actorType: 'guest',
+          messageCount: item._count._all,
+          lastMessage: last
+            ? {
+                role: last.role,
+                content: last.content.slice(0, 120),
+                createdAt: last.createdAt,
+              }
+            : null,
+        };
       });
+
+    return [...userConversations, ...guestConversations].sort((a, b) => {
+      const ta = a.lastMessage?.createdAt
+        ? new Date(a.lastMessage.createdAt).getTime()
+        : 0;
+      const tb = b.lastMessage?.createdAt
+        ? new Date(b.lastMessage.createdAt).getTime()
+        : 0;
+      return tb - ta;
+    });
   }
 
-  async getConversation(userId: string, page = 1, pageSize = 50) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, username: true, email: true, avatar: true },
-    });
-    if (!user) throw new NotFoundException('用户不存在');
+  async getConversation(actorId: string, page = 1, pageSize = 50) {
+    const guestIdHash = actorId.startsWith('guest:')
+      ? actorId.slice('guest:'.length)
+      : null;
+    if (guestIdHash && !/^[a-f0-9]{64}$/.test(guestIdHash)) {
+      throw new NotFoundException('访客会话不存在');
+    }
+    const userId = guestIdHash ? null : actorId;
+    const user = userId
+      ? await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, username: true, email: true, avatar: true },
+        })
+      : null;
+    if (!guestIdHash && !user) throw new NotFoundException('用户不存在');
+    const where = guestIdHash ? { guestIdHash } : { userId: userId! };
 
     const take = Math.max(1, Math.min(100, pageSize));
     const skip = Math.max(0, (Math.max(1, page) - 1) * take);
     const [total, messages] = await Promise.all([
-      this.prisma.chatMessage.count({ where: { userId } }),
+      this.prisma.chatMessage.count({ where }),
       this.prisma.chatMessage.findMany({
-        where: { userId },
+        where,
         orderBy: { createdAt: 'asc' },
         skip,
         take,
@@ -2072,7 +2092,13 @@ export class AiService {
     ]);
 
     return {
-      user,
+      user: user || {
+        id: actorId,
+        username: `访客 ${guestIdHash!.slice(0, 8)}`,
+        email: guestIdHash!.slice(0, 16),
+        avatar: null,
+        actorType: 'guest',
+      },
       total,
       page: Math.max(1, page),
       pageSize: take,

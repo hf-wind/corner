@@ -354,7 +354,7 @@ export class AiController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   clearConversation(@Param('userId') userId: string) {
-    return this.ai.clearHistory({ userId, ip: 'admin' });
+    return this.ai.clearConversation(userId);
   }
   @UseGuards(OptionalJwtAuthGuard)
   @Post('explore')

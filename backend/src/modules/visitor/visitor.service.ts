@@ -108,9 +108,20 @@ function parseUserAgent(ua: string | undefined): {
   if (!ua || ua.length > 500) return { browser: null, os: null, device: null };
   const text = ua.toLowerCase();
   let browser: string | null = null;
-  if (/edg\//.test(text)) browser = 'Edge';
+  if (/edgios\//.test(text)) browser = 'Edge';
+  else if (/edga\//.test(text)) browser = 'Edge';
+  else if (/edg\//.test(text)) browser = 'Edge';
+  else if (/vivaldi\//.test(text)) browser = 'Vivaldi';
+  else if (/yabrowser\//.test(text)) browser = 'Yandex';
+  else if (/samsungbrowser\//.test(text)) browser = 'Samsung Internet';
+  else if (/ucbrowser\//.test(text)) browser = 'UC';
+  else if (/qqbrowser\//.test(text)) browser = 'QQ';
+  else if (/metasr\//.test(text)) browser = '搜狗';
+  else if (/360se|360ee/.test(text)) browser = '360';
   else if (/opr\/|opera/.test(text)) browser = 'Opera';
   else if (/micromessenger|微信/.test(text)) browser = '微信';
+  else if (/crios\//.test(text)) browser = 'Chrome';
+  else if (/fxios\//.test(text)) browser = 'Firefox';
   else if (/chrome\/|chromium/.test(text)) browser = 'Chrome';
   else if (/firefox\//.test(text)) browser = 'Firefox';
   else if (/safari\//.test(text)) browser = 'Safari';
@@ -121,7 +132,7 @@ function parseUserAgent(ua: string | undefined): {
   else if (/android/.test(text)) os = 'Android';
   else if (/linux/.test(text)) os = 'Linux';
   let device: string | null = null;
-  if (/ipad|tablet/.test(text)) device = 'tablet';
+  if (/ipad|tablet|macintosh.+mobile/.test(text)) device = 'tablet';
   else if (/iphone|ipod|android|windows phone|mobile/.test(text))
     device = 'mobile';
   else device = 'desktop';

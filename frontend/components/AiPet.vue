@@ -197,20 +197,6 @@
         </div>
       </Transition>
 
-      <Transition name="pet-actions">
-        <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
-          <button
-            v-for="action in quickActions.slice(0, 3)"
-            :key="action.label"
-            type="button"
-            @click="runQuickAction(action)"
-          >
-            <Icon :name="action.icon" />
-            <span>{{ action.label }}</span>
-          </button>
-        </div>
-      </Transition>
-
       <button
         type="button"
         class="pet-fab"
@@ -339,7 +325,6 @@ const { isLoggedIn } = useAuth();
 const { mediaUrl } = useMediaUrl();
 const toast = useToast();
 const { requestTrack } = useMusicPlayerState();
-const { activeBottomDock } = useBottomDockState();
 const chatOpen = ref(false);
 const sending = ref(false);
 const streamStarted = ref(false);
@@ -350,7 +335,6 @@ const inputRef = ref<HTMLTextAreaElement | null>(null);
 const showHint = ref(true);
 const historyLoaded = ref(false);
 const historyLoading = ref(false);
-const suppressActions = ref(false);
 let streamController: AbortController | null = null;
 let scrollFrame: number | null = null;
 let typingBuffer = "";
@@ -634,22 +618,10 @@ function compactHint(value: string, maxLength = 26) {
     : normalized;
 }
 
-const hintText = computed(() =>
-  compactHint(
-    isContentMode.value ? activeProfile.value.hint : selectedGreeting.value,
-  ),
-);
+const hintText = computed(() => compactHint(selectedGreeting.value));
 const inputPlaceholder = computed(() =>
   isContentMode.value ? activeProfile.value.placeholder : "想从这里发现什么？",
 );
-const actionsVisible = computed(
-  () =>
-    !chatOpen.value &&
-    !suppressActions.value &&
-    !showHint.value &&
-    activeBottomDock.value !== "pagination",
-);
-
 watch(isLoggedIn, () => {
   historyLoaded.value = false;
   messages.value = [];
@@ -790,8 +762,6 @@ const spriteStyle = computed(() => {
 });
 
 let hintTimer: ReturnType<typeof setTimeout> | null = null;
-let actionRevealTimer: ReturnType<typeof setTimeout> | null = null;
-
 function openChat() {
   void api
     .post("/ai/events", {
@@ -801,17 +771,11 @@ function openChat() {
       sourceId: props.article?.sourceId,
     })
     .catch(() => undefined);
-  if (actionRevealTimer) clearTimeout(actionRevealTimer);
-  suppressActions.value = true;
   chatOpen.value = true;
 }
 
 function closeChat() {
   chatOpen.value = false;
-  if (actionRevealTimer) clearTimeout(actionRevealTimer);
-  actionRevealTimer = setTimeout(() => {
-    suppressActions.value = false;
-  }, 220);
 }
 
 async function toggleChat() {
@@ -1185,18 +1149,14 @@ onMounted(() => {
   window.addEventListener("resize", syncViewport);
   chooseGreeting();
   loadPetMeta();
-  hintTimer = setTimeout(
-    () => {
-      showHint.value = false;
-    },
-    isContentMode.value ? 4200 : 6000,
-  );
+  hintTimer = setTimeout(() => {
+    showHint.value = false;
+  }, 6000);
 });
 
 onUnmounted(() => {
   window.removeEventListener("resize", syncViewport);
   if (hintTimer) clearTimeout(hintTimer);
-  if (actionRevealTimer) clearTimeout(actionRevealTimer);
   streamController?.abort();
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
   if (typingTimer) clearTimeout(typingTimer);

@@ -7,12 +7,7 @@
       >
         <FeaturedSwiper />
       </div>
-      <div
-        class="discovery-module-slot home-module"
-        style="--home-enter-order: 1"
-      >
-        <AiDiscoveryPanel />
-      </div>
+      <!-- AI discovery is temporarily removed from the home flow. -->
 
       <SectionHead
         class="home-module latest-head"
@@ -95,9 +90,6 @@ import { useBottomDockState } from "~/composables/useBottomDockState";
 
 const FeaturedSwiper = defineAsyncComponent(
   () => import("~/components/FeaturedSwiper.vue"),
-);
-const AiDiscoveryPanel = defineAsyncComponent(
-  () => import("~/components/AiDiscoveryPanel.vue"),
 );
 const HomeSidebar = defineAsyncComponent(
   () => import("~/components/HomeSidebar.vue"),
@@ -238,11 +230,7 @@ onUnmounted(() => {
 }
 
 .featured-module-slot {
-  min-height: 244px;
-}
-
-.discovery-module-slot {
-  min-height: 96px;
+  min-height: 330px;
 }
 
 .home-module {
@@ -372,10 +360,7 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .featured-module-slot {
-    min-height: 206px;
-  }
-  .discovery-module-slot {
-    min-height: 96px;
+    min-height: 264px;
   }
 }
 

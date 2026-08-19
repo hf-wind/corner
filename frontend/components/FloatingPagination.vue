@@ -94,6 +94,7 @@ const {
 } = useBottomDockState();
 const devtoolsCollapsed = ref(false);
 const autoCollapseDismissed = ref(false);
+const recordsCollapseDismissed = ref(false);
 const mobileViewport = ref(false);
 let mobileMedia: MediaQueryList | null = null;
 const isDevtoolsCollapsed = computed(
@@ -101,12 +102,16 @@ const isDevtoolsCollapsed = computed(
     devtoolsCollapsed.value ||
     (dockAutoCollapsed.value && !autoCollapseDismissed.value) ||
     (mobileViewport.value && activeBottomDock.value === "music") ||
-    recordsIntersecting.value,
+    (recordsIntersecting.value && !recordsCollapseDismissed.value),
 );
 let previousPage = props.modelValue;
 
 watch(dockAutoCollapsed, (collapsed) => {
   if (!collapsed) autoCollapseDismissed.value = false;
+});
+
+watch(recordsIntersecting, (intersecting) => {
+  if (!intersecting) recordsCollapseDismissed.value = false;
 });
 
 watch(isDevtoolsCollapsed, (collapsed) => {
@@ -147,8 +152,22 @@ function goTo(page: number) {
   emit("change", page);
 }
 
-function toggleDevtoolsCollapsed() {
+async function toggleDevtoolsCollapsed() {
   const wasCollapsed = isDevtoolsCollapsed.value;
+  if (wasCollapsed && recordsIntersecting.value) {
+    const scrollContainer =
+      document.querySelector<HTMLElement>(".main-content");
+    if (scrollContainer) {
+      scrollContainer.scrollBy({
+        top: -Math.min(240, window.innerHeight * 0.3),
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
+    }
+    recordsCollapseDismissed.value = true;
+    await nextTick();
+  }
   if (dockAutoCollapsed.value && !recordsIntersecting.value) {
     autoCollapseDismissed.value = true;
   } else {
@@ -210,18 +229,17 @@ function syncMobileViewport() {
   user-select: none;
   touch-action: none;
   transition:
-    all 0.6s,
-    max-width 0.6s,
-    padding 0.5s,
-    transform 0.4s,
-    opacity 0.2s;
+    max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.24s ease,
+    background-color 0.24s ease,
+    box-shadow 0.24s ease,
+    opacity 0.2s ease;
 }
 
 .pagination-anchor.is-devtools-collapsed .corner-pagination {
   max-width: 32px;
-  padding: 2px 0;
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
+  padding: 0;
 }
 
 .pagination-toggle {
@@ -245,6 +263,12 @@ function syncMobileViewport() {
   opacity: 0.8;
   transform: translateY(-50%);
   transition: opacity 0.2s ease-in-out;
+}
+
+.pagination-anchor.is-devtools-collapsed .pagination-toggle {
+  inset: 0;
+  margin: auto;
+  transform: none;
 }
 
 .pagination-toggle:hover {

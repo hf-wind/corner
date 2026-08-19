@@ -70,7 +70,7 @@ export class EmojiController {
 
   @Get()
   getPacks() {
-    return this.emoji.getPacks(false, 48);
+    return this.emoji.getPacks(false);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
