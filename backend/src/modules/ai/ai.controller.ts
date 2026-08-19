@@ -408,8 +408,11 @@ export class AiController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Get('admin/usage')
-  usage() {
-    return this.aiNative.usageAnalytics();
+  usage(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    return this.aiNative.usageAnalytics(
+      page ? Number(page) : 1,
+      pageSize ? Number(pageSize) : 15,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

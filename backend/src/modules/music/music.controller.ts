@@ -22,6 +22,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UpdateMusicConfigDto } from './dto/update-music-config.dto';
 import { MusicFavoriteDto } from './dto/music-favorite.dto';
+import { ResolveMusicCoverDto } from './dto/resolve-music-cover.dto';
 
 @Controller('music')
 export class MusicController {
@@ -166,5 +167,17 @@ export class MusicController {
   @Post('admin/refresh')
   refresh() {
     return this.music.refreshCache();
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post('admin/cover')
+  async resolveCover(@Body() body: ResolveMusicCoverDto) {
+    return {
+      pic: await this.music.resolveTrackCover(
+        String(body?.name || ''),
+        String(body?.artist || ''),
+      ),
+    };
   }
 }

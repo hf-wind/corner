@@ -439,6 +439,7 @@ onUnmounted(() => {
 <style scoped>
 .sidebar-right {
   width: var(--article-aside-w, 236px);
+  animation: article-sidebar-arrive 0.56s cubic-bezier(0.16, 1, 0.3, 1) both;
   flex-basis: var(--article-aside-w, 236px);
   height: 100dvh;
   flex-shrink: 0;
@@ -448,6 +449,11 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
   background: transparent;
+}
+
+@keyframes article-sidebar-arrive {
+  from { opacity: 0; transform: translate3d(14px, 0, 0); }
+  to { opacity: 1; transform: none; }
 }
 
 .widget-head {
@@ -1331,6 +1337,7 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sidebar-right { animation: none; }
   .immersive-ui-enter-active,
   .immersive-ui-leave-active,
   .immersive-catalog-enter-active,

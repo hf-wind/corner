@@ -1,6 +1,6 @@
 <template>
   <ClientOnly>
-    <GlobalBottomDock v-show="route.meta.layout !== 'admin'" />
+    <GlobalBottomDock />
   </ClientOnly>
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">

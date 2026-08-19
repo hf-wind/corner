@@ -6,18 +6,9 @@ function authHeaders(): Record<string, string> {
 
 function aiGuestId(): string {
   if (typeof window === "undefined") return "";
-  const storageKey = "corner:ai:guest-id";
-  const existing = localStorage.getItem(storageKey);
-  if (existing && /^[a-zA-Z0-9_-]{16,128}$/.test(existing)) return existing;
-
-  const generated =
-    typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : Array.from(crypto.getRandomValues(new Uint8Array(24)), (value) =>
-          value.toString(16).padStart(2, "0"),
-        ).join("");
-  localStorage.setItem(storageKey, generated);
-  return generated;
+  const id = visitorGuestId();
+  localStorage.setItem("corner:ai:guest-id", id);
+  return id;
 }
 
 function visitorGuestId(): string {

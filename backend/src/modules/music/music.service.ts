@@ -22,8 +22,11 @@ export type MusicTrack = {
   artist: string;
   url: string;
   pic: string;
+  sort?: number;
   lrc?: string;
   key?: string;
+  proxyUrl?: string;
+  proxyPic?: string;
 };
 
 type CacheEntry = {
@@ -36,6 +39,7 @@ type CacheEntry = {
 export class MusicService {
   private readonly logger = new Logger(MusicService.name);
   private cache = new Map<string, CacheEntry>();
+  private coverCache = new Map<string, string>();
 
   constructor(
     private settings: SettingsService,
@@ -71,9 +75,15 @@ export class MusicService {
     const allowed = new Set<string>(MUSIC_SETTING_KEYS);
     for (const [key, value] of Object.entries(partial)) {
       if (!allowed.has(key)) continue;
+      let normalized = this.coerce(key as keyof MusicConfig, value);
+      if (key === 'music_playlists' && Array.isArray(normalized)) {
+        normalized = await this.enrichMissingCovers(
+          normalized as MusicPlaylistSource[],
+        );
+      }
       await this.settings.set(
         key,
-        this.coerce(key as keyof MusicConfig, value),
+        normalized,
       );
     }
     this.cache.clear();
@@ -341,6 +351,8 @@ export class MusicService {
           url: presented.url,
           pic: presented.pic,
           key: presented.key,
+          proxyUrl: presented.proxyUrl,
+          proxyPic: presented.proxyPic,
         };
       });
   }
@@ -404,10 +416,14 @@ export class MusicService {
   }
 
   private presentTrack(track: MusicTrack): MusicTrack {
+    const remoteUrl = !this.isLocalMediaPath(track.url);
+    const remotePic = Boolean(track.pic && !this.isLocalMediaPath(track.pic));
     return {
       ...track,
-      url: this.presentMediaUrl(track.url),
-      pic: track.pic ? this.presentMediaUrl(track.pic) : '',
+      url: remoteUrl ? track.url : this.presentMediaUrl(track.url),
+      proxyUrl: remoteUrl ? this.presentMediaUrl(track.url) : undefined,
+      pic: track.pic || '',
+      proxyPic: remotePic ? this.presentMediaUrl(track.pic) : undefined,
       key: this.trackKey(track.url),
     };
   }
@@ -627,9 +643,140 @@ export class MusicService {
         ).trim();
         const lrc = item.lrc != null ? String(item.lrc) : undefined;
         if (!name || !url) return null;
-        return { name, artist, url, pic, lrc };
+        const sort = Number(item.sort);
+        return {
+          name,
+          artist,
+          url,
+          pic,
+          sort: Number.isFinite(sort) ? Math.trunc(sort) : undefined,
+          lrc,
+        };
       })
-      .filter(Boolean) as MusicTrack[];
+      .filter((track) => track !== null)
+      .sort(
+        (left, right) =>
+          (left.sort ?? Number.MAX_SAFE_INTEGER) -
+          (right.sort ?? Number.MAX_SAFE_INTEGER),
+      ) as MusicTrack[];
+  }
+
+  private async enrichMissingCovers(playlists: MusicPlaylistSource[]) {
+    const missing = new Map<string, { name: string; artist: string }>();
+    for (const playlist of playlists) {
+      for (const track of playlist.tracks || []) {
+        if (track.pic?.trim()) continue;
+        const key = this.trackIdentity(track);
+        if (!missing.has(key)) {
+          missing.set(key, { name: track.name, artist: track.artist });
+        }
+      }
+    }
+    if (!missing.size) return playlists;
+
+    const covers = new Map<string, string>();
+    await Promise.all(
+      [...missing.entries()].map(async ([key, track]) => {
+        const cover = await this.resolveTrackCover(track.name, track.artist);
+        if (cover) covers.set(key, cover);
+      }),
+    );
+    if (!covers.size) return playlists;
+
+    return playlists.map((playlist) => ({
+      ...playlist,
+      tracks: (playlist.tracks || []).map((track) => ({
+        ...track,
+        pic: track.pic?.trim() || covers.get(this.trackIdentity(track)) || '',
+      })),
+    }));
+  }
+
+  async resolveTrackCover(name: string, artist: string) {
+    const title = String(name || '').trim().slice(0, 120);
+    const performer = String(artist || '').trim().slice(0, 120);
+    if (!title) throw new BadRequestException('歌曲名不能为空');
+    const cacheKey = `${title}\u0000${performer}`.toLocaleLowerCase();
+    if (this.coverCache.has(cacheKey)) return this.coverCache.get(cacheKey) || '';
+
+    const query = `${title} ${performer}`.trim();
+    let cover = '';
+    try {
+      const params = new URLSearchParams({
+        s: query,
+        type: '1',
+        offset: '0',
+        total: 'true',
+        limit: '8',
+      });
+      const response = await fetch(
+        `https://music.163.com/api/search/get/web?${params.toString()}`,
+        {
+          signal: AbortSignal.timeout(4500),
+          headers: {
+            Accept: 'application/json',
+            Referer: 'https://music.163.com/',
+            'User-Agent': 'corner-blog-cover-resolver/1.0',
+          },
+        },
+      );
+      if (response.ok) {
+        const payload = (await response.json()) as any;
+        const songs = Array.isArray(payload?.result?.songs)
+          ? payload.result.songs
+          : [];
+        const normalizedTitle = title.toLocaleLowerCase();
+        const normalizedArtist = performer.toLocaleLowerCase();
+        const ranked = songs
+          .map((song: any) => {
+            const songName = String(song?.name || '').toLocaleLowerCase();
+            const songArtists = String(
+              (song?.artists || song?.ar || [])
+                .map((item: any) => item?.name || item)
+                .filter(Boolean)
+                .join(' / '),
+            ).toLocaleLowerCase();
+            return {
+              song,
+              score:
+                (songName === normalizedTitle ? 8 : songName.includes(normalizedTitle) ? 4 : 0) +
+                (normalizedArtist && songArtists.includes(normalizedArtist) ? 5 : 0),
+            };
+          })
+          .sort((left: any, right: any) => right.score - left.score);
+        const raw = String(
+          ranked[0]?.song?.album?.picUrl || ranked[0]?.song?.al?.picUrl || '',
+        ).trim();
+        if (/^https?:\/\//i.test(raw)) cover = `${raw}?param=500y500`;
+      }
+    } catch (error) {
+      this.logger.debug(`netease cover lookup failed: ${error}`);
+    }
+
+    if (!cover) {
+      try {
+        const params = new URLSearchParams({
+          term: query,
+          entity: 'song',
+          limit: '5',
+          country: 'CN',
+        });
+        const response = await fetch(`https://itunes.apple.com/search?${params}`, {
+          signal: AbortSignal.timeout(4500),
+          headers: { Accept: 'application/json' },
+        });
+        if (response.ok) {
+          const payload = (await response.json()) as any;
+          const raw = String(payload?.results?.[0]?.artworkUrl100 || '').trim();
+          if (/^https?:\/\//i.test(raw)) cover = raw.replace(/100x100bb/i, '600x600bb');
+        }
+      } catch (error) {
+        this.logger.debug(`itunes cover lookup failed: ${error}`);
+      }
+    }
+
+    this.coverCache.set(cacheKey, cover);
+    return cover;
   }
 
   private mergeLocalTracks(remote: MusicTrack[], local: MusicTrack[]) {
@@ -688,6 +835,9 @@ export class MusicService {
                     pic: String(track?.pic || '')
                       .trim()
                       .slice(0, 2000),
+                    sort: Number.isFinite(Number(track?.sort))
+                      ? Math.trunc(Number(track.sort))
+                      : undefined,
                     lrc: track?.lrc
                       ? String(track.lrc).slice(0, 200000)
                       : undefined,

@@ -197,6 +197,20 @@
         </div>
       </Transition>
 
+      <Transition name="pet-actions">
+        <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
+          <button
+            v-for="action in quickActions.slice(0, 3)"
+            :key="action.label"
+            type="button"
+            @click="runQuickAction(action)"
+          >
+            <Icon :name="action.icon" />
+            <span>{{ action.label }}</span>
+          </button>
+        </div>
+      </Transition>
+
       <button
         type="button"
         class="pet-fab"
@@ -356,9 +370,11 @@ const isContentMode = computed(
   () => props.mode === "article" || props.mode === "context",
 );
 const isMobileView = ref(false);
+const isPhoneView = ref(false);
 const teleportToBody = computed(() => props.docked && isMobileView.value);
 function syncViewport() {
   isMobileView.value = window.matchMedia("(max-width: 900px)").matches;
+  isPhoneView.value = window.matchMedia("(max-width: 640px)").matches;
 }
 const contentType = computed(
   () => props.article?.type || (isArticleMode.value ? "post" : "home"),
@@ -619,6 +635,9 @@ function compactHint(value: string, maxLength = 26) {
 }
 
 const hintText = computed(() => compactHint(selectedGreeting.value));
+const actionsVisible = computed(
+  () => !chatOpen.value && !showHint.value && !isPhoneView.value,
+);
 const inputPlaceholder = computed(() =>
   isContentMode.value ? activeProfile.value.placeholder : "想从这里发现什么？",
 );
@@ -1846,6 +1865,7 @@ onUnmounted(() => {
   }
 
   .pet-actions {
+    display: none;
     max-width: calc(100vw - 24px);
     gap: 5px;
   }

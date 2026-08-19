@@ -674,7 +674,9 @@ export class AiNativeService {
     };
   }
 
-  async usageAnalytics() {
+  async usageAnalytics(requestedPage = 1, requestedPageSize = 15) {
+    const page = Math.max(1, Math.floor(requestedPage) || 1);
+    const pageSize = Math.min(50, Math.max(10, Math.floor(requestedPageSize) || 15));
     const [totals, userGroups, guestGroups, daily] = await Promise.all([
       this.prisma.aiInteraction.aggregate({
         where: { action: 'chat' },
@@ -687,7 +689,7 @@ export class AiNativeService {
         _count: { _all: true },
         _sum: { inputTokens: true, outputTokens: true },
         orderBy: { _sum: { outputTokens: 'desc' } },
-        take: 50,
+        take: 250,
       }),
       this.prisma.aiInteraction.groupBy({
         by: ['guestIdHash'],
@@ -699,7 +701,7 @@ export class AiNativeService {
         _count: { _all: true },
         _sum: { inputTokens: true, outputTokens: true },
         orderBy: { _sum: { outputTokens: 'desc' } },
-        take: 50,
+        take: 250,
       }),
       this.prisma.aiInteraction.findMany({
         where: {
@@ -715,9 +717,54 @@ export class AiNativeService {
       .filter(Boolean) as string[];
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, username: true, email: true },
+      select: { id: true, username: true, email: true, avatar: true, bio: true },
     });
     const userMap = new Map(users.map((user) => [user.id, user]));
+    const guestHashes = guestGroups
+      .map((item) => item.guestIdHash)
+      .filter(Boolean) as string[];
+    const profiles = await this.prisma.visitorProfile.findMany({
+      where: {
+        OR: [
+          { userId: { in: userIds } },
+          { visitorIdHash: { in: guestHashes } },
+        ],
+      },
+      select: {
+        userId: true,
+        visitorIdHash: true,
+        nickname: true,
+        visitCount: true,
+        messageCount: true,
+        firstSeenAt: true,
+        lastSeenAt: true,
+      },
+    });
+    const profileByUser = new Map(
+      profiles.filter((item) => item.userId).map((item) => [item.userId!, item]),
+    );
+    const profileByHash = new Map(
+      profiles.map((item) => [item.visitorIdHash, item]),
+    );
+    const profileHashes = profiles.map((item) => item.visitorIdHash);
+    const recentVisits = profileHashes.length
+      ? await this.prisma.visitorVisit.findMany({
+          where: { visitorIdHash: { in: profileHashes } },
+          orderBy: { createdAt: 'desc' },
+          take: Math.min(1000, profileHashes.length * 4),
+          select: {
+            visitorIdHash: true,
+            region: true,
+            browser: true,
+            device: true,
+            createdAt: true,
+          },
+        })
+      : [];
+    const latestVisit = new Map<string, (typeof recentVisits)[number]>();
+    for (const visit of recentVisits) {
+      if (!latestVisit.has(visit.visitorIdHash)) latestVisit.set(visit.visitorIdHash, visit);
+    }
     const inputPrice = Math.max(
       0,
       Number(process.env.AI_INPUT_PRICE_PER_1M || 0),
@@ -746,6 +793,55 @@ export class AiNativeService {
       current.calls += 1;
       byDay.set(key, current);
     }
+    const actors = [
+        ...userGroups.map((item) => {
+          const user = item.userId ? userMap.get(item.userId) : undefined;
+          const profile = item.userId ? profileByUser.get(item.userId) : undefined;
+          const visit = profile ? latestVisit.get(profile.visitorIdHash) : undefined;
+          return {
+            actorType: 'user',
+            actorId: item.userId,
+            conversationId: item.userId,
+            name: user?.username || profile?.nickname || '已注销用户',
+            email: user?.email || '',
+            avatar: user?.avatar || '',
+            bio: user?.bio || '',
+            region: visit?.region || null,
+            browser: visit?.browser || null,
+            device: visit?.device || null,
+            visitCount: profile?.visitCount || 0,
+            messageCount: profile?.messageCount || 0,
+            firstSeenAt: profile?.firstSeenAt || null,
+            lastSeenAt: profile?.lastSeenAt || visit?.createdAt || null,
+            calls: item._count._all,
+            ...present(item._sum.inputTokens || 0, item._sum.outputTokens || 0),
+          };
+        }),
+        ...guestGroups.map((item) => {
+          const hash = item.guestIdHash || '';
+          const profile = profileByHash.get(hash);
+          const visit = latestVisit.get(hash);
+          return {
+            actorType: 'guest',
+            actorId: hash.slice(0, 12),
+            conversationId: `guest:${hash}`,
+            name: profile?.nickname?.trim() || '未登记访客',
+            email: '',
+            avatar: '',
+            bio: '',
+            region: visit?.region || null,
+            browser: visit?.browser || null,
+            device: visit?.device || null,
+            visitCount: profile?.visitCount || 0,
+            messageCount: profile?.messageCount || 0,
+            firstSeenAt: profile?.firstSeenAt || null,
+            lastSeenAt: profile?.lastSeenAt || visit?.createdAt || null,
+            calls: item._count._all,
+            ...present(item._sum.inputTokens || 0, item._sum.outputTokens || 0),
+          };
+        }),
+      ].sort((left, right) => right.totalTokens - left.totalTokens);
+    const totalActors = actors.length;
     return {
       pricing: {
         inputPerMillionUsd: inputPrice,
@@ -756,29 +852,8 @@ export class AiNativeService {
         calls: totals._count._all,
         ...present(totals._sum.inputTokens || 0, totals._sum.outputTokens || 0),
       },
-      actors: [
-        ...userGroups.map((item) => {
-          const user = item.userId ? userMap.get(item.userId) : undefined;
-          return {
-            actorType: 'user',
-            actorId: item.userId,
-            conversationId: item.userId,
-            name: user?.username || '已注销用户',
-            email: user?.email || '',
-            calls: item._count._all,
-            ...present(item._sum.inputTokens || 0, item._sum.outputTokens || 0),
-          };
-        }),
-        ...guestGroups.map((item) => ({
-          actorType: 'guest',
-          actorId: item.guestIdHash?.slice(0, 12),
-          conversationId: `guest:${item.guestIdHash}`,
-          name: `访客 ${item.guestIdHash?.slice(0, 8)}`,
-          email: '',
-          calls: item._count._all,
-          ...present(item._sum.inputTokens || 0, item._sum.outputTokens || 0),
-        })),
-      ].sort((left, right) => right.totalTokens - left.totalTokens),
+      actors: actors.slice((page - 1) * pageSize, page * pageSize),
+      actorPagination: { page, pageSize, total: totalActors },
       daily: [...byDay.entries()].map(([date, item]) => ({
         date,
         calls: item.calls,

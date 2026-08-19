@@ -2,7 +2,7 @@
   <audio
     ref="audioRef"
     class="music-audio"
-    preload="metadata"
+    preload="auto"
     :src="current?.url || undefined"
     @ended="onEnded"
     @timeupdate="onTimeUpdate"
@@ -114,6 +114,8 @@
             :class="{ active: isCurrentTrack(track) }"
             role="option"
             :aria-selected="isCurrentTrack(track)"
+            @pointerenter="warmTrack(track)"
+            @focus="warmTrack(track)"
             @click="playAt(trackIndex)"
           >
             <span class="track-index">
@@ -131,7 +133,7 @@
                 :src="track.pic"
                 alt=""
                 draggable="false"
-                @error="markCoverBroken(track.pic)"
+                @error="onCoverError($event, track)"
               />
               <Icon v-else name="ph:music-note-bold" />
             </span>
@@ -236,7 +238,7 @@
                 :src="current.pic"
                 alt=""
                 draggable="false"
-                @error="markCoverBroken(current.pic)"
+                @error="onCoverError($event, current)"
               />
               <Icon v-else name="ph:music-note-bold" />
             </span>
@@ -342,6 +344,8 @@ type Track = {
   pic: string;
   lrc?: string;
   key?: string;
+  proxyUrl?: string;
+  proxyPic?: string;
 };
 
 type PlaylistMeta = {
@@ -404,6 +408,7 @@ const visibleQueueCovers = ref(new Set<string>());
 let playlistRequestId = 0;
 let playRequestId = 0;
 let coverObserver: IntersectionObserver | null = null;
+let warmAudio: HTMLAudioElement | null = null;
 
 const vLazyCover = {
   mounted(element: HTMLElement, binding: { value?: string }) {
@@ -488,6 +493,8 @@ watch(isLoggedIn, (loggedIn) => {
 onMounted(async () => {
   document.addEventListener("pointerdown", onDocumentPointerDown);
   document.addEventListener("keydown", onDocumentKeydown);
+  warmAudio = new Audio();
+  warmAudio.preload = "auto";
   await bootstrap();
 });
 
@@ -498,6 +505,11 @@ onUnmounted(() => {
   setPlaying(false);
   coverObserver?.disconnect();
   coverObserver = null;
+  if (warmAudio) {
+    warmAudio.pause();
+    warmAudio.onerror = null;
+  }
+  warmAudio = null;
   const audio = audioRef.value;
   if (audio) {
     audio.pause();
@@ -681,7 +693,7 @@ async function handleExternalPlayRequest(
   request: Track & { requestId: number },
 ) {
   const requestId = ++playRequestId;
-  await preloadCovers([request]);
+  void preloadCovers([request]);
   if (requestId !== playRequestId) return;
   const existing = tracks.value.findIndex(
     (track) =>
@@ -788,7 +800,7 @@ async function previous() {
   errorRecoveryAvailable.value = true;
   const targetIndex =
     (index.value - 1 + tracks.value.length) % tracks.value.length;
-  await preloadCovers([tracks.value[targetIndex]]);
+  void preloadCovers([tracks.value[targetIndex]]);
   index.value = targetIndex;
   await reloadAndPlay();
 }
@@ -800,7 +812,7 @@ async function next(allowErrorRecovery = true) {
     await loadMorePlaybackTracks();
   }
   const targetIndex = (index.value + 1) % tracks.value.length;
-  await preloadCovers([tracks.value[targetIndex]]);
+  void preloadCovers([tracks.value[targetIndex]]);
   index.value = targetIndex;
   await reloadAndPlay();
 }
@@ -815,7 +827,7 @@ function onQueueScroll(event: Event) {
 async function playAt(trackIndex: number) {
   const selectedTrack = queueTracks.value[trackIndex];
   if (!selectedTrack) return;
-  await preloadCovers([selectedTrack]);
+  void preloadCovers([selectedTrack]);
   tracks.value = [...queueTracks.value];
   playbackPlaylistTab.value = playlistTab.value;
   playbackPlaylistIndex.value = playlistIndex.value;
@@ -890,8 +902,36 @@ async function prepareCurrentTrack(shouldPlay: boolean) {
   const audio = audioRef.value;
   if (!audio || !current.value) return;
   applyVolume();
+  delete audio.dataset.proxyFallback;
   audio.load();
+  warmNextTrack();
   if (shouldPlay) await play();
+}
+
+function warmNextTrack() {
+  if (tracks.value.length < 2) return;
+  const nextTrack = tracks.value[(index.value + 1) % tracks.value.length];
+  warmTrack(nextTrack);
+}
+
+function warmTrack(nextTrack: Track | undefined) {
+  const audio = warmAudio;
+  if (
+    !audio ||
+    !nextTrack?.url ||
+    audio.getAttribute("src") === nextTrack.url
+  )
+    return;
+  delete audio.dataset.proxyFallback;
+  audio.src = nextTrack.url;
+  audio.onerror = () => {
+    if (nextTrack.proxyUrl && !audio.dataset.proxyFallback) {
+      audio.dataset.proxyFallback = "1";
+      audio.src = nextTrack.proxyUrl;
+      audio.load();
+    }
+  };
+  audio.load();
 }
 
 async function tryAutoplay() {
@@ -925,6 +965,15 @@ function onMetadata() {
 }
 
 function onAudioError() {
+  const audio = audioRef.value;
+  const track = current.value;
+  if (audio && track?.proxyUrl && !audio.dataset.proxyFallback) {
+    audio.dataset.proxyFallback = "1";
+    audio.src = track.proxyUrl;
+    audio.load();
+    if (playbackRequested.value) void play();
+    return;
+  }
   playing.value = false;
   if (
     playbackRequested.value &&
@@ -969,8 +1018,8 @@ async function toggleFavorite(track: Track) {
       const response = await api.post<{ track?: Track }>("/music/favorites", {
         name: track.name,
         artist: track.artist,
-        url: track.url,
-        pic: track.pic,
+        url: track.proxyUrl || track.url,
+        pic: track.proxyPic || track.pic,
         lrc: track.lrc,
       });
       if (response?.track) {
@@ -1080,6 +1129,16 @@ function hasCover(url: string | undefined) {
 function markCoverBroken(url: string | undefined) {
   if (!url) return;
   brokenCovers.value = new Set([...brokenCovers.value, url]);
+}
+
+function onCoverError(event: Event, track: Track) {
+  const image = event.currentTarget as HTMLImageElement;
+  if (track.proxyPic && !image.dataset.proxyFallback) {
+    image.dataset.proxyFallback = "1";
+    image.src = track.proxyPic;
+    return;
+  }
+  markCoverBroken(track.pic);
 }
 
 function locateCurrentTrack() {

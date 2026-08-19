@@ -3,8 +3,8 @@
     <header class="fp-head">
       <div>
         <span class="fp-kicker">RECENT ARRIVALS</span>
-        <h4>欢迎路过风隅</h4>
-        <p>愿你在这里，遇见一段刚好的文字。</p>
+        <h4>有人循风而来</h4>
+        <p>每一次路过，都在风隅留下轻轻的回声。</p>
       </div>
       <button
         type="button"
@@ -51,7 +51,7 @@
         <div class="fp-copy">
           <p :title="visitorTitle(visit)">
             <span class="fp-name">{{ visitorLabel(visit) }}</span>
-            <span class="fp-welcome">欢迎路过风隅</span>
+            <span class="fp-welcome">刚刚路过风隅</span>
           </p>
           <div class="fp-meta">
             <span v-if="visit.region" class="fp-region" :title="visit.region"
@@ -119,7 +119,7 @@ function visitorLabel(visit: RecentVisit) {
 
 function visitorTitle(visit: RecentVisit) {
   return [
-    `${visitorLabel(visit)}，欢迎路过风隅`,
+    `${visitorLabel(visit)}，刚刚路过风隅`,
     visit.region,
     visit.browser,
     visit.device ? deviceLabel(visit.device) : "",
@@ -183,7 +183,7 @@ async function load(fresh = false) {
   try {
     const data = await fetchRecent(fresh);
     if (seq !== loadSeq) return;
-    items.value = (Array.isArray(data) ? data : []).slice(0, 5);
+    items.value = (Array.isArray(data) ? data : []).slice(0, 4);
     listKey.value += 1;
   } catch {
     // Supplementary content keeps its last successful state on network failure.
@@ -215,7 +215,7 @@ onUnmounted(() => {
 <style scoped>
 .footprints {
   display: flex;
-  min-height: 190px;
+  min-height: 264px;
   flex-direction: column;
   padding: 13px 13px 9px;
   overflow: hidden;
@@ -245,7 +245,10 @@ onUnmounted(() => {
 .fp-head h4 {
   margin: 3px 0 0;
   color: var(--c-text);
-  font-size: 0.82rem;
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  font-weight: 760;
+  line-height: 1.35;
 }
 .fp-head p {
   margin: 2px 0 0;
@@ -297,7 +300,7 @@ onUnmounted(() => {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-auto-rows: minmax(46px, 1fr);
+  grid-auto-rows: minmax(54px, 1fr);
   align-content: stretch;
   gap: 0;
   margin: 0;
@@ -312,7 +315,7 @@ onUnmounted(() => {
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  min-height: 46px;
+  min-height: 54px;
   padding: 4px;
   overflow: hidden;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
@@ -372,8 +375,8 @@ onUnmounted(() => {
   overflow-wrap: anywhere;
 }
 .fp-welcome {
-  color: var(--c-text-2);
-  font-weight: 560;
+  color: var(--c-primary);
+  font-weight: 620;
 }
 .fp-browser {
   display: inline-flex;
@@ -399,7 +402,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   margin-top: 3px;
-  overflow: hidden;
+  flex-wrap: wrap;
+  row-gap: 3px;
+  overflow: visible;
   color: var(--c-text-3);
   font-size: 0.45rem;
 }
@@ -411,7 +416,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .fp-region {
-  max-width: min(112px, 42%);
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -437,7 +442,7 @@ onUnmounted(() => {
   flex: none;
   align-items: center;
   gap: 3px;
-  margin-left: auto;
+  margin-left: 0;
   padding-left: 5px;
   border-left: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   color: var(--c-text-2);
@@ -450,7 +455,7 @@ onUnmounted(() => {
 }
 @media (max-height: 680px) and (min-width: 901px) {
   .footprints {
-    min-height: 170px;
+    min-height: 224px;
     padding-top: 12px;
   }
   .fp-head {

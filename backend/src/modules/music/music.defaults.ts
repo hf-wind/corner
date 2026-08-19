@@ -3,6 +3,7 @@ export type MusicPlaylistTrack = {
   artist: string;
   url: string;
   pic: string;
+  sort?: number;
   lrc?: string;
   mediaId?: string;
 };

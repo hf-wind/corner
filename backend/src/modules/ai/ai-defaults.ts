@@ -55,6 +55,7 @@ export const AI_SETTING_KEYS = [
   'ai_article_model_config_id',
   'ai_article_temperature',
   'ai_article_max_tokens',
+  'ai_wallpaper_source_url',
   'ai_moment_enabled',
   'ai_moment_prompt',
   'ai_moment_summary_prompt',
@@ -128,6 +129,7 @@ export type AiConfig = {
   ai_article_model_config_id: string;
   ai_article_temperature: number;
   ai_article_max_tokens: number;
+  ai_wallpaper_source_url: string;
   ai_moment_enabled: boolean;
   ai_moment_prompt: string;
   ai_moment_summary_prompt: string;
@@ -278,6 +280,7 @@ export const AI_DEFAULTS: AiConfig = {
   ai_article_model_config_id: '',
   ai_article_temperature: 0.7,
   ai_article_max_tokens: 4096,
+  ai_wallpaper_source_url: 'https://wallhaven.cc/toplist',
 
   ai_moment_enabled: true,
   ai_moment_prompt: [

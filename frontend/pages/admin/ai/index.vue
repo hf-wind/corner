@@ -202,6 +202,13 @@
             desc="根据灵感生成文章正文与元数据，并为文章生成导语摘要"
           >
             <a-form layout="vertical" size="middle">
+                <a-form-item label="文章封面壁纸来源">
+                  <a-input
+                    v-model:value="form.ai_wallpaper_source_url"
+                    placeholder="https://wallhaven.cc/toplist"
+                  />
+                  <div class="field-hint">AI 文章与随机封面会从该壁纸站点获取，默认使用 Wallhaven 热门榜。</div>
+                </a-form-item>
               <a-form-item label="正文生成提示词">
                   <a-textarea
                     v-model:value="form.ai_article_prompt"

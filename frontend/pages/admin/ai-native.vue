@@ -58,7 +58,7 @@
           <span>FRONTEND USAGE</span>
           <h2>前台 AI 消耗明细</h2>
         </div>
-        <small>最多展示 Token 消耗最高的 50 位用户与访客</small>
+        <small>关联足迹档案，按 Token 消耗排序</small>
       </header>
       <div class="usage-table-wrap">
         <table>
@@ -66,6 +66,8 @@
             <tr>
               <th>身份</th>
               <th>账户</th>
+              <th>最近足迹</th>
+              <th>访问</th>
               <th>调用</th>
               <th>输入 Token</th>
               <th>输出 Token</th>
@@ -85,9 +87,16 @@
                 }}</span>
               </td>
               <td>
-                <strong>{{ actor.name }}</strong
-                ><small>{{ actor.email || actor.actorId }}</small>
+                <div class="actor-account">
+                  <span class="actor-avatar">
+                    <img v-if="actor.avatar" :src="actor.avatar" alt="" />
+                    <b v-else>{{ String(actor.name || '访').charAt(0) }}</b>
+                  </span>
+                  <span><strong>{{ actor.name }}</strong><small>{{ actor.email || actor.bio || (actor.visitCount ? "访客足迹档案" : "未关联足迹档案") }}</small></span>
+                </div>
               </td>
+              <td><strong>{{ actor.region || "位置未知" }}</strong><small>{{ [actor.browser, deviceLabel(actor.device), formatTime(actor.lastSeenAt)].filter(Boolean).join(" · ") || "暂无足迹" }}</small></td>
+              <td>{{ actor.visitCount || 0 }}<small>{{ actor.messageCount || 0 }} 条留言</small></td>
               <td>{{ actor.calls }}</td>
               <td>{{ formatNumber(actor.inputTokens) }}</td>
               <td>{{ formatNumber(actor.outputTokens) }}</td>
@@ -99,16 +108,26 @@
                   size="small"
                   :disabled="!actor.conversationId"
                   @click="openConversation(actor)"
-                  ><Icon name="ph:chats-circle-bold" />查看</a-button
+                  ><Icon name="ph:eye-bold" />查看</a-button
                 >
               </td>
             </tr>
             <tr v-if="!(usage.actors || []).length">
-              <td colspan="8" class="usage-empty">暂无前台 AI 消耗记录</td>
+              <td colspan="10" class="usage-empty">暂无前台 AI 消耗记录</td>
             </tr>
           </tbody>
         </table>
       </div>
+      <a-pagination
+        v-if="(usage.actorPagination?.total || 0) > usagePageSize"
+        class="usage-pagination"
+        size="small"
+        :current="usagePage"
+        :page-size="usagePageSize"
+        :total="usage.actorPagination.total"
+        :show-size-changer="false"
+        @change="loadUsage"
+      />
     </section>
     <div class="grid">
       <a-card title="作者风格档案" :bordered="false"
@@ -220,6 +239,8 @@ const toast = useToast();
 const busy = ref("");
 const analytics = ref<any>({});
 const usage = ref<any>({});
+const usagePage = ref(1);
+const usagePageSize = 15;
 const styleResult = ref<any>();
 const privateQuery = ref("");
 const privateResult = ref<any>();
@@ -253,6 +274,17 @@ function formatTime(value?: string) {
   if (!value) return "";
   return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }
+function deviceLabel(value?: string) {
+  return ({ mobile: "手机", tablet: "平板", desktop: "桌面端" } as Record<string, string>)[String(value || "")] || value || "";
+}
+async function loadUsage(page = usagePage.value) {
+  usagePage.value = page;
+  try {
+    usage.value = await api.get("/ai/admin/usage", { page, pageSize: usagePageSize });
+  } catch {
+    usage.value = {};
+  }
+}
 async function openConversation(actor: any) {
   selectedActor.value = actor;
   conversationDetail.value = null;
@@ -284,7 +316,7 @@ async function load() {
   try {
     const [analyticsResult, usageResult] = await Promise.all([
       api.get("/ai/admin/analytics"),
-      api.get("/ai/admin/usage"),
+      api.get("/ai/admin/usage", { page: usagePage.value, pageSize: usagePageSize }),
     ]);
     analytics.value = analyticsResult;
     usage.value = usageResult;
@@ -395,7 +427,7 @@ onMounted(load);
 }
 .usage-panel table {
   width: 100%;
-  min-width: 760px;
+  min-width: 1120px;
   border-collapse: collapse;
 }
 .usage-panel th,
@@ -418,6 +450,12 @@ onMounted(load);
 .usage-panel td small {
   display: block;
 }
+.actor-account { display:flex; min-width:190px; align-items:center; gap:8px; }
+.actor-account > span:last-child { min-width:0; }
+.actor-avatar { display:grid; width:32px; height:32px; flex:0 0 32px; overflow:hidden; border-radius:50%; background:var(--c-primary-soft); color:var(--c-primary); place-items:center; }
+.actor-avatar img { width:100%; height:100%; object-fit:cover; }
+.actor-avatar b { font-size:.7rem; }
+.usage-pagination { display:flex; justify-content:center; margin-top:14px; }
 .usage-panel td small {
   margin-top: 2px;
   color: var(--c-text-3);

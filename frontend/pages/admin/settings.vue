@@ -98,7 +98,7 @@
                 style="width: 140px"
                 @change="saveSetting('visitor_fish_daily_limit')"
               />
-              <div class="hint">打捞请求会计入额度，默认 8 次。</div>
+              <div class="hint">打捞请求会计入额度，默认 5 次。</div>
             </a-form-item>
           </a-form>
         </AdminCard>
@@ -408,61 +408,50 @@
                     @after-leave="afterPlaylistTransition"
                   >
                     <div v-if="p.expanded" class="playlist-content">
-                      <div class="playlist-content-head">
-                        <span>歌曲</span>
-                        <span>歌手</span>
-                        <span>排序与移除</span>
-                      </div>
-                      <div v-if="p.tracks.length" class="playlist-tracks">
-                        <div
-                          v-for="(track, trackIndex) in p.tracks"
-                          :key="track.key"
-                          class="playlist-track-row"
-                        >
-                          <span class="playlist-track-order">{{
-                            String(trackIndex + 1).padStart(2, "0")
-                          }}</span>
-                          <a-input
-                            v-model:value="track.name"
-                            size="small"
-                            placeholder="歌曲名"
-                          />
-                          <a-input
-                            v-model:value="track.artist"
-                            size="small"
-                            placeholder="歌手"
-                          />
-                          <div class="track-actions">
-                            <a-button
-                              type="text"
-                              size="small"
-                              :disabled="trackIndex === 0"
-                              title="上移"
-                              @click="moveTrack(p, trackIndex, -1)"
-                            >
-                              <Icon name="ph:caret-up-bold" />
-                            </a-button>
-                            <a-button
-                              type="text"
-                              size="small"
-                              :disabled="trackIndex === p.tracks.length - 1"
-                              title="下移"
-                              @click="moveTrack(p, trackIndex, 1)"
-                            >
-                              <Icon name="ph:caret-down-bold" />
-                            </a-button>
-                            <a-button
-                              type="text"
-                              danger
-                              size="small"
-                              title="移除歌曲"
-                              @click="p.tracks.splice(trackIndex, 1)"
-                            >
-                              <Icon name="ph:x-bold" />
-                            </a-button>
-                          </div>
-                        </div>
-                      </div>
+                      <a-table
+                        v-if="p.tracks.length"
+                        row-key="key"
+                        size="small"
+                        :columns="trackColumns"
+                        :data-source="p.tracks"
+                        :pagination="false"
+                        :scroll="{ x: 820 }"
+                        class="playlist-track-table"
+                      >
+                        <template #bodyCell="{ column, record: track, index: trackIndex }">
+                          <template v-if="column.key === 'cover'">
+                            <div class="track-cover-editor">
+                              <img v-if="track.pic" :src="track.pic" alt="" loading="lazy" />
+                              <span v-else><Icon name="ph:music-note-bold" /></span>
+                              <a-button
+                                type="text"
+                                size="small"
+                                :loading="coverResolvingKey === track.key"
+                                title="自动获取封面"
+                                @click="resolveTrackCover(track)"
+                              ><Icon name="ph:magnifying-glass-bold" /></a-button>
+                            </div>
+                          </template>
+                          <template v-else-if="column.key === 'name'">
+                            <a-input v-model:value="track.name" size="small" placeholder="歌曲名" />
+                          </template>
+                          <template v-else-if="column.key === 'artist'">
+                            <a-input v-model:value="track.artist" size="small" placeholder="歌手" />
+                          </template>
+                          <template v-else-if="column.key === 'sort'">
+                            <a-input-number v-model:value="track.sort" size="small" :min="0" :step="10" />
+                          </template>
+                          <template v-else-if="column.key === 'actions'">
+                            <div class="track-actions">
+                              <a-button type="text" size="small" :disabled="trackIndex === 0" title="上移" @click="moveTrack(p, trackIndex, -1)"><Icon name="ph:caret-up-bold" /></a-button>
+                              <a-button type="text" size="small" :disabled="trackIndex === p.tracks.length - 1" title="下移" @click="moveTrack(p, trackIndex, 1)"><Icon name="ph:caret-down-bold" /></a-button>
+                              <a-popconfirm title="确认从歌单移除这首歌？" ok-text="移除" cancel-text="取消" @confirm="p.tracks.splice(trackIndex, 1)">
+                                <a-button type="text" danger size="small" title="移除歌曲"><Icon name="ph:trash-bold" /></a-button>
+                              </a-popconfirm>
+                            </div>
+                          </template>
+                        </template>
+                      </a-table>
                       <div v-else class="playlist-empty">
                         <Icon name="ph:music-notes-simple-bold" />
                         <span>从在线歌单或媒体库添加歌曲</span>
@@ -630,7 +619,7 @@ const settings = ref({
   site_description: "",
   site_keywords: "" as any,
   visitor_bottle_daily_limit: 3,
-  visitor_fish_daily_limit: 8,
+  visitor_fish_daily_limit: 5,
 });
 const keywordText = ref("");
 const mediaNaming = ref("timestamp");
@@ -661,6 +650,7 @@ type PlaylistTrackForm = {
   artist: string;
   url: string;
   pic: string;
+  sort: number;
   lrc?: string;
   mediaId?: string;
 };
@@ -695,6 +685,14 @@ const sourcePicker = reactive({
   >,
 });
 const sourcePreviewRef = ref<HTMLAudioElement | null>(null);
+const coverResolvingKey = ref("");
+const trackColumns = [
+  { title: "封面", key: "cover", width: 92 },
+  { title: "歌曲", key: "name", minWidth: 180 },
+  { title: "歌手", key: "artist", minWidth: 150 },
+  { title: "权重", key: "sort", width: 100 },
+  { title: "操作", key: "actions", width: 118, fixed: "right" as const },
+];
 const sourcePreviewKey = ref("");
 const sourcePreviewPlaying = ref(false);
 const selectedSourceKeys = ref(new Set<string>());
@@ -746,7 +744,7 @@ async function loadSettings() {
       );
       settings.value.visitor_fish_daily_limit = Math.max(
         1,
-        Number(res.visitor_fish_daily_limit) || 8,
+        Number(res.visitor_fish_daily_limit) || 5,
       );
     }
   } catch {}
@@ -873,11 +871,12 @@ async function loadMusic() {
               key: playlistKey(),
               visible: p.visible !== false,
               expanded: false,
-              tracks: Array.isArray(p.tracks)
-                ? p.tracks.map((track: any) => ({
+                  tracks: Array.isArray(p.tracks)
+                ? p.tracks.map((track: any, trackIndex: number) => ({
                     ...track,
                     key: trackKey(),
                     pic: track.pic || "",
+                    sort: Number.isFinite(Number(track.sort)) ? Number(track.sort) : (trackIndex + 1) * 10,
                   }))
                 : [],
               sort: Number.isFinite(Number(p.sort))
@@ -948,6 +947,7 @@ async function loadSourceTracks() {
       ...track,
       key: track.key || trackKey(),
       pic: track.pic || "",
+      sort: Number.isFinite(Number(track.sort)) ? Number(track.sort) : 0,
     }));
     if (!sourcePicker.tracks.length) toast.info("这个来源歌单没有可用歌曲");
   } catch {
@@ -1062,6 +1062,7 @@ async function addMediaTracks(playlist: PlaylistForm) {
       artist: "本地音乐",
       url: String(item.path || ""),
       pic: "",
+      sort: (playlist.tracks.length + 1) * 10,
       mediaId: String(item.id || ""),
     }))
     .filter((track) => track.url);
@@ -1079,11 +1080,30 @@ function appendPlaylistTracks(
   );
 }
 
+async function resolveTrackCover(track: PlaylistTrackForm) {
+  if (!track.name.trim()) return toast.warning("请先填写歌曲名");
+  coverResolvingKey.value = track.key;
+  try {
+    const result = await api.post<{ pic?: string }>("/music/admin/cover", {
+      name: track.name,
+      artist: track.artist,
+    });
+    if (!result?.pic) return toast.warning("暂未找到匹配封面");
+    track.pic = result.pic;
+    toast.success("已补充歌曲封面");
+  } catch {
+    toast.error("封面获取失败");
+  } finally {
+    coverResolvingKey.value = "";
+  }
+}
+
 function moveTrack(playlist: PlaylistForm, index: number, offset: number) {
   const target = index + offset;
   if (target < 0 || target >= playlist.tracks.length) return;
   const [track] = playlist.tracks.splice(index, 1);
   playlist.tracks.splice(target, 0, track);
+  playlist.tracks.forEach((item, position) => (item.sort = (position + 1) * 10));
 }
 
 function beforePlaylistEnter(element: Element) {
@@ -1476,6 +1496,36 @@ async function refreshCache() {
   transition:
     height 0.28s cubic-bezier(0.22, 0.8, 0.24, 1),
     opacity 0.2s ease;
+}
+.playlist-track-table {
+  border-top: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+}
+.playlist-track-table :deep(.ant-table),
+.playlist-track-table :deep(.ant-table-cell) {
+  background: transparent !important;
+}
+.track-cover-editor {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.track-cover-editor > img,
+.track-cover-editor > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--c-bg-2);
+  color: var(--c-primary);
+  object-fit: cover;
+  place-items: center;
+}
+.track-cover-editor :deep(.ant-btn) {
+  width: 26px;
+  height: 26px;
+  padding: 0;
 }
 .playlist-content-head {
   display: grid;

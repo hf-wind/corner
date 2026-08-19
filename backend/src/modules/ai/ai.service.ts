@@ -1075,7 +1075,39 @@ export class AiService {
   async listWallpapers(page = 1, rows = 9) {
     const p = Math.max(1, page || 1);
     const r = Math.min(24, Math.max(1, rows || 9));
-    const pageUrl = `https://haowallpaper.com/?page=${p}&sortType=7&wpType=1&rows=${r}`;
+    const cfg = await this.getConfig();
+    const configured = String(cfg.ai_wallpaper_source_url || '').trim();
+    const sourceUrl = this.safeWallpaperSource(configured);
+
+    if (sourceUrl.hostname === 'wallhaven.cc' || sourceUrl.hostname.endsWith('.wallhaven.cc')) {
+      const params = new URLSearchParams({
+        sorting: sourceUrl.pathname.includes('toplist') ? 'toplist' : 'favorites',
+        page: String(p),
+      });
+      try {
+        const response = await fetch(`https://wallhaven.cc/api/v1/search?${params}`, {
+          signal: AbortSignal.timeout(12000),
+          headers: { Accept: 'application/json', 'User-Agent': 'corner-blog-wallpaper/1.0' },
+        });
+        if (response.ok) {
+          const payload = (await response.json()) as any;
+          const items = (Array.isArray(payload?.data) ? payload.data : [])
+            .slice(0, r)
+            .map((item: any) => ({
+              id: String(item?.id || ''),
+              url: String(item?.path || ''),
+              thumb: String(item?.thumbs?.large || item?.thumbs?.original || item?.path || ''),
+            }))
+            .filter((item: any) => item.id && /^https?:\/\//i.test(item.url));
+          if (items.length) return { items, source: sourceUrl.toString() };
+        }
+      } catch (error) {
+        this.logger.warn(`wallhaven api fail: ${error}`);
+      }
+    }
+
+    sourceUrl.searchParams.set('page', String(p));
+    const pageUrl = sourceUrl.toString();
 
     try {
       const res = await fetch(pageUrl, {
@@ -1084,12 +1116,12 @@ export class AiService {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           Accept: 'text/html,application/xhtml+xml',
-          Referer: 'https://haowallpaper.com/',
+          Referer: sourceUrl.origin + '/',
         },
       });
       if (res.ok) {
         const html = await res.text();
-        const items = this.parseWallpapersFromHtml(html).slice(0, r);
+        const items = this.parseWallpapersFromHtml(html, sourceUrl).slice(0, r);
         if (items.length) return { items, source: pageUrl };
       }
     } catch (e) {
@@ -1103,8 +1135,19 @@ export class AiService {
     };
   }
 
+  private safeWallpaperSource(value: string) {
+    try {
+      const url = new URL(value || 'https://wallhaven.cc/toplist');
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+      return url;
+    } catch {
+      return new URL('https://wallhaven.cc/toplist');
+    }
+  }
+
   private parseWallpapersFromHtml(
     html: string,
+    source: URL,
   ): { id: string; url: string; thumb: string }[] {
     const re =
       /https:\/\/haowallpaper\.com\/link\/common\/file\/(?:getCroppingImg|previewImg)\/(\d+)/g;
@@ -1117,6 +1160,18 @@ export class AiService {
       seen.add(id);
       const url = `https://haowallpaper.com/link/common/file/getCroppingImg/${id}`;
       out.push({ id, url, thumb: url });
+    }
+    const imageRe = /<(?:img|source)[^>]+(?:data-src|src)=["']([^"']+)["']/gi;
+    while ((m = imageRe.exec(html))) {
+      try {
+        const url = new URL(m[1], source).toString();
+        if (!/^https?:\/\//i.test(url) || seen.has(url)) continue;
+        if (!/\.(?:avif|jpe?g|png|webp)(?:\?|$)/i.test(url)) continue;
+        seen.add(url);
+        out.push({ id: createHash('sha256').update(url).digest('hex').slice(0, 16), url, thumb: url });
+      } catch {
+        /* ignore invalid image URLs */
+      }
     }
     return out;
   }

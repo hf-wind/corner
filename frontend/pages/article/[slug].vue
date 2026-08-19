@@ -899,11 +899,13 @@ onUnmounted(() => {
 @keyframes article-fade-up {
   from {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(14px);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+    filter: none;
   }
 }
 
@@ -913,7 +915,7 @@ onUnmounted(() => {
 
 .article-ready .article-anim,
 .comments-enter {
-  animation: article-fade-up 0.5s ease both;
+  animation: article-fade-up 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .article-anim:nth-child(2) {
@@ -1230,9 +1232,6 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .article-loading-state {
-    animation: none;
-  }
   .article-anim {
     opacity: 1;
   }

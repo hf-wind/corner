@@ -74,7 +74,7 @@ describe('VisitorService', () => {
 
       await expect(service.bottleQuota(req)).resolves.toEqual({
         throw: { used: 0, limit: 3, remaining: 3 },
-        fish: { used: 0, limit: 8, remaining: 8 },
+        fish: { used: 0, limit: 5, remaining: 5 },
       });
     });
   });
