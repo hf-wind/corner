@@ -1,5 +1,5 @@
 <template>
-  <div class="library-form-page">
+  <div class="library-form-page admin-page-shell">
     <header class="form-header">
       <div>
         <a-button type="text" class="back-button" @click="router.push('/admin/library')">

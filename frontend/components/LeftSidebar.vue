@@ -237,11 +237,12 @@ const adminFullNav = [
   { to: "/admin/memory-graph", icon: "ph:planet-bold", label: "时光星图" },
   { to: "/admin/categories", icon: "ph:folder-open-bold", label: "分类管理" },
   { to: "/admin/tags", icon: "ph:tag-bold", label: "标签管理" },
+  { to: "/admin/friends", icon: "ph:handshake-bold", label: "友链管理" },
   { to: "/admin/comments", icon: "ph:shield-check-bold", label: "审核中心" },
   { to: "/admin/media", icon: "ph:image-bold", label: "媒体库" },
   { to: "/admin/users", icon: "ph:users-three-bold", label: "用户管理" },
   { to: "/admin/visitor", icon: "ph:footprints-bold", label: "访客时光" },
-  { to: "/admin/ai", icon: "ph:robot-bold", label: "AI 中心" },
+  { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件通知" },
   { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情资源" },
   { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
@@ -314,7 +315,7 @@ const navGroups = computed<NavGroup[]>(() => {
       {
         key: "resources",
         label: "内容资源",
-        items: select(["/admin/categories", "/admin/tags", "/admin/media", "/admin/emoji"]),
+        items: select(["/admin/categories", "/admin/tags", "/admin/friends", "/admin/media", "/admin/emoji"]),
       },
       {
         key: "engagement",
@@ -327,7 +328,7 @@ const navGroups = computed<NavGroup[]>(() => {
       },
       {
         key: "intelligence",
-        label: "AI 中心",
+        label: "AI 能力",
         items: select(["/admin/ai"]),
       },
       {

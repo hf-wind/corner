@@ -81,6 +81,13 @@
   --devtools-widget-fg: #111;
   --devtools-widget-border: #efefef;
   --devtools-widget-shadow: rgb(128 128 128 / 10%);
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 18px;
+  --space-xl: 24px;
+  --admin-control-height: 34px;
+  --admin-radius: 6px;
 }
 
 :root[data-font="ayuan"] {
@@ -601,8 +608,8 @@ a {
 }
 
 .admin-main .admin-page-shell {
-  width: min(1220px, 100%);
-  margin: 0 auto;
+  width: 100%;
+  min-height: 100%;
 }
 
 .admin-main .admin-page-head {
@@ -638,14 +645,29 @@ a {
 }
 
 .admin-main :where(.ant-btn:not(.ant-btn-link), .ant-segmented, .ant-radio-button-wrapper) {
-  border-radius: 999px;
+  border-radius: var(--admin-radius);
 }
 
 .admin-main :where(.ant-btn) {
+  display: inline-flex;
+  min-height: var(--admin-control-height);
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: var(--space-sm);
+  padding-inline: 14px;
   line-height: 1;
+}
+
+.admin-main :where(.ant-btn-sm) {
+  min-height: 28px;
+  padding-inline: 10px;
+}
+
+.admin-main :where(.ant-btn .icon, .ant-btn svg) {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  font-size: 1rem;
 }
 
 .admin-main :where(.ant-btn > span) {
@@ -673,6 +695,70 @@ a {
   margin-bottom: 12px;
 }
 
+.admin-main :where(.admin-toolbar, .table-toolbar, .media-toolbar, .comment-filter) {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--admin-panel-radius);
+  background: var(--c-bg-1);
+}
+
+.admin-main :where(.table-shell, .admin-table-shell) {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--admin-panel-radius);
+  background: var(--ld-bg-card);
+}
+
+.admin-main :where(.ant-input, .ant-input-affix-wrapper, .ant-select-selector, .ant-input-number) {
+  min-height: var(--admin-control-height);
+  border-radius: var(--admin-radius) !important;
+}
+
+.admin-main :where(.ant-tabs-nav) {
+  margin-bottom: var(--space-lg);
+}
+
+.admin-main :where(.ant-alert) {
+  margin-bottom: var(--space-md);
+  border-radius: var(--admin-panel-radius);
+}
+
+.admin-main :where(.admin-refresh-button) {
+  min-width: 88px;
+}
+
+.admin-pagination {
+  display: flex;
+  min-height: 54px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) 14px;
+  border-top: 1px solid var(--border);
+  background: var(--c-bg-1);
+}
+
+.admin-pagination-total {
+  color: var(--c-text-3);
+  font-size: .72rem;
+  white-space: nowrap;
+}
+
+.admin-main :where(.detail-row) {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-md);
+}
+
+.admin-main :where(.detail-row .ant-tag) {
+  width: max-content;
+  max-width: 100%;
+  justify-self: start;
+}
+
 .admin-main :where(.table-toolbar, .media-toolbar) .ant-input-affix-wrapper {
   border-radius: 999px;
 }
@@ -694,6 +780,8 @@ a {
 
 @media (max-width: 640px) {
   .admin-main .admin-page-head { align-items: flex-start; flex-direction: column; }
+  .admin-pagination { align-items: flex-start; flex-direction: column; }
+  .admin-main :where(.detail-row) { grid-template-columns: 1fr; gap: var(--space-xs); }
 }
 
 @media (prefers-reduced-motion: reduce) {

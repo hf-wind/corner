@@ -170,8 +170,7 @@ onUnmounted(() => {
 .admin-main {
   background: var(--c-bg);
   padding: 20px 24px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+  overflow: hidden;
   min-height: 0;
   flex: 1;
   min-width: 0;
@@ -179,6 +178,16 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   max-height: 100dvh;
+}
+
+.admin-main > :first-child {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .admin-menu-trigger,

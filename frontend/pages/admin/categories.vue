@@ -7,8 +7,8 @@
     </div>
 
     <a-spin :spinning="loading" class="table-spin">
-      <a-card :bordered="false" class="list-card" size="small">
-        <a-table :dataSource="filteredCategories" :columns="columns" rowKey="slug" size="small" :pagination="false" :locale="{ emptyText: keyword ? '没有匹配的分类' : '暂无分类' }">
+      <div class="admin-table-shell">
+        <a-table :dataSource="pagedCategories" :columns="columns" rowKey="slug" size="small" :pagination="false" :locale="{ emptyText: keyword ? '没有匹配的分类' : '暂无分类' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'icon'">
               <Icon :name="record.icon || 'ph:folder-open-bold'" :style="{ color: record.color || 'var(--c-text-3)', fontSize: '16px' }" />
@@ -24,8 +24,8 @@
               <a-button type="link" size="small" danger @click="remove(record.slug, record.name)"><DeleteOutlined /> 删除</a-button>
             </template>
           </template>
-        </a-table>
-      </a-card>
+        </a-table><AdminPagination v-model:current="page" :page-size="pageSize" :total="filteredCategories.length" :show-size-changer="false" />
+      </div>
     </a-spin>
 
     <a-modal v-model:open="addDialog.open" :title="addDialog.editing ? '编辑分类' : '添加分类'" width="460px" @ok="confirmSave" @cancel="addDialog.open = false">
@@ -59,9 +59,7 @@
             <template v-if="column.key === 'date'">{{ (record.publishedAt||record.createdAt||'').slice(0,10) }}</template>
           </template>
         </a-table>
-        <div style="display:flex;justify-content:center;margin-top:12px" v-if="viewDialog.totalPages>1">
-          <a-pagination v-model:current="viewDialog.page" :pageSize="20" :total="viewDialog.total" size="small" @change="loadViewPosts" />
-        </div>
+        <AdminPagination v-model:current="viewDialog.page" :page-size="20" :total="viewDialog.total" :show-size-changer="false" @change="loadViewPosts" />
       </a-spin>
     </a-modal>
 
@@ -96,11 +94,15 @@ const toast = useToast()
 const loading = ref(true)
 const categories = ref<any[]>([])
 const keyword = ref('')
+const page = ref(1)
+const pageSize = 10
 const addDialog = reactive({ open: false, name: '', slug: '', icon: 'ph:folder-open-bold', color: '', editing: false, editingSlug: '' })
 const filteredCategories = computed(() => {
   const query = keyword.value.trim().toLowerCase()
   return query ? categories.value.filter(item => `${item.name} ${item.slug}`.toLowerCase().includes(query)) : categories.value
 })
+const pagedCategories = computed(() => filteredCategories.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+watch(keyword, () => { page.value = 1 })
 
 const columns = [
   { title: '', key: 'icon', width: 36, align: 'center' as const },

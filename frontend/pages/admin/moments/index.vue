@@ -1,6 +1,9 @@
 <template>
-  <div class="moment-admin-page">
-    <div class="toolbar">
+  <div class="moment-admin-page admin-page-shell">
+    <header class="admin-page-head">
+      <div><span>CONTENT MANAGEMENT</span><h1>瞬间管理</h1><p>管理瞬间草稿、发布状态与公开版本。</p></div>
+    </header>
+    <div class="toolbar table-toolbar">
       <a-segmented
         v-model:value="filter.status"
         :options="statusOptions"
@@ -21,7 +24,7 @@
       </div>
     </div>
 
-    <a-card :bordered="false" class="moment-table-card">
+    <div class="admin-table-shell moment-table-card">
       <a-table
         :loading="loading"
         :columns="columns"
@@ -61,16 +64,8 @@
         </template>
       </a-table>
 
-      <div v-if="totalPages > 1" class="pagination-wrap">
-        <a-pagination
-          v-model:current="page"
-          :page-size="limit"
-          :total="total"
-          show-less-items
-          @change="loadMoments"
-        />
-      </div>
-    </a-card>
+      <AdminPagination v-model:current="page" :page-size="limit" :total="total" :show-size-changer="false" @change="loadMoments" />
+    </div>
   </div>
 </template>
 

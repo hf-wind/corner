@@ -38,7 +38,7 @@ export class SettingsController {
     if (!publicKeys.has(key)) return null;
     const value = await this.settings.get(key);
     if (key !== 'friends' || !Array.isArray(value)) return value;
-    return value.map((friend: any) => ({
+    return value.filter((friend: any) => friend.enabled !== false).map((friend: any) => ({
       name: friend.name || friend.siteName,
       url: friend.url || friend.siteUrl,
       avatar: friend.avatar || friend.siteAvatar,
@@ -46,6 +46,7 @@ export class SettingsController {
       rssUrl: friend.rssUrl || friend.siteRssUrl,
       webmasterName: friend.webmasterName,
       approvedAt: friend.approvedAt,
+      enabled: friend.enabled !== false,
     }));
   }
 

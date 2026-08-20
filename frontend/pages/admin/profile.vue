@@ -1,5 +1,8 @@
 <template>
-  <div class="profile-page">
+  <div class="profile-page admin-page-shell">
+    <header class="admin-page-head">
+      <div><span>ACCOUNT</span><h1>我的信息</h1><p>维护个人资料、头像与登录密码。</p></div>
+    </header>
     <a-spin :spinning="loading">
       <a-card :bordered="false" class="section-card" size="small" title="我的信息">
         <div class="profile-head">
@@ -249,7 +252,7 @@ async function save() {
 </script>
 
 <style scoped>
-.profile-page { max-width: 560px; }
+.profile-page { width:100%; }
 .section-card { border-radius: 10px; }
 .profile-head {
   display: flex;
@@ -331,7 +334,7 @@ async function save() {
   font-size: 0.68rem;
   color: var(--c-text-3);
 }
-.profile-form { max-width: 420px; }
+.profile-form { width:min(760px,100%); }
 .code-row {
   display: flex;
   gap: 8px;

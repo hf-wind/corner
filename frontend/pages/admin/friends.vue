@@ -1,19 +1,20 @@
 <template>
   <div class="friends-admin admin-page-shell">
-    <header class="admin-page-head"><div><h1>友链管理</h1><p>维护前台友链展示内容；本站展示资料统一在网站信息中配置。</p></div><a-button type="primary" @click="openAddFriend"><PlusOutlined /> 添加友链</a-button></header>
-    <AdminSectionTabs label="站点设置" :items="settingsTabs" />
+    <header class="admin-page-head"><div><span>CONTENT RESOURCES</span><h1>友链管理</h1><p>维护前台友链、展示状态并处理互链资料。</p></div><a-button type="primary" @click="openAddFriend"><PlusOutlined /> 新增友链</a-button></header>
 
-    <div>
-      <div class="table-toolbar">
-        <a-space>
-          <a-button :loading="loading" @click="loadFriends">刷新</a-button>
-        </a-space>
+    <div class="table-toolbar">
+        <a-input v-model:value="keyword" allow-clear placeholder="搜索名称、URL、站长或描述" @press-enter="resetPage"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+        <a-select v-model:value="statusFilter" style="width:130px" @change="resetPage"><a-select-option value="all">全部状态</a-select-option><a-select-option value="enabled">已启用</a-select-option><a-select-option value="disabled">已停用</a-select-option></a-select>
+        <a-button type="primary" @click="resetPage"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+        <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+        <span class="toolbar-spacer" />
+        <AdminRefreshButton :loading="loading" @click="loadFriends" />
       </div>
 
-      <a-card :bordered="false" class="list-card" size="small">
+      <div class="admin-table-shell">
         <a-table
           :loading="loading"
-          :dataSource="friends"
+          :dataSource="pagedFriends"
           :columns="columns"
           rowKey="_key"
           size="small"
@@ -31,16 +32,17 @@
               <a v-if="record.rssUrl" :href="record.rssUrl" target="_blank" class="friend-link">RSS</a>
               <span v-else class="muted">-</span>
             </template>
+            <template v-else-if="column.key === 'enabled'"><a-switch :checked="record.enabled !== false" checked-children="启用" un-checked-children="停用" @change="toggleStatus(index, record, $event)" /></template>
             <template v-else-if="column.key === 'actions'">
               <div class="admin-row-actions">
-                <a-button type="link" size="small" @click="editFriend(index)"><EditOutlined /> 编辑</a-button>
-                <a-button type="link" size="small" danger @click="removeFriend(index, record.name)"><DeleteOutlined /> 删除</a-button>
+                <a-button type="link" size="small" @click="editFriend(record)"><EditOutlined /> 编辑</a-button>
+                <a-button type="link" size="small" danger @click="removeFriend(record)"><DeleteOutlined /> 删除</a-button>
               </div>
             </template>
           </template>
         </a-table>
-      </a-card>
-    </div>
+        <AdminPagination v-model:current="page" :page-size="pageSize" :total="filteredFriends.length" :show-size-changer="false" @change="page = $event" />
+      </div>
 
     <a-modal v-model:open="dialog.open" :title="dialog.isEdit ? '编辑友链' : '添加友链'" width="520px" @ok="saveFriend" @cancel="dialog.open = false">
       <a-form :model="dialog.form" layout="vertical" size="middle">
@@ -52,6 +54,7 @@
         <a-form-item label="站长名"><a-input v-model:value="dialog.form.webmasterName" placeholder="站长名称（可选）" /></a-form-item>
         <a-form-item label="联系邮箱"><a-input v-model:value="dialog.form.contactEmail" placeholder="用于申请移除验证（可选）" /></a-form-item>
         <a-form-item label="对方友链页面"><a-input v-model:value="dialog.form.friendPageUrl" placeholder="https://example.com/friends" /></a-form-item>
+        <a-form-item label="展示状态"><a-switch v-model:checked="dialog.form.enabled" checked-children="启用" un-checked-children="停用" /></a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -71,6 +74,7 @@ type FriendForm = {
   webmasterName: string;
   contactEmail: string;
   friendPageUrl: string;
+  enabled: boolean;
 }
 
 const emptyFriend = (): FriendForm => ({
@@ -82,17 +86,27 @@ const emptyFriend = (): FriendForm => ({
   webmasterName: '',
   contactEmail: '',
   friendPageUrl: '',
+  enabled: true,
 })
 
 const api = useApi()
 const toast = useToast()
-const settingsTabs = [
-  { to: '/admin/settings', label: '网站与系统设置', icon: 'ph:gear-bold' },
-  { to: '/admin/friends', label: '友链管理', icon: 'ph:handshake-bold' },
-]
 const loading = ref(true)
 const friends = ref<any[]>([])
+const keyword = ref('')
+const statusFilter = ref<'all' | 'enabled' | 'disabled'>('all')
+const page = ref(1)
+const pageSize = 10
 const dialog = reactive({ open: false, isEdit: false, editIndex: -1, form: emptyFriend() })
+const filteredFriends = computed(() => {
+  const query = keyword.value.trim().toLowerCase()
+  return friends.value.filter((friend) => {
+    const matchesKeyword = !query || `${friend.name} ${friend.url} ${friend.webmasterName} ${friend.description}`.toLowerCase().includes(query)
+    const matchesStatus = statusFilter.value === 'all' || (statusFilter.value === 'enabled' ? friend.enabled !== false : friend.enabled === false)
+    return matchesKeyword && matchesStatus
+  })
+})
+const pagedFriends = computed(() => filteredFriends.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 
 const columns = [
   { title: '', key: 'avatar', width: 54 },
@@ -101,6 +115,7 @@ const columns = [
   { title: '描述', dataIndex: 'description', key: 'description', width: 180, ellipsis: true },
   { title: 'RSS', key: 'rssUrl', width: 80 },
   { title: '站长', dataIndex: 'webmasterName', key: 'webmasterName', width: 90 },
+  { title: '状态', key: 'enabled', width: 110 },
   { title: '操作', key: 'actions', width: 170, fixed: 'right' as const },
 ]
 
@@ -120,6 +135,7 @@ function normalizeFriend(friend: any, index: number) {
     contactEmail: friend.contactEmail || '',
     friendPageUrl: friend.friendPageUrl || '',
     approvedAt: friend.approvedAt || '',
+    enabled: friend.enabled !== false,
   }
 }
 
@@ -157,7 +173,12 @@ function openAddFriend() {
   dialog.open = true
 }
 
-function editFriend(index: number) {
+function resetPage() { page.value = 1 }
+function resetFilters() { keyword.value = ''; statusFilter.value = 'all'; page.value = 1 }
+
+function editFriend(record: any) {
+  const index = friends.value.findIndex((item) => item._key === record._key)
+  if (index < 0) return
   dialog.isEdit = true
   dialog.editIndex = index
   dialog.form = { ...friends.value[index] }
@@ -182,10 +203,19 @@ async function saveFriend() {
   }
 }
 
-async function removeFriend(index: number, name: string) {
+async function toggleStatus(_visibleIndex: number, record: any, enabled: boolean) {
+  const original = record.enabled !== false
+  record.enabled = enabled
+  try { await persistFriends(); toast.success(enabled ? '友链已启用' : '友链已停用') }
+  catch (error: any) { record.enabled = original; toast.error(error?.message || '状态更新失败') }
+}
+
+async function removeFriend(record: any) {
+  const index = friends.value.findIndex((item) => item._key === record._key)
+  if (index < 0) return
   Modal.confirm({
     title: '删除确认',
-    content: `确认移除友链「${name}」？`,
+    content: `确认移除友链「${record.name}」？`,
     okText: '删除',
     okType: 'danger',
     cancelText: '取消',
@@ -205,8 +235,7 @@ async function removeFriend(index: number, name: string) {
 
 <style scoped>
 .friends-admin { width: 100%; }
-.table-toolbar { margin-bottom: 12px; }
-.list-card { border-radius: 8px; }
+.table-toolbar { margin-bottom: 12px; justify-content:flex-start; }.table-toolbar :deep(.ant-input-affix-wrapper){width:min(360px,100%)}.toolbar-spacer{flex:1}
 .site-card { max-width: 640px; margin-top: 8px; }
 .friend-link { color: var(--c-primary); font-size: 0.78rem; text-decoration: none; }
 .friend-link:hover { text-decoration: underline; }

@@ -1,5 +1,6 @@
 <template>
-  <div class="media-page">
+  <div class="media-page admin-page-shell">
+    <header class="admin-page-head"><div><span>CONTENT RESOURCES</span><h1>媒体库</h1><p>按文件夹整理图片、视频、音频和文档。</p></div><div class="head-actions"><AdminRefreshButton :loading="loading" @click="loadAll" /><a-upload :show-upload-list="false" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" :before-upload="beforeUpload"><a-button type="primary"><UploadOutlined /> 上传文件</a-button></a-upload></div></header>
     <div class="media-body">
       <div class="media-sidebar">
         <a-menu
@@ -12,7 +13,6 @@
           <a-menu-item key="__none__"><InboxOutlined /> 未分类</a-menu-item>
           <a-menu-item v-for="f in folders" :key="f.key">
             <FolderFilled /> {{ f.label }}
-            <span v-if="f.preset" class="preset-tag">预设</span>
           </a-menu-item>
           <a-menu-item key="__add__" class="menu-add-folder" @click.stop="showNewFolder = true">
             <FolderAddOutlined /> 新建文件夹
@@ -28,9 +28,6 @@
             <a-radio-button value="audio">音频</a-radio-button>
             <a-radio-button value="document">文档</a-radio-button>
           </a-radio-group>
-          <a-upload :showUploadList="false" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" :beforeUpload="beforeUpload">
-            <a-button type="primary"><UploadOutlined /> 上传</a-button>
-          </a-upload>
         </div>
 
         <div v-if="selectedIds.size" class="selection-bar">
@@ -40,9 +37,10 @@
           <a-button size="small" @click="selectedIds.clear()">取消选择</a-button>
         </div>
 
-        <a-spin :spinning="loading" class="table-spin">
-          <a-card :bordered="false" class="list-card" size="small">
-            <div class="media-grid" v-if="items.length">
+        <div class="media-content-scroll">
+          <a-spin :spinning="loading">
+            <div class="media-content-inner">
+              <div class="media-grid" v-if="items.length">
               <div
                 v-for="(item, i) in items" :key="item.id"
                 class="media-item"
@@ -67,24 +65,13 @@
                   <a-button type="link" size="small" danger @click.stop="handleRemove(item)">删除</a-button>
                 </div>
               </div>
+              </div>
+              <a-empty v-else description="暂无文件" />
             </div>
-            <a-empty v-else description="暂无文件" />
-          </a-card>
-        </a-spin>
-
-        <div class="media-pagination" v-if="total > 0">
-          <span>共 {{ total }} 项 · 第 {{ page }} / {{ Math.max(totalPages, 1) }} 页</span>
-          <a-pagination
-            v-model:current="page"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['20', '30', '60']"
-            show-size-changer
-            size="small"
-            @change="changePage"
-            @show-size-change="changePageSize"
-          />
+          </a-spin>
         </div>
+
+        <AdminPagination v-model:current="page" v-model:page-size="pageSize" :total="total" @change="changePage" />
       </div>
     </div>
 
@@ -116,7 +103,7 @@ const items = ref<any[]>([])
 const total = ref(0)
 const totalPages = ref(1)
 const page = ref(1)
-const pageSize = ref(30)
+const pageSize = ref(10)
 const typeFilter = ref('all')
 const folders = ref<{ key: string; label: string; preset?: boolean }[]>([])
 const activeFolder = ref('all')
@@ -221,12 +208,7 @@ function changePage(next: number) {
   page.value = next
   void loadMedia()
 }
-
-function changePageSize(_page: number, size: number) {
-  pageSize.value = size
-  page.value = 1
-  void loadMedia()
-}
+async function loadAll() { await Promise.all([loadMedia(), loadFolders()]) }
 
 function beforeUpload(file: File) {
   const fd = new FormData()
@@ -321,14 +303,15 @@ onMounted(() => { loadMedia(); loadFolders() })
 </script>
 
 <style scoped>
-.media-page { height:100%; }
-.media-body { display:flex; gap:16px; height:100%; }
-.media-sidebar { width:200px; flex-shrink:0; }
-.media-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+.media-page { display:flex; height:100%; min-height:0; flex-direction:column; overflow:hidden!important; }
+.head-actions { display:flex; align-items:center; gap:8px; }
+.media-body { display:flex; min-height:0; flex:1; gap:0; overflow:hidden; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); }
+.media-sidebar { width:200px; min-height:0; flex-shrink:0; overflow-y:auto; padding:8px 0; border-right:1px solid var(--border); }
+.media-main { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .media-toolbar { display:flex; gap:12px; align-items:center; margin-bottom:12px; }
 .selection-bar { display:flex; gap:10px; align-items:center; padding:8px 12px; margin-bottom:10px; background:var(--c-primary-soft); border-radius:6px; border:1px solid var(--c-primary); }
 .selection-count { font-size:0.82rem; color:var(--c-text); margin-right:auto; }
-.list-card { border-radius:8px; }
+.media-content-scroll { min-height:0; flex:1; overflow:hidden; }.media-content-scroll :deep(.ant-spin-nested-loading),.media-content-scroll :deep(.ant-spin-container){height:100%;min-height:0}.media-content-scroll :deep(.ant-spin-container){overflow-y:auto}.media-content-inner{min-height:100%;padding:12px}
 .media-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
 .media-item { position:relative; border:2px solid var(--border); border-radius:6px; overflow:hidden; transition:border-color 0.2s; display:flex; flex-direction:column; cursor:pointer; }
 .media-item:hover { border-color:var(--c-primary); }
@@ -341,13 +324,5 @@ onMounted(() => { loadMedia(); loadFolders() })
 .media-icon { width:100%; height:120px; display:flex; align-items:center; justify-content:center; color:var(--c-text-3); background:var(--c-bg-1); }
 .media-meta { display:flex; align-items:center; min-height:38px; padding:4px 6px; gap:4px; }
 .media-name { font-size:0.7rem; color:var(--c-text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
-.media-pagination { display:flex; justify-content:center; margin-top:16px; }
-.preset-tag {
-  margin-left: 4px;
-  font-size: 0.62rem;
-  color: var(--c-primary);
-  background: var(--c-primary-soft);
-  padding: 0 5px;
-  border-radius: 4px;
-}
+@media(max-width:700px){.media-body{flex-direction:column}.media-sidebar{width:100%;max-height:150px;border-right:0;border-bottom:1px solid var(--border)}.head-actions{align-items:stretch;flex-wrap:wrap}}
 </style>

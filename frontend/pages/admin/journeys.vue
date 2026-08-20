@@ -1,6 +1,6 @@
 <template>
-  <div class="journey-admin">
-    <header><div><h1>故事航线</h1><p>编排旅行停靠点与可播放的记忆故事。</p></div><a-button type="primary" @click="tab==='journeys'?openJourney():openStory()"><Icon name="ph:plus-bold" />{{ tab==='journeys'?'新建旅行':'新建故事' }}</a-button></header>
+  <div class="journey-admin admin-page-shell">
+    <header class="admin-page-head"><div><span>STORY ROUTES</span><h1>故事航线</h1><p>编排旅行停靠点与可播放的记忆故事。</p></div><a-button type="primary" @click="tab==='journeys'?openJourney():openStory()"><Icon name="ph:plus-bold" />{{ tab==='journeys'?'新建旅行':'新建故事' }}</a-button></header>
     <a-tabs v-model:activeKey="tab"><a-tab-pane key="journeys" tab="旅行" /><a-tab-pane key="stories" tab="故事" /></a-tabs>
     <a-spin :spinning="loading">
       <div v-if="tab==='journeys'" class="rows">

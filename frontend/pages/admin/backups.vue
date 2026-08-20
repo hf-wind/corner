@@ -54,13 +54,13 @@
     </section>
 
     <section class="records-section">
-      <header><div><span>RECOVERY POINTS</span><h2>备份记录</h2></div><a-button :loading="loading" @click="loadAll"><Icon name="ph:arrows-clockwise-bold" /> 刷新</a-button></header>
+      <header><div><span>RECOVERY POINTS</span><h2>备份记录</h2></div><AdminRefreshButton :loading="loading" @click="loadAll" /></header>
       <a-table
         row-key="backupId"
         :columns="columns"
-        :data-source="backups"
+        :data-source="pagedBackups"
         :loading="loading"
-        :pagination="{ pageSize: 10, showSizeChanger: true, showTotal: (total: number) => `共 ${total} 个恢复点` }"
+        :pagination="false"
         :scroll="{ x: 1180 }"
       >
         <template #bodyCell="{ column, record }">
@@ -83,6 +83,7 @@
           </template>
         </template>
       </a-table>
+      <AdminPagination v-model:current="page" :page-size="pageSize" :total="backups.length" :show-size-changer="false" />
     </section>
 
     <a-modal v-model:open="restore.open" title="恢复历史数据" :confirm-loading="restore.loading" ok-text="创建安全备份并恢复" ok-type="danger" width="540px" @ok="confirmRestore">
@@ -104,6 +105,9 @@ const toast = useToast();
 const loading = ref(true);
 const creating = ref(false);
 const backups = ref<any[]>([]);
+const page = ref(1);
+const pageSize = 10;
+const pagedBackups = computed(() => backups.value.slice((page.value - 1) * pageSize, page.value * pageSize));
 const inventory = reactive<any>({ latestBackupId: null, assets: [] });
 const status = reactive<any>({ action: null, status: "idle", message: "" });
 const restore = reactive({ open: false, loading: false, backupId: "", token: "", confirmation: "" });

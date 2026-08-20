@@ -1,5 +1,5 @@
 <template>
-  <div class="moment-editor">
+  <div class="moment-editor admin-page-shell">
     <a-spin :spinning="loading">
       <template v-if="!loading && !isEdit">
         <header class="studio-header">

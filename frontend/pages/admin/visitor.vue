@@ -1,8 +1,8 @@
 <template>
-  <div class="visitor-admin">
-    <header class="admin-heading">
-      <div><h1>访客时光</h1><p>审核留言与漂流瓶，管理途经这座角落的旅人。</p></div>
-      <a-button :loading="loadingStats" @click="loadStats"><Icon name="ph:arrows-clockwise-bold" /> 刷新统计</a-button>
+  <div class="visitor-admin admin-page-shell">
+    <header class="admin-page-head">
+      <div><span>VISITOR MANAGEMENT</span><h1>访客时光</h1><p>审核留言与漂流瓶，管理途经这座角落的旅人。</p></div>
+      <AdminRefreshButton :loading="loadingStats" @click="loadStats" />
     </header>
 
     <div class="stats-grid">
@@ -47,21 +47,21 @@
               <a-select-option value="caught">已被捞起</a-select-option>
               <a-select-option value="pending">待审核</a-select-option>
             </a-select>
-            <a-button :loading="loadingMsgs" @click="loadMessages(msgPagination.current)">刷新</a-button>
             <a-button type="primary" @click="loadMessages(1)">搜索</a-button>
+            <a-button @click="resetMessageFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+            <AdminRefreshButton :loading="loadingMsgs" @click="loadMessages(msgPagination.current)" />
           </a-space>
         </div>
         <a-spin :spinning="loadingMsgs">
-          <a-card :bordered="false" class="list-card" size="small">
+          <div class="admin-table-shell">
             <a-table
               :data-source="messages"
               :columns="msgColumns"
               row-key="id"
               size="small"
-              :pagination="msgPagination"
+              :pagination="false"
               :scroll="{ x: 980 }"
               :locale="{ emptyText: '暂无内容' }"
-              @change="handleMsgChange"
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'content'">
@@ -92,7 +92,8 @@
                 </template>
               </template>
             </a-table>
-          </a-card>
+            <AdminPagination v-model:current="msgPagination.current" :page-size="msgPagination.pageSize" :total="msgPagination.total" :show-size-changer="false" @change="loadMessages" />
+          </div>
         </a-spin>
       </a-tab-pane>
 
@@ -106,20 +107,20 @@
               <a-select-option value="registered">登记访客</a-select-option>
               <a-select-option value="anonymous">未登记访客</a-select-option>
             </a-select>
-            <a-button :loading="loadingProfiles" @click="loadProfiles(profilePagination.current)">刷新</a-button>
+            <a-button @click="resetProfileFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+            <AdminRefreshButton :loading="loadingProfiles" @click="loadProfiles(profilePagination.current)" />
           </a-space>
         </div>
         <a-spin :spinning="loadingProfiles">
-          <a-card :bordered="false" class="list-card" size="small">
+          <div class="admin-table-shell">
             <a-table
               :data-source="profiles"
               :columns="profileColumns"
               row-key="id"
               size="small"
-              :pagination="profilePagination"
+              :pagination="false"
               :scroll="{ x: 800 }"
               :locale="{ emptyText: '暂无访客' }"
-              @change="handleProfileChange"
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'nickname'">
@@ -140,7 +141,8 @@
                 </template>
               </template>
             </a-table>
-          </a-card>
+            <AdminPagination v-model:current="profilePagination.current" :page-size="profilePagination.pageSize" :total="profilePagination.total" :show-size-changer="false" @change="loadProfiles" />
+          </div>
         </a-spin>
       </a-tab-pane>
     </a-tabs>
@@ -214,6 +216,7 @@ const msgColumns = [
   { title: '时间', key: 'createdAt', width: 150 },
   { title: '操作', key: 'actions', width: 170, fixed: 'right' as const },
 ]
+function resetMessageFilters() { Object.assign(msgFilter, { keyword: '', type: '', status: '' }); void loadMessages(1) }
 
 const loadingProfiles = ref(false)
 const profiles = ref<any[]>([])
@@ -226,6 +229,7 @@ const profileColumns = [
   { title: '成就', key: 'achievements', width: 90 },
   { title: '最近到访', key: 'lastSeen', width: 230 },
 ]
+function resetProfileFilters() { Object.assign(profileFilter, { keyword: '', type: '' }); void loadProfiles(1) }
 
 const rejectDialog = reactive({ open: false, record: null as any, reason: '' })
 const detailDialog = reactive({ open: false, record: null as any })
@@ -401,6 +405,7 @@ function handleProfileChange(pag: any) {
 .first-seen { display: block; margin-top: 2px; color: var(--c-text-4); font-size: .6rem; }
 .detail-body { display: flex; flex-direction: column; gap: 12px; }
 .detail-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: start; gap: 12px; color: var(--c-text-2); font-size: .78rem; }
+.detail-row :deep(.ant-tag) { width:max-content; max-width:100%; justify-self:start; }
 .detail-row-block { grid-template-columns: 84px minmax(0, 1fr); }
 .detail-label { color: var(--c-text-3); font-size: .65rem; }
 .detail-content { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--c-bg-1); color: var(--c-text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }

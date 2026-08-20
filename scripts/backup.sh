@@ -123,7 +123,7 @@ done
 
 git rev-parse HEAD > "$staging/project/git-commit.txt"
 git status --short > "$staging/project/git-status.txt"
-git remote -v | sed -E 's#(https?://)[^/@]+@#\1[redacted]@#g' > "$staging/project/git-remotes.txt"
+git remote -v > "$staging/project/git-remotes.txt"
 git bundle create "$staging/project/corner-source.bundle" --all
 
 secret_paths=()

@@ -1,5 +1,8 @@
 <template>
-  <div>
+  <div class="admin-page-shell">
+    <header class="admin-page-head">
+      <div><span>CONTENT MANAGEMENT</span><h1>文章管理</h1><p>管理文章草稿、发布状态与公开版本。</p></div>
+    </header>
     <div class="table-toolbar post-toolbar">
       <a-segmented v-model:value="filter.status" :options="statusOptions" @change="onFilterChange" />
       <div class="post-toolbar-actions">
@@ -9,7 +12,7 @@
     </div>
 
     <a-spin :spinning="loading" class="table-spin">
-      <a-card :bordered="false" class="list-card" size="small">
+      <div class="admin-table-shell">
         <a-table :dataSource="posts" :columns="columns" rowKey="slug" size="small" :pagination="false" :scroll="{ x: 1230 }" :locale="{ emptyText: '暂无文章' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'title'">
@@ -29,29 +32,28 @@
             <template v-if="column.key === 'actions'">
               <AdminRowActions
                 :record="record"
+                settings-menu
                 :publishing="publishingSlug === record.slug"
                 @edit="$router.push('/admin/posts/' + record.slug)"
                 @preview="preview(record.slug)"
                 @publish="publish(record)"
-                @settings="openSettings(record)"
+                @schedule="openSchedule(record)"
+                @privacy="changePrivacy(record)"
                 @delete="remove(record.slug, record.title)"
               />
             </template>
           </template>
         </a-table>
-        <div class="table-pagination" v-if="totalPages > 1">
-          <a-pagination v-model:current="page" :pageSize="limit" :total="total" size="small" @change="loadPosts" />
-        </div>
-      </a-card>
+        <AdminPagination v-model:current="page" :page-size="limit" :total="total" :show-size-changer="false" @change="loadPosts" />
+      </div>
     </a-spin>
 
-    <a-modal v-model:open="settingDialog.open" title="文章设置" :footer="null" width="460px">
+    <a-modal v-model:open="settingDialog.open" title="定时发布" :footer="null" width="460px">
       <div class="setting-form">
         <label>定时发布<a-date-picker v-model:value="settingDialog.scheduledAt" show-time style="width:100%" placeholder="不设置则取消定时发布" /></label>
         <p>定时发布只适用于文章，到达时间后会发布当前已保存版本。</p>
         <div class="setting-actions">
-          <a-button v-if="settingDialog.record?.status !== 'private'" danger :loading="settingDialog.saving" @click="setPrivate">设为私密</a-button>
-          <a-button v-else :loading="settingDialog.saving" @click="restorePublic">恢复公开</a-button>
+          <a-button @click="settingDialog.open = false">取消</a-button>
           <a-button type="primary" :loading="settingDialog.saving" @click="saveSchedule">保存设置</a-button>
         </div>
       </div>
@@ -137,10 +139,23 @@ async function loadPosts() {
   loading.value = false
 }
 
-function openSettings(record: any) {
+function openSchedule(record: any) {
   settingDialog.record = record
   settingDialog.scheduledAt = record.scheduledAt ? dayjs(record.scheduledAt) : null
   settingDialog.open = true
+}
+
+function changePrivacy(record: any) {
+  settingDialog.record = record
+  const restoring = record.status === 'private'
+  Modal.confirm({
+    title: restoring ? '恢复公开文章' : '将文章设为私密',
+    content: restoring ? `确认将「${record.title}」的当前保存版本发布并恢复公开？` : `确认将「${record.title}」设为私密？前台会立即隐藏，草稿与版本不会删除。`,
+    okText: restoring ? '恢复公开' : '设为私密',
+    cancelText: '取消',
+    okType: restoring ? 'primary' : 'danger',
+    onOk: restoring ? restorePublic : setPrivate,
+  })
 }
 
 async function saveSchedule() {

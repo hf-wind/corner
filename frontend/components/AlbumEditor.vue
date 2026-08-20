@@ -1,5 +1,5 @@
 <template>
-  <div class="album-editor">
+  <div class="album-editor admin-page-shell">
     <header class="editor-heading">
       <div class="heading-copy">
         <button type="button" class="back-link" @click="router.push('/admin/albums')"><Icon name="ph:arrow-left-bold" /> 返回相册</button>

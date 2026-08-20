@@ -331,8 +331,16 @@ export class AiController {
   @Get('admin/conversations')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  listConversations(@Query('q') q?: string) {
-    return this.ai.listConversations(q);
+  listConversations(
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.ai.listConversations(
+      q,
+      page ? Number(page) : 1,
+      pageSize ? Number(pageSize) : 20,
+    );
   }
 
   @Get('admin/conversations/:userId')

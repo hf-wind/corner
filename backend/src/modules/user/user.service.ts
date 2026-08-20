@@ -111,6 +111,55 @@ export class UserService {
     });
   }
 
+  async adminDelete(actorId: string, userId: string) {
+    if (actorId === userId) {
+      throw new BadRequestException('不能删除当前登录的管理员账号');
+    }
+
+    const target = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!target) throw new NotFoundException('User not found');
+    if (target.role === 'admin' && target.isActive) {
+      const activeAdmins = await this.prisma.user.count({
+        where: { role: 'admin', isActive: true },
+      });
+      if (activeAdmins <= 1) {
+        throw new BadRequestException('至少需要保留一个启用的管理员');
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // 创作内容继续保留，并明确转交给执行删除操作的管理员。
+      await Promise.all([
+        tx.post.updateMany({ where: { authorId: userId }, data: { authorId: actorId } }),
+        tx.moment.updateMany({ where: { authorId: userId }, data: { authorId: actorId } }),
+        tx.album.updateMany({ where: { authorId: userId }, data: { authorId: actorId } }),
+        tx.journey.updateMany({ where: { authorId: userId }, data: { authorId: actorId } }),
+        tx.storyRoute.updateMany({ where: { authorId: userId }, data: { authorId: actorId } }),
+        tx.media.updateMany({ where: { uploadedBy: userId }, data: { uploadedBy: null } }),
+        tx.comment.updateMany({ where: { userId }, data: { userId: null } }),
+        tx.momentComment.updateMany({ where: { userId }, data: { userId: null } }),
+        tx.visitorMessage.updateMany({ where: { userId }, data: { userId: null } }),
+        tx.emailLog.updateMany({ where: { userId }, data: { userId: null } }),
+        tx.aiInteraction.updateMany({ where: { userId }, data: { userId: null } }),
+        tx.aiNarrative.updateMany({ where: { createdBy: userId }, data: { createdBy: null } }),
+        tx.visitorProfile.updateMany({ where: { userId }, data: { userId: null } }),
+        tx.visitorBottleCatch.updateMany({ where: { catcherUserId: userId }, data: { catcherUserId: null } }),
+      ]);
+
+      await Promise.all([
+        tx.commentLike.deleteMany({ where: { userId } }),
+        tx.momentCommentLike.deleteMany({ where: { userId } }),
+        tx.momentLike.deleteMany({ where: { userId } }),
+        tx.notification.deleteMany({ where: { userId } }),
+        tx.aiAuthorStyleProfile.deleteMany({ where: { userId } }),
+      ]);
+
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    return { success: true };
+  }
+
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id, isActive: true },

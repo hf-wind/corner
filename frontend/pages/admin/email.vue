@@ -1,6 +1,6 @@
 <template>
   <div class="email-logs-page admin-page-shell">
-    <header class="admin-page-head"><div><h1>邮件通知</h1><p>管理通知模板、发送预览和完整投递日志。</p></div><a-button :loading="tab === 'templates' ? templatesLoading : loading" @click="tab === 'templates' ? loadTemplates() : loadLogs()"><Icon name="ph:arrows-clockwise-bold" /> 刷新</a-button></header>
+    <header class="admin-page-head"><div><h1>邮件通知</h1><p>管理通知模板、发送预览和完整投递日志。</p></div><AdminRefreshButton :loading="tab === 'templates' ? templatesLoading : loading" @click="tab === 'templates' ? loadTemplates() : loadLogs()" /></header>
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="templates" tab="邮件模板" />
       <a-tab-pane key="logs" tab="发送记录" />
@@ -14,21 +14,20 @@
       </aside>
       <a-spin :spinning="templatesLoading" class="template-editor-spin">
         <div v-if="selected" class="template-editor">
-          <header><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><a-switch v-model:checked="editor.custom" checked-children="自定义" un-checked-children="默认" /></header>
+          <header><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><a-tag :color="editor.custom ? 'blue' : 'default'">{{ editor.custom ? '自定义模板' : '系统默认' }}</a-tag></header>
           <label><span>邮件主题</span><a-input v-model:value="editor.subject" :disabled="!editor.custom" /></label>
           <label><span>HTML 模板</span><a-textarea v-model:value="editor.html" :rows="18" :disabled="!editor.custom" class="html-editor" /></label>
-          <div class="variables"><span>可用变量</span><button v-for="variable in selected.variables" :key="variable" type="button" @click="insertVariable(variable)" v-text="formatVariable(variable)" /><small>富文本正文使用 <code v-text="formatVariable('contentHtml', true)" />，其余变量均自动转义。</small></div>
-          <footer><a-button @click="previewTemplate"><Icon name="ph:eye-bold" /> 预览</a-button><a-button type="primary" :loading="templateSaving" @click="saveTemplate"><Icon name="ph:floppy-disk-bold" /> 保存模板</a-button></footer>
+          <div class="variables"><span>预设变量</span><p>在主题或 HTML 中插入变量，发送时系统会替换为当前通知的实际内容。</p><button v-for="variable in selected.variables" :key="variable" type="button" :disabled="!editor.custom" @click="insertVariable(variable)"><code v-text="formatVariable(variable)" /><small>{{ variableDescription(variable) }}</small></button><em>富文本正文使用 <code v-text="formatVariable('contentHtml', true)" />，其余变量均自动转义。</em></div>
+          <footer><a-button v-if="!editor.custom" @click="editor.custom = true"><Icon name="ph:pencil-simple-bold" /> 编辑模板</a-button><a-button @click="previewTemplate"><Icon name="ph:eye-bold" /> 预览</a-button><a-button v-if="editor.custom && selected.custom" danger @click="restoreDefault"><Icon name="ph:arrow-counter-clockwise-bold" /> 恢复默认</a-button><a-button v-if="editor.custom" type="primary" :loading="templateSaving" @click="saveTemplate"><Icon name="ph:floppy-disk-bold" /> 保存模板</a-button></footer>
         </div>
         <a-empty v-else description="请选择邮件模板" />
       </a-spin>
     </section>
 
     <div v-show="tab === 'logs'">
-    <a-card :bordered="false" class="section-card" size="small">
-      <template #title>
-        <div class="card-header">
-          <span>邮件记录</span>
+    <div class="admin-table-shell">
+        <div class="card-header table-toolbar">
+          <strong>邮件记录</strong>
           <div class="filter-bar">
             <a-select v-model:value="filterType" placeholder="邮件类型" allowClear class="type-filter" @change="loadLogs">
               <a-select-option value="verification">验证码</a-select-option>
@@ -42,13 +41,12 @@
               <a-select-option value="sent">已发送</a-select-option>
               <a-select-option value="failed">失败</a-select-option>
             </a-select>
-            <a-button @click="loadLogs">刷新</a-button>
+            <AdminRefreshButton :loading="loading" @click="loadLogs" />
           </div>
         </div>
-      </template>
 
       <a-spin :spinning="loading">
-        <a-table :dataSource="logs" :columns="columns" :pagination="pagination" :scroll="{ x: 1420 }" @change="handleTableChange" rowKey="id" size="middle">
+        <a-table :dataSource="logs" :columns="columns" :pagination="false" :scroll="{ x: 1420 }" rowKey="id" size="middle">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'type'">
               <a-tag :color="getTypeColor(record.type)">{{ getTypeLabel(record.type) }}</a-tag>
@@ -81,7 +79,8 @@
           </template>
         </a-table>
       </a-spin>
-    </a-card>
+      <AdminPagination v-model:current="pagination.current" v-model:page-size="pagination.pageSize" :total="pagination.total" @change="handlePagination" />
+    </div>
     </div>
 
     <a-modal v-model:open="detail.open" title="邮件详情" width="640px" :footer="null" @cancel="detail.open = false">
@@ -127,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import { Modal } from 'ant-design-vue'
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
@@ -194,6 +194,32 @@ function formatVariable(variable: string, raw = false) {
   return raw ? `{` + `{{${variable}}}` + `}` : `{{${variable}}}`
 }
 
+function variableDescription(variable: string) {
+  return ({ username: '收件人的显示名称', siteName: '当前站点名称', siteUrl: '站点公开地址', link: '通知关联页面链接', detailUrl: '通知详情完整链接', content: '通知纯文本正文', contentHtml: '允许富文本的通知正文', code: '验证码或一次性口令', subject: '通知主题', authorName: '评论或回复作者名称', postTitle: '关联文章标题' } as Record<string, string>)[variable] || '发送时由系统填充的模板内容'
+}
+
+function restoreDefault() {
+  if (!selected.value) return
+  Modal.confirm({
+    title: '恢复系统默认模板',
+    content: `「${selected.value.name}」将恢复为系统预设内容，当前自定义主题和 HTML 会被覆盖。`,
+    okText: '恢复默认',
+    cancelText: '取消',
+    okType: 'danger',
+    onOk: async () => {
+      templateSaving.value = true
+      try {
+        const result = await api.put<any>(`/email/templates/${selected.value.key}`, { custom: false, subject: editor.subject, html: editor.html })
+        const index = templates.value.findIndex(item => item.key === result.key)
+        if (index >= 0) templates.value[index] = result
+        selectTemplate(result)
+        toast.success('已恢复系统默认模板')
+      } catch (error: any) { toast.error(error?.message || '恢复默认模板失败') }
+      finally { templateSaving.value = false }
+    },
+  })
+}
+
 async function saveTemplate() {
   if (!editor.subject.trim() || !editor.html.trim()) { toast.warning('主题和 HTML 不能为空'); return }
   templateSaving.value = true
@@ -242,6 +268,12 @@ function handleTableChange(pag: any) {
   pagination.current = pag.current
   pagination.pageSize = pag.pageSize
   loadLogs()
+}
+
+function handlePagination(page: number, pageSize: number) {
+  pagination.current = page
+  pagination.pageSize = pageSize
+  void loadLogs()
 }
 
 function openDetail(record: any) {
@@ -317,7 +349,7 @@ function stripHtml(html: string) {
 .email-logs-page {
   padding: 0;
 }
-.template-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:620px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.template-list{display:flex;flex-direction:column;gap:3px;padding:8px;border-right:1px solid var(--border);background:var(--c-bg-1)}.template-list button{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;border:0;border-radius:7px;background:transparent;color:var(--c-text);cursor:pointer;text-align:left}.template-list button:hover,.template-list button.active{background:var(--ld-bg-card)}.template-list button.active{box-shadow:0 1px 4px var(--ld-shadow)}.template-list button>span{display:grid;width:30px;height:30px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.template-list strong,.template-list small{display:block}.template-list strong{font-size:.64rem}.template-list small{margin-top:3px;color:var(--c-text-3);font-size:.5rem;line-height:1.4}.template-editor-spin{min-width:0}.template-editor{display:flex;min-width:0;flex-direction:column;gap:14px;padding:18px}.template-editor>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.template-editor h2{margin:0;font-size:.86rem}.template-editor header p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem}.template-editor>label>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.62rem}.html-editor :deep(textarea){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.variables{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:10px;border-radius:7px;background:var(--c-bg-1)}.variables>span{margin-right:3px;color:var(--c-text-2);font-size:.58rem;font-weight:700}.variables button{padding:4px 7px;border:1px solid var(--border);border-radius:12px;background:var(--ld-bg-card);color:var(--c-primary);cursor:pointer;font:10px/1.2 ui-monospace,monospace}.variables small{width:100%;color:var(--c-text-3);font-size:.52rem}.template-editor>footer{display:flex;justify-content:flex-end;gap:8px}.email-preview{display:block;width:100%;height:620px;border:0;border-radius:6px;background:#fff}
+.template-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:620px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.template-list{display:flex;min-height:0;flex-direction:column;gap:3px;overflow-y:auto;padding:8px;border-right:1px solid var(--border);background:var(--c-bg-1)}.template-list button{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;border:0;border-radius:7px;background:transparent;color:var(--c-text);cursor:pointer;text-align:left}.template-list button:hover,.template-list button.active{background:var(--ld-bg-card)}.template-list button.active{box-shadow:0 1px 4px var(--ld-shadow)}.template-list button>span{display:grid;width:30px;height:30px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.template-list strong,.template-list small{display:block}.template-list strong{font-size:.64rem}.template-list small{margin-top:3px;color:var(--c-text-3);font-size:.5rem;line-height:1.4}.template-editor-spin{min-width:0}.template-editor{display:flex;min-width:0;flex-direction:column;gap:14px;padding:18px}.template-editor>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.template-editor h2{margin:0;font-size:.86rem}.template-editor header p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem}.template-editor>label>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.62rem}.html-editor :deep(textarea){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.variables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:12px;border-radius:7px;background:var(--c-bg-1)}.variables>span,.variables>p,.variables>em{grid-column:1/-1}.variables>span{color:var(--c-text-2);font-size:.65rem;font-weight:700}.variables>p,.variables>em{margin:0;color:var(--c-text-3);font-size:.56rem;font-style:normal}.variables button{display:flex;min-width:0;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--ld-bg-card);color:var(--c-primary);cursor:pointer;text-align:left}.variables button:disabled{cursor:not-allowed;opacity:.55}.variables button code{flex:0 0 auto;font:10px/1.2 ui-monospace,monospace}.variables button small{min-width:0;color:var(--c-text-3);font-size:.52rem}.template-editor>footer{display:flex;justify-content:flex-end;gap:8px}.email-preview{display:block;width:100%;height:620px;border:0;border-radius:6px;background:#fff}
 
 .section-card {
   border-radius: 8px;

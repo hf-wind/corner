@@ -1,10 +1,7 @@
 <template>
-  <div class="constellation-admin">
-    <header class="page-header">
-      <div class="title-block">
-        <span class="title-icon"><Icon name="ph:planet-bold" /></span>
-        <div><small>TIME CONSTELLATION</small><h1>时光星图</h1><p>发布内容并记录时间、地点，系统会自动完成其余工作。</p></div>
-      </div>
+  <div class="constellation-admin admin-page-shell">
+    <header class="page-header admin-page-head">
+      <div><span>TIME CONSTELLATION</span><h1>时光星图</h1><p>发布内容并记录时间、地点，系统会自动完成其余工作。</p></div>
       <AppLink to="/time/constellation" target="_blank" class="preview-link"><Icon name="ph:arrow-square-out-bold" />查看前台星图</AppLink>
     </header>
 

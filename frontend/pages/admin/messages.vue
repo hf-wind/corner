@@ -1,9 +1,9 @@
 <template>
-  <div class="messages-page">
-    <a-card :bordered="false" class="section-card" size="small">
-      <template #title>
+  <div class="messages-page admin-page-shell">
+    <header class="admin-page-head"><div><span>ACCOUNT</span><h1>我的消息</h1><p>集中查看评论、回复、点赞和系统通知。</p></div><AdminRefreshButton :loading="loading" @click="loadNotifications" /></header>
+    <div class="admin-table-shell">
         <div class="card-header">
-          <span>我的消息</span>
+          <strong>消息列表</strong>
           <a-space>
             <a-badge :count="unreadCount" :overflow-count="99">
               <a-button size="small" @click="filterType = 'unread'; loadNotifications()">未读</a-button>
@@ -12,7 +12,6 @@
             <a-button size="small" @click="markAllRead" :disabled="unreadCount === 0">全部已读</a-button>
           </a-space>
         </div>
-      </template>
 
       <a-spin :spinning="loading">
         <div v-if="notifications.length === 0" class="empty">
@@ -45,17 +44,9 @@
             </div>
           </div>
         </div>
-        <div v-if="totalPages > 1" class="pagination-wrap">
-          <a-pagination
-            v-model:current="currentPage"
-            :total="total"
-            :pageSize="pageSize"
-            size="small"
-            @change="loadNotifications"
-          />
-        </div>
+        <AdminPagination v-model:current="currentPage" :total="total" :page-size="pageSize" :show-size-changer="false" @change="loadNotifications" />
       </a-spin>
-    </a-card>
+    </div>
 
     <a-modal v-model:open="detail.open" :title="detail.item?.title || '消息详情'" width="min(560px, calc(100vw - 32px))">
       <div v-if="detail.item" class="message-detail">
@@ -74,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { Modal } from 'ant-design-vue'
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
@@ -162,13 +154,10 @@ async function markAllRead() {
 }
 
 async function deleteNotification(item: any) {
-  try {
-    await removeSharedNotification(item.id, !item.read)
-    notifications.value = notifications.value.filter(i => i.id !== item.id)
-    total.value--
-  } catch {
-    toast.error('删除失败')
-  }
+  Modal.confirm({ title: '删除消息', content: `确认删除「${item.title || '这条消息'}」？删除后无法恢复。`, okText: '删除', cancelText: '取消', okType: 'danger', onOk: async () => {
+    try { await removeSharedNotification(item.id, !item.read); notifications.value = notifications.value.filter(i => i.id !== item.id); total.value-- }
+    catch { toast.error('删除失败') }
+  } })
 }
 
 function formatTime(date: string) {

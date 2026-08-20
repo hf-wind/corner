@@ -1,7 +1,7 @@
 <template>
-  <div class="analytics-page">
-    <header class="analytics-header">
-      <h1>访问统计</h1>
+  <div class="analytics-page admin-page-shell">
+    <header class="analytics-header admin-page-head">
+      <div><span>ANALYTICS</span><h1>访问统计</h1><p>查看站点流量、来源与访问趋势。</p></div>
       <a-button href="https://cloud.umami.is/share/z8bB3Qqg3bGNyd5z" target="_blank" rel="noopener noreferrer">
         <Icon name="ph:arrow-square-out-bold" />
         在 Umami 打开
@@ -25,6 +25,7 @@ useHead({ title: '访问统计' })
 <style scoped>
 .analytics-page {
   display: flex;
+  height: 100%;
   min-height: 0;
   flex: 1;
   flex-direction: column;
@@ -46,14 +47,11 @@ useHead({ title: '访问统计' })
 
 .analytics-frame {
   width: 100%;
-  min-height: 680px;
+  min-height: 0;
   flex: 1;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: #fff;
 }
 
-@media (max-width: 900px) {
-  .analytics-frame { min-height: calc(100dvh - 145px); }
-}
 </style>

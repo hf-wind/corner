@@ -107,7 +107,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/ai-native",
-    component: () => import("./pages/admin/ai-native.vue"),
+    redirect: { path: "/admin/ai", query: { tab: "chats" } },
     meta: adminMeta,
   },
   {
@@ -132,7 +132,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/friend-applications",
-    component: () => import("./pages/admin/friend-applications.vue"),
+    redirect: { path: "/admin/comments", query: { section: "applications" } },
     meta: adminMeta,
   },
   {
@@ -167,7 +167,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/logs",
-    component: () => import("./pages/admin/logs.vue"),
+    redirect: "/admin/info",
     meta: adminMeta,
   },
   {

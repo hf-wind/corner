@@ -1,9 +1,10 @@
 <template>
   <div class="comment-admin admin-page-shell">
-    <header class="admin-page-head"><div><h1>评论审核</h1><p>统一查看文章与瞬间评论，按状态和内容快速定位。</p></div><a-button :loading="loading" @click="loadComments"><Icon name="ph:arrows-clockwise-bold" /> 刷新</a-button></header>
-    <AdminSectionTabs label="审核中心" :items="reviewTabs" />
+    <header class="admin-page-head"><div><span>MODERATION</span><h1>审核中心</h1><p>直接处理文章评论、瞬间评论和友链申请，不设置重复入口。</p></div><AdminRefreshButton :loading="loading" @click="loadComments" /></header>
+    <section aria-labelledby="comment-review-title">
+      <div class="review-section-head"><div><h2 id="comment-review-title">文章与瞬间评论</h2><p>按来源、状态和关键字定位评论。</p></div></div>
     <a-spin :spinning="loading" class="table-spin">
-      <a-card :bordered="false" class="list-card" size="small">
+      <div class="admin-table-shell">
         <div class="comment-filter table-toolbar">
           <a-segmented v-model:value="source" :options="sourceOptions" @change="resetAndLoad" />
           <a-select v-model:value="status" style="width: 120px" @change="resetAndLoad">
@@ -15,7 +16,8 @@
           <a-input v-model:value="keyword" allow-clear placeholder="搜索内容、作者或所属内容" class="comment-search" @press-enter="resetAndLoad">
             <template #prefix><Icon name="ph:magnifying-glass" /></template>
           </a-input>
-          <a-button type="primary" @click="resetAndLoad">搜索</a-button>
+          <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+          <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
         </div>
         <a-table :dataSource="comments" :columns="columns" rowKey="id" size="small" :pagination="false" :locale="{ emptyText: '暂无评论' }">
           <template #bodyCell="{ column, record }">
@@ -43,11 +45,11 @@
             </template>
           </template>
         </a-table>
-        <div v-if="totalPages > 1" class="table-pagination">
-          <a-pagination v-model:current="currentPage" :total="total" :pageSize="pageSize" size="small" @change="loadComments" />
-        </div>
-      </a-card>
+        <AdminPagination v-model:current="currentPage" :total="total" :page-size="pageSize" :show-size-changer="false" @change="loadComments" />
+      </div>
     </a-spin>
+    </section>
+    <AdminFriendApplications />
 
     <a-modal v-model:open="detail.open" title="评论详情" width="640px" :footer="null" @cancel="detail.open = false">
       <div v-if="detail.item" class="detail-wrap">
@@ -124,10 +126,6 @@
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
-const reviewTabs = [
-  { to: '/admin/comments', label: '评论审核', icon: 'ph:chat-circle-dots-bold' },
-  { to: '/admin/friend-applications', label: '友链申请', icon: 'ph:handshake-bold' },
-]
 const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
@@ -185,6 +183,7 @@ async function loadComments() {
 }
 
 function resetAndLoad() { currentPage.value = 1; void loadComments() }
+function resetFilters() { status.value = ''; keyword.value = ''; source.value = 'article'; resetAndLoad() }
 
 onMounted(loadComments)
 
@@ -226,10 +225,9 @@ async function confirmReject() {
 </script>
 
 <style scoped>
-.list-card { border-radius:8px; }
+.review-section-head { margin-bottom: 12px; }.review-section-head h2 { margin:0; font-size:1rem; }.review-section-head p { margin:3px 0 0; color:var(--c-text-3); font-size:.68rem; }
 .comment-filter { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 .comment-search { width:260px; }
-.table-pagination { display:flex; justify-content:center; padding:16px 0 4px; }
 .comment-author { font-weight:500; font-size:0.82rem; }
 .moderation-content { white-space:pre-wrap; word-break:break-word; }
 .reply-mention { color:var(--c-primary); font-weight:600; }

@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-page">
+  <div class="editor-page admin-page-shell">
     <a-spin :spinning="loading" class="table-spin">
       <div class="editor-layout" v-if="!loading">
         <div class="editor-main">

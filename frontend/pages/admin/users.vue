@@ -1,6 +1,7 @@
 <template>
-  <div class="users-admin">
-    <div class="users-toolbar">
+  <div class="users-admin admin-page-shell">
+    <header class="admin-page-head"><div><span>ACCESS CONTROL</span><h1>用户管理</h1><p>管理账号角色、启用状态与内容归属。</p></div></header>
+    <div class="users-toolbar table-toolbar">
       <a-input-search
         v-model:value="search"
         class="user-search"
@@ -10,12 +11,13 @@
       />
       <a-select v-model:value="role" class="filter-select" :options="roleOptions" @change="resetAndLoad" />
       <a-select v-model:value="status" class="filter-select" :options="statusOptions" @change="resetAndLoad" />
-      <a-button :loading="loading" title="刷新" @click="loadUsers">
-        <Icon name="ph:arrows-clockwise-bold" />
-      </a-button>
+      <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="loadUsers" />
     </div>
 
-    <a-table
+    <div class="admin-table-shell"><a-table
       :data-source="users"
       :columns="columns"
       :loading="loading"
@@ -64,24 +66,26 @@
           <span class="count-cell">评 {{ record._count?.comments || 0 }}</span>
         </template>
         <template v-else-if="column.key === 'createdAt'">{{ formatDate(record.createdAt) }}</template>
+        <template v-else-if="column.key === 'actions'">
+          <a-button
+            size="small"
+            danger
+            :disabled="record.id === currentUser?.id || savingIds.has(record.id)"
+            @click="confirmDelete(record)"
+          >
+            <Icon name="ph:trash-bold" /> 删除
+          </a-button>
+        </template>
       </template>
     </a-table>
-
-    <div class="users-footer">
-      <span>共 {{ total }} 位用户</span>
-      <a-pagination
-        v-model:current="page"
-        :total="total"
-        :page-size="pageSize"
-        size="small"
-        show-less-items
-        @change="loadUsers"
-      />
+    <AdminPagination v-model:current="page" :total="total" :page-size="pageSize" :show-size-changer="false" @change="loadUsers" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Modal } from 'ant-design-vue'
+
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
@@ -114,6 +118,7 @@ const columns = [
   { title: '状态', key: 'status', width: 110 },
   { title: '内容', key: 'content', width: 190 },
   { title: '注册时间', key: 'createdAt', width: 150 },
+  { title: '操作', key: 'actions', width: 96, fixed: 'right' },
 ]
 
 async function loadUsers() {
@@ -139,6 +144,7 @@ function resetAndLoad() {
   page.value = 1
   void loadUsers()
 }
+function resetFilters() { search.value = ''; role.value = 'all'; status.value = 'all'; resetAndLoad() }
 
 async function updateUser(record: any, changes: { role?: 'admin' | 'user'; isActive?: boolean }) {
   savingIds.value = new Set(savingIds.value).add(record.id)
@@ -155,6 +161,32 @@ async function updateUser(record: any, changes: { role?: 'admin' | 'user'; isAct
   }
 }
 
+function confirmDelete(record: any) {
+  Modal.confirm({
+    title: `删除用户「${record.username}」？`,
+    content: '账号、登录能力和个人互动数据将永久删除；其文章、瞬间、相册、旅行与故事会转交给当前管理员。此操作无法恢复。',
+    okText: '确认删除',
+    cancelText: '取消',
+    okType: 'danger',
+    async onOk() {
+      savingIds.value = new Set(savingIds.value).add(record.id)
+      try {
+        await api.delete(`/users/admin/${record.id}`)
+        toast.success('用户已删除，创作内容已转交')
+        if (users.value.length === 1 && page.value > 1) page.value -= 1
+        await loadUsers()
+      } catch (error: any) {
+        toast.error(error?.message || '删除失败')
+        throw error
+      } finally {
+        const next = new Set(savingIds.value)
+        next.delete(record.id)
+        savingIds.value = next
+      }
+    },
+  })
+}
+
 function formatDate(value: string) {
   return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'
 }
@@ -164,7 +196,7 @@ onMounted(loadUsers)
 
 <style scoped>
 .users-admin { display:flex; flex-direction:column; gap:14px; }
-.users-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.users-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }.toolbar-spacer{flex:1}
 .user-search { width:min(320px, 100%); }
 .filter-select { width:130px; }
 .user-cell { display:flex; align-items:center; gap:10px; min-width:250px; }

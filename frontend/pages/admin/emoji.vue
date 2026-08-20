@@ -13,7 +13,7 @@
     <a-table
       row-key="id"
       :columns="packColumns"
-      :data-source="filteredPacks"
+      :data-source="pagedPacks"
       :loading="loading"
       :pagination="false"
       :expanded-row-keys="expandedPackIds"
@@ -91,16 +91,7 @@
             :data-source="itemStates[pack.id]?.items || []"
             :loading="itemStates[pack.id]?.loading"
             :scroll="{ x: 660 }"
-            :pagination="{
-              current: itemStates[pack.id]?.page || 1,
-              pageSize: itemStates[pack.id]?.pageSize || 20,
-              total: itemStates[pack.id]?.total || 0,
-              showSizeChanger: false,
-              showTotal: (total: number) => `共 ${total} 条`,
-            }"
-            @change="
-              (pagination: any) => changeItemPage(pack, pagination.current || 1)
-            "
+            :pagination="false"
           >
             <template #bodyCell="{ column, record: item }">
               <template v-if="column.key === 'preview'">
@@ -141,9 +132,11 @@
               </template>
             </template>
           </a-table>
+          <AdminPagination :current="itemStates[pack.id]?.page || 1" :page-size="itemStates[pack.id]?.pageSize || 20" :total="itemStates[pack.id]?.total || 0" :show-size-changer="false" @change="(page: number) => changeItemPage(pack, page)" />
         </div>
       </template>
     </a-table>
+    <AdminPagination v-model:current="packPage" :page-size="packPageSize" :total="filteredPacks.length" :show-size-changer="false" />
 
     <a-modal
       v-model:open="packDialog.open"
@@ -240,6 +233,7 @@
 </template>
 
 <script setup lang="ts">
+import { Modal } from 'ant-design-vue'
 definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
 
 type ItemState = {
@@ -259,6 +253,8 @@ const loading = ref(true);
 const saving = ref(false);
 const packs = ref<any[]>([]);
 const packKeyword = ref("");
+const packPage = ref(1);
+const packPageSize = 10;
 const filteredPacks = computed(() => {
   const keyword = packKeyword.value.trim().toLocaleLowerCase();
   if (!keyword) return packs.value;
@@ -266,6 +262,8 @@ const filteredPacks = computed(() => {
     `${pack.name} ${pack.type}`.toLocaleLowerCase().includes(keyword),
   );
 });
+const pagedPacks = computed(() => filteredPacks.value.slice((packPage.value - 1) * packPageSize, packPage.value * packPageSize));
+watch(packKeyword, () => { packPage.value = 1; });
 const expandedPackIds = ref<string[]>([]);
 const itemStates = reactive<Record<string, ItemState>>({});
 const packColumns = [
@@ -423,14 +421,10 @@ async function togglePack(pack: any) {
   }
 }
 async function removePack(pack: any) {
-  try {
-    await api.delete(`/emoji-packs/${pack.id}`);
-    delete itemStates[pack.id];
-    toast.success("已删除");
-    await loadPacks();
-  } catch {
-    toast.error("删除失败");
-  }
+  Modal.confirm({ title: '删除表情包', content: `确认删除「${pack.name}」及其中全部表情？此操作不可恢复。`, okText: '删除', cancelText: '取消', okType: 'danger', onOk: async () => {
+    try { await api.delete(`/emoji-packs/${pack.id}`); delete itemStates[pack.id]; toast.success('已删除'); await loadPacks() }
+    catch { toast.error('删除失败') }
+  } })
 }
 
 function openAddItem(pack: any) {
@@ -493,23 +487,15 @@ async function refreshPack(packId: string) {
   await Promise.all([loadPackItems(packId, state.page), loadPacks()]);
 }
 async function removeItem(pack: any, item: any) {
-  try {
-    await api.delete(`/emoji-packs/items/${item.id}`);
-    toast.success("已删除");
-    const state = ensureItemState(pack.id);
-    const targetPage =
-      state.items.length === 1 && state.page > 1 ? state.page - 1 : state.page;
-    await refreshPack(pack.id);
-    if (targetPage !== state.page) await loadPackItems(pack.id, targetPage);
-  } catch {
-    toast.error("删除失败");
-  }
+  Modal.confirm({ title: '删除表情', content: `确认删除「${item.label || '当前表情'}」？此操作不可恢复。`, okText: '删除', cancelText: '取消', okType: 'danger', onOk: async () => {
+    try { await api.delete(`/emoji-packs/items/${item.id}`); toast.success('已删除'); const state = ensureItemState(pack.id); const targetPage = state.items.length === 1 && state.page > 1 ? state.page - 1 : state.page; await refreshPack(pack.id); if (targetPage !== state.page) await loadPackItems(pack.id, targetPage) }
+    catch { toast.error('删除失败') }
+  } })
 }
 async function deleteItemFromDialog() {
   const pack = packs.value.find((entry) => entry.id === itemDialog.packId);
   if (!pack) return;
   await removeItem(pack, { id: itemDialog.id });
-  itemDialog.open = false;
 }
 async function openMediaLibrary() {
   const { open } = useMediaLibrary();

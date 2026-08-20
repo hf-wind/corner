@@ -1,7 +1,7 @@
 <template>
-  <div class="library-admin">
-    <header class="admin-heading">
-      <div><h1>书影</h1><p>管理阅读与观影收藏、体会、摘录和个人排名。</p></div>
+  <div class="library-admin admin-page-shell">
+    <header class="admin-page-head">
+      <div><span>CONTENT MANAGEMENT</span><h1>书影管理</h1><p>管理阅读与观影收藏、体会、摘录和个人排名。</p></div>
       <a-button type="primary" @click="router.push('/admin/library/create')"><Icon name="ph:plus-bold" /> 新增记录</a-button>
     </header>
 
@@ -21,7 +21,7 @@
     </div>
 
     <a-spin :spinning="loading">
-      <a-card :bordered="false" class="list-card">
+      <div class="admin-table-shell">
         <a-table :data-source="items" :columns="columns" row-key="id" :pagination="false" :locale="{ emptyText: '还没有收藏记录' }" :scroll="{ x: 860 }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'work'">
@@ -60,8 +60,8 @@
             </template>
           </template>
         </a-table>
-        <div v-if="totalPages > 1" class="pagination"><a-pagination v-model:current="page" :total="total" :page-size="limit" size="small" @change="load" /></div>
-      </a-card>
+        <AdminPagination v-model:current="page" :total="total" :page-size="limit" :show-size-changer="false" @change="load" />
+      </div>
     </a-spin>
   </div>
 </template>
@@ -78,7 +78,7 @@ const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
 const items = ref<LibraryItem[]>([])
 const page = ref(1)
-const limit = 12
+const limit = 10
 const total = ref(0)
 const totalPages = ref(1)
 const filter = reactive({ type: 'all', status: 'all', search: '' })

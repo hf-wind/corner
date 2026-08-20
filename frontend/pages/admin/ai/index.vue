@@ -1,6 +1,7 @@
 <template>
-  <div class="ai-admin">
-    <AdminSectionTabs label="AI 中心" :items="aiCenterTabs" />
+  <div class="ai-admin admin-page-shell">
+    <header class="admin-page-head"><div><span>AI CONTROL</span><h1>功能与模型</h1><p>统一管理模型能力、使用统计与全部用户及访客会话。</p></div></header>
+    <AdminAiUsage />
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="base" tab="基础配置" />
       <a-tab-pane key="content" tab="内容生成" />
@@ -678,12 +679,11 @@
             desc="已发布并纳入知识库检索的文章清单"
           >
             <template #extra>
-              <a-button
+              <AdminRefreshButton
                 size="small"
                 :loading="knowledgeListLoading"
                 @click="loadKnowledgeList"
-                >刷新</a-button
-              >
+              />
             </template>
             <a-spin :spinning="knowledgeListLoading">
               <div v-if="knowledgeList.items.length" class="knowledge-list">
@@ -834,7 +834,7 @@
             placeholder="用户名 / 邮箱"
             style="width: 180px"
             allow-clear
-            @search="loadConversations"
+            @search="searchConversations"
           />
         </template>
         <a-spin :spinning="convLoading">
@@ -857,6 +857,13 @@
               {{ formatTime(conversation.lastMessage?.createdAt) }}
             </div>
           </div>
+          <AdminPagination
+            v-model:current="conversationPage"
+            :page-size="conversationPageSize"
+            :total="conversationTotal"
+            :show-size-changer="false"
+            @change="loadConversations"
+          />
         </a-spin>
       </a-card>
 
@@ -869,14 +876,12 @@
         </template>
         <template #extra>
           <a-space>
-            <a-button
+            <AdminRefreshButton
               size="small"
               :disabled="!selectedUserId"
               :loading="detailLoading"
               @click="loadDetail"
-            >
-              刷新
-            </a-button>
+            />
             <a-popconfirm
               title="确认清空这个用户的全部对话？"
               ok-text="清空"
@@ -901,11 +906,19 @@
                 <span>{{ message.role === "user" ? "用户" : "哆啦A梦" }}</span>
                 <span class="muted">{{ formatTime(message.createdAt) }}</span>
               </div>
-              <div class="msg-bubble">{{ message.content }}</div>
+              <AdminMarkdown class="msg-bubble" :content="message.content" />
             </div>
           </div>
           <a-empty v-else-if="selectedUserId" description="暂无消息" />
           <a-empty v-else description="从左侧选择会话" />
+          <AdminPagination
+            v-if="detail"
+            v-model:current="detailPage"
+            :page-size="detailPageSize"
+            :total="detail.total || 0"
+            :show-size-changer="false"
+            @change="loadDetail"
+          />
         </a-spin>
       </a-card>
     </div>
@@ -983,11 +996,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
 
-const aiCenterTabs = [
-  { to: "/admin/ai", label: "功能与模型", icon: "ph:sliders-horizontal-bold" },
-  { to: "/admin/ai-native", label: "用量与会话", icon: "ph:chart-line-up-bold" },
-];
-
 type AiModelItem = {
   id: string;
   name: string;
@@ -1006,9 +1014,10 @@ const router = useRouter();
 const api = useApi();
 const toast = useToast();
 
-const tab = ref((route.query.tab as string) === "chats" ? "chats" : "base");
+const validTabs = new Set(["base", "content", "chat", "moderation", "chats"]);
+const tab = ref(validTabs.has(String(route.query.tab)) ? String(route.query.tab) : "base");
 watch(tab, (value) => {
-  router.replace({ query: value === "settings" ? {} : { tab: value } });
+  router.replace({ query: value === "base" ? {} : { tab: value } });
   if (value === "chats" && !conversations.value.length)
     void loadConversations();
 });
@@ -1060,6 +1069,11 @@ const convQuery = ref("");
 const selectedUserId = ref("");
 const detailLoading = ref(false);
 const detail = ref<any>(null);
+const detailPage = ref(1);
+const detailPageSize = 50;
+const conversationPage = ref(1);
+const conversationPageSize = 20;
+const conversationTotal = ref(0);
 
 const knowledgeListLoading = ref(false);
 const knowledgeList = ref<{ total: number; items: any[] }>({
@@ -1293,9 +1307,13 @@ async function loadKnowledgeList() {
 async function loadConversations() {
   convLoading.value = true;
   try {
-    conversations.value = await api.get<any[]>("/ai/admin/conversations", {
+    const result = await api.get<any>("/ai/admin/conversations", {
       q: convQuery.value || undefined,
+      page: conversationPage.value,
+      pageSize: conversationPageSize,
     });
+    conversations.value = result.items || [];
+    conversationTotal.value = result.total || 0;
   } catch {
     toast.error("加载会话失败");
   } finally {
@@ -1303,20 +1321,27 @@ async function loadConversations() {
   }
 }
 
-async function selectConversation(userId: string) {
-  selectedUserId.value = userId;
-  await loadDetail();
+function searchConversations() {
+  conversationPage.value = 1;
+  void loadConversations();
 }
 
-async function loadDetail() {
+async function selectConversation(userId: string) {
+  selectedUserId.value = userId;
+  detailPage.value = 1;
+  await loadDetail(1);
+}
+
+async function loadDetail(page = detailPage.value) {
   if (!selectedUserId.value) return;
+  detailPage.value = page;
   detailLoading.value = true;
   try {
     detail.value = await api.get(
       `/ai/admin/conversations/${selectedUserId.value}`,
       {
-        page: 1,
-        pageSize: 200,
+        page,
+        pageSize: detailPageSize,
       },
     );
   } catch {
@@ -1344,12 +1369,12 @@ function formatTime(value?: string) {
   return String(value).slice(0, 16).replace("T", " ");
 }
 
-useHead({ title: "AI 配置" });
+useHead({ title: "功能与模型" });
 </script>
 
 <style scoped>
 .ai-admin {
-  max-width: 1180px;
+  width: 100%;
 }
 
 .tab-body {

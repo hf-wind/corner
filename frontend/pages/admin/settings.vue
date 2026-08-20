@@ -10,23 +10,23 @@
       <a-tab-pane key="basic" tab="基本设置" />
       <a-tab-pane key="email" tab="邮件配置" />
       <a-tab-pane key="music" tab="音乐播放器" />
-      <a-tab-pane key="friends" tab="友链管理" />
     </a-tabs>
 
     <div v-show="tab === 'website'" class="tab-body">
       <a-space direction="vertical" :size="16" style="width: 100%">
         <AdminCard icon="ph:house-bold" title="默认站点信息" desc="前台标题、搜索描述与系统默认站点资料">
           <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
-            <a-form-item label="标题"><a-input v-model:value="settings.site_title" @blur="saveSetting('site_title')" /></a-form-item>
-            <a-form-item label="公开地址"><a-input v-model:value="settings.site_url" placeholder="https://corner.ink" @blur="saveSetting('site_url')" /></a-form-item>
-            <a-form-item label="描述"><a-textarea v-model:value="settings.site_description" :rows="3" @blur="saveSetting('site_description')" /></a-form-item>
-            <a-form-item label="关键词"><a-input v-model:value="keywordText" placeholder="逗号分隔" @blur="saveKeywords" /></a-form-item>
+            <a-form-item label="标题"><a-input v-model:value="settings.site_title" /></a-form-item>
+            <a-form-item label="公开地址"><a-input v-model:value="settings.site_url" placeholder="https://corner.ink" /></a-form-item>
+            <a-form-item label="描述"><a-textarea v-model:value="settings.site_description" :rows="3" /></a-form-item>
+            <a-form-item label="关键词"><a-input v-model:value="keywordText" placeholder="逗号分隔" /></a-form-item>
+            <a-form-item :wrapper-col="{ style: { marginLeft: '88px' } }"><a-button type="primary" :loading="websiteSaving" @click="saveWebsiteSettings"><Icon name="ph:floppy-disk-bold" /> 保存网站信息</a-button></a-form-item>
           </a-form>
         </AdminCard>
         <AdminCard icon="ph:handshake-bold" title="友链展示资料" desc="用于友链页展示、互链申请和本站默认对外资料">
           <a-alert type="info" show-icon message="站点名称、地址和描述直接共用上方默认站点信息；这里只补充友链展示需要的头像、RSS 和联系邮箱。" />
           <a-form class="site-profile-form" labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
-            <a-form-item label="站点头像"><a-input v-model:value="siteForm.avatar" placeholder="头像 URL" /></a-form-item>
+            <a-form-item label="站点 Logo"><a-input v-model:value="siteForm.avatar" placeholder="/logo.png" /><div class="site-logo-preview" :class="{ failed: siteLogoFailed }"><img v-if="!siteLogoFailed" :src="siteForm.avatar || '/logo.png'" alt="友链 Logo 预览" @error="siteLogoFailed = true"><Icon v-else name="ph:image-broken-bold" /><span>{{ siteLogoFailed ? 'Logo 加载失败，请检查地址' : '实时预览' }}</span></div></a-form-item>
             <a-form-item label="RSS 地址"><a-input v-model:value="siteForm.rssUrl" placeholder="https://corner.ink/api/rss.xml" /></a-form-item>
             <a-form-item label="联系邮箱"><a-input v-model:value="siteForm.contactEmail" type="email" /></a-form-item>
             <a-form-item :wrapper-col="{ style: { marginLeft: '88px' } }"><a-button type="primary" :loading="siteSaving" @click="saveSiteInfo"><Icon name="ph:floppy-disk-bold" /> 保存展示资料</a-button></a-form-item>
@@ -51,7 +51,6 @@
               <a-select
                 v-model:value="mediaNaming"
                 style="width: 200px"
-                @change="saveMediaNaming"
               >
                 <a-select-option value="timestamp"
                   >时间戳（默认）</a-select-option
@@ -81,7 +80,6 @@
                 :max="100"
                 :precision="0"
                 style="width: 140px"
-                @change="saveSetting('visitor_bottle_daily_limit')"
               />
               <div class="hint">包含新瓶和接力瓶，默认 3 次。</div>
             </a-form-item>
@@ -92,11 +90,11 @@
                 :max="100"
                 :precision="0"
                 style="width: 140px"
-                @change="saveSetting('visitor_fish_daily_limit')"
               />
               <div class="hint">打捞请求会计入额度，默认 5 次。</div>
             </a-form-item>
           </a-form>
+          <div class="settings-save-row"><a-button type="primary" :loading="basicSaving" @click="saveBasicSettings"><Icon name="ph:floppy-disk-bold" /> 保存基本设置</a-button></div>
         </AdminCard>
       </a-space>
     </div>
@@ -115,14 +113,12 @@
           <a-form-item label="启用邮件">
             <a-switch
               v-model:checked="email.email_enabled"
-              @change="saveEmailSetting('email_enabled')"
             />
           </a-form-item>
           <a-form-item label="SMTP服务器">
             <a-input
               v-model:value="email.email_smtp_host"
               placeholder="smtp.qq.com"
-              @blur="saveEmailSetting('email_smtp_host')"
             />
           </a-form-item>
           <a-form-item label="端口">
@@ -131,20 +127,17 @@
               :min="1"
               :max="65535"
               style="width: 120px"
-              @blur="saveEmailSetting('email_smtp_port')"
             />
           </a-form-item>
           <a-form-item label="SSL加密">
             <a-switch
               v-model:checked="email.email_smtp_secure"
-              @change="saveEmailSetting('email_smtp_secure')"
             />
           </a-form-item>
           <a-form-item label="发信地址">
             <a-input
               v-model:value="email.email_smtp_user"
               placeholder="1833079849@qq.com"
-              @blur="saveEmailSetting('email_smtp_user')"
             />
           </a-form-item>
           <a-form-item label="SMTP密钥">
@@ -169,21 +162,18 @@
             <a-input
               v-model:value="email.email_from_name"
               placeholder="风隅随笔"
-              @blur="saveEmailSetting('email_from_name')"
             />
           </a-form-item>
           <a-form-item label="发信人地址">
             <a-input
               v-model:value="email.email_from_address"
               placeholder="1833079849@qq.com"
-              @blur="saveEmailSetting('email_from_address')"
             />
           </a-form-item>
           <a-form-item label="站点URL">
             <a-input
               v-model:value="email.site_url"
               placeholder="https://your-domain.com"
-              @blur="saveEmailSetting('site_url')"
             />
             <div class="hint">
               用于邮件模板中的「查看详情」链接，请填写完整URL，如
@@ -200,7 +190,8 @@
               >发送测试</a-button
             >
           </a-form-item>
-        </a-form>
+          </a-form>
+          <div class="settings-save-row"><a-button type="primary" :loading="emailSaving" @click="saveEmailConfig"><Icon name="ph:floppy-disk-bold" /> 保存邮件配置</a-button></div>
       </AdminCard>
     </div>
 
@@ -612,6 +603,9 @@ const { openItems } = useMediaLibrary();
 const router = useRouter();
 const tab = ref("website");
 const healthLoading = ref(false);
+const websiteSaving = ref(false);
+const basicSaving = ref(false);
+const emailSaving = ref(false);
 const configHealth = reactive<any>({ checks: [], configuredCount: 0, requiredMissing: 0, checkedAt: "" });
 const settings = ref({
   site_title: "",
@@ -624,10 +618,11 @@ const settings = ref({
 const keywordText = ref("");
 const mediaNaming = ref("timestamp");
 const siteSaving = ref(false);
+const siteLogoFailed = ref(false);
 const siteForm = reactive({
   name: "",
   url: "",
-  avatar: "",
+  avatar: "/logo.png",
   description: "",
   rssUrl: "",
   contactEmail: "1833079849@qq.com",
@@ -739,9 +734,7 @@ onMounted(async () => {
   settings.value.site_description ||= siteForm.description;
 });
 
-function handleSettingsTab(key: string) {
-  if (key === "friends") void router.push("/admin/friends");
-}
+function handleSettingsTab() {}
 
 async function loadSiteInfo() {
   try {
@@ -749,7 +742,7 @@ async function loadSiteInfo() {
     Object.assign(siteForm, {
       name: result?.name || "",
       url: result?.url || "",
-      avatar: result?.avatar || "",
+      avatar: result?.avatar || "/logo.png",
       description: result?.description || "",
       rssUrl: result?.rssUrl || "",
       contactEmail: result?.contactEmail || "1833079849@qq.com",
@@ -757,6 +750,52 @@ async function loadSiteInfo() {
   } catch {
     toast.error("本站展示资料加载失败");
   }
+}
+
+watch(() => siteForm.avatar, () => { siteLogoFailed.value = false })
+
+async function saveWebsiteSettings() {
+  websiteSaving.value = true;
+  try {
+    const keywords = keywordText.value.split(/[,，]\s*/).filter(Boolean);
+    await Promise.all([
+      api.put('/settings', { key: 'site_title', value: settings.value.site_title }),
+      api.put('/settings', { key: 'site_url', value: settings.value.site_url }),
+      api.put('/settings', { key: 'site_description', value: settings.value.site_description }),
+      api.put('/settings', { key: 'site_keywords', value: keywords }),
+    ]);
+    settings.value.site_keywords = keywords;
+    updateSiteSetting('site_title', settings.value.site_title);
+    updateSiteSetting('site_description', settings.value.site_description);
+    toast.success('网站信息已保存');
+  } catch { toast.error('网站信息保存失败'); }
+  finally { websiteSaving.value = false; }
+}
+
+async function saveBasicSettings() {
+  basicSaving.value = true;
+  try {
+    await Promise.all([
+      api.put('/settings', { key: 'media_naming', value: mediaNaming.value }),
+      api.put('/settings', { key: 'visitor_bottle_daily_limit', value: settings.value.visitor_bottle_daily_limit }),
+      api.put('/settings', { key: 'visitor_fish_daily_limit', value: settings.value.visitor_fish_daily_limit }),
+    ]);
+    toast.success('基本设置已保存');
+  } catch { toast.error('基本设置保存失败'); }
+  finally { basicSaving.value = false; }
+}
+
+async function saveEmailConfig() {
+  emailSaving.value = true;
+  try {
+    const payload: Record<string, unknown> = { ...email };
+    if (!emailPasswordDirty.value || !email.email_smtp_pass.trim()) delete payload.email_smtp_pass;
+    await api.put('/email/config', payload);
+    if (emailPasswordDirty.value) { email.email_smtp_pass = ''; emailPasswordDirty.value = false; }
+    toast.success('邮件配置已保存');
+    void loadConfigHealth();
+  } catch { toast.error('邮件配置保存失败'); }
+  finally { emailSaving.value = false; }
 }
 
 async function saveSiteInfo() {
@@ -1963,4 +2002,8 @@ async function refreshCache() {
     grid-template-columns: 1fr 1fr;
   }
 }
+.settings-save-row { display:flex; justify-content:flex-end; padding-top:12px; border-top:1px solid var(--border); }
+.site-logo-preview { display:flex; align-items:center; gap:10px; margin-top:10px; padding:9px 10px; border:1px solid var(--border); border-radius:8px; background:var(--c-bg-1); color:var(--c-text-3); font-size:.68rem; }
+.site-logo-preview img { width:48px; height:48px; border-radius:6px; background:var(--ld-bg-card); object-fit:contain; }
+.site-logo-preview.failed { color:#d65f5f; }.site-logo-preview.failed :deep(svg) { width:32px; height:32px; }
 </style>

@@ -130,15 +130,7 @@
           />
         </a-spin>
 
-        <div class="media-pagination" v-if="totalPages > 1">
-          <a-pagination
-            v-model:current="page"
-            :pageSize="limit"
-            :total="total"
-            size="small"
-            @change="loadMedia"
-          />
-        </div>
+        <AdminPagination v-model:current="page" :page-size="limit" :total="total" :show-size-changer="false" @change="loadMedia" />
       </div>
     </div>
   </a-modal>

@@ -1,11 +1,11 @@
 <template>
-  <div class="album-admin">
-    <header class="admin-heading">
-      <div><h1>相册</h1><p>编排照片并管理保存版本与公开版本。</p></div>
+  <div class="album-admin admin-page-shell">
+    <header class="admin-page-head">
+      <div><span>CONTENT MANAGEMENT</span><h1>相册管理</h1><p>编排照片并管理保存版本与公开版本。</p></div>
       <a-button type="primary" @click="router.push('/admin/albums/create')"><Icon name="ph:plus-bold" /> 新建相册</a-button>
     </header>
 
-    <div class="album-toolbar">
+    <div class="album-toolbar table-toolbar">
       <a-segmented v-model:value="filter.status" :options="statusOptions" @change="resetAndLoad" />
       <a-input-search v-model:value="filter.search" allow-clear placeholder="搜索相册名称或说明" @search="resetAndLoad" />
     </div>
@@ -36,7 +36,7 @@
         </template>
       </a-table>
     </div>
-    <div v-if="totalPages > 1" class="pagination"><a-pagination v-model:current="page" :total="total" :page-size="limit" @change="load" /></div>
+    <AdminPagination v-model:current="page" :total="total" :page-size="limit" :show-size-changer="false" @change="load" />
   </div>
 </template>
 
@@ -53,7 +53,7 @@ const items = ref<any[]>([])
 const page = ref(1)
 const total = ref(0)
 const totalPages = ref(1)
-const limit = 12
+const limit = 10
 const filter = reactive({ status: 'all', search: '' })
 const statusOptions = [
   { label: '全部', value: 'all' }, { label: '已发布', value: 'published' },

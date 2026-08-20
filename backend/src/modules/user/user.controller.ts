@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Put,
   Body,
@@ -43,6 +44,13 @@ export class UserController {
     @Body() dto: AdminUpdateUserDto,
   ) {
     return this.user.adminUpdate(req.user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Delete('admin/:id')
+  adminDelete(@Req() req: any, @Param('id') id: string) {
+    return this.user.adminDelete(req.user.id, id);
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -25,14 +25,16 @@
     >
       <Icon name="ph:eye-bold" /> 预览
     </a-button>
-    <a-button
-      v-if="showSettings"
-      type="link"
-      size="small"
-      @click="emit('settings')"
-    >
-      <Icon name="ph:gear-six-bold" /> 设置
-    </a-button>
+    <a-dropdown v-if="showSettings && settingsMenu" :trigger="['click']">
+      <a-button type="link" size="small"><Icon name="ph:gear-six-bold" /> 设置 <Icon name="ph:caret-down-bold" /></a-button>
+      <template #overlay>
+        <a-menu @click="onSettingsMenuClick">
+          <a-menu-item key="schedule"><span class="settings-menu-item"><Icon name="ph:clock-countdown-bold" /> 定时发布</span></a-menu-item>
+          <a-menu-item key="privacy"><span class="settings-menu-item"><Icon name="ph:lock-key-bold" /> {{ record?.status === 'private' ? '恢复公开' : '设置私密' }}</span></a-menu-item>
+        </a-menu>
+      </template>
+    </a-dropdown>
+    <a-button v-else-if="showSettings" type="link" size="small" @click="emit('settings')"><Icon name="ph:gear-six-bold" /> 设置</a-button>
     <a-button
       v-if="showDelete"
       type="link"
@@ -56,6 +58,7 @@ const props = withDefaults(
     showDelete?: boolean
     publishing?: boolean
     previewOnlyPublished?: boolean
+    settingsMenu?: boolean
   }>(),
   {
     showEdit: true,
@@ -65,6 +68,7 @@ const props = withDefaults(
     showDelete: true,
     publishing: false,
     previewOnlyPublished: false,
+    settingsMenu: false,
   },
 )
 const emit = defineEmits<{
@@ -73,7 +77,14 @@ const emit = defineEmits<{
   (e: 'publish'): void
   (e: 'settings'): void
   (e: 'delete'): void
+  (e: 'schedule'): void
+  (e: 'privacy'): void
 }>()
+
+function onSettingsMenuClick({ key }: { key: string }) {
+  if (key === 'schedule') emit('schedule')
+  if (key === 'privacy') emit('privacy')
+}
 
 const canPreview = computed(() => {
   if (!props.showPreview) return false
@@ -92,4 +103,5 @@ const canPreview = computed(() => {
   flex-wrap: nowrap;
   white-space: nowrap;
 }
+.settings-menu-item { display:inline-flex; align-items:center; gap:8px; }
 </style>

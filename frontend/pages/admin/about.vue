@@ -1,9 +1,10 @@
 <template>
-  <div class="about-editor">
-    <header class="editor-heading">
+  <div class="about-editor admin-page-shell">
+    <header class="editor-heading admin-page-head">
       <div>
-        <p class="eyebrow">CONTENT / PROFILE</p>
+        <span class="eyebrow">CONTENT / PROFILE</span>
         <h1>关于我</h1>
+        <p>维护前台个人介绍、经历、技能与社交资料。</p>
       </div>
       <a-space>
         <a-button href="/about" target="_blank"><Icon name="ph:arrow-square-out-bold" /> 查看页面</a-button>

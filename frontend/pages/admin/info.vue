@@ -1,6 +1,6 @@
 <template>
   <div class="admin-page-shell system-page">
-    <header class="admin-page-head"><div><span>SYSTEM STATUS</span><h1>系统信息</h1><p>来自当前生产进程的运行状态，不使用前端硬编码信息。</p></div><a-button :loading="loading" @click="load"><Icon name="ph:arrows-clockwise-bold" />刷新</a-button></header>
+    <header class="admin-page-head"><div><span>SYSTEM STATUS</span><h1>系统信息</h1><p>来自当前生产进程的运行状态，不使用前端硬编码信息。</p></div><AdminRefreshButton :loading="loading" @click="load" /></header>
     <a-spin :spinning="loading">
       <section class="system-status"><span :class="info.database === 'online' ? 'online' : 'offline'"><i />数据库 {{ info.database === 'online' ? '正常' : '不可用' }}</span><small>检查于 {{ formatTime(info.checkedAt) }}</small></section>
       <section class="system-grid">
