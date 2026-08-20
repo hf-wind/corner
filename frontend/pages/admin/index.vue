@@ -145,13 +145,24 @@ function chartTheme() {
   }
 }
 
+function withAlpha(color: string, opacity: number) {
+  const alpha = Math.min(1, Math.max(0, opacity))
+  if (/^hsl\([^/]+\)$/i.test(color)) {
+    return color.replace(/\)$/, ` / ${Math.round(alpha * 100)}%)`)
+  }
+  if (/^#[\da-f]{6}$/i.test(color)) {
+    return `${color}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`
+  }
+  return color
+}
+
 function renderCharts() {
   const theme = chartTheme()
   const labels = (data.trends.dates || []).map((date: string) => String(date).slice(5))
   const base = { animationDuration: 450, textStyle: { color: theme.text, fontFamily: 'var(--font-body)' }, grid: { left: 42, right: 16, top: 28, bottom: 30 }, tooltip: { trigger: 'axis' as const }, xAxis: { type: 'category' as const, data: labels, boundaryGap: false, axisLine: { lineStyle: { color: theme.line } }, axisTick: { show: false }, axisLabel: { color: theme.text } }, yAxis: { type: 'value' as const, minInterval: 1, splitLine: { lineStyle: { color: theme.line, type: 'dashed' as const } }, axisLabel: { color: theme.text } } }
-  if (hasVisits.value && visitChartEl.value) { visitChart ||= echarts.init(visitChartEl.value); visitChart.setOption({ ...base, series: [{ name: '访问', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, data: data.trends.visits || [], lineStyle: { width: 3, color: theme.primary }, itemStyle: { color: theme.primary }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: `${theme.primary}55` }, { offset: 1, color: `${theme.primary}05` }] } } }] }, true) }
+  if (hasVisits.value && visitChartEl.value) { visitChart ||= echarts.init(visitChartEl.value); visitChart.setOption({ ...base, series: [{ name: '访问', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, data: data.trends.visits || [], lineStyle: { width: 3, color: theme.primary }, itemStyle: { color: theme.primary }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: withAlpha(theme.primary, 0.33) }, { offset: 1, color: withAlpha(theme.primary, 0.02) }] } } }] }, true) }
   if (hasContentTrends.value && contentChartEl.value) { contentChart ||= echarts.init(contentChartEl.value); contentChart.setOption({ ...base, legend: { top: 0, textStyle: { color: theme.text } }, xAxis: { ...base.xAxis, boundaryGap: true }, series: [{ name: '文章', type: 'bar', stack: 'content', data: data.trends.content?.posts || [], itemStyle: { color: theme.primary } }, { name: '瞬间', type: 'bar', stack: 'content', data: data.trends.content?.moments || [], itemStyle: { color: '#43a977' } }, { name: '相册', type: 'bar', stack: 'content', data: data.trends.content?.albums || [], itemStyle: { color: '#d49a32' } }, { name: '书影', type: 'bar', stack: 'content', data: data.trends.content?.library || [], itemStyle: { color: '#bd5268' } }] }, true) }
-  if (hasAiTrends.value && aiChartEl.value) { aiChart ||= echarts.init(aiChartEl.value); aiChart.setOption({ ...base, legend: { top: 0, textStyle: { color: theme.text } }, series: [{ name: '输入 Token', type: 'line', smooth: true, data: data.trends.ai?.inputTokens || [], itemStyle: { color: '#795bbe' } }, { name: '输出 Token', type: 'line', smooth: true, data: data.trends.ai?.outputTokens || [], itemStyle: { color: '#d49a32' } }, { name: '调用', type: 'bar', data: data.trends.ai?.calls || [], itemStyle: { color: `${theme.primary}55` } }] }, true) }
+  if (hasAiTrends.value && aiChartEl.value) { aiChart ||= echarts.init(aiChartEl.value); aiChart.setOption({ ...base, legend: { top: 0, textStyle: { color: theme.text } }, series: [{ name: '输入 Token', type: 'line', smooth: true, data: data.trends.ai?.inputTokens || [], itemStyle: { color: '#795bbe' } }, { name: '输出 Token', type: 'line', smooth: true, data: data.trends.ai?.outputTokens || [], itemStyle: { color: '#d49a32' } }, { name: '调用', type: 'bar', data: data.trends.ai?.calls || [], itemStyle: { color: withAlpha(theme.primary, 0.33) } }] }, true) }
 }
 
 function resizeCharts() { visitChart?.resize(); contentChart?.resize(); aiChart?.resize() }
