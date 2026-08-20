@@ -168,12 +168,14 @@ export class VisitorController {
   adminMessages(
     @Query('status') status?: string,
     @Query('type') type?: string,
+    @Query('keyword') keyword?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.visitorService.adminMessages({
       status,
       type,
+      keyword,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });

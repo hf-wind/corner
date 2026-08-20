@@ -1361,18 +1361,38 @@ describe('VisitorService', () => {
           findMany: jest
             .fn()
             .mockResolvedValue([
-              { id: 'm1', userId: null, caughtByIdHash: 'h2' },
+              {
+                id: 'm1',
+                type: 'bottle',
+                userId: null,
+                visitorIdHash: null,
+                caughtByIdHash: 'h2',
+                chainId: null,
+                catchEvents: [],
+              },
             ]),
           count: jest.fn().mockResolvedValue(1),
         },
         visitorProfile: {
           findMany: jest
             .fn()
-            .mockResolvedValue([{ visitorIdHash: 'h2', nickname: '拾光者' }]),
+            .mockResolvedValue([
+              {
+                visitorIdHash: 'h2',
+                nickname: '拾光者',
+                email: null,
+                ipHash: null,
+                visitCount: 3,
+                lastSeenAt: null,
+              },
+            ]),
         },
+        visitorVisit: { findMany: jest.fn().mockResolvedValue([]) },
       } as any;
       const result = await makeService(prisma).adminMessages({});
-      expect(result.items[0].catcher).toEqual({ nickname: '拾光者' });
+      expect(result.items[0].catcher).toEqual(
+        expect.objectContaining({ nickname: '拾光者', visitCount: 3 }),
+      );
     });
 
     it('adminProfiles 按登录用户筛选并返回账号、身份和地区', async () => {

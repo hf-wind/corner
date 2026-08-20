@@ -1,12 +1,14 @@
 <template>
-  <div>
+  <div class="admin-page-shell">
+    <header class="admin-page-head"><div><span>CONTENT TAXONOMY</span><h1>标签管理</h1><p>检索、整理标签并统一关联文章。</p></div></header>
     <div class="table-toolbar">
+      <a-input v-model:value="keyword" allow-clear placeholder="搜索标签名称或 Slug" style="width:min(300px,100%)"><template #prefix><Icon name="ph:magnifying-glass-bold" /></template></a-input>
       <a-button type="primary" @click="openAdd"><PlusOutlined /> 添加</a-button>
     </div>
 
     <a-spin :spinning="loading" class="table-spin">
       <a-card :bordered="false" class="list-card" size="small">
-        <a-table :dataSource="tags" :columns="columns" rowKey="slug" size="small" :pagination="false" :locale="{ emptyText: '暂无标签' }">
+        <a-table :dataSource="filteredTags" :columns="columns" rowKey="slug" size="small" :pagination="false" :locale="{ emptyText: keyword ? '没有匹配的标签' : '暂无标签' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'icon'">
               <Icon :name="record.icon || 'ph:tag-bold'" :style="{ color: record.color || 'var(--c-text-3)', fontSize: '16px' }" />
@@ -93,7 +95,12 @@ const api = useApi()
 const toast = useToast()
 const loading = ref(true)
 const tags = ref<any[]>([])
+const keyword = ref('')
 const addDialog = reactive({ open: false, name: '', slug: '', icon: 'ph:tag-bold', color: '', editing: false, editingSlug: '' })
+const filteredTags = computed(() => {
+  const query = keyword.value.trim().toLowerCase()
+  return query ? tags.value.filter(item => `${item.name} ${item.slug}`.toLowerCase().includes(query)) : tags.value
+})
 
 const columns = [
   { title: '', key: 'icon', width: 36, align: 'center' as const },

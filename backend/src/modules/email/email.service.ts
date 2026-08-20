@@ -11,6 +11,20 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import * as nodemailer from 'nodemailer';
 
+type EmailTemplateKey =
+  | 'verification'
+  | 'comment_notification'
+  | 'reply_notification'
+  | 'comment_moderation_notification'
+  | 'like_notification'
+  | 'test';
+
+type StoredEmailTemplate = {
+  custom?: boolean;
+  subject?: string;
+  html?: string;
+};
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -90,6 +104,65 @@ export class EmailService {
     };
   }
 
+  async getTemplates() {
+    const config = await this.getEmailConfig();
+    const stored = await this.getStoredTemplates();
+    return this.templateDefinitions(config.siteUrl).map((definition) => ({
+      ...definition,
+      custom: Boolean(stored[definition.key]?.custom),
+      subject: stored[definition.key]?.custom
+        ? stored[definition.key]?.subject || definition.defaultSubject
+        : definition.defaultSubject,
+      html: stored[definition.key]?.custom
+        ? stored[definition.key]?.html || definition.defaultHtml
+        : definition.defaultHtml,
+    }));
+  }
+
+  async updateTemplate(
+    key: string,
+    value: { custom: boolean; subject: string; html: string },
+  ) {
+    const definition = this.templateDefinitions('https://corner.ink').find(
+      (item) => item.key === key,
+    );
+    if (!definition)
+      throw new HttpException('邮件模板不存在', HttpStatus.NOT_FOUND);
+    const stored = await this.getStoredTemplates();
+    stored[key as EmailTemplateKey] = {
+      custom: value.custom,
+      subject: value.subject.trim(),
+      html: value.html,
+    };
+    await this.settings.set('email_templates', stored);
+    return (await this.getTemplates()).find((item) => item.key === key);
+  }
+
+  async previewTemplate(
+    key: string,
+    override?: { subject?: string; html?: string },
+  ) {
+    const config = await this.getEmailConfig();
+    const definition = this.templateDefinitions(config.siteUrl).find(
+      (item) => item.key === key,
+    );
+    if (!definition)
+      throw new HttpException('邮件模板不存在', HttpStatus.NOT_FOUND);
+    const stored = await this.getStoredTemplates();
+    const selected = stored[key as EmailTemplateKey];
+    return {
+      key,
+      subject: this.renderTemplateText(
+        override?.subject || selected?.subject || definition.defaultSubject,
+        definition.sample,
+      ),
+      html: this.renderTemplateText(
+        override?.html || selected?.html || definition.defaultHtml,
+        definition.sample,
+      ),
+    };
+  }
+
   async generateVerificationCode(): Promise<string> {
     const chars =
       'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
@@ -148,14 +221,24 @@ export class EmailService {
           : type === 'friend_remove'
             ? '移除友链'
             : '修改密码';
-    const html = this.getVerificationCodeTemplate(code, typeText);
+    const template = await this.resolveTemplate(
+      'verification',
+      {
+        code,
+        type: typeText,
+        siteName: '风隅随笔',
+        siteUrl: config.siteUrl,
+      },
+      `【风隅随笔】${typeText}验证码`,
+      this.getVerificationCodeTemplate(code, typeText),
+    );
 
     const job = await this.verificationQueue.add(
       'send-verification',
       {
         to: email,
-        subject: `【风隅随笔】${typeText}验证码`,
-        html,
+        subject: template.subject,
+        html: template.html,
         type: 'verification',
       },
       {
@@ -221,12 +304,30 @@ export class EmailService {
   }): Promise<void> {
     const config = await this.getEmailConfig();
     const siteUrl = data.siteUrl || config.siteUrl;
-    const html = this.getCommentNotificationTemplate({ ...data, siteUrl });
+    const detailUrl = data.link
+      ? `${siteUrl}${data.link}`
+      : `${siteUrl}/article/${data.postId}`;
+    const template = await this.resolveTemplate(
+      'comment_notification',
+      {
+        siteName: '风隅随笔',
+        siteUrl,
+        recipientName: data.toName,
+        senderName: data.senderName,
+        sourceType: data.sourceType || '文章',
+        sourceTitle: data.postTitle,
+        content: data.content,
+        contentHtml: this.renderEmailContent(data.content, siteUrl),
+        detailUrl,
+      },
+      `【风隅随笔】${data.senderName} 评论了你的${data.sourceType || '文章'}`,
+      this.getCommentNotificationTemplate({ ...data, siteUrl }),
+    );
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【风隅随笔】${data.senderName} 评论了你的${data.sourceType || '文章'}`,
-      html,
+      subject: template.subject,
+      html: template.html,
       type: 'comment_notification',
       postId: data.postId,
     });
@@ -246,12 +347,29 @@ export class EmailService {
   }): Promise<void> {
     const config = await this.getEmailConfig();
     const siteUrl = data.siteUrl || config.siteUrl;
-    const html = this.getReplyNotificationTemplate({ ...data, siteUrl });
+    const detailUrl = data.link
+      ? `${siteUrl}${data.link}`
+      : `${siteUrl}/article/${data.postId}`;
+    const template = await this.resolveTemplate(
+      'reply_notification',
+      {
+        siteName: '风隅随笔',
+        siteUrl,
+        recipientName: data.toName,
+        senderName: data.senderName,
+        sourceTitle: data.postTitle,
+        content: data.content,
+        contentHtml: this.renderEmailContent(data.content, siteUrl),
+        detailUrl,
+      },
+      `【风隅随笔】${data.senderName} 回复了你的评论`,
+      this.getReplyNotificationTemplate({ ...data, siteUrl }),
+    );
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【风隅随笔】${data.senderName} 回复了你的评论`,
-      html,
+      subject: template.subject,
+      html: template.html,
       type: 'reply_notification',
       postId: data.postId,
     });
@@ -272,15 +390,33 @@ export class EmailService {
     link: string;
   }): Promise<void> {
     const config = await this.getEmailConfig();
-    const html = this.getCommentModerationTemplate({
+    const fallbackHtml = this.getCommentModerationTemplate({
       ...data,
       siteUrl: config.siteUrl,
     });
+    const template = await this.resolveTemplate(
+      'comment_moderation_notification',
+      {
+        siteName: '风隅随笔',
+        siteUrl: config.siteUrl,
+        recipientName: data.toName,
+        authorName: data.authorName,
+        sourceType: data.sourceType,
+        sourceTitle: data.sourceTitle,
+        content: data.content,
+        contentHtml: this.renderEmailContent(data.content, config.siteUrl),
+        approved: data.approved ? '通过' : '未通过',
+        reason: data.reason || '',
+        detailUrl: `${config.siteUrl}${data.link}`,
+      },
+      `【风隅随笔】评论审核${data.approved ? '通过' : '未通过'}：${data.sourceTitle}`,
+      fallbackHtml,
+    );
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【风隅随笔】评论审核${data.approved ? '通过' : '未通过'}：${data.sourceTitle}`,
-      html,
+      subject: template.subject,
+      html: template.html,
       type: 'comment_moderation_notification',
       postId: data.sourceId,
     });
@@ -298,12 +434,24 @@ export class EmailService {
   }): Promise<void> {
     const config = await this.getEmailConfig();
     const siteUrl = data.siteUrl || config.siteUrl;
-    const html = this.getLikeNotificationTemplate({ ...data, siteUrl });
+    const template = await this.resolveTemplate(
+      'like_notification',
+      {
+        siteName: '风隅随笔',
+        siteUrl,
+        recipientName: data.toName,
+        senderName: data.senderName,
+        sourceTitle: data.postTitle,
+        detailUrl: `${siteUrl}/article/${data.postId}`,
+      },
+      `【风隅随笔】${data.senderName} 赞了你的评论`,
+      this.getLikeNotificationTemplate({ ...data, siteUrl }),
+    );
 
     await this.notificationQueue.add('send-notification', {
       to: data.to,
-      subject: `【风隅随笔】${data.senderName} 赞了你的评论`,
-      html,
+      subject: template.subject,
+      html: template.html,
       type: 'like_notification',
       postId: data.postId,
     });
@@ -316,13 +464,18 @@ export class EmailService {
       const config = await this.getEmailConfig();
       const transporter = await this.getTransporter();
 
-      const html = this.getTestEmailTemplate();
+      const template = await this.resolveTemplate(
+        'test',
+        { siteName: '风隅随笔', siteUrl: config.siteUrl },
+        '【风隅随笔】邮件测试',
+        this.getTestEmailTemplate(),
+      );
 
       await transporter.sendMail({
         from: `"${config.fromName}" <${config.fromAddress}>`,
         to,
-        subject: '【风隅随笔】邮件测试',
-        html,
+        subject: template.subject,
+        html: template.html,
       });
 
       this.logger.log(`测试邮件已发送: ${to}`);
@@ -362,6 +515,202 @@ export class EmailService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  private async getStoredTemplates(): Promise<
+    Partial<Record<EmailTemplateKey, StoredEmailTemplate>>
+  > {
+    const value = await this.settings.get('email_templates');
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Partial<Record<EmailTemplateKey, StoredEmailTemplate>>)
+      : {};
+  }
+
+  private async resolveTemplate(
+    key: EmailTemplateKey,
+    variables: Record<string, unknown>,
+    fallbackSubject: string,
+    fallbackHtml: string,
+  ) {
+    const stored = (await this.getStoredTemplates())[key];
+    if (!stored?.custom || !stored.subject?.trim() || !stored.html?.trim()) {
+      return { subject: fallbackSubject, html: fallbackHtml };
+    }
+    return {
+      subject: this.renderTemplateText(stored.subject, variables),
+      html: this.renderTemplateText(stored.html, variables),
+    };
+  }
+
+  private renderTemplateText(
+    template: string,
+    variables: Record<string, unknown>,
+  ) {
+    return String(template)
+      .replace(/\{\{\{\s*([a-zA-Z][\w]*)\s*\}\}\}/g, (_, key) =>
+        String(variables[key] ?? ''),
+      )
+      .replace(/\{\{\s*([a-zA-Z][\w]*)\s*\}\}/g, (_, key) =>
+        this.escapeHtml(String(variables[key] ?? '')),
+      );
+  }
+
+  private templateDefinitions(siteUrl: string) {
+    const sampleBase = { siteName: '风隅随笔', siteUrl };
+    const layout = (title: string, body: string) => `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:24px;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#27303f">
+<main style="max-width:560px;margin:0 auto;padding:32px;background:#fff;border:1px solid #e7eaf0;border-radius:12px">
+<p style="margin:0 0 22px;color:#57708f;font-weight:700">{{siteName}}</p><h1 style="margin:0 0 20px;font-size:22px">${title}</h1>${body}
+<footer style="margin-top:28px;padding-top:18px;border-top:1px solid #edf0f4;color:#8a94a3;font-size:12px">此邮件由 {{siteName}} 自动发送，请勿直接回复。</footer>
+</main></body></html>`;
+    return [
+      {
+        key: 'verification' as const,
+        name: '验证码',
+        description: '注册、登录、修改密码和移除友链时发送。',
+        variables: ['siteName', 'siteUrl', 'type', 'code'],
+        sample: { ...sampleBase, type: '登录', code: 'A8K2Q7' },
+        defaultSubject: '【{{siteName}}】{{type}}验证码',
+        defaultHtml: layout(
+          '{{type}}验证码',
+          '<p style="color:#5f6b7a">您的验证码是：</p><div style="margin:22px 0;padding:18px;border-radius:8px;background:#eef4fb;color:#315b87;font:700 32px/1 monospace;text-align:center;letter-spacing:6px">{{code}}</div><p style="color:#8a94a3;font-size:13px">验证码 5 分钟内有效，请勿向他人泄露。</p>',
+        ),
+      },
+      {
+        key: 'comment_notification' as const,
+        name: '新评论通知',
+        description: '文章或瞬间收到新评论时发送给内容作者。',
+        variables: [
+          'siteName',
+          'siteUrl',
+          'recipientName',
+          'senderName',
+          'sourceType',
+          'sourceTitle',
+          'content',
+          'contentHtml',
+          'detailUrl',
+        ],
+        sample: {
+          ...sampleBase,
+          recipientName: '惠风',
+          senderName: '访客',
+          sourceType: '文章',
+          sourceTitle: '夏日随笔',
+          content: '写得真好。',
+          contentHtml: '写得真好。',
+          detailUrl: `${siteUrl}/article/sample`,
+        },
+        defaultSubject:
+          '【{{siteName}}】{{senderName}} 评论了你的{{sourceType}}',
+        defaultHtml: layout(
+          '收到一条新评论',
+          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 评论了你的{{sourceType}}《{{sourceTitle}}》。</p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #57708f;background:#f7f9fb">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#315b87">查看详情</a>',
+        ),
+      },
+      {
+        key: 'reply_notification' as const,
+        name: '评论回复通知',
+        description: '评论收到回复时发送给原评论作者。',
+        variables: [
+          'siteName',
+          'siteUrl',
+          'recipientName',
+          'senderName',
+          'sourceTitle',
+          'content',
+          'contentHtml',
+          'detailUrl',
+        ],
+        sample: {
+          ...sampleBase,
+          recipientName: '访客',
+          senderName: '惠风',
+          sourceTitle: '夏日随笔',
+          content: '谢谢你的留言。',
+          contentHtml: '谢谢你的留言。',
+          detailUrl: `${siteUrl}/article/sample`,
+        },
+        defaultSubject: '【{{siteName}}】{{senderName}} 回复了你的评论',
+        defaultHtml: layout(
+          '你的评论收到回复',
+          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 回复了你在《{{sourceTitle}}》的评论。</p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #57708f;background:#f7f9fb">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#315b87">查看详情</a>',
+        ),
+      },
+      {
+        key: 'comment_moderation_notification' as const,
+        name: '评论审核结果',
+        description: '管理员审核评论后发送审核结果。',
+        variables: [
+          'siteName',
+          'siteUrl',
+          'recipientName',
+          'authorName',
+          'sourceType',
+          'sourceTitle',
+          'content',
+          'contentHtml',
+          'approved',
+          'reason',
+          'detailUrl',
+        ],
+        sample: {
+          ...sampleBase,
+          recipientName: '访客',
+          authorName: '访客',
+          sourceType: '文章',
+          sourceTitle: '夏日随笔',
+          content: '期待更新。',
+          contentHtml: '期待更新。',
+          approved: '通过',
+          reason: '',
+          detailUrl: `${siteUrl}/article/sample`,
+        },
+        defaultSubject: '【{{siteName}}】评论审核{{approved}}：{{sourceTitle}}',
+        defaultHtml: layout(
+          '评论审核结果：{{approved}}',
+          '<p>Hi <strong>{{recipientName}}</strong>，你在{{sourceType}}《{{sourceTitle}}》下的评论已完成审核。</p><blockquote style="margin:20px 0;padding:14px;background:#f7f9fb">{{{contentHtml}}}</blockquote><p>审核结果：<strong>{{approved}}</strong></p><p>说明：{{reason}}</p><a href="{{detailUrl}}" style="color:#315b87">查看内容</a>',
+        ),
+      },
+      {
+        key: 'like_notification' as const,
+        name: '点赞通知',
+        description: '评论被点赞时发送给评论作者。',
+        variables: [
+          'siteName',
+          'siteUrl',
+          'recipientName',
+          'senderName',
+          'sourceTitle',
+          'detailUrl',
+        ],
+        sample: {
+          ...sampleBase,
+          recipientName: '访客',
+          senderName: '惠风',
+          sourceTitle: '夏日随笔',
+          detailUrl: `${siteUrl}/article/sample`,
+        },
+        defaultSubject: '【{{siteName}}】{{senderName}} 赞了你的评论',
+        defaultHtml: layout(
+          '你的评论收到点赞',
+          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 赞了你在《{{sourceTitle}}》下的评论。</p><a href="{{detailUrl}}" style="color:#315b87">查看详情</a>',
+        ),
+      },
+      {
+        key: 'test' as const,
+        name: '测试邮件',
+        description: '管理员验证 SMTP 配置时发送。',
+        variables: ['siteName', 'siteUrl'],
+        sample: sampleBase,
+        defaultSubject: '【{{siteName}}】邮件测试',
+        defaultHtml: layout(
+          '邮件服务测试成功',
+          '<p>如果你看到这封邮件，说明 SMTP 发信配置可用。</p><a href="{{siteUrl}}" style="color:#315b87">访问站点</a>',
+        ),
+      },
+    ];
   }
 
   private renderEmailContent(text: string, siteUrl: string): string {

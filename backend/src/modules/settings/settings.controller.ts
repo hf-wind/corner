@@ -16,6 +16,13 @@ export class SettingsController {
     return this.settings.findAll();
   }
 
+  @Get('health')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  health() {
+    return this.settings.health();
+  }
+
   @Get(':key')
   async get(@Param('key') key: string) {
     const publicKeys = new Set([

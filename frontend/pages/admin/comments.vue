@@ -1,9 +1,21 @@
 <template>
-  <div>
+  <div class="comment-admin admin-page-shell">
+    <header class="admin-page-head"><div><h1>评论审核</h1><p>统一查看文章与瞬间评论，按状态和内容快速定位。</p></div><a-button :loading="loading" @click="loadComments"><Icon name="ph:arrows-clockwise-bold" /> 刷新</a-button></header>
+    <AdminSectionTabs label="审核中心" :items="reviewTabs" />
     <a-spin :spinning="loading" class="table-spin">
       <a-card :bordered="false" class="list-card" size="small">
-        <div class="comment-filter">
+        <div class="comment-filter table-toolbar">
           <a-segmented v-model:value="source" :options="sourceOptions" @change="resetAndLoad" />
+          <a-select v-model:value="status" style="width: 120px" @change="resetAndLoad">
+            <a-select-option value="">全部状态</a-select-option>
+            <a-select-option value="pending">待审核</a-select-option>
+            <a-select-option value="approved">已发布</a-select-option>
+            <a-select-option value="rejected">已拒绝</a-select-option>
+          </a-select>
+          <a-input v-model:value="keyword" allow-clear placeholder="搜索内容、作者或所属内容" class="comment-search" @press-enter="resetAndLoad">
+            <template #prefix><Icon name="ph:magnifying-glass" /></template>
+          </a-input>
+          <a-button type="primary" @click="resetAndLoad">搜索</a-button>
         </div>
         <a-table :dataSource="comments" :columns="columns" rowKey="id" size="small" :pagination="false" :locale="{ emptyText: '暂无评论' }">
           <template #bodyCell="{ column, record }">
@@ -23,10 +35,11 @@
             </template>
             <template v-if="column.key === 'createdAt'">{{ record.createdAt?.slice(0, 16) || '' }}</template>
             <template v-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
-              <a-button v-if="record.status==='pending'" type="link" size="small" @click="handleApprove(record)">通过</a-button>
-              <a-button v-if="record.status==='pending'" type="link" size="small" @click="openReject(record)">驳回</a-button>
-              <a-button v-if="record.status==='rejected'" type="link" size="small" @click="handleApprove(record)">通过</a-button>
+              <div class="admin-row-actions">
+                <a-button type="link" size="small" @click="openDetail(record)"><Icon name="ph:eye-bold" />详情</a-button>
+                <a-button v-if="record.status==='pending' || record.status==='rejected'" type="link" size="small" @click="handleApprove(record)"><Icon name="ph:check-bold" />通过</a-button>
+                <a-button v-if="record.status==='pending'" type="link" size="small" danger @click="openReject(record)"><Icon name="ph:x-bold" />驳回</a-button>
+              </div>
             </template>
           </template>
         </a-table>
@@ -111,6 +124,10 @@
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const reviewTabs = [
+  { to: '/admin/comments', label: '评论审核', icon: 'ph:chat-circle-dots-bold' },
+  { to: '/admin/friend-applications', label: '友链申请', icon: 'ph:handshake-bold' },
+]
 const toast = useToast()
 const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
@@ -120,6 +137,8 @@ const total = ref(0)
 const totalPages = ref(1)
 const pageSize = 20
 const source = ref<'article' | 'moment'>('article')
+const status = ref('')
+const keyword = ref('')
 const sourceOptions = [{ label: '文章评论', value: 'article' }, { label: '瞬间评论', value: 'moment' }]
 const rejectDialog = reactive({ open: false, comment: null as any, reason: '', customReason: '' })
 const detail = reactive({ open: false, item: null as any })
@@ -147,7 +166,12 @@ async function loadComments() {
   loading.value = true
   try {
     const isMoment = source.value === 'moment'
-    const res = await api.get<any>(isMoment ? '/moment-comments' : '/comments', { page: currentPage.value, limit: pageSize })
+    const res = await api.get<any>(isMoment ? '/moment-comments' : '/comments', {
+      page: currentPage.value,
+      limit: pageSize,
+      status: status.value || undefined,
+      keyword: keyword.value.trim() || undefined,
+    })
     comments.value = (res?.items ?? []).map((item: any) => ({
       ...item,
       sourceLink: isMoment
@@ -168,7 +192,7 @@ async function handleApprove(c: any) {
   try {
     const updated = await api.post<any>(`${source.value === 'moment' ? '/moment-comments' : '/comments'}/${c.id}/approve`)
     Object.assign(c, updated)
-    toast.success('已通过并已通知评论作者')
+    toast.success('评论已通过')
   }
   catch { toast.error('操作失败') }
 }
@@ -195,7 +219,7 @@ async function confirmReject() {
   try {
     const updated = await api.post<any>(`${source.value === 'moment' ? '/moment-comments' : '/comments'}/${rejectDialog.comment.id}/reject`, { reason })
     Object.assign(rejectDialog.comment, updated)
-    toast.success('已驳回并已通知评论作者')
+    toast.success('评论已驳回')
     rejectDialog.open = false; rejectDialog.reason = ''; rejectDialog.customReason = ''
   } catch { toast.error('操作失败') }
 }
@@ -203,7 +227,8 @@ async function confirmReject() {
 
 <style scoped>
 .list-card { border-radius:8px; }
-.comment-filter { margin-bottom:12px; }
+.comment-filter { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.comment-search { width:260px; }
 .table-pagination { display:flex; justify-content:center; padding:16px 0 4px; }
 .comment-author { font-weight:500; font-size:0.82rem; }
 .moderation-content { white-space:pre-wrap; word-break:break-word; }
@@ -233,6 +258,7 @@ async function confirmReject() {
 .detail-actions { display:flex; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
 
 @media (max-width: 640px) {
+  .comment-search { width:100%; }
   .detail-header,
   .detail-row {
     align-items:flex-start;

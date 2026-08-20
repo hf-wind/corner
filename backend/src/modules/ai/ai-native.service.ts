@@ -765,14 +765,14 @@ export class AiNativeService {
     for (const visit of recentVisits) {
       if (!latestVisit.has(visit.visitorIdHash)) latestVisit.set(visit.visitorIdHash, visit);
     }
-    const inputPrice = Math.max(
-      0,
-      Number(process.env.AI_INPUT_PRICE_PER_1M || 0),
-    );
-    const outputPrice = Math.max(
-      0,
-      Number(process.env.AI_OUTPUT_PRICE_PER_1M || 0),
-    );
+    const pricingTier = String(process.env.DEEPSEEK_PRICING_TIER || 'flash').toLowerCase() === 'pro' ? 'pro' : 'flash';
+    const beijingHour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', hour: '2-digit', hour12: false }).format(new Date()));
+    const peak = (beijingHour >= 9 && beijingHour < 12) || (beijingHour >= 14 && beijingHour < 18);
+    const officialPricing = pricingTier === 'pro'
+      ? peak ? { cacheHit: 0.3, cacheMiss: 9, output: 27 } : { cacheHit: 0.15, cacheMiss: 4.5, output: 13.5 }
+      : peak ? { cacheHit: 0.1, cacheMiss: 3, output: 9 } : { cacheHit: 0.05, cacheMiss: 1.5, output: 4.5 };
+    const inputPrice = Math.max(0, Number(process.env.AI_INPUT_PRICE_PER_1M || officialPricing.cacheMiss));
+    const outputPrice = Math.max(0, Number(process.env.AI_OUTPUT_PRICE_PER_1M || officialPricing.output));
     const present = (input = 0, output = 0) => ({
       inputTokens: input,
       outputTokens: output,
@@ -780,6 +780,8 @@ export class AiNativeService {
       estimatedCostUsd: Number(
         ((input * inputPrice + output * outputPrice) / 1_000_000).toFixed(6),
       ),
+      estimatedCostCny: Number(((input * officialPricing.cacheMiss + output * officialPricing.output) / 1_000_000).toFixed(6)),
+      estimatedCostCnyMin: Number(((input * officialPricing.cacheHit + output * officialPricing.output) / 1_000_000).toFixed(6)),
     });
     const byDay = new Map<
       string,
@@ -847,6 +849,14 @@ export class AiNativeService {
         inputPerMillionUsd: inputPrice,
         outputPerMillionUsd: outputPrice,
         estimated: true,
+        currency: 'CNY',
+        source: 'DeepSeek 官方定价',
+        modelTier: pricingTier === 'pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash',
+        period: peak ? 'peak' : 'offPeak',
+        cacheHitPerMillionCny: officialPricing.cacheHit,
+        cacheMissPerMillionCny: officialPricing.cacheMiss,
+        outputPerMillionCny: officialPricing.output,
+        cacheBreakdownAvailable: false,
       },
       totals: {
         calls: totals._count._all,

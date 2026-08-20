@@ -277,20 +277,23 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     const slug = await this.uniqueSlug(data.slug);
     const spacetime = await this.prepareContentSpacetime(dto);
 
-    const created = await this.prisma.post.create({
-      data: {
-        ...data,
-        ...spacetime,
-        slug,
-        authorId,
-        status: 'draft',
-        needsPublish: true,
-        publishedSnapshot: Prisma.DbNull,
-        tags: tagIds?.length
-          ? { create: tagIds.map((tagId) => ({ tagId })) }
-          : undefined,
-      },
-      select: postAdminSelect,
+    const created = await this.prisma.$transaction(async (tx) => {
+      const record = await tx.post.create({
+        data: {
+          ...data,
+          ...spacetime,
+          slug,
+          authorId,
+          status: 'draft',
+          needsPublish: true,
+          publishedSnapshot: Prisma.DbNull,
+          tags: tagIds?.length
+            ? { create: tagIds.map((tagId) => ({ tagId })) }
+            : undefined,
+        },
+        select: postAdminSelect,
+      });
+      return record;
     });
 
     return this.format(created);
@@ -348,7 +351,7 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
         : true;
       const publishedSnapshot = currentSnapshot;
 
-      return tx.post.update({
+      const saved = await tx.post.update({
         where: { id: existing.id },
         data: {
           needsPublish,
@@ -358,13 +361,134 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
         },
         select: postAdminSelect,
       });
+      return saved;
     });
 
     this.memoryGraph?.scheduleRebuild();
     return this.format(updated);
   }
 
-  async publish(slug: string) {
+  async listVersions(slug: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    if (!post) throw new NotFoundException('Post not found');
+
+    const items = await this.prisma.postVersion.findMany({
+      where: { postId: post.id },
+      orderBy: { version: 'desc' },
+      include: { createdBy: { select: { id: true, username: true } } },
+    });
+    return items.map((item) => {
+      const snapshot = this.readSnapshot(item.snapshot);
+      return {
+        id: item.id,
+        version: item.version,
+        source: item.source,
+        createdAt: item.createdAt,
+        createdBy: item.createdBy,
+        title: snapshot?.title || '',
+        excerpt: snapshot?.excerpt || '',
+        contentLength: snapshot?.content?.length || 0,
+      };
+    });
+  }
+
+  async restoreVersion(slug: string, versionId: string, actorId?: string) {
+    const existing = await this.prisma.post.findUnique({
+      where: { slug },
+      select: postAdminSelect,
+    });
+    if (!existing) throw new NotFoundException('Post not found');
+    const version = await this.prisma.postVersion.findFirst({
+      where: { id: versionId, postId: existing.id },
+    });
+    const snapshot = this.readSnapshot(version?.snapshot);
+    if (!version || !snapshot) throw new NotFoundException('Version not found');
+
+    const restoredSlug = await this.uniqueSlug(snapshot.slug, existing.id);
+    const restored = await this.prisma.$transaction(async (tx) => {
+      const [category, place, tags] = await Promise.all([
+        snapshot.category?.id
+          ? tx.category.findUnique({
+              where: { id: snapshot.category.id },
+              select: { id: true },
+            })
+          : null,
+        (snapshot.place as any)?.id
+          ? tx.place.findUnique({
+              where: { id: (snapshot.place as any).id },
+              select: { id: true },
+            })
+          : null,
+        snapshot.tags.length
+          ? tx.tag.findMany({
+              where: { id: { in: snapshot.tags.map((tag) => tag.id) } },
+              select: { id: true },
+            })
+          : [],
+      ]);
+      await tx.postTag.deleteMany({ where: { postId: existing.id } });
+      const record = await tx.post.update({
+        where: { id: existing.id },
+        data: {
+          title: snapshot.title,
+          slug: restoredSlug,
+          content: snapshot.content,
+          excerpt: snapshot.excerpt,
+          coverImage: snapshot.coverImage,
+          featured: snapshot.featured,
+          occurredAt: snapshot.occurredAt
+            ? new Date(snapshot.occurredAt)
+            : null,
+          categoryId: category?.id || null,
+          placeId: place?.id || null,
+          locationVisibility: snapshot.locationVisibility,
+          locationPrecision: snapshot.locationPrecision,
+          locationSource: snapshot.locationSource,
+          locationExactConfirmedAt: snapshot.locationExactConfirmedAt
+            ? new Date(snapshot.locationExactConfirmedAt)
+            : null,
+          needsPublish: true,
+          tags: tags.length
+            ? { create: tags.map((tag) => ({ tagId: tag.id })) }
+            : undefined,
+        },
+        select: postAdminSelect,
+      });
+      return record;
+    });
+
+    this.memoryGraph?.scheduleRebuild();
+    return this.format(restored);
+  }
+
+  private async createVersion(
+    tx: Prisma.TransactionClient,
+    post: any,
+    createdById: string | undefined,
+    source: 'publish',
+  ) {
+    const latest = await tx.postVersion.findFirst({
+      where: { postId: post.id },
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    });
+    await tx.postVersion.create({
+      data: {
+        postId: post.id,
+        version: (latest?.version || 0) + 1,
+        snapshot: this.buildSnapshotFromPost(
+          post,
+        ) as unknown as Prisma.InputJsonValue,
+        source,
+        createdById: createdById || null,
+      },
+    });
+  }
+
+  async publish(slug: string, actorId?: string) {
     const existing = await this.prisma.post.findUnique({
       where: { slug },
       select: postAdminSelect,
@@ -372,16 +496,20 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     if (!existing) throw new NotFoundException('Post not found');
 
     const snapshot = this.buildSnapshotFromPost(existing);
-    const post = await this.prisma.post.update({
-      where: { id: existing.id },
-      data: {
-        status: 'published',
-        needsPublish: false,
-        publishedSnapshot: snapshot,
-        publishedAt: existing.publishedAt ?? new Date(),
-        scheduledAt: null,
-      },
-      select: postAdminSelect,
+    const post = await this.prisma.$transaction(async (tx) => {
+      const record = await tx.post.update({
+        where: { id: existing.id },
+        data: {
+          status: 'published',
+          needsPublish: false,
+          publishedSnapshot: snapshot,
+          publishedAt: existing.publishedAt ?? new Date(),
+          scheduledAt: null,
+        },
+        select: postAdminSelect,
+      });
+      await this.createVersion(tx, record, actorId, 'publish');
+      return record;
     });
 
     this.memoryGraph?.scheduleRebuild();

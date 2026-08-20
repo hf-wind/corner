@@ -1,6 +1,10 @@
 <template>
-  <div class="emoji-admin">
+  <div class="emoji-admin admin-page-shell">
+    <header class="admin-page-head"><div><h1>表情资源</h1><p>管理表情包、Unicode 字符和动态图片资源。</p></div></header>
     <div class="table-toolbar">
+      <a-input v-model:value="packKeyword" allow-clear placeholder="搜索表情包" class="pack-search">
+        <template #prefix><Icon name="ph:magnifying-glass" /></template>
+      </a-input>
       <a-button type="primary" @click="openAddPack">
         <PlusOutlined /> 添加表情包
       </a-button>
@@ -9,7 +13,7 @@
     <a-table
       row-key="id"
       :columns="packColumns"
-      :data-source="packs"
+      :data-source="filteredPacks"
       :loading="loading"
       :pagination="false"
       :expanded-row-keys="expandedPackIds"
@@ -72,6 +76,10 @@
         <div class="items-table-wrap">
           <div class="items-heading">
             <span>{{ pack.name }} / 表情明细</span>
+            <a-input v-model:value="ensureItemState(pack.id).keyword" allow-clear size="small" placeholder="搜索标签、字符或 URL" class="item-search" @press-enter="searchPackItems(pack.id)">
+              <template #prefix><Icon name="ph:magnifying-glass" /></template>
+            </a-input>
+            <a-button size="small" @click="searchPackItems(pack.id)">搜索</a-button>
             <a-button size="small" @click="openAddItem(pack)"
               ><PlusOutlined /> 添加表情</a-button
             >
@@ -241,6 +249,7 @@ type ItemState = {
   total: number;
   loading: boolean;
   loaded: boolean;
+  keyword: string;
 };
 
 const api = useApi();
@@ -249,6 +258,14 @@ const { mediaUrl } = useMediaUrl();
 const loading = ref(true);
 const saving = ref(false);
 const packs = ref<any[]>([]);
+const packKeyword = ref("");
+const filteredPacks = computed(() => {
+  const keyword = packKeyword.value.trim().toLocaleLowerCase();
+  if (!keyword) return packs.value;
+  return packs.value.filter((pack) =>
+    `${pack.name} ${pack.type}`.toLocaleLowerCase().includes(keyword),
+  );
+});
 const expandedPackIds = ref<string[]>([]);
 const itemStates = reactive<Record<string, ItemState>>({});
 const packColumns = [
@@ -296,6 +313,7 @@ function ensureItemState(packId: string) {
     total: 0,
     loading: false,
     loaded: false,
+    keyword: "",
   };
   return itemStates[packId];
 }
@@ -320,6 +338,7 @@ async function loadPackItems(packId: string, page = 1) {
     const data = await api.get<any>(`/emoji-packs/${packId}/items`, {
       page,
       limit: state.pageSize,
+      keyword: state.keyword.trim() || undefined,
     });
     state.items = Array.isArray(data?.items) ? data.items : [];
     state.page = Number(data?.page) || page;
@@ -342,6 +361,12 @@ function onPackExpand(expanded: boolean, pack: any) {
 
 function changeItemPage(pack: any, page: number) {
   void loadPackItems(pack.id, page);
+}
+
+function searchPackItems(packId: string) {
+  const state = ensureItemState(packId);
+  state.loaded = false;
+  void loadPackItems(packId, 1);
 }
 
 function openAddPack() {
@@ -507,8 +532,17 @@ onMounted(loadPacks);
 }
 .table-toolbar {
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
   margin-bottom: 14px;
+}
+.pack-search {
+  width: 240px;
+  margin-right: auto;
+}
+.item-search {
+  width: min(260px, 32vw);
+  margin-left: auto;
 }
 .pack-name {
   color: var(--c-text);
@@ -598,6 +632,14 @@ onMounted(loadPacks);
 @media (max-width: 640px) {
   .items-table-wrap {
     padding-left: 0;
+  }
+  .pack-search,
+  .item-search {
+    width: 100%;
+  }
+  .items-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>

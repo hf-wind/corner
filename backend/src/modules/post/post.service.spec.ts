@@ -139,3 +139,94 @@ describe('PostService article cleanup', () => {
     );
   });
 });
+
+describe('PostService published versions', () => {
+  const publishable = {
+    id: 'post-id',
+    title: 'Draft title',
+    slug: 'draft-title',
+    content: 'draft content',
+    excerpt: null,
+    coverImage: null,
+    authorId: 'author-id',
+    categoryId: null,
+    status: 'draft',
+    viewCount: 0,
+    likeCount: 0,
+    featured: false,
+    needsPublish: true,
+    publishedSnapshot: null,
+    scheduledAt: null,
+    occurredAt: null,
+    placeId: null,
+    locationVisibility: 'private',
+    locationPrecision: 'place',
+    locationSource: null,
+    locationExactConfirmedAt: null,
+    publishedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    author: { id: 'author-id', username: 'admin', avatar: null },
+    category: null,
+    place: null,
+    tags: [],
+    _count: { comments: 0 },
+  };
+
+  it('creates exactly one snapshot when publishing', async () => {
+    const published = {
+      ...publishable,
+      status: 'published',
+      needsPublish: false,
+      publishedAt: new Date(),
+    };
+    const tx = {
+      post: { update: jest.fn().mockResolvedValue(published) },
+      postVersion: {
+        findFirst: jest.fn().mockResolvedValue({ version: 2 }),
+        create: jest.fn().mockResolvedValue({ id: 'version-id' }),
+      },
+    };
+    const prisma = {
+      post: { findUnique: jest.fn().mockResolvedValue(publishable) },
+      $transaction: jest.fn((callback: (client: any) => unknown) =>
+        callback(tx),
+      ),
+    } as any;
+    const service = new PostService(prisma);
+
+    await service.publish('draft-title', 'admin-id');
+
+    expect(tx.postVersion.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        postId: 'post-id',
+        version: 3,
+        source: 'publish',
+        createdById: 'admin-id',
+      }),
+    });
+    expect(tx.postVersion.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create a snapshot when only saving a draft', async () => {
+    const prisma = {
+      post: {
+        findUnique: jest.fn().mockResolvedValue(publishable),
+        update: jest.fn().mockResolvedValue(publishable),
+      },
+      postTag: { deleteMany: jest.fn() },
+      $transaction: jest.fn((callback: (client: any) => unknown) =>
+        callback({
+          post: { update: jest.fn().mockResolvedValue(publishable) },
+          postTag: { deleteMany: jest.fn() },
+        }),
+      ),
+      postVersion: { create: jest.fn() },
+    } as any;
+    const service = new PostService(prisma);
+
+    await service.update('draft-title', { title: 'Saved draft' });
+
+    expect(prisma.postVersion.create).not.toHaveBeenCalled();
+  });
+});

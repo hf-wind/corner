@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for Corner backup and restore requests
+
+[Path]
+PathExistsGlob=/srv/corner/data/backup-control/*.request
+Unit=corner-backup-control.service
+
+[Install]
+WantedBy=multi-user.target

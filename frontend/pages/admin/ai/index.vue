@@ -1,5 +1,6 @@
 <template>
   <div class="ai-admin">
+    <AdminSectionTabs label="AI 中心" :items="aiCenterTabs" />
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="base" tab="基础配置" />
       <a-tab-pane key="content" tab="内容生成" />
@@ -981,6 +982,11 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
+
+const aiCenterTabs = [
+  { to: "/admin/ai", label: "功能与模型", icon: "ph:sliders-horizontal-bold" },
+  { to: "/admin/ai-native", label: "用量与会话", icon: "ph:chart-line-up-bold" },
+];
 
 type AiModelItem = {
   id: string;

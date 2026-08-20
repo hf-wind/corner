@@ -85,11 +85,13 @@ export class EmojiController {
     @Param('id') id: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('keyword') keyword?: string,
   ) {
     return this.emoji.getPackItems(
       id,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 48,
+      keyword,
     );
   }
 

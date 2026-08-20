@@ -1,14 +1,11 @@
 <template>
-  <div class="friends-admin">
-    <a-tabs v-model:activeKey="tab" size="small">
-      <a-tab-pane key="links" tab="友链列表" />
-      <a-tab-pane key="site" tab="本站信息" />
-    </a-tabs>
+  <div class="friends-admin admin-page-shell">
+    <header class="admin-page-head"><div><h1>友链管理</h1><p>维护前台友链展示内容；本站展示资料统一在网站信息中配置。</p></div><a-button type="primary" @click="openAddFriend"><PlusOutlined /> 添加友链</a-button></header>
+    <AdminSectionTabs label="站点设置" :items="settingsTabs" />
 
-    <div v-show="tab === 'links'">
+    <div>
       <div class="table-toolbar">
         <a-space>
-          <a-button type="primary" @click="openAddFriend"><PlusOutlined /> 添加友链</a-button>
           <a-button :loading="loading" @click="loadFriends">刷新</a-button>
         </a-space>
       </div>
@@ -35,37 +32,15 @@
               <span v-else class="muted">-</span>
             </template>
             <template v-else-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="editFriend(index)"><EditOutlined /> 编辑</a-button>
-              <a-button type="link" size="small" danger @click="removeFriend(index, record.name)"><DeleteOutlined /> 删除</a-button>
+              <div class="admin-row-actions">
+                <a-button type="link" size="small" @click="editFriend(index)"><EditOutlined /> 编辑</a-button>
+                <a-button type="link" size="small" danger @click="removeFriend(index, record.name)"><DeleteOutlined /> 删除</a-button>
+              </div>
             </template>
           </template>
         </a-table>
       </a-card>
     </div>
-
-    <a-card v-show="tab === 'site'" :bordered="false" class="list-card site-card" size="small">
-      <a-form layout="vertical" :model="siteForm">
-        <a-form-item label="站点名称" required>
-          <a-input v-model:value="siteForm.name" />
-        </a-form-item>
-        <a-form-item label="站点地址" required>
-          <a-input v-model:value="siteForm.url" placeholder="https://" />
-        </a-form-item>
-        <a-form-item label="站点头像">
-          <a-input v-model:value="siteForm.avatar" placeholder="头像 URL" />
-        </a-form-item>
-        <a-form-item label="站点描述">
-          <a-textarea v-model:value="siteForm.description" :rows="3" />
-        </a-form-item>
-        <a-form-item label="RSS 地址">
-          <a-input v-model:value="siteForm.rssUrl" placeholder="RSS/Atom feed URL" />
-        </a-form-item>
-        <a-form-item label="联系邮箱">
-          <a-input v-model:value="siteForm.contactEmail" type="email" placeholder="用于本站资料展示" />
-        </a-form-item>
-        <a-button type="primary" :loading="siteSaving" @click="saveSiteInfo">保存本站信息</a-button>
-      </a-form>
-    </a-card>
 
     <a-modal v-model:open="dialog.open" :title="dialog.isEdit ? '编辑友链' : '添加友链'" width="520px" @ok="saveFriend" @cancel="dialog.open = false">
       <a-form :model="dialog.form" layout="vertical" size="middle">
@@ -111,12 +86,13 @@ const emptyFriend = (): FriendForm => ({
 
 const api = useApi()
 const toast = useToast()
-const tab = ref('links')
+const settingsTabs = [
+  { to: '/admin/settings', label: '网站与系统设置', icon: 'ph:gear-bold' },
+  { to: '/admin/friends', label: '友链管理', icon: 'ph:handshake-bold' },
+]
 const loading = ref(true)
 const friends = ref<any[]>([])
 const dialog = reactive({ open: false, isEdit: false, editIndex: -1, form: emptyFriend() })
-const siteSaving = ref(false)
-const siteForm = reactive({ name: '', url: '', avatar: '', description: '', rssUrl: '', contactEmail: '1833079849@qq.com' })
 
 const columns = [
   { title: '', key: 'avatar', width: 54 },
@@ -129,7 +105,7 @@ const columns = [
 ]
 
 onMounted(async () => {
-  await Promise.all([loadFriends(), loadSiteInfo()])
+  await loadFriends()
 })
 
 function normalizeFriend(friend: any, index: number) {
@@ -172,39 +148,6 @@ async function persistFriends() {
     key: 'friends',
     value: friends.value.map(serializeFriend),
   })
-}
-
-async function loadSiteInfo() {
-  try {
-    const res = await api.get<any>('/friend-link/my-site')
-    Object.assign(siteForm, {
-      name: res?.name || '',
-      url: res?.url || '',
-      avatar: res?.avatar || '',
-      description: res?.description || '',
-      rssUrl: res?.rssUrl || '',
-      contactEmail: res?.contactEmail || '1833079849@qq.com',
-    })
-  } catch {
-    Object.assign(siteForm, { name: '', url: '', avatar: '', description: '', rssUrl: '', contactEmail: '1833079849@qq.com' })
-  }
-}
-
-async function saveSiteInfo() {
-  if (!siteForm.name?.trim() || !siteForm.url?.trim()) {
-    toast.warning('站点名称和地址不能为空')
-    return
-  }
-  siteSaving.value = true
-  try {
-    const res = await api.put<any>('/friend-link/my-site', { ...siteForm })
-    Object.assign(siteForm, res)
-    toast.success('本站信息已保存')
-  } catch (e: any) {
-    toast.error(e?.message || '保存失败')
-  } finally {
-    siteSaving.value = false
-  }
 }
 
 function openAddFriend() {

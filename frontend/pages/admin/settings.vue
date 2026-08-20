@@ -1,46 +1,42 @@
 <template>
-  <div class="settings-page">
-    <a-tabs v-model:activeKey="tab" size="small">
+  <div class="settings-page admin-page-shell">
+    <header class="admin-page-head"><div><h1>站点设置</h1><p>集中管理站点信息、邮件、上传策略与音乐资源。</p></div><a-button :loading="healthLoading" @click="loadConfigHealth"><Icon name="ph:heartbeat-bold" /> 配置体检</a-button></header>
+    <section class="config-health" :class="{ attention: configHealth.requiredMissing }">
+      <header><div><Icon :name="configHealth.requiredMissing ? 'ph:warning-circle-bold' : 'ph:check-circle-bold'" /><span><strong>{{ configHealth.requiredMissing ? `${configHealth.requiredMissing} 项必要配置缺失` : '必要配置已齐全' }}</strong><small>{{ configHealth.configuredCount }} / {{ configHealth.checks.length }} 项已配置</small></span></div><time v-if="configHealth.checkedAt">{{ String(configHealth.checkedAt).slice(0, 16).replace('T', ' ') }}</time></header>
+      <div class="health-grid"><article v-for="item in configHealth.checks" :key="item.key"><i :class="{ ok: item.configured }"><Icon :name="item.configured ? 'ph:check-bold' : 'ph:x-bold'" /></i><span><strong>{{ item.label }}</strong><small>{{ item.source }}</small></span><a-tag :color="item.configured ? 'green' : item.required ? 'red' : 'default'">{{ item.configured ? '已配置' : item.required ? '必需' : '可选' }}</a-tag></article></div>
+    </section>
+    <a-tabs v-model:activeKey="tab" size="small" @change="handleSettingsTab">
+      <a-tab-pane key="website" tab="网站信息" />
       <a-tab-pane key="basic" tab="基本设置" />
       <a-tab-pane key="email" tab="邮件配置" />
       <a-tab-pane key="music" tab="音乐播放器" />
+      <a-tab-pane key="friends" tab="友链管理" />
     </a-tabs>
+
+    <div v-show="tab === 'website'" class="tab-body">
+      <a-space direction="vertical" :size="16" style="width: 100%">
+        <AdminCard icon="ph:house-bold" title="默认站点信息" desc="前台标题、搜索描述与系统默认站点资料">
+          <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
+            <a-form-item label="标题"><a-input v-model:value="settings.site_title" @blur="saveSetting('site_title')" /></a-form-item>
+            <a-form-item label="公开地址"><a-input v-model:value="settings.site_url" placeholder="https://corner.ink" @blur="saveSetting('site_url')" /></a-form-item>
+            <a-form-item label="描述"><a-textarea v-model:value="settings.site_description" :rows="3" @blur="saveSetting('site_description')" /></a-form-item>
+            <a-form-item label="关键词"><a-input v-model:value="keywordText" placeholder="逗号分隔" @blur="saveKeywords" /></a-form-item>
+          </a-form>
+        </AdminCard>
+        <AdminCard icon="ph:handshake-bold" title="友链展示资料" desc="用于友链页展示、互链申请和本站默认对外资料">
+          <a-alert type="info" show-icon message="站点名称、地址和描述直接共用上方默认站点信息；这里只补充友链展示需要的头像、RSS 和联系邮箱。" />
+          <a-form class="site-profile-form" labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
+            <a-form-item label="站点头像"><a-input v-model:value="siteForm.avatar" placeholder="头像 URL" /></a-form-item>
+            <a-form-item label="RSS 地址"><a-input v-model:value="siteForm.rssUrl" placeholder="https://corner.ink/api/rss.xml" /></a-form-item>
+            <a-form-item label="联系邮箱"><a-input v-model:value="siteForm.contactEmail" type="email" /></a-form-item>
+            <a-form-item :wrapper-col="{ style: { marginLeft: '88px' } }"><a-button type="primary" :loading="siteSaving" @click="saveSiteInfo"><Icon name="ph:floppy-disk-bold" /> 保存展示资料</a-button></a-form-item>
+          </a-form>
+        </AdminCard>
+      </a-space>
+    </div>
 
     <div v-show="tab === 'basic'" class="tab-body">
       <a-space direction="vertical" :size="16" style="width: 100%">
-        <AdminCard
-          icon="ph:house-bold"
-          title="站点信息"
-          desc="站点标题、描述与关键词"
-        >
-          <a-form
-            labelAlign="left"
-            size="middle"
-            :label-col="{ style: { width: '88px' } }"
-          >
-            <a-form-item label="标题">
-              <a-input
-                v-model:value="settings.site_title"
-                @blur="saveSetting('site_title')"
-              />
-            </a-form-item>
-            <a-form-item label="描述">
-              <a-textarea
-                v-model:value="settings.site_description"
-                :rows="3"
-                @blur="saveSetting('site_description')"
-              />
-            </a-form-item>
-            <a-form-item label="关键词">
-              <a-input
-                v-model:value="keywordText"
-                placeholder="逗号分隔"
-                @blur="saveKeywords"
-              />
-            </a-form-item>
-          </a-form>
-        </AdminCard>
-
         <AdminCard
           icon="ph:upload-bold"
           title="上传文件"
@@ -613,9 +609,13 @@ const api = useApi();
 const toast = useToast();
 const { updateSiteSetting } = useSiteSettings();
 const { openItems } = useMediaLibrary();
-const tab = ref("basic");
+const router = useRouter();
+const tab = ref("website");
+const healthLoading = ref(false);
+const configHealth = reactive<any>({ checks: [], configuredCount: 0, requiredMissing: 0, checkedAt: "" });
 const settings = ref({
   site_title: "",
+  site_url: "",
   site_description: "",
   site_keywords: "" as any,
   visitor_bottle_daily_limit: 3,
@@ -623,6 +623,15 @@ const settings = ref({
 });
 const keywordText = ref("");
 const mediaNaming = ref("timestamp");
+const siteSaving = ref(false);
+const siteForm = reactive({
+  name: "",
+  url: "",
+  avatar: "",
+  description: "",
+  rssUrl: "",
+  contactEmail: "1833079849@qq.com",
+});
 
 const emailTesting = ref(false);
 const emailTestTo = ref("");
@@ -722,17 +731,75 @@ const volumePercent = computed({
   },
 });
 
-onMounted(() => {
-  loadSettings();
-  loadMusic();
-  loadEmail();
+onMounted(async () => {
+  loadConfigHealth();
+  await Promise.all([loadSettings(), loadSiteInfo(), loadMusic(), loadEmail()]);
+  settings.value.site_title ||= siteForm.name;
+  settings.value.site_url ||= siteForm.url;
+  settings.value.site_description ||= siteForm.description;
 });
+
+function handleSettingsTab(key: string) {
+  if (key === "friends") void router.push("/admin/friends");
+}
+
+async function loadSiteInfo() {
+  try {
+    const result = await api.get<any>("/friend-link/my-site");
+    Object.assign(siteForm, {
+      name: result?.name || "",
+      url: result?.url || "",
+      avatar: result?.avatar || "",
+      description: result?.description || "",
+      rssUrl: result?.rssUrl || "",
+      contactEmail: result?.contactEmail || "1833079849@qq.com",
+    });
+  } catch {
+    toast.error("本站展示资料加载失败");
+  }
+}
+
+async function saveSiteInfo() {
+  if (!settings.value.site_title.trim() || !settings.value.site_url.trim()) {
+    toast.warning("站点名称和地址不能为空");
+    return;
+  }
+  siteSaving.value = true;
+  try {
+    Object.assign(
+      siteForm,
+      await api.put<any>("/friend-link/my-site", {
+        ...siteForm,
+        name: settings.value.site_title,
+        url: settings.value.site_url,
+        description: settings.value.site_description,
+      }),
+    );
+    toast.success("友链展示资料已保存");
+  } catch (error: any) {
+    toast.error(error?.message || "展示资料保存失败");
+  } finally {
+    siteSaving.value = false;
+  }
+}
+
+async function loadConfigHealth() {
+  healthLoading.value = true;
+  try {
+    Object.assign(configHealth, await api.get<any>("/settings/health"));
+  } catch {
+    configHealth.checks = [];
+  } finally {
+    healthLoading.value = false;
+  }
+}
 
 async function loadSettings() {
   try {
     const res = await api.get<any>("/settings");
     if (res) {
       settings.value.site_title = res.site_title || "";
+      settings.value.site_url = res.site_url || "";
       settings.value.site_description = res.site_description || "";
       const kw = res.site_keywords;
       settings.value.site_keywords = Array.isArray(kw) ? kw : [];
@@ -778,6 +845,7 @@ async function saveEmailSetting(key: string) {
   try {
     await api.put("/email/config", { [key]: (email as any)[key] });
     toast.success("已保存");
+    void loadConfigHealth();
   } catch {
     toast.error("保存失败");
   }
@@ -822,6 +890,7 @@ async function saveMediaNaming() {
       value: mediaNaming.value,
     });
     toast.success("已保存");
+    void loadConfigHealth();
   } catch {
     toast.error("保存失败");
   }
@@ -834,6 +903,7 @@ async function saveSetting(key: string) {
       updateSiteSetting(key, String((settings.value as any)[key] || ""));
     }
     toast.success("已保存");
+    void loadConfigHealth();
   } catch {
     toast.error("保存失败");
   }
@@ -1246,6 +1316,96 @@ async function refreshCache() {
 </script>
 
 <style scoped>
+.settings-page {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+.config-health {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #43a977 34%, var(--border));
+  border-radius: 8px;
+  background: var(--ld-bg-card);
+}
+.config-health.attention {
+  border-color: color-mix(in srgb, #d18a24 42%, var(--border));
+}
+.config-health > header,
+.config-health > header > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.config-health > header {
+  justify-content: space-between;
+  margin-bottom: 11px;
+}
+.config-health > header > div > svg {
+  color: #43a977;
+  font-size: 1.1rem;
+}
+.config-health.attention > header > div > svg {
+  color: #c47d17;
+}
+.config-health header span {
+  display: flex;
+  flex-direction: column;
+}
+.config-health header strong {
+  font-size: .72rem;
+}
+.config-health header small,
+.config-health time {
+  color: var(--c-text-3);
+  font-size: .54rem;
+}
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+.health-grid article {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--c-bg-1);
+}
+.health-grid i {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgb(197 86 86 / 11%);
+  color: #c55656;
+  font-style: normal;
+  place-items: center;
+}
+.health-grid i.ok {
+  background: rgb(67 169 119 / 11%);
+  color: #43a977;
+}
+.health-grid article > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.health-grid article strong {
+  overflow: hidden;
+  font-size: .6rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.health-grid article small {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: .48rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .tab-body {
   animation: tab-fade 0.18s ease;
 }
@@ -1260,9 +1420,16 @@ async function refreshCache() {
   }
 }
 .section-card {
-  border-radius: 18px;
+  border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   box-shadow: 0 14px 34px color-mix(in srgb, var(--ld-shadow) 16%, transparent);
+}
+@media (max-width: 900px) {
+  .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .health-grid { grid-template-columns: 1fr; }
+  .config-health > header { align-items: flex-start; flex-direction: column; }
 }
 .hint {
   font-size: 0.72rem;

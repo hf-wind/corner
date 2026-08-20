@@ -24,6 +24,17 @@ export class MomentCommentService {
     private aiService: AiService,
   ) {}
 
+  private async shouldNotifyRegularUser(userId?: string | null) {
+    if (!userId) return false;
+    const findUnique = (this.prisma.user as any)?.findUnique;
+    if (typeof findUnique !== 'function') return true;
+    const user = await findUnique.call(this.prisma.user, {
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role !== 'admin';
+  }
+
   async findByMoment(
     momentId: string,
     currentUserId?: string,
@@ -192,11 +203,26 @@ export class MomentCommentService {
     };
   }
 
-  async findAll(query: { page?: number; limit?: number; status?: string }) {
+  async findAll(query: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    keyword?: string;
+  }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where: any = {};
     if (query.status) where.status = query.status;
+    if (query.keyword?.trim()) {
+      const keyword = query.keyword.trim();
+      where.OR = [
+        { content: { contains: keyword, mode: 'insensitive' } },
+        { authorName: { contains: keyword, mode: 'insensitive' } },
+        { user: { username: { contains: keyword, mode: 'insensitive' } } },
+        { user: { email: { contains: keyword, mode: 'insensitive' } } },
+        { moment: { title: { contains: keyword, mode: 'insensitive' } } },
+      ];
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.momentComment.findMany({
@@ -281,6 +307,7 @@ export class MomentCommentService {
     currentUserId: string,
     userName: string,
   ) {
+    const notifyAuthor = await this.shouldNotifyRegularUser(comment.userId);
     let approved = true;
     let reason = 'AI 审核异常，自动通过';
     const nonsenseReason = checkContentNonsense(comment.content);
@@ -301,7 +328,7 @@ export class MomentCommentService {
         false,
         nonsenseReason,
       );
-      if (comment.userId) {
+      if (notifyAuthor) {
         await this.notificationService.create(comment.userId, {
           type: 'system',
           title: '瞬间评论未通过',
@@ -357,7 +384,7 @@ export class MomentCommentService {
         currentUserId,
         adminEmails,
       );
-      if (comment.userId) {
+      if (notifyAuthor) {
         await this.notificationService.create(comment.userId, {
           type: 'system',
           title: '瞬间评论已通过',
@@ -365,7 +392,7 @@ export class MomentCommentService {
           link: `/moments?focus=${encodeURIComponent(moment.slug || moment.id)}&reviewComment=${comment.id}&review=approved`,
         });
       }
-    } else if (comment.userId) {
+    } else if (notifyAuthor) {
       await this.notificationService.create(comment.userId, {
         type: 'system',
         title: '瞬间评论未通过',
@@ -390,6 +417,7 @@ export class MomentCommentService {
       });
       await Promise.allSettled(
         admins.map(async (admin) => {
+          if (admin.id === comment.userId) return;
           if (!approved) {
             await this.notificationService
               .create(admin.id, {
@@ -405,7 +433,6 @@ export class MomentCommentService {
                 );
               });
           }
-          if (admin.id === comment.userId) return;
           if (!admin.email) return;
           adminEmails.add(admin.email.toLowerCase());
           await this.emailService.sendCommentModerationNotification({
@@ -565,8 +592,11 @@ export class MomentCommentService {
       },
     });
 
-    if (existing.status !== 'approved' && existing.userId) {
-      await this.notificationService.create(existing.userId, {
+    if (
+      existing.status !== 'approved' &&
+      (await this.shouldNotifyRegularUser(existing.userId))
+    ) {
+      await this.notificationService.create(existing.userId!, {
         type: 'system',
         title: '瞬间评论已通过',
         content: `瞬间：「${existing.moment.title}」\n你的评论：${contentPreview(existing.content)}\n审核结果：已通过并展示`,
@@ -594,8 +624,11 @@ export class MomentCommentService {
       },
     });
 
-    if (existing.status !== 'rejected' && existing.userId) {
-      await this.notificationService.create(existing.userId, {
+    if (
+      existing.status !== 'rejected' &&
+      (await this.shouldNotifyRegularUser(existing.userId))
+    ) {
+      await this.notificationService.create(existing.userId!, {
         type: 'system',
         title: '瞬间评论未通过',
         content: `瞬间：「${existing.moment.title}」\n你的评论：${contentPreview(existing.content)}\n审核结果：未通过${reason ? `\n原因：${reason}` : ''}`,

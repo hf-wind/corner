@@ -26,18 +26,30 @@ export class EmojiService {
     return packs;
   }
 
-  async getPackItems(id: string, page = 1, limit = 48) {
+  async getPackItems(id: string, page = 1, limit = 48, keyword?: string) {
     await this.getPack(id);
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
+    const where = {
+      packId: id,
+      ...(keyword?.trim()
+        ? {
+            OR: [
+              { label: { contains: keyword.trim(), mode: 'insensitive' as const } },
+              { char: { contains: keyword.trim(), mode: 'insensitive' as const } },
+              { imageUrl: { contains: keyword.trim(), mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
     const [items, total] = await Promise.all([
       this.prisma.emojiItem.findMany({
-        where: { packId: id },
+        where,
         orderBy: [{ sort: 'asc' }, { id: 'asc' }],
         skip: (safePage - 1) * safeLimit,
         take: safeLimit,
       }),
-      this.prisma.emojiItem.count({ where: { packId: id } }),
+      this.prisma.emojiItem.count({ where }),
     ]);
     return {
       items: items.map((item) => this.presentItem(item)),

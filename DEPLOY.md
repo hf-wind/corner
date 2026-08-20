@@ -37,7 +37,8 @@ Internet -> Caddy :80/:443 -> frontend :3000
 /srv/corner/
 ├── app/       # Git 工作区，可随时重新克隆
 ├── data/      # PostgreSQL、Redis、上传文件和 Caddy 状态
-└── backups/   # 数据库、上传文件、环境配置的时间点备份
+│   └── backup-control/ # 后台与宿主机 systemd 间的受控请求目录
+└── backups/   # 完整迁移归档、清单与校验和
 ```
 
 迁移服务器时只需迁移 `/srv/corner/backups` 中的最新完整备份，并重新克隆仓库。应用代码与持久数据不混放。
@@ -53,6 +54,8 @@ Internet -> Caddy :80/:443 -> frontend :3000
 - `ACME_EMAIL`
 - `DATA_ROOT=/srv/corner/data`
 - `BACKUP_ROOT=/srv/corner/backups`
+- `BACKUP_ENCRYPTION_KEY`：至少 32 位，只用于加密敏感资产包
+- `BACKUP_RECOVERY_TOKEN`：至少 32 位，后台恢复的独立二次口令
 
 DeepSeek 可使用 `DEEPSEEK_API_KEY` 或兼容变量 `AI_API_KEY`。`.env` 包含密钥，权限必须为 `600`，不得提交 Git。
 
@@ -82,22 +85,24 @@ cd /srv/corner/app
 ./scripts/backup.sh
 ```
 
-备份目录包括：
+每个恢复点包含 `corner-backup-<时间>.tar.zst`、`manifest.json`、`SHA256SUMS` 和报告。归档内部包括：
 
-- `database.dump`：PostgreSQL 自定义格式备份
-- `uploads.tar.gz`：上传文件
-- `environment.env`：生产环境配置，包含密钥
-- `git-commit.txt`：备份对应的代码提交
-- `SHA256SUMS`：完整性校验
+- `database/blog.dump`：PostgreSQL 自定义格式备份
+- `uploads/uploads.tar.zst`：上传和媒体文件
+- `config/`：Caddy、Docker Compose、systemd、cron 与运行环境清单
+- `project/corner-source.bundle`：包含全部 refs 的 Git Bundle
+- `secrets/secrets.tar.enc`：AES-256-CBC + PBKDF2 加密的生产/开发 `.env`、SSH 目录和 Caddy TLS 状态
+
+敏感资产不会以明文进入邮件附件。完整归档不超过 `BACKUP_EMAIL_MAX_MB`（默认 20MB，低于 Gmail 25MB 附件上限）时发送到 `BACKUP_ARCHIVE_EMAIL_TO`，结果报告固定发送到 `BACKUP_NOTIFICATION_EMAIL_TO`。超过阈值时不会尝试发送必然被拒收的大附件，后台会明确记录“仅报告”。
 
 建议通过系统定时器或 cron 每日执行，并将 `/srv/corner/backups` 再同步到对象存储或另一台机器。只保存在同一块系统盘不构成灾备。
 
 仓库已提供每日备份的 systemd timer：
 
 ```bash
-sudo cp deploy/systemd/corner-backup.* /etc/systemd/system/
+sudo cp deploy/systemd/corner-backup.* deploy/systemd/corner-backup-control.* /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now corner-backup.timer
+sudo systemctl enable --now corner-backup.timer corner-backup-control.path
 systemctl list-timers corner-backup.timer
 ```
 
@@ -105,12 +110,10 @@ systemctl list-timers corner-backup.timer
 
 ```bash
 cd /srv/corner/app
-cp /path/to/backup/environment.env .env
-chmod 600 .env
 CONFIRM_RESTORE=corner ./scripts/restore.sh /path/to/backup
 ```
 
-恢复脚本会替换当前数据库。现有上传目录不会直接删除，而会改名为 `uploads.pre-restore-<时间>` 以便回退。
+恢复脚本会先创建完整安全备份，再替换数据库和上传文件。现有上传目录会改名为 `uploads.pre-restore-<时间>`。后台恢复额外要求管理员权限、独立恢复口令和精确确认文本，且不会覆盖 SSH、证书或系统服务。迁移新服务器时，使用单独保管的 `BACKUP_ENCRYPTION_KEY` 解密 `secrets.tar.enc`，人工检查目标路径后再恢复系统级资产。
 
 ## CI/CD
 

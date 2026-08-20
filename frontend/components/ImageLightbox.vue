@@ -1,733 +1,156 @@
 <template>
   <Teleport to="body">
-    <Transition name="lightbox-fade">
-      <div
-        v-if="modelValue"
-        ref="dialogRef"
-        class="image-lightbox"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="dialogLabel"
-        tabindex="-1"
-        @click.self="closeFromBackdrop"
-      >
-        <header class="lightbox-toolbar" @click.stop>
-          <span class="lightbox-count">
-            <strong>{{ paddedIndex }}</strong
-            ><i>/</i>{{ paddedTotal }}
-          </span>
-          <div class="lightbox-tools">
-            <button
-              type="button"
-              title="缩小"
-              aria-label="缩小图片"
-              :disabled="scale <= minScale"
-              @click="zoomBy(-0.25)"
-            >
-              <Icon name="ph:magnifying-glass-minus-bold" />
-            </button>
-            <span>{{ Math.round(scale * 100) }}%</span>
-            <button
-              type="button"
-              title="放大"
-              aria-label="放大图片"
-              :disabled="scale >= maxScale"
-              @click="zoomBy(0.25)"
-            >
-              <Icon name="ph:magnifying-glass-plus-bold" />
-            </button>
-            <button
-              type="button"
-              title="向左旋转"
-              aria-label="向左旋转图片"
-              @click="rotate(-90)"
-            >
-              <Icon name="ph:arrow-counter-clockwise-bold" />
-            </button>
-            <button
-              type="button"
-              title="重置"
-              aria-label="重置图片"
-              @click="resetTransform"
-            >
-              <Icon name="ph:arrows-in-simple-bold" />
-            </button>
-            <slot name="toolbar" :image="activeImage" :index="safeIndex" />
-            <button
-              ref="closeRef"
-              type="button"
-              class="lightbox-close"
-              title="关闭"
-              aria-label="关闭图片预览"
-              @click="close"
-            >
-              <Icon name="ph:x-bold" />
-            </button>
-          </div>
-        </header>
-
-        <button
-          v-if="canNavigate"
-          type="button"
-          class="lightbox-nav lightbox-prev"
-          title="上一张"
-          aria-label="上一张图片"
-          @click.stop="previous"
-        >
-          <Icon name="ph:caret-left-bold" />
-        </button>
-        <button
-          v-if="canNavigate"
-          type="button"
-          class="lightbox-nav lightbox-next"
-          title="下一张"
-          aria-label="下一张图片"
-          @click.stop="next"
-        >
-          <Icon name="ph:caret-right-bold" />
-        </button>
-
-        <div
-          class="lightbox-stage"
-          :class="{ panning: scale > 1, dragging, loading, failed }"
-          @click.self="closeFromBackdrop"
-          @dblclick.stop="toggleZoom"
-          @wheel.prevent="onWheel"
-          @pointerdown="onPointerDown"
-          @pointermove="onPointerMove"
-          @pointerup="onPointerUp"
-          @pointercancel="onPointerCancel"
-        >
-          <Transition :name="slideTransition">
-            <div
-              v-if="activeImage"
-              :key="activeImage.id ?? activeImage.src"
-              class="lightbox-slide"
-            >
-              <div class="lightbox-canvas" :style="canvasStyle">
-                <img
-                  :src="activeImage.src"
-                  :alt="activeImage.alt"
-                  draggable="false"
-                  @load="onImageLoad"
-                  @error="onImageError"
-                />
-              </div>
-            </div>
-          </Transition>
-          <div v-if="loadingVisible" class="lightbox-state">
-            <Icon name="ph:spinner-gap-bold" class="spinning" /><span
-              >正在加载</span
-            >
-          </div>
-          <div v-else-if="failed" class="lightbox-state">
-            <Icon name="ph:image-broken-bold" /><span>图片加载失败</span>
+    <Transition name="viewer-fade">
+      <div v-if="modelValue" ref="dialogRef" class="media-viewer" role="dialog" aria-modal="true" :aria-label="dialogLabel" tabindex="-1" @click.self="closeFromBackdrop">
+        <div class="viewer-chrome viewer-top" @click.stop>
+          <span class="viewer-count"><b>{{ paddedIndex }}</b><i>/</i>{{ paddedTotal }}</span>
+          <div class="viewer-tools">
+            <template v-if="activeItem?.type === 'image'">
+              <button type="button" title="缩小" :disabled="scale <= minScale" @click="zoomBy(-.25)"><Icon name="ph:magnifying-glass-minus-bold" /></button>
+              <span>{{ Math.round(scale * 100) }}%</span>
+              <button type="button" title="放大" :disabled="scale >= maxScale" @click="zoomBy(.25)"><Icon name="ph:magnifying-glass-plus-bold" /></button>
+              <button type="button" title="重置" @click="resetTransform"><Icon name="ph:arrows-in-simple-bold" /></button>
+            </template>
+            <slot name="toolbar" :image="activeItem" :index="safeIndex" />
+            <button ref="closeRef" type="button" class="viewer-close" title="关闭" @click="close"><Icon name="ph:x-bold" /></button>
           </div>
         </div>
 
-        <footer class="lightbox-footer" @click.stop>
-          <div v-if="activeImage?.caption" class="lightbox-caption">
-            <slot name="caption" :image="activeImage" :index="safeIndex">{{
-              activeImage.caption
-            }}</slot>
+        <Swiper
+          class="viewer-swiper"
+          :modules="swiperModules"
+          :initial-slide="safeIndex"
+          :loop="loop && normalizedItems.length > 1"
+          :keyboard="{ enabled: true }"
+          :a11y="a11yOptions"
+          :resistance-ratio=".72"
+          :speed="420"
+          grab-cursor
+          @swiper="onSwiper"
+          @slide-change="onSlideChange"
+          @click="onStageClick"
+        >
+          <SwiperSlide v-for="item in normalizedItems" :key="item.id ?? item.src" class="viewer-slide" :class="{ 'is-long': longImages.has(item.src) }">
+            <div v-if="item.type === 'image'" class="viewer-image-wrap" :style="item.src === activeItem?.src ? imageStyle : undefined" @wheel.prevent="onWheel">
+              <img :src="item.src" :alt="item.alt" draggable="false" @load="onImageLoad($event, item.src)" @error="failedSources.add(item.src)" />
+              <div v-if="failedSources.has(item.src)" class="viewer-state"><Icon name="ph:image-broken-bold" /><span>图片加载失败</span></div>
+            </div>
+            <video v-else-if="item.type === 'video'" class="viewer-video" :src="item.src" :poster="item.poster" controls playsinline preload="metadata" @click.stop />
+            <div v-else-if="item.type === 'audio'" class="viewer-audio" @click.stop>
+              <span><Icon name="ph:waveform-bold" /></span><strong>{{ item.name || item.caption || '音频文件' }}</strong><audio :src="item.src" controls preload="metadata" />
+            </div>
+            <div v-else class="viewer-document" @click.stop>
+              <span><Icon name="ph:file-text-bold" /></span><strong>{{ item.name || item.caption || '文档文件' }}</strong><a :href="item.src" target="_blank" rel="noopener"><Icon name="ph:arrow-square-out-bold" />打开文件</a>
+            </div>
+          </SwiperSlide>
+        </Swiper>
+
+        <button v-if="canNavigate" type="button" class="viewer-nav viewer-prev" title="上一项" @click.stop="previous"><Icon name="ph:caret-left-bold" /></button>
+        <button v-if="canNavigate" type="button" class="viewer-nav viewer-next" title="下一项" @click.stop="next"><Icon name="ph:caret-right-bold" /></button>
+
+        <div class="viewer-chrome viewer-bottom" @click.stop>
+          <p v-if="activeItem?.caption">{{ activeItem.caption }}</p>
+          <div v-if="canNavigate" class="viewer-pagination">
+            <button v-for="(_, index) in normalizedItems" :key="index" type="button" :class="{ active: index === safeIndex }" :aria-label="`查看第 ${index + 1} 项`" @click="select(index)" />
           </div>
-          <div
-            v-if="canNavigate"
-            class="lightbox-progress"
-            role="progressbar"
-            :aria-valuenow="safeIndex + 1"
-            aria-valuemin="1"
-            :aria-valuemax="normalizedImages.length"
-          >
-            <i :style="{ width: progressWidth }" />
-          </div>
-        </footer>
+        </div>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-export type ImagePreviewItem = {
-  src: string;
-  alt?: string;
-  caption?: string;
-  id?: string | number;
-};
+import { Swiper, SwiperSlide } from 'swiper/vue'
+import { A11y, Keyboard } from 'swiper/modules'
+import type { Swiper as SwiperInstance } from 'swiper'
+import 'swiper/css'
 
-const props = withDefaults(
-  defineProps<{
-    modelValue: boolean;
-    images: Array<string | ImagePreviewItem>;
-    index?: number;
-    loop?: boolean;
-    minScale?: number;
-    maxScale?: number;
-    closeOnBackdrop?: boolean;
-    label?: string;
-  }>(),
-  {
-    index: 0,
-    loop: true,
-    minScale: 0.5,
-    maxScale: 4,
-    closeOnBackdrop: true,
-    label: "图片预览",
-  },
-);
+export type MediaPreviewItem = {
+  src: string
+  alt?: string
+  caption?: string
+  id?: string | number
+  type?: 'image' | 'video' | 'audio' | 'document'
+  mimeType?: string
+  poster?: string
+  name?: string
+}
+export type ImagePreviewItem = MediaPreviewItem
 
-const emit = defineEmits<{
-  "update:modelValue": [open: boolean];
-  "update:index": [index: number];
-  change: [index: number];
-  close: [];
-}>();
+const props = withDefaults(defineProps<{
+  modelValue: boolean
+  images: Array<string | MediaPreviewItem>
+  index?: number
+  loop?: boolean
+  minScale?: number
+  maxScale?: number
+  closeOnBackdrop?: boolean
+  label?: string
+}>(), { index: 0, loop: true, minScale: .5, maxScale: 4, closeOnBackdrop: true, label: '媒体预览' })
 
-const { mediaUrl } = useMediaUrl();
-const dialogRef = ref<HTMLElement | null>(null);
-const closeRef = ref<HTMLButtonElement | null>(null);
-const scale = ref(1);
-const rotation = ref(0);
-const translateX = ref(0);
-const translateY = ref(0);
-const swipeOffset = ref(0);
-const dragging = ref(false);
-const loading = ref(true);
-const loadingVisible = ref(false);
-const failed = ref(false);
-const transitionDirection = ref<"next" | "prev">("next");
-const pointers = new Map<number, { x: number; y: number }>();
-let gestureStart = { x: 0, y: 0, time: 0, translateX: 0, translateY: 0 };
-let pinchStartDistance = 0;
-let pinchStartScale = 1;
-let gestureWasPinch = false;
-let gesturePointerType = "";
-let previousFocus: HTMLElement | null = null;
-let loadingTimer = 0;
+const emit = defineEmits<{ 'update:modelValue': [open:boolean]; 'update:index':[index:number]; change:[index:number]; close:[] }>()
+const { mediaUrl } = useMediaUrl()
+const dialogRef = ref<HTMLElement|null>(null)
+const closeRef = ref<HTMLButtonElement|null>(null)
+const swiperRef = shallowRef<SwiperInstance|null>(null)
+const scale = ref(1)
+const longImages = reactive(new Set<string>())
+const failedSources = reactive(new Set<string>())
+const swiperModules = [A11y, Keyboard]
+const a11yOptions = { enabled:true, prevSlideMessage:'上一项', nextSlideMessage:'下一项', slideLabelMessage:'第 {{index}} 项，共 {{slidesLength}} 项' }
+let previousFocus: HTMLElement|null = null
 
-const normalizedImages = computed<ImagePreviewItem[]>(() =>
-  props.images
-    .map((item, index) =>
-      typeof item === "string"
-        ? { src: mediaUrl(item), alt: `${props.label} ${index + 1}` }
-        : {
-            ...item,
-            src: mediaUrl(item.src),
-            alt: item.alt || `${props.label} ${index + 1}`,
-          },
-    )
-    .filter((item) => Boolean(item.src)),
-);
-const safeIndex = computed(() =>
-  Math.min(
-    Math.max(0, props.index),
-    Math.max(0, normalizedImages.value.length - 1),
-  ),
-);
-const activeImage = computed(() => normalizedImages.value[safeIndex.value]);
-const canNavigate = computed(() => normalizedImages.value.length > 1);
-const paddedIndex = computed(() =>
-  String(safeIndex.value + 1).padStart(2, "0"),
-);
-const paddedTotal = computed(() =>
-  String(normalizedImages.value.length).padStart(2, "0"),
-);
-const progressWidth = computed(
-  () => `${((safeIndex.value + 1) / normalizedImages.value.length) * 100}%`,
-);
-const dialogLabel = computed(
-  () =>
-    `${props.label}，第 ${safeIndex.value + 1} 张，共 ${normalizedImages.value.length} 张`,
-);
-const slideTransition = computed(
-  () => `lightbox-slide-${transitionDirection.value}`,
-);
-const canvasStyle = computed(() => ({
-  transform: `translate3d(${scale.value > 1 ? translateX.value : swipeOffset.value}px, ${translateY.value}px, 0) scale(${scale.value}) rotate(${rotation.value}deg)`,
-}));
+function inferType(item: MediaPreviewItem) {
+  if (item.type) return item.type
+  const value = `${item.mimeType || ''} ${item.src}`.toLowerCase()
+  if (/video\/|\.(mp4|webm|mov|m4v)(\?|$)/.test(value)) return 'video'
+  if (/audio\/|\.(mp3|flac|wav|ogg|m4a|aac)(\?|$)/.test(value)) return 'audio'
+  if (/image\/|\.(avif|gif|jpe?g|png|svg|webp)(\?|$)/.test(value)) return 'image'
+  return 'document'
+}
+const normalizedItems = computed<MediaPreviewItem[]>(() => props.images.map((raw,index) => {
+  const item = typeof raw === 'string' ? { src:raw } : raw
+  return { ...item, src:mediaUrl(item.src), poster:item.poster ? mediaUrl(item.poster) : undefined, alt:item.alt || `${props.label} ${index+1}`, type:inferType(item) }
+}).filter(item => Boolean(item.src)))
+const safeIndex = computed(() => Math.min(Math.max(0,props.index),Math.max(0,normalizedItems.value.length-1)))
+const activeItem = computed(() => normalizedItems.value[safeIndex.value])
+const canNavigate = computed(() => normalizedItems.value.length > 1)
+const paddedIndex = computed(() => String(safeIndex.value+1).padStart(2,'0'))
+const paddedTotal = computed(() => String(normalizedItems.value.length).padStart(2,'0'))
+const dialogLabel = computed(() => `${props.label}，第 ${safeIndex.value+1} 项，共 ${normalizedItems.value.length} 项`)
+const imageStyle = computed(() => ({ transform:`scale(${scale.value})` }))
 
-watch(
-  () => props.modelValue,
-  (open) => {
-    if (!import.meta.client) return;
-    document.body.classList.toggle("image-lightbox-open", open);
-    if (open) {
-      previousFocus = document.activeElement as HTMLElement | null;
-      resetTransform();
-      preloadNeighbors();
-      nextTick(() => (closeRef.value || dialogRef.value)?.focus());
-    } else {
-      previousFocus?.focus?.();
-      previousFocus = null;
-    }
-  },
-  { immediate: true },
-);
-watch(activeImage, () => {
-  loading.value = true;
-  scheduleLoadingIndicator();
-  failed.value = false;
-  resetTransform();
-  preloadNeighbors();
-});
+watch(() => props.modelValue, open => {
+  if (!import.meta.client) return
+  document.body.classList.toggle('image-lightbox-open',open)
+  if (open) { previousFocus=document.activeElement as HTMLElement|null; resetTransform(); nextTick(() => closeRef.value?.focus()) }
+  else { previousFocus?.focus?.(); previousFocus=null }
+}, { immediate:true })
+watch(() => props.index, index => { if (swiperRef.value && swiperRef.value.realIndex !== index) swiperRef.value.slideToLoop(index) })
+watch(activeItem, () => resetTransform())
 
-function scheduleLoadingIndicator() {
-  window.clearTimeout(loadingTimer);
-  loadingVisible.value = false;
-  loadingTimer = window.setTimeout(() => {
-    loadingVisible.value = loading.value;
-  }, 180);
-}
-
-function preloadNeighbors() {
-  if (!import.meta.client || normalizedImages.value.length < 2) return;
-  const count = normalizedImages.value.length;
-  for (const index of [safeIndex.value - 1, safeIndex.value + 1]) {
-    const source = normalizedImages.value[(index + count) % count]?.src;
-    if (source) new Image().src = source;
-  }
-}
-
-function clampScale(value: number) {
-  return Math.min(props.maxScale, Math.max(props.minScale, value));
-}
-function zoomBy(delta: number) {
-  scale.value = clampScale(Number((scale.value + delta).toFixed(2)));
-  if (scale.value <= 1) translateX.value = translateY.value = 0;
-}
-function toggleZoom() {
-  scale.value = scale.value > 1 ? 1 : Math.min(2, props.maxScale);
-  if (scale.value === 1) translateX.value = translateY.value = 0;
-}
-function rotate(degrees: number) {
-  rotation.value = (rotation.value + degrees) % 360;
-}
-function resetTransform() {
-  scale.value = 1;
-  rotation.value = translateX.value = translateY.value = swipeOffset.value = 0;
-  dragging.value = false;
-  pointers.clear();
-}
-function select(index: number, direction?: "next" | "prev") {
-  const count = normalizedImages.value.length;
-  if (!count) return;
-  const nextIndex = props.loop
-    ? (index + count) % count
-    : Math.min(count - 1, Math.max(0, index));
-  if (nextIndex === safeIndex.value) {
-    swipeOffset.value = 0;
-    return;
-  }
-  transitionDirection.value =
-    direction || (nextIndex > safeIndex.value ? "next" : "prev");
-  emit("update:index", nextIndex);
-  emit("change", nextIndex);
-}
-function previous() {
-  select(safeIndex.value - 1, "prev");
-}
-function next() {
-  select(safeIndex.value + 1, "next");
-}
-function close() {
-  emit("update:modelValue", false);
-  emit("close");
-}
-function closeFromBackdrop() {
-  if (props.closeOnBackdrop) close();
-}
-function onWheel(event: WheelEvent) {
-  zoomBy(event.deltaY < 0 ? 0.2 : -0.2);
-}
-function pointerDistance() {
-  const [first, second] = Array.from(pointers.values());
-  return first && second
-    ? Math.hypot(second.x - first.x, second.y - first.y)
-    : 0;
-}
-function onPointerDown(event: PointerEvent) {
-  if (event.pointerType === "mouse" && scale.value <= 1) return;
-  (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (pointers.size === 1) {
-    gestureStart = {
-      x: event.clientX,
-      y: event.clientY,
-      time: performance.now(),
-      translateX: translateX.value,
-      translateY: translateY.value,
-    };
-    gestureWasPinch = false;
-    gesturePointerType = event.pointerType;
-    dragging.value = true;
-  } else if (pointers.size === 2) {
-    pinchStartDistance = pointerDistance();
-    pinchStartScale = scale.value;
-    gestureWasPinch = true;
-  }
-}
-function onPointerMove(event: PointerEvent) {
-  if (!pointers.has(event.pointerId)) return;
-  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (pointers.size === 2 && pinchStartDistance > 0) {
-    scale.value = clampScale(
-      pinchStartScale * (pointerDistance() / pinchStartDistance),
-    );
-  } else if (pointers.size === 1 && scale.value > 1) {
-    translateX.value = gestureStart.translateX + event.clientX - gestureStart.x;
-    translateY.value = gestureStart.translateY + event.clientY - gestureStart.y;
-  } else if (
-    pointers.size === 1 &&
-    gesturePointerType !== "mouse" &&
-    canNavigate.value
-  ) {
-    swipeOffset.value = event.clientX - gestureStart.x;
-  }
-}
-function finishPointer(event: PointerEvent, cancelled = false) {
-  if (!pointers.has(event.pointerId)) return;
-  const deltaX = event.clientX - gestureStart.x;
-  const velocity =
-    Math.abs(deltaX) / Math.max(1, performance.now() - gestureStart.time);
-  pointers.delete(event.pointerId);
-  if (pointers.size) return;
-  dragging.value = false;
-  if (
-    !cancelled &&
-    !gestureWasPinch &&
-    gesturePointerType !== "mouse" &&
-    scale.value <= 1 &&
-    canNavigate.value &&
-    (Math.abs(deltaX) > Math.min(72, window.innerWidth * 0.17) ||
-      (Math.abs(deltaX) > 28 && velocity > 0.45))
-  ) {
-    deltaX > 0 ? previous() : next();
-  } else {
-    swipeOffset.value = 0;
-  }
-}
-function onPointerUp(event: PointerEvent) {
-  finishPointer(event);
-}
-function onPointerCancel(event: PointerEvent) {
-  finishPointer(event, true);
-}
-function onImageLoad() {
-  window.clearTimeout(loadingTimer);
-  loading.value = false;
-  loadingVisible.value = false;
-  failed.value = false;
-}
-function onImageError() {
-  window.clearTimeout(loadingTimer);
-  loading.value = false;
-  loadingVisible.value = false;
-  failed.value = true;
-}
-function onKeydown(event: KeyboardEvent) {
-  if (!props.modelValue) return;
-  if (event.key === "Escape") close();
-  else if (event.key === "ArrowLeft" && canNavigate.value) previous();
-  else if (event.key === "ArrowRight" && canNavigate.value) next();
-  else if (event.key === "+" || event.key === "=") zoomBy(0.25);
-  else if (event.key === "-") zoomBy(-0.25);
-  else if (event.key === "0") resetTransform();
-}
-
-onMounted(() => window.addEventListener("keydown", onKeydown));
-onUnmounted(() => {
-  window.clearTimeout(loadingTimer);
-  window.removeEventListener("keydown", onKeydown);
-  if (props.modelValue) document.body.classList.remove("image-lightbox-open");
-});
+function onSwiper(swiper: SwiperInstance) { swiperRef.value=swiper }
+function onSlideChange(swiper: SwiperInstance) { const index=swiper.realIndex; if(index!==safeIndex.value){ emit('update:index',index); emit('change',index) } }
+function select(index:number) { swiperRef.value?.slideToLoop(index) }
+function previous() { swiperRef.value?.slidePrev() }
+function next() { swiperRef.value?.slideNext() }
+function zoomBy(delta:number) { scale.value=Math.min(props.maxScale,Math.max(props.minScale,Number((scale.value+delta).toFixed(2)))); if(swiperRef.value) swiperRef.value.allowTouchMove=scale.value<=1 }
+function resetTransform() { scale.value=1; if(swiperRef.value) swiperRef.value.allowTouchMove=true }
+function onWheel(event:WheelEvent) { if(activeItem.value?.type==='image') zoomBy(event.deltaY < 0 ? .2 : -.2) }
+function onImageLoad(event:Event,src:string) { const image=event.currentTarget as HTMLImageElement; if(image.naturalHeight/image.naturalWidth>2.15) longImages.add(src) }
+function onStageClick(swiper:SwiperInstance,event:MouseEvent) { if(event.target instanceof HTMLElement && event.target.closest('video,audio,a,button')) return; if(event.detail===2 && activeItem.value?.type==='image') scale.value>1?resetTransform():zoomBy(1) }
+function close() { emit('update:modelValue',false); emit('close') }
+function closeFromBackdrop() { if(props.closeOnBackdrop) close() }
+function onKeydown(event:KeyboardEvent) { if(!props.modelValue)return; if(event.key==='Escape')close(); else if(event.key==='+')zoomBy(.25); else if(event.key==='-')zoomBy(-.25); else if(event.key==='0')resetTransform() }
+onMounted(() => window.addEventListener('keydown',onKeydown))
+onUnmounted(() => { window.removeEventListener('keydown',onKeydown); document.body.classList.remove('image-lightbox-open') })
 </script>
 
 <style scoped>
-.image-lightbox {
-  position: fixed;
-  z-index: 3000;
-  inset: 0;
-  display: grid;
-  grid-template-rows: 54px minmax(0, 1fr) auto;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--c-bg) 92%, transparent);
-  color: var(--c-text);
-  backdrop-filter: blur(18px) saturate(0.92);
-  overscroll-behavior: none;
-  touch-action: none;
-}
-.lightbox-toolbar {
-  z-index: 4;
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px 4px 18px;
-}
-.lightbox-count {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  color: var(--c-text-3);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-variant-numeric: tabular-nums;
-}
-.lightbox-count strong {
-  color: var(--c-text);
-  font-size: 0.88rem;
-}
-.lightbox-count i {
-  font-style: normal;
-  opacity: 0.46;
-}
-.lightbox-tools {
-  display: flex;
-  height: 38px;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--ld-bg-card) 90%, transparent);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--ld-shadow) 42%, transparent);
-}
-.lightbox-tools > span {
-  width: 42px;
-  color: var(--c-text-3);
-  font-size: 0.65rem;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.lightbox-tools button,
-.lightbox-nav {
-  display: grid;
-  border: 0;
-  background: transparent;
-  color: var(--c-text);
-  cursor: pointer;
-  place-items: center;
-}
-.lightbox-tools button {
-  width: 31px;
-  height: 31px;
-  border-radius: 6px;
-  font-size: 0.95rem;
-}
-.lightbox-tools button:hover,
-.lightbox-tools button:focus-visible {
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-  outline: 0;
-}
-.lightbox-tools button:disabled {
-  cursor: not-allowed;
-  opacity: 0.32;
-}
-.lightbox-tools .lightbox-close {
-  margin-left: 3px;
-  background: color-mix(in srgb, var(--c-text) 7%, transparent);
-}
-.lightbox-stage {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  cursor: zoom-in;
-  place-items: center;
-}
-.lightbox-stage.panning {
-  cursor: grab;
-}
-.lightbox-stage.panning:active {
-  cursor: grabbing;
-}
-.lightbox-slide {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-}
-.lightbox-canvas {
-  display: grid;
-  max-width: calc(100vw - 132px);
-  max-height: calc(100dvh - 116px);
-  transform-origin: center;
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
-  place-items: center;
-}
-.lightbox-canvas img {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100dvh - 116px);
-  border-radius: 6px;
-  box-shadow: 0 24px 80px color-mix(in srgb, #000 42%, transparent);
-  object-fit: contain;
-  user-select: none;
-}
-.lightbox-stage.dragging .lightbox-canvas {
-  transition: none;
-}
-.lightbox-nav {
-  position: absolute;
-  z-index: 4;
-  top: 50%;
-  width: 42px;
-  height: 52px;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--ld-bg-card) 82%, transparent);
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 38%, transparent);
-  font-size: 1.2rem;
-  transform: translateY(-50%);
-  backdrop-filter: blur(12px);
-}
-.lightbox-nav:hover,
-.lightbox-nav:focus-visible {
-  border-color: color-mix(in srgb, var(--c-primary) 28%, var(--border));
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-  outline: 0;
-}
-.lightbox-prev {
-  left: 14px;
-}
-.lightbox-next {
-  right: 14px;
-}
-.lightbox-state {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--c-text-3);
-  font-size: 0.72rem;
-  pointer-events: none;
-}
-.lightbox-footer {
-  z-index: 3;
-  display: grid;
-  width: min(720px, calc(100vw - 32px));
-  justify-self: center;
-  gap: 8px;
-  padding: 7px 14px calc(13px + env(safe-area-inset-bottom));
-}
-.lightbox-caption {
-  color: var(--c-text-2);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  text-align: center;
-}
-.lightbox-progress {
-  width: min(220px, 52vw);
-  height: 2px;
-  justify-self: center;
-  overflow: hidden;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--c-text) 12%, transparent);
-}
-.lightbox-progress i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--c-primary);
-  transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.lightbox-fade-enter-active,
-.lightbox-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.lightbox-fade-enter-from,
-.lightbox-fade-leave-to {
-  opacity: 0;
-}
-.lightbox-slide-next-enter-active,
-.lightbox-slide-next-leave-active,
-.lightbox-slide-prev-enter-active,
-.lightbox-slide-prev-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.lightbox-slide-next-enter-from,
-.lightbox-slide-prev-leave-to {
-  opacity: 0;
-  transform: translate3d(6vw, 0, 0) scale(0.985);
-}
-.lightbox-slide-next-leave-to,
-.lightbox-slide-prev-enter-from {
-  opacity: 0;
-  transform: translate3d(-6vw, 0, 0) scale(0.985);
-}
-.spinning {
-  animation: lightbox-spin 0.8s linear infinite;
-}
-@keyframes lightbox-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 640px) {
-  .image-lightbox {
-    grid-template-rows: 48px minmax(0, 1fr) auto;
-  }
-  .lightbox-toolbar {
-    padding: 6px 7px 3px 13px;
-  }
-  .lightbox-tools {
-    gap: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-  .lightbox-tools > span,
-  .lightbox-tools button[title="向左旋转"] {
-    display: none;
-  }
-  .lightbox-tools button {
-    width: 34px;
-    height: 34px;
-  }
-  .lightbox-canvas {
-    max-width: 100vw;
-    max-height: calc(100dvh - 96px);
-  }
-  .lightbox-canvas img {
-    max-width: 100vw;
-    max-height: calc(100dvh - 96px);
-    border-radius: 0;
-    box-shadow: 0 14px 54px color-mix(in srgb, #000 30%, transparent);
-  }
-  .lightbox-nav {
-    display: none;
-  }
-  .lightbox-footer {
-    width: calc(100vw - 24px);
-    padding-right: 4px;
-    padding-bottom: calc(13px + env(safe-area-inset-bottom));
-    padding-left: 4px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lightbox-canvas,
-  .lightbox-progress i,
-  .lightbox-fade-enter-active,
-  .lightbox-fade-leave-active,
-  .lightbox-slide-next-enter-active,
-  .lightbox-slide-next-leave-active,
-  .lightbox-slide-prev-enter-active,
-  .lightbox-slide-prev-leave-active {
-    transition: none;
-  }
-}
-</style>
-
-<style>
-body.image-lightbox-open {
-  overflow: hidden;
-}
+.media-viewer{position:fixed;z-index:3000;inset:0;overflow:hidden;background:color-mix(in srgb,var(--c-bg) 94%,transparent);color:var(--c-text);backdrop-filter:blur(20px) saturate(.9);overscroll-behavior:none}.viewer-swiper{width:100%;height:100%}.viewer-slide{display:flex;align-items:center;justify-content:center;padding:72px 92px 68px;overflow:auto}.viewer-image-wrap{display:flex;max-width:100%;max-height:100%;align-items:center;justify-content:center;transform-origin:center;transition:transform .25s cubic-bezier(.22,1,.36,1)}.viewer-image-wrap img{display:block;max-width:100%;max-height:calc(100dvh - 140px);border-radius:6px;box-shadow:0 24px 78px rgb(0 0 0 / 28%);object-fit:contain;user-select:none}.viewer-slide.is-long{align-items:flex-start}.viewer-slide.is-long .viewer-image-wrap{width:min(920px,100%);max-height:none;align-items:flex-start}.viewer-slide.is-long img{width:100%;max-height:none;height:auto}.viewer-video{width:min(1120px,100%);max-height:calc(100dvh - 140px);border-radius:6px;background:#000;box-shadow:0 24px 78px rgb(0 0 0 / 30%)}
+.viewer-audio,.viewer-document{display:grid;width:min(520px,calc(100vw - 32px));justify-items:center;gap:14px;padding:28px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card);box-shadow:0 20px 60px color-mix(in srgb,var(--ld-shadow) 48%,transparent)}.viewer-audio>span,.viewer-document>span{display:grid;width:58px;height:58px;border-radius:50%;background:var(--c-primary-soft);color:var(--c-primary);font-size:1.6rem;place-items:center}.viewer-audio strong,.viewer-document strong{max-width:100%;overflow:hidden;font-size:.85rem;text-overflow:ellipsis;white-space:nowrap}.viewer-audio audio{width:100%}.viewer-document a{display:inline-flex;min-height:34px;align-items:center;gap:6px;padding:0 14px;border-radius:999px;background:var(--c-primary);color:#fff;font-size:.68rem}
+.viewer-chrome{position:absolute;z-index:10;display:flex;align-items:center;pointer-events:none}.viewer-chrome>*{pointer-events:auto}.viewer-top{top:max(12px,env(safe-area-inset-top));right:14px;left:14px;justify-content:space-between}.viewer-bottom{right:18px;bottom:max(14px,env(safe-area-inset-bottom));left:18px;flex-direction:column;gap:9px}.viewer-bottom p{max-width:min(720px,80vw);margin:0;color:var(--c-text-2);font-size:.68rem;line-height:1.5;text-align:center}.viewer-count{display:inline-flex;height:34px;align-items:center;gap:7px;padding:0 13px;border:1px solid var(--border);border-radius:999px;background:color-mix(in srgb,var(--ld-bg-card) 90%,transparent);box-shadow:0 8px 24px color-mix(in srgb,var(--ld-shadow) 32%,transparent);font-family:var(--font-mono);font-size:.62rem}.viewer-count b{font-size:.8rem}.viewer-count i{font-style:normal;opacity:.42}.viewer-tools{display:flex;height:40px;align-items:center;gap:3px;padding:3px;border:1px solid var(--border);border-radius:999px;background:color-mix(in srgb,var(--ld-bg-card) 90%,transparent);box-shadow:0 8px 24px color-mix(in srgb,var(--ld-shadow) 32%,transparent)}.viewer-tools>span{width:40px;color:var(--c-text-3);font-size:.58rem;text-align:center}.viewer-tools button,.viewer-nav{display:grid;border:0;background:transparent;color:var(--c-text);cursor:pointer;place-items:center}.viewer-tools button{width:32px;height:32px;border-radius:50%}.viewer-tools button:hover,.viewer-tools button:focus-visible{background:var(--c-primary-soft);color:var(--c-primary);outline:0}.viewer-tools button:disabled{opacity:.3}.viewer-tools .viewer-close{background:color-mix(in srgb,var(--c-text) 7%,transparent)}
+.viewer-nav{position:absolute;z-index:9;top:50%;width:44px;height:44px;border:1px solid var(--border);border-radius:50%;background:color-mix(in srgb,var(--ld-bg-card) 88%,transparent);box-shadow:0 9px 28px color-mix(in srgb,var(--ld-shadow) 38%,transparent);font-size:1.05rem;transform:translateY(-50%);backdrop-filter:blur(12px)}.viewer-nav:hover{background:var(--c-primary-soft);color:var(--c-primary)}.viewer-prev{left:18px}.viewer-next{right:18px}.viewer-pagination{display:flex;max-width:min(440px,80vw);align-items:center;gap:5px;padding:6px 9px;border:1px solid var(--border);border-radius:999px;background:color-mix(in srgb,var(--ld-bg-card) 88%,transparent);overflow-x:auto}.viewer-pagination button{width:6px;height:6px;flex:0 0 6px;padding:0;border:0;border-radius:50%;background:var(--c-text-3);cursor:pointer;opacity:.42;transition:width .22s ease,opacity .22s ease}.viewer-pagination button.active{width:22px;border-radius:999px;background:var(--c-primary);opacity:1}.viewer-state{position:absolute;display:flex;align-items:center;gap:7px;color:var(--c-text-3);font-size:.68rem}.viewer-fade-enter-active,.viewer-fade-leave-active{transition:opacity .2s ease}.viewer-fade-enter-from,.viewer-fade-leave-to{opacity:0}
+@media(max-width:640px){.viewer-slide{padding:58px 0 62px}.viewer-image-wrap img{max-height:calc(100dvh - 120px);border-radius:0;box-shadow:none}.viewer-slide.is-long .viewer-image-wrap{width:100%}.viewer-nav{display:none}.viewer-top{top:max(7px,env(safe-area-inset-top));right:7px;left:10px}.viewer-count{height:32px;padding:0 10px}.viewer-tools{height:36px;border-color:color-mix(in srgb,var(--border) 60%,transparent)}.viewer-tools button{width:28px;height:28px}.viewer-tools>span{display:none}.viewer-bottom{bottom:max(8px,env(safe-area-inset-bottom))}.viewer-bottom p{max-width:90vw}.viewer-video{max-height:calc(100dvh - 120px);border-radius:0}.viewer-audio,.viewer-document{padding:22px 16px;border-radius:8px}}
+@media(prefers-reduced-motion:reduce){.viewer-image-wrap,.viewer-pagination button,.viewer-fade-enter-active,.viewer-fade-leave-active{transition:none}}
 </style>

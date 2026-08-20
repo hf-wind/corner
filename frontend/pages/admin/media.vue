@@ -21,7 +21,7 @@
       </div>
       <div class="media-main">
         <div class="media-toolbar">
-          <a-radio-group v-model:value="typeFilter" @change="loadMedia">
+          <a-radio-group v-model:value="typeFilter" @change="changeType">
             <a-radio-button value="all">全部</a-radio-button>
             <a-radio-button value="image">图片</a-radio-button>
             <a-radio-button value="video">视频</a-radio-button>
@@ -48,12 +48,13 @@
                 class="media-item"
                 :class="{ selected: selectedIds.has(item.id) }"
                 @click="toggleSelect(item.id, i, $event)"
+                @dblclick.stop="previewItem(item)"
               >
                 <div class="media-check" @click.stop>
                   <a-checkbox :checked="selectedIds.has(item.id)" @change="toggleSelect(item.id, i)" />
                 </div>
                 <div v-if="isImage(item)" class="media-img-wrap">
-                  <a-image :src="mediaUrl(item.path)" style="width:100%;height:120px;object-fit:cover" />
+                  <img :src="mediaUrl(item.path)" :alt="item.originalName || item.filename" />
                 </div>
                 <div v-else-if="isAudio(item)" class="media-audio-wrap" @click.stop>
                   <Icon name="ph:waveform-bold" />
@@ -62,6 +63,7 @@
                 <div v-else class="media-icon"><FileOutlined style="font-size:28px" /></div>
                 <div class="media-meta">
                   <span class="media-name" :title="item.filename">{{ item.filename }}</span>
+                  <a-button type="link" size="small" @click.stop="previewItem(item)"><Icon name="ph:eye-bold" /> 预览</a-button>
                   <a-button type="link" size="small" danger @click.stop="handleRemove(item)">删除</a-button>
                 </div>
               </div>
@@ -70,8 +72,18 @@
           </a-card>
         </a-spin>
 
-        <div class="media-pagination" v-if="totalPages > 1">
-          <a-pagination v-model:current="page" :pageSize="limit" :total="total" size="small" @change="loadMedia" />
+        <div class="media-pagination" v-if="total > 0">
+          <span>共 {{ total }} 项 · 第 {{ page }} / {{ Math.max(totalPages, 1) }} 页</span>
+          <a-pagination
+            v-model:current="page"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['20', '30', '60']"
+            show-size-changer
+            size="small"
+            @change="changePage"
+            @show-size-change="changePageSize"
+          />
         </div>
       </div>
     </div>
@@ -87,6 +99,7 @@
         </a-radio>
       </a-radio-group>
     </a-modal>
+    <ImageLightbox v-model="preview.open" v-model:index="preview.index" :images="previewItems" label="媒体库预览" />
   </div>
 </template>
 
@@ -103,13 +116,21 @@ const items = ref<any[]>([])
 const total = ref(0)
 const totalPages = ref(1)
 const page = ref(1)
-const limit = 30
+const pageSize = ref(30)
 const typeFilter = ref('all')
 const folders = ref<{ key: string; label: string; preset?: boolean }[]>([])
 const activeFolder = ref('all')
 const showNewFolder = ref(false)
 const newFolderName = ref('')
 const selectedIds = reactive(new Set<string>())
+const preview = reactive({ open: false, index: 0 })
+const previewItems = computed(() => items.value.map(item => ({
+  id: item.id,
+  src: item.path,
+  name: item.originalName || item.filename,
+  caption: item.originalName || item.filename,
+  mimeType: item.mimeType,
+})))
 let lastClickedIndex = -1
 
 const moveDialog = reactive({
@@ -120,6 +141,13 @@ const moveDialog = reactive({
 
 const isImage = (item: any) => item.mimeType?.startsWith('image/')
 const isAudio = (item: any) => item.mimeType?.startsWith('audio/')
+
+function previewItem(item: any) {
+  const index = items.value.findIndex(entry => entry.id === item.id)
+  if (index < 0) return
+  preview.index = index
+  preview.open = true
+}
 
 const uploadFolder = computed(() => {
   if (activeFolder.value === 'all' || activeFolder.value === '__none__') return 'general'
@@ -159,7 +187,7 @@ function onFolderClick({ key }: { key: string }) {
 async function loadMedia() {
   loading.value = true
   try {
-    const params: any = { page: page.value, limit, type: typeFilter.value }
+    const params: any = { page: page.value, limit: pageSize.value, type: typeFilter.value }
     if (activeFolder.value === '__none__') params.folder = ''
     else if (activeFolder.value !== 'all') params.folder = activeFolder.value
     const res = await api.get<any>('/media', params)
@@ -182,6 +210,22 @@ async function loadFolders() {
   } catch {
     folders.value = []
   }
+}
+
+function changeType() {
+  page.value = 1
+  void loadMedia()
+}
+
+function changePage(next: number) {
+  page.value = next
+  void loadMedia()
+}
+
+function changePageSize(_page: number, size: number) {
+  pageSize.value = size
+  page.value = 1
+  void loadMedia()
 }
 
 function beforeUpload(file: File) {
@@ -291,10 +335,11 @@ onMounted(() => { loadMedia(); loadFolders() })
 .media-item.selected { border-color:var(--c-primary); background:var(--c-primary-soft); }
 .media-check { position:absolute; top:6px; left:6px; z-index:2; }
 .media-img-wrap { display:flex; align-items:center; justify-content:center; width:100%; height:120px; overflow:hidden; background:var(--c-bg-1); }
+.media-img-wrap img { width:100%; height:100%; object-fit:cover; }
 .media-audio-wrap { display:flex; width:100%; height:120px; box-sizing:border-box; align-items:center; justify-content:center; flex-direction:column; gap:10px; padding:18px 10px 10px; overflow:hidden; background:var(--c-bg-1); color:var(--c-primary); font-size:1.5rem; }
 .media-audio-wrap audio { display:block; width:100%; max-width:220px; height:32px; }
 .media-icon { width:100%; height:120px; display:flex; align-items:center; justify-content:center; color:var(--c-text-3); background:var(--c-bg-1); }
-.media-meta { display:flex; align-items:center; padding:4px 6px; gap:4px; }
+.media-meta { display:flex; align-items:center; min-height:38px; padding:4px 6px; gap:4px; }
 .media-name { font-size:0.7rem; color:var(--c-text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
 .media-pagination { display:flex; justify-content:center; margin-top:16px; }
 .preset-tag {

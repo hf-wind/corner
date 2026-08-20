@@ -31,7 +31,10 @@
     <a-tabs v-model:active-key="activeTab" class="visitor-tabs">
       <a-tab-pane key="messages" :tab="`留言与漂流瓶${pendingTotal ? `（${pendingTotal} 待审）` : ''}`">
         <div class="table-toolbar">
-          <a-space>
+          <a-space wrap>
+            <a-input v-model:value="msgFilter.keyword" allow-clear placeholder="搜索内容、署名或账号" class="message-search" @press-enter="loadMessages(1)">
+              <template #prefix><Icon name="ph:magnifying-glass" /></template>
+            </a-input>
             <a-select v-model:value="msgFilter.type" style="width: 130px" @change="loadMessages(1)">
               <a-select-option value="">全部类型</a-select-option>
               <a-select-option value="message">留言</a-select-option>
@@ -45,6 +48,7 @@
               <a-select-option value="pending">待审核</a-select-option>
             </a-select>
             <a-button :loading="loadingMsgs" @click="loadMessages(msgPagination.current)">刷新</a-button>
+            <a-button type="primary" @click="loadMessages(1)">搜索</a-button>
           </a-space>
         </div>
         <a-spin :spinning="loadingMsgs">
@@ -74,6 +78,9 @@
                   </template>
                   <span v-else class="acct-guest">访客</span>
                 </template>
+                <template v-else-if="column.key === 'source'">
+                  <span class="source-cell"><strong>{{ record.visitor?.region || record.originRegion || '未定位' }}</strong><small>{{ deviceText(record.visitor) }}</small></span>
+                </template>
                 <template v-else-if="column.key === 'status'">
                   <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
                 </template>
@@ -99,11 +106,6 @@
               <a-select-option value="registered">登记访客</a-select-option>
               <a-select-option value="anonymous">未登记访客</a-select-option>
             </a-select>
-            <a-select v-model:value="profileFilter.banned" style="width: 120px" @change="loadProfiles(1)">
-              <a-select-option value="">全部状态</a-select-option>
-              <a-select-option value="false">正常</a-select-option>
-              <a-select-option value="true">已封禁</a-select-option>
-            </a-select>
             <a-button :loading="loadingProfiles" @click="loadProfiles(profilePagination.current)">刷新</a-button>
           </a-space>
         </div>
@@ -123,7 +125,6 @@
                 <template v-if="column.key === 'nickname'">
                   <span class="nick-cell">{{ record.nickname || '未署名' }}</span>
                   <a-tag :color="identityColor(record.identity)" class="identity-tag">{{ identityText(record.identity) }}</a-tag>
-                  <a-tag v-if="record.isBanned" color="red" class="banned-tag">已封禁</a-tag>
                 </template>
                 <template v-else-if="column.key === 'region'">
                   <span class="region-cell">{{ record.region || '未定位' }}</span>
@@ -137,12 +138,6 @@
                 <template v-else-if="column.key === 'lastSeen'">
                   {{ formatTime(record.lastSeenAt) }}<span v-if="record.firstSeenAt" class="first-seen">初访 {{ formatTime(record.firstSeenAt) }}</span>
                 </template>
-                <template v-else-if="column.key === 'actions'">
-                  <template v-if="record.identity !== 'anonymous'">
-                    <a-button v-if="!record.isBanned" type="link" size="small" danger @click="handleBan(record, true)">封禁</a-button>
-                    <a-button v-else type="link" size="small" @click="handleBan(record, false)">解封</a-button>
-                  </template>
-                </template>
               </template>
             </a-table>
           </a-card>
@@ -153,7 +148,7 @@
     <a-modal
       v-model:open="detailDialog.open"
       :title="detailDialog.record ? (detailDialog.record.type === 'bottle' ? '漂流瓶详情' : '留言详情') : ''"
-      width="560px"
+      width="720px"
       :footer="null"
     >
       <div v-if="detailDialog.record" class="detail-body">
@@ -161,10 +156,30 @@
         <div class="detail-row detail-row-block"><span class="detail-label">内容</span><p class="detail-content">{{ detailDialog.record.content }}</p></div>
         <div class="detail-row"><span class="detail-label">署名</span><span>{{ detailDialog.record.nickname || '未署名' }}</span></div>
         <div class="detail-row"><span class="detail-label">账号</span><span v-if="detailDialog.record.account">{{ detailDialog.record.account.username }}<small v-if="detailDialog.record.account.email">（{{ detailDialog.record.account.email }}）</small></span><span v-else class="acct-guest">访客</span></div>
+        <div class="detail-row"><span class="detail-label">访客摘要</span><span>{{ detailDialog.record.visitor?.id || '-' }}<small v-if="detailDialog.record.visitor?.ipHash"> · IP {{ detailDialog.record.visitor.ipHash }}</small></span></div>
+        <div class="detail-row"><span class="detail-label">位置与设备</span><span>{{ detailDialog.record.visitor?.region || detailDialog.record.originRegion || '未定位' }} · {{ deviceText(detailDialog.record.visitor) }}</span></div>
+        <div class="detail-row"><span class="detail-label">访问记录</span><span>{{ detailDialog.record.visitor?.visitCount || 0 }} 次 · 最近 {{ formatTime(detailDialog.record.visitor?.lastSeenAt) || '未知' }}</span></div>
         <div class="detail-row"><span class="detail-label">状态</span><a-tag :color="statusColor(detailDialog.record.status)">{{ statusText(detailDialog.record.status) }}</a-tag></div>
         <div v-if="detailDialog.record.aiReview" class="detail-row"><span class="detail-label">AI 审核</span><span>{{ detailDialog.record.aiReview }}</span></div>
         <div v-if="detailDialog.record.rejectReason" class="detail-row"><span class="detail-label">拒绝原因</span><span>{{ detailDialog.record.rejectReason }}</span></div>
-        <template v-if="detailDialog.record.status === 'caught'"><div class="detail-row"><span class="detail-label">捞起人</span><span>{{ detailDialog.record.catcher?.nickname || '未知旅人' }}</span></div><div class="detail-row"><span class="detail-label">捞起时间</span><span>{{ formatTime(detailDialog.record.caughtAt) }}</span></div></template>
+        <template v-if="detailDialog.record.type === 'bottle'">
+          <div class="detail-row"><span class="detail-label">漂流状态</span><span>{{ detailDialog.record.originRegion || '未知起点' }} → {{ detailDialog.record.currentRegion || '仍在漂流' }} · 累计捞起 {{ detailDialog.record.catchCount || 0 }} 次</span></div>
+          <div v-if="detailDialog.record.catchEvents?.length" class="detail-row detail-row-block">
+            <span class="detail-label">捞起记录</span>
+            <div class="event-list">
+              <article v-for="event in detailDialog.record.catchEvents" :key="event.id">
+                <span><strong>{{ event.catcher?.nickname || event.catcher?.id || '未知旅人' }}</strong><a-tag>{{ resolutionText(event.resolution) }}</a-tag></span>
+                <small>{{ event.catcherRegion || event.catcher?.region || '未知地区' }} · {{ formatTime(event.caughtAt) }}<template v-if="event.releasedAt"> · 离手 {{ formatTime(event.releasedAt) }}</template></small>
+              </article>
+            </div>
+          </div>
+          <div v-if="detailDialog.record.chain?.length" class="detail-row detail-row-block">
+            <span class="detail-label">完整接力</span>
+            <ol class="chain-list">
+              <li v-for="(node, index) in detailDialog.record.chain" :key="node.id"><i>{{ index + 1 }}</i><div><strong>{{ node.nickname || '未署名' }} · {{ node.originRegion || '未知地区' }}</strong><p>{{ node.content }}</p><small>{{ formatTime(node.createdAt) }} · {{ statusText(node.status) }}</small></div></li>
+            </ol>
+          </div>
+        </template>
         <div class="detail-row"><span class="detail-label">提交时间</span><span>{{ formatTime(detailDialog.record.createdAt) }}</span></div>
       </div>
     </a-modal>
@@ -176,8 +191,6 @@
 </template>
 
 <script setup lang="ts">
-import { Modal } from 'ant-design-vue'
-
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
@@ -190,12 +203,13 @@ const pendingTotal = computed(() => stats.pendingMessages + stats.pendingBottles
 
 const loadingMsgs = ref(false)
 const messages = ref<any[]>([])
-const msgFilter = reactive({ type: '', status: '' })
+const msgFilter = reactive({ keyword: '', type: '', status: '' })
 const msgPagination = reactive({ current: 1, pageSize: 20, total: 0, showSizeChanger: false })
 const msgColumns = [
   { title: '内容', key: 'content', minWidth: 280 },
   { title: '署名', key: 'nickname', width: 110 },
   { title: '账号', key: 'account', width: 150 },
+  { title: '来源', key: 'source', width: 150 },
   { title: '状态', key: 'status', width: 110 },
   { title: '时间', key: 'createdAt', width: 150 },
   { title: '操作', key: 'actions', width: 170, fixed: 'right' as const },
@@ -203,7 +217,7 @@ const msgColumns = [
 
 const loadingProfiles = ref(false)
 const profiles = ref<any[]>([])
-const profileFilter = reactive({ keyword: '', banned: '', type: '' })
+const profileFilter = reactive({ keyword: '', type: '' })
 const profilePagination = reactive({ current: 1, pageSize: 20, total: 0, showSizeChanger: false })
 const profileColumns = [
   { title: '昵称', key: 'nickname', width: 160 },
@@ -211,7 +225,6 @@ const profileColumns = [
   { title: '数据', key: 'counts', minWidth: 220 },
   { title: '成就', key: 'achievements', width: 90 },
   { title: '最近到访', key: 'lastSeen', width: 230 },
-  { title: '操作', key: 'actions', width: 90, fixed: 'right' as const },
 ]
 
 const rejectDialog = reactive({ open: false, record: null as any, reason: '' })
@@ -242,6 +255,13 @@ function openDetail(record: any) {
 function formatTime(value?: string) {
   return value ? String(value).slice(0, 16).replace('T', ' ') : ''
 }
+function deviceText(visitor?: any) {
+  if (!visitor) return '未知设备'
+  return [visitor.device, visitor.browser, visitor.os].filter(Boolean).join(' · ') || '未知设备'
+}
+function resolutionText(value?: string) {
+  return ({ holding: '持有中', relayed: '已接力', returned: '已放回', expired: '已过期' } as Record<string, string>)[value || ''] || '已记录'
+}
 
 async function loadStats() {
   loadingStats.value = true
@@ -261,6 +281,7 @@ async function loadMessages(page: number) {
     const params: Record<string, any> = { page, pageSize: msgPagination.pageSize }
     if (msgFilter.type) params.type = msgFilter.type
     if (msgFilter.status) params.status = msgFilter.status
+    if (msgFilter.keyword.trim()) params.keyword = msgFilter.keyword.trim()
     const res = await api.get<any>('/visitor/admin/messages', params)
     messages.value = res?.items ?? []
     msgPagination.total = res?.total ?? 0
@@ -317,7 +338,6 @@ async function loadProfiles(page: number) {
   try {
     const params: Record<string, any> = { page, pageSize: profilePagination.pageSize }
     if (profileFilter.keyword.trim()) params.keyword = profileFilter.keyword.trim()
-    if (profileFilter.banned !== '') params.banned = profileFilter.banned
     if (profileFilter.type) params.type = profileFilter.type
     const res = await api.get<any>('/visitor/admin/profiles', params)
     profiles.value = res?.items ?? []
@@ -335,24 +355,6 @@ function handleProfileChange(pag: any) {
   loadProfiles(pag.current)
 }
 
-function handleBan(record: any, ban: boolean) {
-  Modal.confirm({
-    title: ban ? '封禁该访客' : '解除封禁',
-    content: ban ? `封禁后「${record.nickname || '未署名'}」将无法再留言、投瓶或起名。` : `解除「${record.nickname || '未署名'}」的封禁？`,
-    okText: ban ? '封禁' : '解封',
-    okType: ban ? 'danger' : 'primary',
-    cancelText: '取消',
-    onOk: async () => {
-      try {
-        const updated = await api.post<any>(`/visitor/admin/profiles/${record.id}/${ban ? 'ban' : 'unban'}`)
-        record.isBanned = updated.isBanned
-        toast.success(ban ? '已封禁' : '已解封')
-      } catch (e: any) {
-        toast.error(e?.message || '操作失败')
-      }
-    },
-  })
-}
 </script>
 
 <style scoped>
@@ -370,6 +372,7 @@ function handleBan(record: any, ban: boolean) {
 
 .visitor-tabs :deep(.ant-tabs-nav) { margin-bottom: 12px; }
 .table-toolbar { margin-bottom: 12px; }
+.message-search { width: 240px; }
 .list-card { border-radius: 8px; }
 .content-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .content-cell span {  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -380,10 +383,19 @@ function handleBan(record: any, ban: boolean) {
 .acct-cell { display: inline-flex; flex-direction: column; line-height: 1.35; color: var(--c-text); font-size: .74rem; }
 .acct-cell small { color: var(--c-text-3); font-size: .62rem; }
 .acct-guest { color: var(--c-text-3); font-size: .72rem; }
+.source-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.source-cell strong { color: var(--c-text-2); font-size: .7rem; font-weight: 600; }
+.source-cell small { overflow: hidden; color: var(--c-text-4); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
 .acct-tag { margin-right: 6px; }
 .ai-tag { margin-left: 4px; }
-.banned-tag { margin-left: 6px; }
-.identity-tag { margin-left: 6px; }
+.identity-tag {
+  display: inline-flex;
+  width: auto !important;
+  max-width: 100%;
+  align-items: center;
+  margin-left: 6px;
+  white-space: nowrap;
+}
 .region-cell { color: var(--c-text-2); font-size: .7rem; }
 .count-cell { color: var(--c-text-2); font-size: .72rem; white-space: nowrap; }
 .first-seen { display: block; margin-top: 2px; color: var(--c-text-4); font-size: .6rem; }
@@ -392,9 +404,21 @@ function handleBan(record: any, ban: boolean) {
 .detail-row-block { grid-template-columns: 84px minmax(0, 1fr); }
 .detail-label { color: var(--c-text-3); font-size: .65rem; }
 .detail-content { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--c-bg-1); color: var(--c-text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.event-list { display: grid; gap: 7px; }
+.event-list article { display: flex; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--c-bg-1); }
+.event-list article > span { display: flex; align-items: center; gap: 7px; }
+.event-list small { color: var(--c-text-3); font-size: .62rem; }
+.chain-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.chain-list li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 9px; }
+.chain-list i { display: grid; width: 24px; height: 24px; border-radius: 50%; background: var(--c-primary-soft); color: var(--c-primary); font-size: .62rem; font-style: normal; place-items: center; }
+.chain-list strong { color: var(--c-text-2); font-size: .68rem; }
+.chain-list p { margin: 3px 0; color: var(--c-text); font-size: .76rem; line-height: 1.6; white-space: pre-wrap; }
+.chain-list small { color: var(--c-text-4); font-size: .58rem; }
 
 @media (max-width: 900px) {
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-heading { align-items: flex-start; flex-direction: column; }
+  .message-search { width: min(100%, 280px); }
+  .event-list article { align-items: flex-start; flex-direction: column; }
 }
 </style>

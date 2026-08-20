@@ -47,9 +47,27 @@ export class PostController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
+  @Get(':slug/versions')
+  listVersions(@Param('slug') slug: string) {
+    return this.post.listVersions(slug);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post(':slug/versions/:versionId/restore')
+  restoreVersion(
+    @Param('slug') slug: string,
+    @Param('versionId') versionId: string,
+    @Req() req: any,
+  ) {
+    return this.post.restoreVersion(slug, versionId, req.user.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':slug/publish')
-  publish(@Param('slug') slug: string) {
-    return this.post.publish(slug);
+  publish(@Param('slug') slug: string, @Req() req: any) {
+    return this.post.publish(slug, req.user.id);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -96,7 +114,10 @@ export class PostController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Put(':slug')
-  update(@Param('slug') slug: string, @Body() dto: UpdatePostDto) {
+  update(
+    @Param('slug') slug: string,
+    @Body() dto: UpdatePostDto,
+  ) {
     return this.post.update(slug, dto);
   }
 

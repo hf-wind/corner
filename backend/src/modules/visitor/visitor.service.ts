@@ -152,6 +152,17 @@ export class VisitorService {
     private settings?: SettingsService,
   ) {}
 
+  private async shouldNotifyRegularUser(userId?: string | null) {
+    if (!userId) return false;
+    const findUnique = (this.prisma.user as any)?.findUnique;
+    if (typeof findUnique !== 'function') return true;
+    const user = await findUnique.call(this.prisma.user, {
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role !== 'admin';
+  }
+
   resolveVisitorId(req: VisitorRequest): string {
     const raw = (req.headers['x-visitor-id'] as string | undefined) ?? '';
     const trimmed = raw.trim();
@@ -464,7 +475,10 @@ export class VisitorService {
       });
     }
 
-    if (actor?.userId) {
+    if (
+      actor?.userId &&
+      (await this.shouldNotifyRegularUser(actor.userId))
+    ) {
       try {
         const kindLabel = type === 'message' ? '留言' : '漂流瓶';
         await this.notificationService.create(actor.userId, {
@@ -717,7 +731,10 @@ export class VisitorService {
         originRegion: true,
       },
     });
-    if (bottle.userId) {
+    if (
+      bottle.userId &&
+      (await this.shouldNotifyRegularUser(bottle.userId))
+    ) {
       try {
         await this.notificationService.create(bottle.userId, {
           type: 'guestbook',
@@ -1144,12 +1161,22 @@ export class VisitorService {
   async adminMessages(query: {
     status?: string;
     type?: string;
+    keyword?: string;
     page?: number;
     pageSize?: number;
   }) {
     const where: Record<string, unknown> = {};
     if (query.status) where.status = query.status;
     if (query.type) where.type = query.type;
+    if (query.keyword?.trim()) {
+      const keyword = query.keyword.trim();
+      where.OR = [
+        { content: { contains: keyword, mode: 'insensitive' } },
+        { nickname: { contains: keyword, mode: 'insensitive' } },
+        { user: { username: { contains: keyword, mode: 'insensitive' } } },
+        { user: { email: { contains: keyword, mode: 'insensitive' } } },
+      ];
+    }
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 20));
     const [items, total] = await Promise.all([
@@ -1158,6 +1185,11 @@ export class VisitorService {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: {
+          catchEvents: {
+            orderBy: { caughtAt: 'desc' },
+          },
+        },
       }),
       this.prisma.visitorMessage.count({ where }),
     ]);
@@ -1171,28 +1203,76 @@ export class VisitorService {
         })
       : [];
     const userMap = new Map(users.map((u) => [u.id, u]));
-    const caughtHashes = [
+    const visitorHashes = [
       ...new Set(
         items
-          .map((message) => message.caughtByIdHash)
+          .flatMap((message) => [
+            message.visitorIdHash,
+            message.caughtByIdHash,
+            ...(message.catchEvents ?? []).map(
+              (event) => event.catcherVisitorIdHash,
+            ),
+          ])
           .filter(Boolean) as string[],
       ),
     ];
-    const catchers = caughtHashes.length
+    const profiles = visitorHashes.length
       ? await this.prisma.visitorProfile.findMany({
-          where: { visitorIdHash: { in: caughtHashes } },
-          select: { visitorIdHash: true, nickname: true },
+          where: { visitorIdHash: { in: visitorHashes } },
+          select: { visitorIdHash: true, nickname: true, email: true, ipHash: true, visitCount: true, lastSeenAt: true },
         })
       : [];
-    const catcherMap = new Map(
-      catchers.map((catcher) => [catcher.visitorIdHash, catcher.nickname]),
-    );
+    const profileMap = new Map(profiles.map((profile) => [profile.visitorIdHash, profile]));
+    const visits = visitorHashes.length
+      ? await this.prisma.visitorVisit.findMany({
+          where: { visitorIdHash: { in: visitorHashes } },
+          orderBy: { createdAt: 'desc' },
+          take: Math.min(1000, visitorHashes.length * 6),
+          select: { visitorIdHash: true, region: true, browser: true, os: true, device: true, createdAt: true },
+        })
+      : [];
+    const latestVisit = new Map<string, (typeof visits)[number]>();
+    for (const visit of visits) if (!latestVisit.has(visit.visitorIdHash)) latestVisit.set(visit.visitorIdHash, visit);
+    const chainRoots = [...new Set(items.filter((message) => message.type === 'bottle').map((message) => message.chainId ?? message.id))];
+    const chainRows = chainRoots.length
+      ? await this.prisma.visitorMessage.findMany({
+          where: { type: 'bottle', OR: [{ chainId: { in: chainRoots } }, { id: { in: chainRoots } }] },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, chainId: true, parentId: true, nickname: true, content: true, status: true, originRegion: true, currentRegion: true, catchCount: true, createdAt: true },
+        })
+      : [];
+    const chains = new Map<string, typeof chainRows>();
+    for (const row of chainRows) {
+      const key = row.chainId ?? row.id;
+      chains.set(key, [...(chains.get(key) || []), row]);
+    }
+    const visitorSummary = (hash: string | null) => {
+      if (!hash) return null;
+      const profile = profileMap.get(hash);
+      const visit = latestVisit.get(hash);
+      return {
+        id: hash.slice(0, 12),
+        nickname: profile?.nickname || null,
+        email: profile?.email || null,
+        ipHash: profile?.ipHash ? `${profile.ipHash.slice(0, 12)}…` : null,
+        region: visit?.region || null,
+        browser: visit?.browser || null,
+        os: visit?.os || null,
+        device: visit?.device || null,
+        visitCount: profile?.visitCount || 0,
+        lastSeenAt: profile?.lastSeenAt || visit?.createdAt || null,
+      };
+    };
     const decorated = items.map((m) => ({
       ...m,
       account: m.userId ? (userMap.get(m.userId) ?? null) : null,
-      catcher: m.caughtByIdHash
-        ? { nickname: catcherMap.get(m.caughtByIdHash) ?? null }
-        : null,
+      visitor: visitorSummary(m.visitorIdHash),
+      catcher: visitorSummary(m.caughtByIdHash),
+      catchEvents: (m.catchEvents ?? []).map((event) => ({
+        ...event,
+        catcher: visitorSummary(event.catcherVisitorIdHash),
+      })),
+      chain: m.type === 'bottle' ? chains.get(m.chainId ?? m.id) || [] : [],
     }));
     return { items: decorated, total, page, pageSize };
   }

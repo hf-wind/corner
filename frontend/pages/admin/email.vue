@@ -1,5 +1,30 @@
 <template>
-  <div class="email-logs-page">
+  <div class="email-logs-page admin-page-shell">
+    <header class="admin-page-head"><div><h1>邮件通知</h1><p>管理通知模板、发送预览和完整投递日志。</p></div><a-button :loading="tab === 'templates' ? templatesLoading : loading" @click="tab === 'templates' ? loadTemplates() : loadLogs()"><Icon name="ph:arrows-clockwise-bold" /> 刷新</a-button></header>
+    <a-tabs v-model:activeKey="tab" size="small">
+      <a-tab-pane key="templates" tab="邮件模板" />
+      <a-tab-pane key="logs" tab="发送记录" />
+    </a-tabs>
+
+    <section v-show="tab === 'templates'" class="template-workspace">
+      <aside class="template-list">
+        <button v-for="item in templates" :key="item.key" type="button" :class="{ active: selected?.key === item.key }" @click="selectTemplate(item)">
+          <span><Icon :name="templateIcon(item.key)" /></span><div><strong>{{ item.name }}</strong><small>{{ item.description }}</small></div><a-tag :color="item.custom ? 'blue' : 'default'">{{ item.custom ? '自定义' : '系统默认' }}</a-tag>
+        </button>
+      </aside>
+      <a-spin :spinning="templatesLoading" class="template-editor-spin">
+        <div v-if="selected" class="template-editor">
+          <header><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><a-switch v-model:checked="editor.custom" checked-children="自定义" un-checked-children="默认" /></header>
+          <label><span>邮件主题</span><a-input v-model:value="editor.subject" :disabled="!editor.custom" /></label>
+          <label><span>HTML 模板</span><a-textarea v-model:value="editor.html" :rows="18" :disabled="!editor.custom" class="html-editor" /></label>
+          <div class="variables"><span>可用变量</span><button v-for="variable in selected.variables" :key="variable" type="button" @click="insertVariable(variable)" v-text="formatVariable(variable)" /><small>富文本正文使用 <code v-text="formatVariable('contentHtml', true)" />，其余变量均自动转义。</small></div>
+          <footer><a-button @click="previewTemplate"><Icon name="ph:eye-bold" /> 预览</a-button><a-button type="primary" :loading="templateSaving" @click="saveTemplate"><Icon name="ph:floppy-disk-bold" /> 保存模板</a-button></footer>
+        </div>
+        <a-empty v-else description="请选择邮件模板" />
+      </a-spin>
+    </section>
+
+    <div v-show="tab === 'logs'">
     <a-card :bordered="false" class="section-card" size="small">
       <template #title>
         <div class="card-header">
@@ -51,12 +76,13 @@
               <span v-else>-</span>
             </template>
             <template v-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+              <div class="admin-row-actions"><a-button type="link" size="small" @click="openDetail(record)"><Icon name="ph:eye-bold" />详情</a-button></div>
             </template>
           </template>
         </a-table>
       </a-spin>
     </a-card>
+    </div>
 
     <a-modal v-model:open="detail.open" title="邮件详情" width="640px" :footer="null" @cancel="detail.open = false">
       <div v-if="detail.item" class="detail-wrap">
@@ -94,6 +120,9 @@
         </div>
       </div>
     </a-modal>
+    <a-modal v-model:open="preview.open" :title="preview.subject || '邮件预览'" width="760px" :footer="null">
+      <iframe class="email-preview" sandbox="" :srcdoc="preview.html" title="邮件模板预览" />
+    </a-modal>
   </div>
 </template>
 
@@ -101,11 +130,19 @@
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const toast = useToast()
+const tab = ref('templates')
 const loading = ref(false)
 const logs = ref<any[]>([])
 const filterType = ref<string | undefined>(undefined)
 const filterStatus = ref<string | undefined>(undefined)
 const detail = reactive({ open: false, item: null as any })
+const templatesLoading = ref(false)
+const templateSaving = ref(false)
+const templates = ref<any[]>([])
+const selected = ref<any>(null)
+const editor = reactive({ custom: false, subject: '', html: '' })
+const preview = reactive({ open: false, subject: '', html: '' })
 
 const pagination = reactive({
   current: 1,
@@ -129,7 +166,57 @@ const columns = [
 
 onMounted(() => {
   loadLogs()
+  loadTemplates()
 })
+
+async function loadTemplates() {
+  templatesLoading.value = true
+  try {
+    templates.value = await api.get<any[]>('/email/templates')
+    const next = templates.value.find(item => item.key === selected.value?.key) || templates.value[0]
+    if (next) selectTemplate(next)
+  } catch (error: any) {
+    toast.error(error?.message || '邮件模板加载失败')
+  } finally { templatesLoading.value = false }
+}
+
+function selectTemplate(item: any) {
+  selected.value = item
+  Object.assign(editor, { custom: Boolean(item.custom), subject: item.subject, html: item.html })
+}
+
+function insertVariable(variable: string) {
+  if (!editor.custom) return
+  editor.html += `{{${variable}}}`
+}
+
+function formatVariable(variable: string, raw = false) {
+  return raw ? `{` + `{{${variable}}}` + `}` : `{{${variable}}}`
+}
+
+async function saveTemplate() {
+  if (!editor.subject.trim() || !editor.html.trim()) { toast.warning('主题和 HTML 不能为空'); return }
+  templateSaving.value = true
+  try {
+    const result = await api.put<any>(`/email/templates/${selected.value.key}`, { ...editor })
+    const index = templates.value.findIndex(item => item.key === result.key)
+    if (index >= 0) templates.value[index] = result
+    selectTemplate(result)
+    toast.success(editor.custom ? '自定义邮件模板已保存' : '已恢复系统默认模板')
+  } catch (error: any) { toast.error(error?.message || '模板保存失败') }
+  finally { templateSaving.value = false }
+}
+
+async function previewTemplate() {
+  try {
+    const result = await api.post<any>(`/email/templates/${selected.value.key}/preview`, { subject: editor.subject, html: editor.html })
+    Object.assign(preview, { open: true, subject: result.subject, html: result.html })
+  } catch (error: any) { toast.error(error?.message || '模板预览失败') }
+}
+
+function templateIcon(key: string) {
+  return ({ verification: 'ph:key-bold', comment_notification: 'ph:chat-circle-bold', reply_notification: 'ph:arrow-bend-up-left-bold', comment_moderation_notification: 'ph:shield-check-bold', like_notification: 'ph:heart-bold', test: 'ph:paper-plane-tilt-bold' } as Record<string, string>)[key] || 'ph:envelope-bold'
+}
 
 async function loadLogs() {
   loading.value = true
@@ -230,6 +317,7 @@ function stripHtml(html: string) {
 .email-logs-page {
   padding: 0;
 }
+.template-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:620px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.template-list{display:flex;flex-direction:column;gap:3px;padding:8px;border-right:1px solid var(--border);background:var(--c-bg-1)}.template-list button{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;border:0;border-radius:7px;background:transparent;color:var(--c-text);cursor:pointer;text-align:left}.template-list button:hover,.template-list button.active{background:var(--ld-bg-card)}.template-list button.active{box-shadow:0 1px 4px var(--ld-shadow)}.template-list button>span{display:grid;width:30px;height:30px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.template-list strong,.template-list small{display:block}.template-list strong{font-size:.64rem}.template-list small{margin-top:3px;color:var(--c-text-3);font-size:.5rem;line-height:1.4}.template-editor-spin{min-width:0}.template-editor{display:flex;min-width:0;flex-direction:column;gap:14px;padding:18px}.template-editor>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.template-editor h2{margin:0;font-size:.86rem}.template-editor header p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem}.template-editor>label>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.62rem}.html-editor :deep(textarea){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.variables{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:10px;border-radius:7px;background:var(--c-bg-1)}.variables>span{margin-right:3px;color:var(--c-text-2);font-size:.58rem;font-weight:700}.variables button{padding:4px 7px;border:1px solid var(--border);border-radius:12px;background:var(--ld-bg-card);color:var(--c-primary);cursor:pointer;font:10px/1.2 ui-monospace,monospace}.variables small{width:100%;color:var(--c-text-3);font-size:.52rem}.template-editor>footer{display:flex;justify-content:flex-end;gap:8px}.email-preview{display:block;width:100%;height:620px;border:0;border-radius:6px;background:#fff}
 
 .section-card {
   border-radius: 8px;
@@ -309,6 +397,7 @@ function stripHtml(html: string) {
 @media (max-width: 700px) {
   .card-header { align-items: stretch; flex-direction: column; gap: 10px; }
   .filter-bar, .type-filter, .status-filter { width: 100%; }
+  .template-workspace{grid-template-columns:1fr}.template-list{overflow-x:auto;flex-direction:row;border-right:0;border-bottom:1px solid var(--border)}.template-list button{min-width:230px}.template-editor{padding:12px}.email-preview{height:70vh}
 }
 
 .detail-content :deep(img) {

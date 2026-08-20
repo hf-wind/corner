@@ -4,6 +4,7 @@ import {
   Get,
   Put,
   Body,
+  Param,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -13,9 +14,11 @@ import {
   IsBoolean,
   IsEmail,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -58,9 +61,63 @@ class UpdateEmailConfigDto {
   site_url?: string;
 }
 
+class UpdateEmailTemplateDto {
+  @IsBoolean()
+  custom: boolean;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  subject: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200000)
+  html: string;
+}
+
+class PreviewEmailTemplateDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  subject?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200000)
+  html?: string;
+}
+
 @Controller('email')
 export class EmailController {
   constructor(private email: EmailService) {}
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Get('templates')
+  templates() {
+    return this.email.getTemplates();
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Put('templates/:key')
+  updateTemplate(
+    @Param('key') key: string,
+    @Body() dto: UpdateEmailTemplateDto,
+  ) {
+    return this.email.updateTemplate(key, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Post('templates/:key/preview')
+  previewTemplate(
+    @Param('key') key: string,
+    @Body() dto: PreviewEmailTemplateDto,
+  ) {
+    return this.email.previewTemplate(key, dto);
+  }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')

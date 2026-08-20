@@ -237,13 +237,159 @@ export class StatsService {
   }
 
   async system() {
+    const memory = process.memoryUsage();
+    let database = 'online';
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch {
+      database = 'unavailable';
+    }
     return {
+      application: 'Corner',
+      framework: 'Vue 3 + Vite SPA / NestJS API',
+      frontend: 'Vue 3 + Vite 8',
+      backend: 'NestJS 11 + Prisma 7',
       nodeVersion: process.version,
-      nestVersion: '',
       platform: process.platform,
+      architecture: process.arch,
+      environment: process.env.NODE_ENV || 'development',
       uptime: formatUptime(process.uptime()),
-      memoryUsage: `${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`,
+      uptimeSeconds: Math.floor(process.uptime()),
+      memoryUsage: `${Math.round(memory.rss / 1024 / 1024)} MB`,
+      heapUsage: `${Math.round(memory.heapUsed / 1024 / 1024)} / ${Math.round(memory.heapTotal / 1024 / 1024)} MB`,
+      hostMemory: `${formatBytes(os.totalmem() - os.freemem())} / ${formatBytes(os.totalmem())}`,
       cpuCores: os.cpus().length,
+      loadAverage: os.loadavg().map((value) => Number(value.toFixed(2))),
+      database,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  async adminDashboard() {
+    const since = new Date(Date.now() - 30 * 86400000);
+    const trendSince = new Date(Date.now() - 14 * 86400000);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [
+      posts,
+      moments,
+      albums,
+      library,
+      categories,
+      tags,
+      users,
+      visitors,
+      visitsToday,
+      messages,
+      bottles,
+      pendingComments,
+      pendingMomentComments,
+      pendingMessages,
+      pendingBottles,
+      media,
+      aiTotals,
+      aiRecent,
+      recent,
+      system,
+      trendVisits,
+      trendPosts,
+      trendMoments,
+      trendAlbums,
+      trendLibrary,
+      trendAi,
+    ] = await Promise.all([
+      this.prisma.post.groupBy({ by: ['status'], _count: { _all: true }, _sum: { viewCount: true, likeCount: true } }),
+      this.prisma.moment.groupBy({ by: ['status'], _count: { _all: true }, _sum: { likeCount: true } }),
+      this.prisma.album.groupBy({ by: ['status'], _count: { _all: true } }),
+      this.prisma.libraryItem.groupBy({ by: ['publishStatus'], _count: { _all: true } }),
+      this.prisma.category.count(),
+      this.prisma.tag.count(),
+      this.prisma.user.count(),
+      this.prisma.visitorProfile.count(),
+      this.prisma.visitorVisit.count({ where: { createdAt: { gte: today } } }),
+      this.prisma.visitorMessage.count({ where: { type: 'message' } }),
+      this.prisma.visitorMessage.count({ where: { type: 'bottle' } }),
+      this.prisma.comment.count({ where: { status: 'pending' } }),
+      this.prisma.momentComment.count({ where: { status: 'pending' } }),
+      this.prisma.visitorMessage.count({ where: { type: 'message', status: 'pending' } }),
+      this.prisma.visitorMessage.count({ where: { type: 'bottle', status: 'pending' } }),
+      this.prisma.media.count(),
+      this.prisma.aiInteraction.aggregate({ where: { action: 'chat' }, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true } }),
+      this.prisma.aiInteraction.count({ where: { action: 'chat', createdAt: { gte: since } } }),
+      this.activities(8),
+      this.system(),
+      this.prisma.visitorVisit.findMany({ where: { createdAt: { gte: trendSince } }, select: { createdAt: true } }),
+      this.prisma.post.findMany({ where: { publishedAt: { gte: trendSince } }, select: { publishedAt: true } }),
+      this.prisma.moment.findMany({ where: { publishedAt: { gte: trendSince } }, select: { publishedAt: true } }),
+      this.prisma.album.findMany({ where: { publishedAt: { gte: trendSince } }, select: { publishedAt: true } }),
+      this.prisma.libraryItem.findMany({ where: { publishedAt: { gte: trendSince } }, select: { publishedAt: true } }),
+      this.prisma.aiInteraction.findMany({ where: { action: 'chat', createdAt: { gte: trendSince } }, select: { createdAt: true, inputTokens: true, outputTokens: true } }),
+    ]);
+    const summarize = (rows: Array<Record<string, any>>, key: string) => Object.fromEntries(rows.map((row) => [String(row[key]), row._count._all]));
+    const postStatus = summarize(posts, 'status');
+    const momentStatus = summarize(moments, 'status');
+    const albumStatus = summarize(albums, 'status');
+    const libraryStatus = summarize(library, 'publishStatus');
+    const dateKey = (value: Date) => new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(value);
+    const dates = Array.from({ length: 14 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (13 - index));
+      return dateKey(date);
+    });
+    const countByDate = (items: Array<{ createdAt?: Date; publishedAt?: Date | null }>, field: 'createdAt' | 'publishedAt') => {
+      const counts = new Map<string, number>();
+      for (const item of items) {
+        const value = item[field];
+        if (!value) continue;
+        const key = dateKey(value);
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      return dates.map((key) => counts.get(key) || 0);
+    };
+    const aiDaily = new Map<string, { calls: number; inputTokens: number; outputTokens: number }>();
+    for (const item of trendAi) {
+      const key = dateKey(item.createdAt);
+      const current = aiDaily.get(key) || { calls: 0, inputTokens: 0, outputTokens: 0 };
+      current.calls += 1;
+      current.inputTokens += item.inputTokens || 0;
+      current.outputTokens += item.outputTokens || 0;
+      aiDaily.set(key, current);
+    }
+    return {
+      content: {
+        posts: postStatus,
+        moments: momentStatus,
+        albums: albumStatus,
+        library: libraryStatus,
+        categories,
+        tags,
+        media,
+        views: posts.reduce((sum, row) => sum + (row._sum.viewCount || 0), 0),
+        likes: posts.reduce((sum, row) => sum + (row._sum.likeCount || 0), 0) + moments.reduce((sum, row) => sum + (row._sum.likeCount || 0), 0),
+      },
+      community: { users, visitors, visitsToday, messages, bottles },
+      pending: { articleComments: pendingComments, momentComments: pendingMomentComments, messages: pendingMessages, bottles: pendingBottles, total: pendingComments + pendingMomentComments + pendingMessages + pendingBottles },
+      ai: { calls: aiTotals._count._all, recentCalls: aiRecent, inputTokens: aiTotals._sum.inputTokens || 0, outputTokens: aiTotals._sum.outputTokens || 0 },
+      recent,
+      system,
+      trends: {
+        dates,
+        visits: countByDate(trendVisits, 'createdAt'),
+        content: {
+          posts: countByDate(trendPosts, 'publishedAt'),
+          moments: countByDate(trendMoments, 'publishedAt'),
+          albums: countByDate(trendAlbums, 'publishedAt'),
+          library: countByDate(trendLibrary, 'publishedAt'),
+        },
+        ai: {
+          calls: dates.map((key) => aiDaily.get(key)?.calls || 0),
+          inputTokens: dates.map((key) => aiDaily.get(key)?.inputTokens || 0),
+          outputTokens: dates.map((key) => aiDaily.get(key)?.outputTokens || 0),
+        },
+      },
     };
   }
 }
@@ -253,4 +399,9 @@ function formatUptime(seconds: number): string {
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return `${d}天 ${h}小时 ${m}分钟`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 ** 3) return `${Math.round(bytes / 1024 / 1024)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }

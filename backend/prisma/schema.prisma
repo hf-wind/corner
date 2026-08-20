@@ -18,6 +18,7 @@ model User {
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
   posts              Post[]
+  postVersions       PostVersion[]
   media              Media[]
   chatMessages       ChatMessage[]
   chatDailyQuotas    ChatDailyQuota[]
@@ -81,36 +82,37 @@ model Tag {
 }
 
 model Post {
-  id                       String      @id @default(uuid()) @db.Uuid
-  title                    String      @db.VarChar(255)
-  slug                     String      @unique @db.VarChar(255)
-  content                  String      @db.Text
-  excerpt                  String?     @db.Text
-  coverImage               String?     @map("cover_image") @db.Text
-  authorId                 String      @map("author_id") @db.Uuid
-  categoryId               String?     @map("category_id") @db.Uuid
-  status                   String      @default("draft") @db.VarChar(20)
-  viewCount                Int         @default(0) @map("view_count")
-  likeCount                Int         @default(0) @map("like_count")
-  featured                 Boolean     @default(false)
-  needsPublish             Boolean     @default(true) @map("needs_publish")
-  publishedSnapshot        Json?       @map("published_snapshot")
-  scheduledAt              DateTime?   @map("scheduled_at")
-  occurredAt               DateTime?   @map("occurred_at")
-  placeId                  String?     @map("place_id") @db.Uuid
-  locationVisibility       String      @default("private") @map("location_visibility") @db.VarChar(20)
-  locationPrecision        String      @default("place") @map("location_precision") @db.VarChar(20)
-  locationSource           String?     @map("location_source") @db.VarChar(20)
-  locationExactConfirmedAt DateTime?   @map("location_exact_confirmed_at")
-  publishedAt              DateTime?   @map("published_at")
-  createdAt                DateTime    @default(now()) @map("created_at")
-  updatedAt                DateTime    @updatedAt @map("updated_at")
-  author                   User        @relation(fields: [authorId], references: [id])
-  category                 Category?   @relation(fields: [categoryId], references: [id])
-  place                    Place?      @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  id                       String        @id @default(uuid()) @db.Uuid
+  title                    String        @db.VarChar(255)
+  slug                     String        @unique @db.VarChar(255)
+  content                  String        @db.Text
+  excerpt                  String?       @db.Text
+  coverImage               String?       @map("cover_image") @db.Text
+  authorId                 String        @map("author_id") @db.Uuid
+  categoryId               String?       @map("category_id") @db.Uuid
+  status                   String        @default("draft") @db.VarChar(20)
+  viewCount                Int           @default(0) @map("view_count")
+  likeCount                Int           @default(0) @map("like_count")
+  featured                 Boolean       @default(false)
+  needsPublish             Boolean       @default(true) @map("needs_publish")
+  publishedSnapshot        Json?         @map("published_snapshot")
+  scheduledAt              DateTime?     @map("scheduled_at")
+  occurredAt               DateTime?     @map("occurred_at")
+  placeId                  String?       @map("place_id") @db.Uuid
+  locationVisibility       String        @default("private") @map("location_visibility") @db.VarChar(20)
+  locationPrecision        String        @default("place") @map("location_precision") @db.VarChar(20)
+  locationSource           String?       @map("location_source") @db.VarChar(20)
+  locationExactConfirmedAt DateTime?     @map("location_exact_confirmed_at")
+  publishedAt              DateTime?     @map("published_at")
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
+  author                   User          @relation(fields: [authorId], references: [id])
+  category                 Category?     @relation(fields: [categoryId], references: [id])
+  place                    Place?        @relation(fields: [placeId], references: [id], onDelete: Restrict)
   tags                     PostTag[]
   comments                 Comment[]
   visitStats               VisitStat[]
+  versions                 PostVersion[]
 
   @@index([status, publishedAt])
   @@index([publishedAt])
@@ -118,6 +120,22 @@ model Post {
   @@index([placeId, occurredAt])
   @@index([occurredAt])
   @@map("posts")
+}
+
+model PostVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  postId      String   @map("post_id") @db.Uuid
+  version     Int
+  snapshot    Json
+  source      String   @default("publish") @db.VarChar(30)
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([postId, version])
+  @@index([postId, createdAt])
+  @@map("post_versions")
 }
 
 model Moment {

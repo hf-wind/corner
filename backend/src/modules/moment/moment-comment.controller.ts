@@ -24,7 +24,10 @@ export class MomentCommentController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Get()
-  findAll(@Query() query: { page?: string; limit?: string; status?: string }) {
+  findAll(
+    @Query()
+    query: { page?: string; limit?: string; status?: string; keyword?: string },
+  ) {
     return this.comment.findAll({
       page: Math.max(
         1,
@@ -35,6 +38,7 @@ export class MomentCommentController {
         Math.min(100, query.limit ? parseInt(query.limit, 10) || 20 : 20),
       ),
       status: query.status,
+      keyword: query.keyword,
     });
   }
 

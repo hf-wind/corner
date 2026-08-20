@@ -65,6 +65,7 @@
           </a-form-item>
         </a-form>
       </a-card>
+      <AdminPersonalAiTools v-if="isAdmin" />
     </a-spin>
   </div>
 </template>

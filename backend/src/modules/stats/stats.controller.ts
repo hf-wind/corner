@@ -29,4 +29,11 @@ export class StatsController {
   system() {
     return this.stats.system();
   }
+
+  @Get('admin-dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  adminDashboard() {
+    return this.stats.adminDashboard();
+  }
 }

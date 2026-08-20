@@ -1,5 +1,7 @@
 <template>
-  <div>
+  <div class="admin-page-shell">
+    <header class="admin-page-head"><div><h1>友链申请审核</h1><p>核验站点信息、AI 审核建议与互链状态。</p></div><a-button :loading="loading" @click="loadApplications(pagination.current)"><Icon name="ph:arrows-clockwise-bold" /> 刷新</a-button></header>
+    <AdminSectionTabs label="审核中心" :items="reviewTabs" />
     <div class="table-toolbar">
       <a-space>
         <a-select v-model:value="statusFilter" style="width: 140px" @change="loadApplications(1)">
@@ -39,10 +41,12 @@
               {{ formatTime(record.createdAt) }}
             </template>
             <template v-else-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
-              <a-button v-if="record.status !== 'approved'" type="link" size="small" @click="handleApprove(record)">通过</a-button>
-              <a-button v-if="record.status !== 'rejected'" type="link" size="small" danger @click="openReject(record)">拒绝</a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
+              <div class="admin-row-actions">
+                <a-button type="link" size="small" @click="openDetail(record)"><Icon name="ph:eye-bold" />详情</a-button>
+                <a-button v-if="record.status !== 'approved'" type="link" size="small" @click="handleApprove(record)"><Icon name="ph:check-bold" />通过</a-button>
+                <a-button v-if="record.status !== 'rejected'" type="link" size="small" danger @click="openReject(record)"><Icon name="ph:x-bold" />拒绝</a-button>
+                <a-button type="link" size="small" danger @click="handleDelete(record)"><Icon name="ph:trash-bold" />删除</a-button>
+              </div>
             </template>
           </template>
         </a-table>
@@ -79,6 +83,10 @@ import { Modal } from 'ant-design-vue'
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
+const reviewTabs = [
+  { to: '/admin/comments', label: '评论审核', icon: 'ph:chat-circle-dots-bold' },
+  { to: '/admin/friend-applications', label: '友链申请', icon: 'ph:handshake-bold' },
+]
 const toast = useToast()
 const loading = ref(true)
 const applications = ref<any[]>([])

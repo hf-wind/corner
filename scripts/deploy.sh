@@ -4,6 +4,19 @@ set -Eeuo pipefail
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
 
+set -a
+# shellcheck disable=SC1091
+source ./.env
+set +a
+data_root="$(realpath -m "${DATA_ROOT:-$project_dir/data}")"
+sudo -n install -d -m 0750 -o ubuntu -g ubuntu "$data_root/backup-control"
+sudo -n install -m 0644 deploy/systemd/corner-backup.service /etc/systemd/system/corner-backup.service
+sudo -n install -m 0644 deploy/systemd/corner-backup.timer /etc/systemd/system/corner-backup.timer
+sudo -n install -m 0644 deploy/systemd/corner-backup-control.service /etc/systemd/system/corner-backup-control.service
+sudo -n install -m 0644 deploy/systemd/corner-backup-control.path /etc/systemd/system/corner-backup-control.path
+sudo -n systemctl daemon-reload
+sudo -n systemctl enable --now corner-backup.timer corner-backup-control.path
+
 if [[ -x scripts/backup.sh ]] && docker compose ps --status running postgres | grep -q postgres; then
   SKIP_BACKUP_EMAIL=1 ./scripts/backup.sh
 fi

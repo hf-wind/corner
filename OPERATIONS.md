@@ -31,8 +31,11 @@ EMAIL_FROM_ADDRESS=1833079849@qq.com
 
 BACKUP_ROOT=/srv/corner/backups
 BACKUP_RETENTION_DAYS=14
-BACKUP_EMAIL_TO=1833079849@qq.com
+BACKUP_ARCHIVE_EMAIL_TO=huifeng680@gmail.com
+BACKUP_NOTIFICATION_EMAIL_TO=1833079849@qq.com
 BACKUP_EMAIL_MAX_MB=20
+BACKUP_ENCRYPTION_KEY=至少32位的独立随机密钥
+BACKUP_RECOVERY_TOKEN=至少32位的独立恢复口令
 ```
 
 修改后执行：
@@ -86,33 +89,34 @@ docker compose exec -T redis redis-cli -a "$REDIS_PASS" --scan --pattern 'corner
 
 ## 备份与恢复
 
-每天约北京时间 03:30 自动备份。每个目录包含数据库、上传文件、环境配置、Git 提交和 SHA256；超过 14 天的备份目录会自动删除。邮件附件包含数据库和上传文件，但明确排除 `environment.env`；附件超过默认 20MB 时只发送报告，完整备份仍留在服务器。
+每天约北京时间 03:30 自动生成完整 `tar.zst` 迁移归档，超过 14 天的恢复点自动删除。归档邮箱用于保存不超过 20MB 的加密完整归档（Gmail 普通附件上限约 25MB）；管理员邮箱始终收到详细结果。超过阈值时仅发报告。环境变量、SSH 密钥和 TLS 证书只存在于归档内的加密包，不会明文发送。
 
 ```bash
 cd /srv/corner/app
 ./scripts/backup.sh
-latest="$(find /srv/corner/backups -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+latest="$(find /srv/corner/backups -mindepth 1 -maxdepth 1 -type d -name '20*T*Z' | sort | tail -n 1)"
 (cd "$latest" && sha256sum --check SHA256SUMS)
+zstd -t "$latest"/corner-backup-*.tar.zst
 ```
 
 恢复会替换数据库。先确认目标目录，再执行：
 
 ```bash
 cd /srv/corner/app
-cp /path/to/backup/environment.env .env
-chmod 600 .env
 CONFIRM_RESTORE=corner ./scripts/restore.sh /path/to/backup
 ```
+
+常规恢复只替换数据库和上传文件，不读取或覆盖环境变量。迁移服务器时，应先使用单独保管的 `BACKUP_ENCRYPTION_KEY` 解密恢复点中的 `secrets/secrets.tar.enc`，核对目标路径后再原样恢复 `.env`、SSH、证书等系统级资产。
 
 ## 迁移服务器
 
 1. 在旧服务器执行一次手工备份并校验 `SHA256SUMS`。
-2. 将完整备份目录复制到新服务器，不要通过邮件附件迁移 `.env`。
+2. 将完整恢复点复制到新服务器，单独安全传递 `BACKUP_ENCRYPTION_KEY`，不得与归档放在同一介质。
 3. 新服务器安装 Docker Engine、Compose plugin、Git、UFW 和 fail2ban。
 4. 创建 `/srv/corner/{app,data,backups}`，克隆私有仓库并安装只读 deploy key。
-5. 从备份复制 `environment.env` 为 `.env`，更新 DNS 到新公网 IP。
+5. 解密 `secrets/secrets.tar.enc`，检查并恢复 `.env`、SSH 与 Caddy状态，再更新 DNS 到新公网 IP。
 6. 使用 `restore.sh` 恢复，再启动 Compose；检查迁移、HTTPS、登录、邮件、Turnstile 和上传文件。
-7. 安装 `deploy/systemd/corner-backup.*` 并启用 timer。
+7. 安装 `deploy/systemd/corner-backup*`，启用 timer 和 control path。
 8. 更新 GitHub Actions 的 `SSH_HOST`、`SSH_KNOWN_HOSTS` 和必要的 CI SSH 密钥。
 
 数据恢复完成前不要停旧服务器。DNS 切换并验收至少 24 小时后，再下线旧机。

@@ -41,6 +41,7 @@
                 :toolbars="toolbars"
                 :theme="editorTheme"
                 @upload-img="onUploadImg"
+                @save="save"
                 class="md-editor"
               />
             </client-only>
@@ -65,6 +66,9 @@
             <div class="meta-row meta-row-inline">
               <label>推荐</label>
               <a-switch v-model:checked="form.featured" />
+              <a-button size="small" @click="openVersions">
+                <Icon name="ph:clock-counter-clockwise-bold" />版本记录
+              </a-button>
               <a-button
                 type="primary"
                 size="small"
@@ -216,6 +220,38 @@
         </section>
       </div>
     </a-modal>
+    <a-modal
+      v-model:open="versionsOpen"
+      title="文章版本记录"
+      width="720px"
+      :footer="null"
+    >
+      <a-spin :spinning="versionsLoading">
+        <div v-if="versions.length" class="version-list">
+          <article v-for="item in versions" :key="item.id">
+            <span class="version-index">V{{ item.version }}</span>
+            <div>
+              <header>
+                <strong>{{ item.title || "未命名版本" }}</strong>
+                <a-tag color="blue">
+                  {{ versionSource(item.source) }}
+                </a-tag>
+              </header>
+              <p>{{ item.excerpt || "该版本未填写摘要" }}</p>
+              <small>{{ formatVersionTime(item.createdAt) }} · {{ item.createdBy?.username || "系统" }} · 正文 {{ item.contentLength }} 字符</small>
+            </div>
+            <a-button
+              size="small"
+              :loading="restoringVersion === item.id"
+              @click="confirmRestoreVersion(item)"
+            >
+              <Icon name="ph:arrow-counter-clockwise-bold" />恢复
+            </a-button>
+          </article>
+        </div>
+        <a-empty v-else-if="!versionsLoading" description="暂无版本记录" />
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -271,6 +307,10 @@ const aiTransforming = ref(false);
 const aiDiffOpen = ref(false);
 const aiOriginal = ref("");
 const aiOutput = ref("");
+const versionsOpen = ref(false);
+const versionsLoading = ref(false);
+const restoringVersion = ref("");
+const versions = ref<any[]>([]);
 const aiSelection = reactive({ start: 0, end: 0 });
 const aiActions = [
   { action: "polish", label: "润色", icon: "ph:magic-wand-bold" },
@@ -635,6 +675,50 @@ async function persistPost(confirmExactLocation: boolean) {
   }
   saving.value = false;
 }
+
+async function openVersions() {
+  versionsOpen.value = true;
+  versionsLoading.value = true;
+  try {
+    versions.value = await api.get<any[]>(`/posts/${route.params.slug}/versions`);
+  } catch (error: any) {
+    versions.value = [];
+    toast.error(error?.message || "版本记录加载失败");
+  } finally {
+    versionsLoading.value = false;
+  }
+}
+
+function versionSource(source: string) {
+  return source === "publish" ? "发布快照" : "历史发布";
+}
+
+function formatVersionTime(value: string) {
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
+
+function confirmRestoreVersion(item: any) {
+  Modal.confirm({
+    title: `恢复到 V${item.version}？`,
+    content: "恢复会把该发布版本替换为当前草稿，线上页面保持不变；确认内容后需要再次点击发布。",
+    okText: "确认恢复",
+    cancelText: "取消",
+    onOk: async () => {
+      restoringVersion.value = item.id;
+      try {
+        const restored = await api.post<any>(`/posts/${route.params.slug}/versions/${item.id}/restore`);
+        originalContent = "";
+        hasUnsaved = false;
+        toast.success("版本已恢复");
+        window.location.assign(`/admin/posts/${restored.slug || route.params.slug}`);
+      } catch (error: any) {
+        toast.error(error?.message || "恢复失败");
+      } finally {
+        restoringVersion.value = "";
+      }
+    },
+  });
+}
 </script>
 
 <style scoped>
@@ -901,6 +985,45 @@ async function persistPost(confirmExactLocation: boolean) {
 .ai-diff section:last-child pre {
   border-color: color-mix(in srgb, var(--c-primary) 35%, var(--border));
 }
+.version-list {
+  display: grid;
+  max-height: 62vh;
+  overflow: auto;
+}
+.version-list article {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.version-index {
+  display: grid;
+  width: 40px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-size: 0.64rem;
+  font-weight: 700;
+  place-items: center;
+}
+.version-list header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.version-list strong { font-size: 0.7rem; }
+.version-list p {
+  overflow: hidden;
+  margin: 5px 0;
+  color: var(--c-text-3);
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.version-list small { color: var(--c-text-4); font-size: 0.52rem; }
 @media (max-width: 700px) {
   .ai-diff {
     grid-template-columns: 1fr;
@@ -908,6 +1031,8 @@ async function persistPost(confirmExactLocation: boolean) {
   .ai-selection-tools {
     flex-wrap: wrap;
   }
+  .version-list article { grid-template-columns: 40px minmax(0, 1fr); }
+  .version-list article > :deep(.ant-btn) { grid-column: 1 / -1; }
 }
 </style>
 

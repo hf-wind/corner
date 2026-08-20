@@ -76,6 +76,7 @@
               tabindex="0"
               :aria-checked="selectedIds.has(item.id)"
               @click="toggleSelect(item)"
+              @dblclick.stop="previewItem(item)"
               @keydown.enter.prevent="toggleSelect(item)"
               @keydown.space.prevent="toggleSelect(item)"
             >
@@ -95,6 +96,15 @@
                   />
                 </div>
                 <div v-else class="media-card-icon"><FileOutlined /></div>
+                <button
+                  type="button"
+                  class="media-card-preview-btn"
+                  title="预览文件"
+                  aria-label="预览文件"
+                  @click.stop="previewItem(item)"
+                >
+                  <Icon name="ph:eye-bold" />
+                </button>
                 <button
                   type="button"
                   class="media-card-selected"
@@ -132,6 +142,12 @@
       </div>
     </div>
   </a-modal>
+  <ImageLightbox
+    v-model="preview.open"
+    v-model:index="preview.index"
+    :images="previewItems"
+    label="媒体库预览"
+  />
 </template>
 
 <script setup lang="ts">
@@ -178,6 +194,16 @@ const selectedIds = ref(new Set<string>());
 const selectedItems = ref(new Map<string, any>());
 let mediaRequestSequence = 0;
 const selected = computed(() => [...selectedItems.value.values()]);
+const preview = reactive({ open: false, index: 0 });
+const previewItems = computed(() =>
+  items.value.map((item) => ({
+    id: item.id,
+    src: item.path,
+    name: item.originalName || item.filename,
+    caption: item.originalName || item.filename,
+    mimeType: item.mimeType,
+  })),
+);
 const uploadFolder = computed(() => {
   if (activeMenu.value.startsWith("folder:")) return activeMenu.value.slice(7);
   return props.folder || "general";
@@ -198,6 +224,13 @@ watch(
 
 const isImage = (item: any) => item.mimeType?.startsWith("image/");
 const isAudio = (item: any) => item.mimeType?.startsWith("audio/");
+
+function previewItem(item: any) {
+  const index = items.value.findIndex((entry) => entry.id === item.id);
+  if (index < 0) return;
+  preview.index = index;
+  preview.open = true;
+}
 
 function toggleSelect(item: any) {
   if (props.type && !String(item.mimeType || "").startsWith(`${props.type}/`)) {
@@ -470,6 +503,27 @@ watch(visible, (v) => {
     opacity 0.15s ease,
     background-color 0.15s ease,
     border-color 0.15s ease;
+}
+.media-card-preview-btn {
+  position: absolute;
+  right: 34px;
+  bottom: 6px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ld-bg-card) 90%, transparent);
+  color: var(--c-text);
+  cursor: pointer;
+  opacity: 0;
+  place-items: center;
+  transition: opacity 0.15s ease;
+}
+.media-card:hover .media-card-preview-btn,
+.media-card-preview-btn:focus-visible {
+  opacity: 1;
 }
 .media-card:hover .media-card-selected,
 .media-card-selected:focus-visible,
