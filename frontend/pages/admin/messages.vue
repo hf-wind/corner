@@ -82,7 +82,7 @@ const loading = ref(true)
 const notifications = ref<any[]>([])
 const total = ref(0)
 const currentPage = ref(1)
-const pageSize = 20
+const pageSize = 10
 const filterType = ref<'all' | 'unread'>('all')
 const detail = reactive({ open: false, item: null as any })
 

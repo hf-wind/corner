@@ -22,7 +22,7 @@ export class AdminUserQueryDto {
   @Min(1)
   @Max(100)
   @Type(() => Number)
-  limit = 20;
+  limit = 10;
 
   @IsOptional()
   @IsString()

@@ -118,6 +118,207 @@ export class AiNativeService {
     };
   }
 
+  private async searchCommentCards(query: string, limit: number) {
+    const contains = { contains: query, mode: 'insensitive' as const };
+    const [postComments, momentComments] = await Promise.all([
+      this.prisma.comment.findMany({
+        where: {
+          status: 'approved',
+          post: { status: 'published' },
+          OR: [
+            { content: contains },
+            { authorName: contains },
+          ],
+        },
+        include: { post: { select: { title: true, slug: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 80,
+      }),
+      this.prisma.momentComment.findMany({
+        where: {
+          status: 'approved',
+          moment: { status: 'published' },
+          OR: [
+            { content: contains },
+            { authorName: contains },
+          ],
+        },
+        include: { moment: { select: { title: true, slug: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 80,
+      }),
+    ]);
+    const cards = [
+      ...postComments.map((comment) => ({
+        type: 'comment',
+        sourceId: comment.id,
+        title: `评论 · ${comment.post.title}`,
+        href: `/article/${comment.post.slug}?commentId=${comment.id}${comment.parentId ? `&parentId=${comment.parentId}` : ''}`,
+        excerpt: this.plain(comment.content, 280),
+        image: null,
+        occurredAt: comment.createdAt?.toISOString() || null,
+        metadata: { commentId: comment.id, parentId: comment.parentId },
+        score: 1.2,
+      })),
+      ...momentComments.map((comment) => ({
+        type: 'moment-comment',
+        sourceId: comment.id,
+        title: `评论 · ${comment.moment.title}`,
+        href: `/moments?focus=${encodeURIComponent(comment.moment.slug)}&commentId=${comment.id}${comment.parentId ? `&parentId=${comment.parentId}` : ''}`,
+        excerpt: this.plain(comment.content, 280),
+        image: null,
+        occurredAt: comment.createdAt?.toISOString() || null,
+        metadata: { commentId: comment.id, parentId: comment.parentId },
+        score: 1.2,
+      })),
+    ];
+    return cards
+      .filter((card) =>
+        `${card.title} ${card.excerpt}`
+          .toLocaleLowerCase()
+          .includes(query.toLocaleLowerCase()),
+      )
+      .sort((left, right) => Number(right.occurredAt || 0) - Number(left.occurredAt || 0))
+      .slice(0, Math.max(1, Math.min(80, limit)));
+  }
+
+  private searchSnippet(value: unknown, query: string, max = 280) {
+    const text = this.plain(value, 12000);
+    if (!text) return '';
+    const index = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+    if (index < 0) return text.slice(0, max);
+    const start = Math.max(0, index - Math.floor(max * 0.35));
+    return `${start > 0 ? '…' : ''}${text.slice(start, start + max)}${start + max < text.length ? '…' : ''}`;
+  }
+
+  private async searchPublishedContent(query: string, limit: number) {
+    const contains = { contains: query, mode: 'insensitive' as const };
+    const [posts, moments, albums, libraryItems, journeys, stories, places, photos] =
+      await Promise.all([
+        this.prisma.post.findMany({
+          where: {
+            status: 'published',
+            OR: [{ title: contains }, { content: contains }, { excerpt: contains }],
+          },
+          select: { id: true, slug: true, title: true, content: true, excerpt: true, publishedAt: true },
+          take: 80,
+        }),
+        this.prisma.moment.findMany({
+          where: {
+            status: 'published',
+            OR: [{ title: contains }, { content: contains }, { excerpt: contains }],
+          },
+          select: { id: true, slug: true, title: true, content: true, excerpt: true, publishedAt: true },
+          take: 80,
+        }),
+        this.prisma.album.findMany({
+          where: {
+            status: 'published',
+            OR: [{ title: contains }, { description: contains }],
+          },
+          select: { id: true, slug: true, title: true, description: true, publishedAt: true },
+          take: 80,
+        }),
+        this.prisma.libraryItem.findMany({
+          where: {
+            publishStatus: 'published',
+            OR: [
+              { title: contains },
+              { originalTitle: contains },
+              { creator: contains },
+              { summary: contains },
+              { reflection: contains },
+            ],
+          },
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            originalTitle: true,
+            creator: true,
+            summary: true,
+            reflection: true,
+            publishedAt: true,
+          },
+          take: 80,
+        }),
+        this.prisma.journey.findMany({
+          where: {
+            status: 'published',
+            OR: [{ title: contains }, { description: contains }],
+          },
+          select: { id: true, slug: true, title: true, description: true, publishedAt: true },
+          take: 80,
+        }),
+        this.prisma.storyRoute.findMany({
+          where: {
+            status: 'published',
+            OR: [{ title: contains }, { description: contains }],
+          },
+          select: { id: true, slug: true, title: true, description: true, publishedAt: true },
+          take: 80,
+        }),
+        this.prisma.place.findMany({
+          where: {
+            OR: [
+              { name: contains },
+              { address: contains },
+              { city: contains },
+              { province: contains },
+              { country: contains },
+            ],
+          },
+          select: { id: true, slug: true, name: true, address: true, city: true, province: true, country: true },
+          take: 80,
+        }),
+        this.prisma.albumItem.findMany({
+          where: {
+            caption: contains,
+            album: { status: 'published' },
+          },
+          select: { id: true, caption: true, album: { select: { title: true, slug: true } } },
+          take: 80,
+        }),
+      ]);
+
+    const createCard = (
+      type: string,
+      sourceId: string,
+      title: string,
+      href: string,
+      text: unknown,
+      occurredAt?: Date | null,
+      metadata: Record<string, unknown> = {},
+    ) => ({
+      type,
+      sourceId,
+      title,
+      href,
+      excerpt: this.searchSnippet(text, query),
+      image: null,
+      occurredAt: occurredAt?.toISOString() || null,
+      metadata,
+      score: 1.05,
+    });
+
+    return [
+      ...posts.map((item) => createCard('post', item.id, item.title, `/article/${item.slug}`, item.content || item.excerpt, item.publishedAt)),
+      ...moments.map((item) => createCard('moment', item.id, item.title, `/moments?focus=${encodeURIComponent(item.slug)}`, item.content || item.excerpt, item.publishedAt)),
+      ...albums.map((item) => createCard('album', item.id, item.title, `/albums/${item.slug}`, item.description, item.publishedAt)),
+      ...libraryItems.map((item) => createCard('library', item.id, item.title, `/library/${item.slug}`, [item.originalTitle, item.creator, item.summary, item.reflection].filter(Boolean).join(' · '), item.publishedAt)),
+      ...journeys.map((item) => createCard('journey', item.id, item.title, `/journeys/${item.slug}`, item.description, item.publishedAt)),
+      ...stories.map((item) => createCard('story', item.id, item.title, `/stories/${item.slug}`, item.description, item.publishedAt)),
+      ...places.map((item) => createCard('place', item.id, item.name, `/places/${item.slug}`, [item.address, item.city, item.province, item.country].filter(Boolean).join(' · '))),
+      ...photos.map((item) => createCard('photo', item.id, `照片 · ${item.album.title}`, `/albums/${item.album.slug}?photo=${item.id}`, item.caption, null, { albumTitle: item.album.title })),
+    ]
+      .filter((card) =>
+        `${card.title} ${card.excerpt}`
+          .toLocaleLowerCase()
+          .includes(query.toLocaleLowerCase()),
+      )
+      .slice(0, Math.max(1, Math.min(80, limit)));
+  }
+
   private firstContentImage(value: unknown) {
     const text = String(value || '');
     return (
@@ -218,30 +419,20 @@ export class AiNativeService {
     const cached = this.searchCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return cached.items;
     const typeFilter = allowed.length ? { contentType: { in: allowed } } : {};
-    const [textMatches, recentItems] = await Promise.all([
-      this.prisma.aiContentIndex.findMany({
-        where: {
-          ...typeFilter,
-          OR: [
-            { title: { contains: normalizedQuery, mode: 'insensitive' } },
-            { excerpt: { contains: normalizedQuery, mode: 'insensitive' } },
-            { body: { contains: normalizedQuery, mode: 'insensitive' } },
-          ],
-        },
-        orderBy: { occurredAt: 'desc' },
-        take: 240,
-      }),
-      this.prisma.aiContentIndex.findMany({
-        where: typeFilter,
-        orderBy: { occurredAt: 'desc' },
-        take: 240,
-      }),
-    ]);
-    const items = [...new Map(
-      [...textMatches, ...recentItems].map((item) => [item.id, item]),
-    ).values()];
+    const items = await this.prisma.aiContentIndex.findMany({
+      where: {
+        ...typeFilter,
+        OR: [
+          { title: { contains: normalizedQuery, mode: 'insensitive' } },
+          { excerpt: { contains: normalizedQuery, mode: 'insensitive' } },
+          { body: { contains: normalizedQuery, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: 240,
+    });
     const queryVector = this.vector(normalizedQuery);
-    const result = items
+    const contentResult = items
       .map((item) => ({
         item,
         score: (() => {
@@ -262,6 +453,18 @@ export class AiNativeService {
       )
       .slice(0, Math.max(1, Math.min(12, limit)))
       .map(({ item, score }) => this.card(item, score));
+    const [contentResultDirect, commentResult] = await Promise.all([
+      this.searchPublishedContent(normalizedQuery, Math.max(1, Math.min(80, limit * 5))),
+      this.searchCommentCards(normalizedQuery, Math.max(1, Math.min(80, limit * 4))),
+    ]);
+    const result = [...contentResult, ...contentResultDirect, ...commentResult]
+      .sort(
+        (left, right) =>
+          Number(right.score || 0) - Number(left.score || 0) ||
+          new Date(right.occurredAt || 0).getTime() -
+            new Date(left.occurredAt || 0).getTime(),
+      )
+      .slice(0, Math.max(1, Math.min(12, limit)));
     this.searchCache.set(cacheKey, { expiresAt: Date.now() + 15_000, items: result });
     return result;
   }

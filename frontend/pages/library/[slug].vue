@@ -6,7 +6,7 @@
       <p>它可能还在草稿箱，或已经被移走。</p>
       <AppLink to="/library">返回书影</AppLink>
     </div>
-    <template v-else>
+    <template v-else-if="item">
       <section class="detail-hero content-reveal">
         <div class="hero-backdrop" :style="item.coverImage
             ? { backgroundImage: `url(${mediaUrl(item.coverImage)})` }
@@ -83,7 +83,7 @@
                 <h2>我的体会</h2>
               </div>
             </header>
-            <div class="reflection-text">{{ item.reflection }}</div>
+            <div class="reflection-text"><span v-if="reflectionParts.prefix">{{ reflectionParts.prefix }}</span><b v-if="reflectionParts.lead">{{ reflectionParts.lead }}</b>{{ reflectionParts.rest }}</div>
           </section>
           <section v-if="item.summary" class="content-section">
             <header>
@@ -205,6 +205,12 @@ const experienceLabel = computed(() => {
   return item.value?.experienceDate
     ? formatMonth(item.value.experienceDate)
     : "";
+});
+const reflectionParts = computed(() => {
+  const source = String(item.value?.reflection || "");
+  const match = source.match(/[\p{L}\p{N}\u4e00-\u9fff]/u);
+  if (!match || match.index == null) return { prefix: source, lead: "", rest: "" };
+  return { prefix: source.slice(0, match.index), lead: match[0], rest: source.slice(match.index + match[0].length) };
 });
 const infoRows = computed(() => {
   const value = item.value;
@@ -609,7 +615,7 @@ useHead({
   white-space: pre-line;
 }
 
-.reflection-text::first-letter {
+.reflection-text > b {
   float: left;
   margin: 8px 10px 0 0;
   color: var(--detail-accent);

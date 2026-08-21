@@ -47,7 +47,7 @@ export class CategoryService {
     return { ...cat, postCount: cat._count.posts };
   }
 
-  async findPosts(slug: string, page = 1, limit = 20) {
+  async findPosts(slug: string, page = 1, limit = 10) {
     const cat = await this.prisma.category.findUnique({ where: { slug } });
     if (!cat) throw new NotFoundException('Category not found');
     const where = { categoryId: cat.id };

@@ -356,7 +356,7 @@ type PlaylistMeta = {
   id: string;
 };
 
-const PLAYLIST_PAGE_SIZE = 6;
+const PLAYLIST_PAGE_SIZE = 10;
 
 const api = useApi();
 const toast = useToast();

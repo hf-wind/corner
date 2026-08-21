@@ -185,7 +185,12 @@
           </div>
         </div>
 
-        <ArticleComments :post-id="article.id" />
+        <ArticleComments
+          :post-id="article.id"
+          :focus-comment-id="focusCommentId"
+          :focus-parent-id="focusParentId"
+          :highlight-query="highlightQuery"
+        />
       </template>
       <section v-else-if="!articleLoading" class="article-state" aria-live="polite">
         <Icon name="ph:file-x-bold" />
@@ -226,6 +231,7 @@
 import avatarImg from "~/assets/images/avatar.jpg";
 import { getDisplayImageUrl } from "~/utils/imagePerformance";
 import { gsap } from "gsap";
+import { focusSearchHighlight } from "~/composables/useSearchHighlight";
 
 function coverUrl(source: string) {
   return getDisplayImageUrl(source, 800, 300);
@@ -264,6 +270,8 @@ const excerptTyping = computed(
   () => excerptVisibleCount.value < excerptCharacters.value.length,
 );
 const highlightQuery = computed(() => String(route.query.highlight || '').trim().slice(0, 80));
+const focusCommentId = computed(() => String(route.query.commentId || '').trim());
+const focusParentId = computed(() => String(route.query.parentId || '').trim());
 const articleContext = computed(() => ({
   title: article.value?.title || "",
   content: article.value?.content || "",
@@ -474,34 +482,7 @@ function checkOutdated() {
 }
 
 function focusSearchResult() {
-  const query = highlightQuery.value.toLocaleLowerCase();
-  const root = articleContentRef.value;
-  if (!query || !root) return;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node: Text | null = null;
-  while (walker.nextNode()) {
-    const current = walker.currentNode as Text;
-    if (current.textContent?.toLocaleLowerCase().includes(query)) {
-      node = current;
-      break;
-    }
-  }
-  if (!node || !node.textContent) return;
-  const start = node.textContent.toLocaleLowerCase().indexOf(query);
-  const range = document.createRange();
-  range.setStart(node, start);
-  range.setEnd(node, start + query.length);
-  const mark = document.createElement('mark');
-  mark.className = 'search-highlight';
-  range.surroundContents(mark);
-  requestAnimationFrame(() => {
-    const container = articleMainRef.value;
-    const target = mark.getBoundingClientRect();
-    if (!container) return;
-    const bounds = container.getBoundingClientRect();
-    container.scrollTo({ top: Math.max(0, container.scrollTop + target.top - bounds.top - 72), behavior: 'smooth' });
-    window.setTimeout(() => mark.classList.add('is-settled'), 900);
-  });
+  if (highlightQuery.value) focusSearchHighlight(highlightQuery.value, articleMainRef.value);
 }
 
 onMounted(async () => {
@@ -580,7 +561,7 @@ onUnmounted(() => {
 }
 
 .article-page.is-immersive .article-main > * {
-  width: min(100%, 900px);
+  width: min(100%, 760px);
 }
 
 .article-page.is-immersive :deep(.sidebar-right) {

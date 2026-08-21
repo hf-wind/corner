@@ -24,9 +24,13 @@
 
 <script setup lang="ts">
 import { useComments } from '~/composables/useComments'
+import { focusSearchHighlight } from '~/composables/useSearchHighlight'
 
 const props = defineProps<{
   momentId: string
+  focusCommentId?: string
+  focusParentId?: string
+  highlightQuery?: string
 }>()
 
 const emit = defineEmits<{
@@ -52,7 +56,9 @@ const {
   replyTarget,
   replySubmitting,
   page,
+  totalPages,
   loadComments,
+  loadMoreReplies,
   submitComment,
   submitReply,
   toggleLike,
@@ -64,8 +70,38 @@ let initialTotal = 0
 const isSubmitting = ref(false)
 
 watch(contentId, (id) => {
-  if (id) void loadComments(1)
+  if (id) void loadComments(1).then(() => void focusComment())
 }, { immediate: true })
+
+watch(() => `${props.focusCommentId || ''}:${props.focusParentId || ''}`, () => {
+  if (props.focusCommentId) void focusComment()
+})
+
+async function focusComment() {
+  const targetId = String(props.focusCommentId || '').trim()
+  if (!targetId || typeof document === 'undefined') return
+  const findTarget = () => document.getElementById(`comment-${targetId}`)
+  const findParent = () => comments.value.find((comment) => comment.id === props.focusParentId)
+  for (let targetPage = 1; targetPage <= totalPages.value; targetPage += 1) {
+    if (targetPage > 1 && !findParent() && !findTarget()) await loadComments(targetPage, true)
+    await nextTick()
+    const parent = findParent()
+    if (parent && !findTarget()) {
+      let attempts = 0
+      while (!findTarget() && (parent.replyCount || 0) > (parent.replies?.length || 0) && attempts < 20) {
+        attempts += 1
+        await loadMoreReplies(parent)
+      }
+      await nextTick()
+    }
+    const target = findTarget()
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (props.highlightQuery) focusSearchHighlight(props.highlightQuery, target)
+      return
+    }
+  }
+}
 
 async function handleSubmit(content: string) {
   isSubmitting.value = true

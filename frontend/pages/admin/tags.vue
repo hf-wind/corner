@@ -62,7 +62,7 @@
             <template v-if="column.key === 'date'">{{ (record.publishedAt||record.createdAt||'').slice(0,10) }}</template>
           </template>
         </a-table>
-        <AdminPagination v-model:current="viewDialog.page" :page-size="20" :total="viewDialog.total" :show-size-changer="false" @change="loadViewPosts" />
+        <AdminPagination v-model:current="viewDialog.page" :page-size="10" :total="viewDialog.total" :show-size-changer="false" @change="loadViewPosts" />
       </a-spin>
     </a-modal>
 
@@ -209,7 +209,7 @@ async function viewPosts(tag: any) {
 async function loadViewPosts() {
   viewDialog.loading = true
   try {
-    const res = await api.get<any>(`/tags/${viewDialog.slug}/posts`, { page: viewDialog.page, limit: 20 })
+        const res = await api.get<any>(`/tags/${viewDialog.slug}/posts`, { page: viewDialog.page, limit: 10 })
     viewDialog.posts = res.items ?? []; viewDialog.total = res.total ?? 0; viewDialog.totalPages = res.totalPages ?? 1
   } catch { viewDialog.posts = []; viewDialog.total = 0; viewDialog.totalPages = 0 }
   viewDialog.loading = false

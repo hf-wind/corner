@@ -852,7 +852,7 @@ export class VisitorService {
     return { ok: true, releasedAt };
   }
 
-  async listMessages(type: 'message' | 'bottle', page: number, pageSize = 20) {
+  async listMessages(type: 'message' | 'bottle', page: number, pageSize = 10) {
     const where = { type, status: 'approved' };
     const [items, total] = await Promise.all([
       this.prisma.visitorMessage.findMany({
@@ -1178,7 +1178,7 @@ export class VisitorService {
       ];
     }
     const page = Math.max(1, Number(query.page) || 1);
-    const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 20));
+    const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 10));
     const [items, total] = await Promise.all([
       this.prisma.visitorMessage.findMany({
         where,
@@ -1344,7 +1344,7 @@ export class VisitorService {
       where.nickname = { in: ['', null] };
     }
     const page = Math.max(1, Number(query.page) || 1);
-    const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 20));
+    const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 10));
     const [items, total] = await Promise.all([
       this.prisma.visitorProfile.findMany({
         where,

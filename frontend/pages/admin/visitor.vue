@@ -205,7 +205,7 @@ const pendingTotal = computed(() => stats.pendingMessages + stats.pendingBottles
 const loadingMsgs = ref(false)
 const messages = ref<any[]>([])
 const msgFilter = reactive({ keyword: '', type: '', status: '' })
-const msgPagination = reactive({ current: 1, pageSize: 20, total: 0, showSizeChanger: false })
+const msgPagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: false })
 const msgColumns = [
   { title: '内容', key: 'content', minWidth: 280 },
   { title: '署名', key: 'nickname', width: 110 },
@@ -220,7 +220,7 @@ function resetMessageFilters() { Object.assign(msgFilter, { keyword: '', type: '
 const loadingProfiles = ref(false)
 const profiles = ref<any[]>([])
 const profileFilter = reactive({ keyword: '', type: '' })
-const profilePagination = reactive({ current: 1, pageSize: 20, total: 0, showSizeChanger: false })
+const profilePagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: false })
 const profileColumns = [
   { title: '昵称', key: 'nickname', width: 160 },
   { title: '地区', key: 'region', width: 130 },

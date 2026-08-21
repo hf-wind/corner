@@ -98,7 +98,7 @@ const search = ref('')
 const role = ref<'all' | 'admin' | 'user'>('all')
 const status = ref<'all' | 'active' | 'disabled'>('all')
 const page = ref(1)
-const pageSize = 20
+const pageSize = 10
 const total = ref(0)
 const savingIds = ref(new Set<string>())
 

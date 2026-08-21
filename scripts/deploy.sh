@@ -39,4 +39,11 @@ curl --fail --silent --show-error \
   --max-time 15 \
   https://corner.ink/api/health >/dev/null
 
+# BuildKit keeps layers and npm cache outside the project (usually /var/lib/docker).
+# Reclaim old build artifacts after a successful rollout while retaining recent
+# layers for faster rollback and never touching application volumes.
+docker builder prune --all --force --filter 'until=168h' >/dev/null 2>&1 || true
+docker image prune --all --force --filter 'until=168h' >/dev/null 2>&1 || true
+docker container prune --force --filter 'until=168h' >/dev/null 2>&1 || true
+
 echo "Deployment completed: $(git rev-parse --short HEAD)"

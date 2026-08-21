@@ -37,7 +37,7 @@ export class TagController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.tag.findPosts(slug, page ?? 1, limit ?? 20);
+    return this.tag.findPosts(slug, page ?? 1, limit ?? 10);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

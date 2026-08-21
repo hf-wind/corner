@@ -134,7 +134,7 @@
               </template>
             </template>
           </a-table>
-          <AdminPagination :current="itemStates[pack.id]?.page || 1" :page-size="itemStates[pack.id]?.pageSize || 20" :total="itemStates[pack.id]?.total || 0" :show-size-changer="false" @change="(page: number) => changeItemPage(pack, page)" />
+          <AdminPagination :current="itemStates[pack.id]?.page || 1" :page-size="itemStates[pack.id]?.pageSize || 10" :total="itemStates[pack.id]?.total || 0" :show-size-changer="false" @change="(page: number) => changeItemPage(pack, page)" />
         </div>
       </template>
     </a-table>
@@ -312,7 +312,7 @@ function ensureItemState(packId: string) {
   itemStates[packId] ||= {
     items: [],
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
     total: 0,
     loading: false,
     loaded: false,

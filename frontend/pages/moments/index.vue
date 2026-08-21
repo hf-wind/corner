@@ -50,6 +50,9 @@
                 :key="moment.slug"
                 :moment="moment"
                 :initially-expanded-comments="moment.slug === focusSlug"
+                :focus-comment-id="moment.slug === focusSlug ? focusCommentId : ''"
+                :focus-parent-id="moment.slug === focusSlug ? focusParentId : ''"
+                :highlight-query="moment.slug === focusSlug ? highlightQuery : ''"
               />
             </div>
 
@@ -141,6 +144,9 @@ const placeOptions = computed(() => [
   })),
 ]);
 const focusSlug = computed(() => String(route.query.focus || ""));
+const focusCommentId = computed(() => String(route.query.commentId || ""));
+const focusParentId = computed(() => String(route.query.parentId || ""));
+const highlightQuery = computed(() => String(route.query.highlight || ""));
 const visibleImageCount = computed(() =>
   moments.value.reduce(
     (sum, item) => sum + extractMomentImages(item.content).length,

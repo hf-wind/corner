@@ -518,7 +518,7 @@ useHead(() => ({
 .about-footer span { display: block; margin-top: 8px; color: var(--c-text-3); font-family: var(--font-mono); font-size: .6rem; }
 .about-footer strong { color: var(--c-text); font-family: var(--font-brand); font-size: 1.7rem; font-weight: 650; }
 
-.reveal-block { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s cubic-bezier(.16, 1, .3, 1); }
+.reveal-block { opacity: 1; transform: none; transition: opacity .7s ease, transform .7s cubic-bezier(.16, 1, .3, 1); }
 .reveal-block.is-visible { opacity: 1; transform: none; }
 
 @keyframes breeze-move { to { transform: translateX(-50%); } }

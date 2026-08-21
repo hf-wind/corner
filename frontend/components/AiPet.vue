@@ -1218,7 +1218,7 @@ onUnmounted(() => {
   padding: 0;
   cursor: pointer;
   transition: transform 0.2s ease;
-  animation: pet-bob 2.8s ease-in-out infinite;
+  animation: none;
   will-change: transform;
 }
 
@@ -1683,13 +1683,14 @@ onUnmounted(() => {
   gap: 8px;
   margin: 10px 12px 12px;
   padding: 6px 6px 6px 10px;
-  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
-  border-radius: 14px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 0;
   background: color-mix(in srgb, var(--c-bg-1) 74%, transparent);
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  position: relative;
+  transition: border-color 0.2s ease;
 }
+.pet-chat-form::after { content:""; position:absolute; left:0; right:100%; bottom:-1px; height:2px; background:var(--c-primary); transition:right .35s ease; }
 
 .pet-history-loading {
   display: grid;
@@ -1725,8 +1726,10 @@ onUnmounted(() => {
 }
 
 .pet-chat-form:focus-within {
-  border-color: color-mix(in srgb, var(--c-primary) 58%, var(--border));
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 9%, transparent);
+  border-color: color-mix(in srgb, var(--c-primary) 30%, var(--border));
+}
+.pet-chat-form:focus-within::after {
+  right:0;
 }
 .pet-input-mark {
   margin-bottom: 10px;
@@ -1737,8 +1740,8 @@ onUnmounted(() => {
 .pet-input {
   flex: 1;
   min-width: 0;
-  min-height: 32px;
-  max-height: 72px;
+  min-height: 26px;
+  max-height: 56px;
   border: none;
   border-radius: 0;
   padding: 6px 2px 5px;
@@ -1889,19 +1892,17 @@ onUnmounted(() => {
 
 .ai-pet.docked {
   position: relative;
-  top: auto;
   right: auto;
   bottom: auto;
-  left: auto;
-  width: auto;
-  height: auto;
+  width: 88px;
+  height: 92px;
   margin: 0 0 0 auto;
 }
 
 .ai-pet.docked .pet-fab {
-  position: relative;
-  right: auto;
-  bottom: auto;
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: block;
   margin: 0;
   animation: none;
@@ -1965,7 +1966,7 @@ onUnmounted(() => {
     right: 0;
     bottom: 0;
     left: auto;
-    animation: pet-bob 2.8s ease-in-out infinite;
+    animation: none;
   }
 
   .ai-pet.docked .pet-hint {

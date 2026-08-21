@@ -146,7 +146,7 @@ export class FriendLinkService {
     search?: string;
   }) {
     const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+    const limit = Math.min(100, Math.max(1, query.limit ?? 10));
     const keyword = query.search?.trim();
     const where: any = {};
     if (query.status) where.status = query.status;

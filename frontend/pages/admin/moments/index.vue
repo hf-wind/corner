@@ -69,7 +69,7 @@ const loading = ref(true)
 const page = ref(1)
 const total = ref(0)
 const totalPages = ref(1)
-const limit = 12
+const limit = 10
 const publishingSlug = ref('')
 const moments = ref<any[]>([])
 

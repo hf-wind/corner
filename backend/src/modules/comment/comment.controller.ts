@@ -35,7 +35,7 @@ export class CommentController {
       ),
       limit: Math.max(
         1,
-        Math.min(100, query.limit ? parseInt(query.limit) || 20 : 20),
+        Math.min(100, query.limit ? parseInt(query.limit) || 10 : 10),
       ),
       status: query.status,
       keyword: query.keyword,

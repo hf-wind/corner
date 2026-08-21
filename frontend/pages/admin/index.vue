@@ -141,6 +141,42 @@ function activityIcon(type: string) { return ({ post: 'ph:article-bold', moment:
 function relativeTime(value?: string) { if (!value) return '-'; const diff = Date.now() - new Date(value).getTime(); if (diff < 3600000) return `${Math.max(1, Math.floor(diff / 60000))} 分钟前`; if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`; return `${Math.floor(diff / 86400000)} 天前` }
 function trendTotal(values: number[]) { return (values || []).reduce((sum, value) => sum + Number(value || 0), 0) }
 
+function numericSeries(value: unknown, length: number) {
+  const source = Array.isArray(value) ? value : []
+  return Array.from({ length }, (_, index) => {
+    const next = Number(source[index])
+    return Number.isFinite(next) ? next : 0
+  })
+}
+
+function normalizeDashboardPayload(payload: any) {
+  const source = payload && typeof payload === 'object' ? payload : {}
+  const rawTrends = source.trends && typeof source.trends === 'object' ? source.trends : {}
+  const rawContent = rawTrends.content && typeof rawTrends.content === 'object' ? rawTrends.content : {}
+  const rawAi = rawTrends.ai && typeof rawTrends.ai === 'object' ? rawTrends.ai : {}
+  const candidates = [rawTrends.dates, rawTrends.visits, rawContent.posts, rawContent.moments, rawContent.albums, rawContent.library, rawAi.calls, rawAi.inputTokens, rawAi.outputTokens]
+  const length = Math.max(0, ...candidates.map((value) => Array.isArray(value) ? value.length : 0))
+  const dates = Array.from({ length }, (_, index) => String(Array.isArray(rawTrends.dates) ? rawTrends.dates[index] || '' : ''))
+  return {
+    ...source,
+    trends: {
+      dates,
+      visits: numericSeries(rawTrends.visits, length),
+      content: {
+        posts: numericSeries(rawContent.posts, length),
+        moments: numericSeries(rawContent.moments, length),
+        albums: numericSeries(rawContent.albums, length),
+        library: numericSeries(rawContent.library, length),
+      },
+      ai: {
+        calls: numericSeries(rawAi.calls, length),
+        inputTokens: numericSeries(rawAi.inputTokens, length),
+        outputTokens: numericSeries(rawAi.outputTokens, length),
+      },
+    },
+  }
+}
+
 function chartTheme() {
   const styles = getComputedStyle(document.documentElement)
   return {
@@ -165,11 +201,12 @@ function renderCharts() {
   if (!echarts) return
   try {
     const theme = chartTheme()
-    const labels = (data.trends.dates || []).map((date: string) => String(date).slice(5))
+    const trends = normalizeDashboardPayload({ trends: data.trends }).trends
+    const labels = trends.dates.map((date: string, index: number) => String(date || `第 ${index + 1} 天`).slice(5))
     const base = { animationDuration: 450, textStyle: { color: theme.text, fontFamily: 'var(--font-body)' }, grid: { left: 42, right: 16, top: 28, bottom: 30 }, tooltip: { trigger: 'axis' as const }, xAxis: { type: 'category' as const, data: labels, boundaryGap: false, axisLine: { lineStyle: { color: theme.line } }, axisTick: { show: false }, axisLabel: { color: theme.text } }, yAxis: { type: 'value' as const, minInterval: 1, splitLine: { lineStyle: { color: theme.line, type: 'dashed' as const } }, axisLabel: { color: theme.text } } }
-    if (hasVisits.value && visitChartEl.value) { visitChart ||= echarts.init(visitChartEl.value); visitChart.setOption({ ...base, series: [{ name: '访问', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, data: data.trends.visits || [], lineStyle: { width: 3, color: theme.primary }, itemStyle: { color: theme.primary }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: withAlpha(theme.primary, 0.33) }, { offset: 1, color: withAlpha(theme.primary, 0.02) }] } } }] }, true) }
-    if (hasContentTrends.value && contentChartEl.value) { contentChart ||= echarts.init(contentChartEl.value); contentChart.setOption({ ...base, legend: { top: 0, textStyle: { color: theme.text } }, xAxis: { ...base.xAxis, boundaryGap: true }, series: [{ name: '文章', type: 'bar', stack: 'content', data: data.trends.content?.posts || [], itemStyle: { color: theme.primary } }, { name: '瞬间', type: 'bar', stack: 'content', data: data.trends.content?.moments || [], itemStyle: { color: '#43a977' } }, { name: '相册', type: 'bar', stack: 'content', data: data.trends.content?.albums || [], itemStyle: { color: '#d49a32' } }, { name: '书影', type: 'bar', stack: 'content', data: data.trends.content?.library || [], itemStyle: { color: '#bd5268' } }] }, true) }
-    if (hasAiTrends.value && aiChartEl.value) { aiChart ||= echarts.init(aiChartEl.value); aiChart.setOption({ ...base, legend: { top: 0, textStyle: { color: theme.text } }, series: [{ name: '输入 Token', type: 'line', smooth: true, data: data.trends.ai?.inputTokens || [], itemStyle: { color: '#795bbe' } }, { name: '输出 Token', type: 'line', smooth: true, data: data.trends.ai?.outputTokens || [], itemStyle: { color: '#d49a32' } }, { name: '调用', type: 'bar', data: data.trends.ai?.calls || [], itemStyle: { color: withAlpha(theme.primary, 0.33) } }] }, true) }
+    if (hasVisits.value && visitChartEl.value) { visitChart ||= echarts.init(visitChartEl.value); visitChart.setOption({ ...base, series: [{ name: '访问', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, data: trends.visits, lineStyle: { width: 3, color: theme.primary }, itemStyle: { color: theme.primary }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: withAlpha(theme.primary, 0.33) }, { offset: 1, color: withAlpha(theme.primary, 0.02) }] } } }] }, true) }
+    if (hasContentTrends.value && contentChartEl.value) { contentChart ||= echarts.init(contentChartEl.value); contentChart.setOption({ ...base, legend: { top: 0, textStyle: { color: theme.text } }, xAxis: { ...base.xAxis, boundaryGap: true }, series: [{ name: '文章', type: 'bar', stack: 'content', data: trends.content.posts, itemStyle: { color: theme.primary } }, { name: '瞬间', type: 'bar', stack: 'content', data: trends.content.moments, itemStyle: { color: '#43a977' } }, { name: '相册', type: 'bar', stack: 'content', data: trends.content.albums, itemStyle: { color: '#d49a32' } }, { name: '书影', type: 'bar', stack: 'content', data: trends.content.library, itemStyle: { color: '#bd5268' } }] }, true) }
+    if (hasAiTrends.value && aiChartEl.value) { aiChart ||= echarts.init(aiChartEl.value); aiChart.setOption({ ...base, legend: { top: 0, textStyle: { color: theme.text } }, series: [{ name: '输入 Token', type: 'line', smooth: true, data: trends.ai.inputTokens, itemStyle: { color: '#795bbe' } }, { name: '输出 Token', type: 'line', smooth: true, data: trends.ai.outputTokens, itemStyle: { color: '#d49a32' } }, { name: '调用', type: 'bar', data: trends.ai.calls, itemStyle: { color: withAlpha(theme.primary, 0.33) } }] }, true) }
     chartError.value = false
   } catch (error) {
     chartError.value = true
@@ -180,7 +217,7 @@ function renderCharts() {
 function resizeCharts() { visitChart?.resize(); contentChart?.resize(); aiChart?.resize() }
 
 onMounted(async () => {
-  try { Object.assign(data, await api.get<any>('/stats/admin-dashboard')) }
+  try { Object.assign(data, normalizeDashboardPayload(await api.get<any>('/stats/admin-dashboard'))) }
   catch (error: any) { toast.error(error?.message || '仪表盘数据加载失败') }
   finally { loading.value = false }
   await nextTick()

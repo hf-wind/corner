@@ -53,7 +53,7 @@ const analytics = ref<any>({})
 const usage = ref<any>({})
 const page = ref(1)
 const pageSize = 10
-const conversation = reactive<any>({ open: false, loading: false, actor: null, detail: null, page: 1, pageSize: 50 })
+const conversation = reactive<any>({ open: false, loading: false, actor: null, detail: null, page: 1, pageSize: 10 })
 const columns = [
   { title: '身份', key: 'actor', minWidth: 180 },
   { title: '请求 / 消息', key: 'calls', width: 132 },

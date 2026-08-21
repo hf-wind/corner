@@ -55,7 +55,7 @@ export class TagService {
     return { ...tag, postCount: tag._count.posts };
   }
 
-  async findPosts(slug: string, page = 1, limit = 20) {
+  async findPosts(slug: string, page = 1, limit = 10) {
     const tag = await this.prisma.tag.findUnique({ where: { slug } });
     if (!tag) throw new NotFoundException('Tag not found');
     const where = {

@@ -40,6 +40,7 @@ import { focusSearchHighlight } from "~/composables/useSearchHighlight";
 const showSearch = ref(false);
 const mobileNavOpen = ref(false);
 const route = useRoute();
+const router = useRouter();
 const pageRef = ref<HTMLElement | null>(null);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 const { selectedMemory } = useMemorySelection();
@@ -106,9 +107,13 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener("keydown", onKeydown);
+  document.addEventListener("pointerdown", clearRouteHighlight);
   focusRouteHighlight();
 });
-onUnmounted(() => document.removeEventListener("keydown", onKeydown));
+onUnmounted(() => {
+  document.removeEventListener("keydown", onKeydown);
+  document.removeEventListener("pointerdown", clearRouteHighlight);
+});
 
 function focusRouteHighlight() {
   const query = String(route.query.highlight || "");
@@ -116,10 +121,25 @@ function focusRouteHighlight() {
   let attempts = 0;
   const run = () => {
     attempts += 1;
-    if (focusSearchHighlight(query, pageRef.value) || attempts >= 10) return;
+    if (focusSearchHighlight(query, pageRef.value) || attempts >= 30) return;
     highlightTimer = window.setTimeout(run, 120);
   };
   nextTick(run);
+}
+
+function clearRouteHighlight(event: PointerEvent) {
+  if (!route.query.highlight) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest(".search-result-row, a[href*='highlight='], mark.search-highlight")) return;
+  pageRef.value?.querySelectorAll("mark.search-highlight").forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    parent.replaceChild(document.createTextNode(mark.textContent || ""), mark);
+    parent.normalize();
+  });
+  const nextQuery = { ...route.query };
+  delete nextQuery.highlight;
+  void router.replace({ path: route.path, query: nextQuery });
 }
 
 watch(() => route.fullPath, focusRouteHighlight, { immediate: true });

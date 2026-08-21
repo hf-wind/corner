@@ -231,12 +231,12 @@ onUnmounted(() => {
 
 .pet-dock {
   display: flex;
-  height: 104px;
-  min-height: 104px;
-  flex: 0 0 104px;
-  align-items: center;
+  height: 92px;
+  min-height: 92px;
+  flex: 0 0 92px;
+  align-items: flex-end;
   justify-content: flex-end;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-top: 0;
 }
 
 .footprints {

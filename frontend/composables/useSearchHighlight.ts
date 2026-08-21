@@ -41,12 +41,17 @@ export function focusSearchHighlight(query: string, root: HTMLElement | null) {
   if (container) {
     const bounds = container.getBoundingClientRect();
     const target = mark.getBoundingClientRect();
-    container.scrollTo({
-      top: Math.max(0, container.scrollTop + target.top - bounds.top - 72),
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
-    });
+    const top = Math.max(0, container.scrollTop + target.top - bounds.top - 72);
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({
+        top,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
+    } else {
+      container.scrollTop = top;
+    }
   }
   window.setTimeout(() => mark.classList.add("is-settled"), 900);
   return true;

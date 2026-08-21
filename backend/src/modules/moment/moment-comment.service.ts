@@ -210,7 +210,7 @@ export class MomentCommentService {
     keyword?: string;
   }) {
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 10;
     const where: any = {};
     if (query.status) where.status = query.status;
     if (query.keyword?.trim()) {

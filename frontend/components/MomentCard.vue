@@ -71,7 +71,13 @@
 
       <Transition name="comment-drop">
         <div v-if="commentsOpen" class="comments-slot">
-          <MomentComments :moment-id="moment.id" @submitted="moment.commentCount = Math.max(0, moment.commentCount + $event)" />
+          <MomentComments
+            :moment-id="moment.id"
+            :focus-comment-id="focusCommentId"
+            :focus-parent-id="focusParentId"
+            :highlight-query="highlightQuery"
+            @submitted="moment.commentCount = Math.max(0, moment.commentCount + $event)"
+          />
         </div>
       </Transition>
     </div>
@@ -93,6 +99,9 @@ import type { PublicLocation } from '~/types/place'
 const props = withDefaults(defineProps<{
   moment: { id: string; slug: string; title: string; content?: string; excerpt?: string; happenedAt?: string; publicLocation?: PublicLocation | null; publishedAt?: string; createdAt?: string; likeCount: number; commentCount: number; liked?: boolean }
   initiallyExpandedComments?: boolean
+  focusCommentId?: string
+  focusParentId?: string
+  highlightQuery?: string
 }>(), { initiallyExpandedComments: false })
 
 const api = useApi()
@@ -101,6 +110,9 @@ const route = useRoute()
 const { isLoggedIn } = useAuth()
 const { mediaUrl } = useMediaUrl()
 const commentsOpen = ref(props.initiallyExpandedComments)
+const focusCommentId = computed(() => props.focusCommentId || '')
+const focusParentId = computed(() => props.focusParentId || '')
+const highlightQuery = computed(() => props.highlightQuery || '')
 const previewOpen = ref(false)
 const previewIndex = ref(0)
 const images = computed(() => extractMomentImages(props.moment.content))

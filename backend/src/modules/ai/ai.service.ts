@@ -2025,7 +2025,7 @@ export class AiService {
     return messages[Math.floor(Math.random() * messages.length)];
   }
 
-  async listConversations(q?: string, page = 1, pageSize = 20) {
+  async listConversations(q?: string, page = 1, pageSize = 10) {
     const users = await this.prisma.user.findMany({
       where: q
         ? {
@@ -2129,7 +2129,7 @@ export class AiService {
       return tb - ta;
     });
     const safePage = Math.max(1, Number.isFinite(page) ? page : 1);
-    const safePageSize = Math.max(1, Math.min(100, Number.isFinite(pageSize) ? pageSize : 20));
+    const safePageSize = Math.max(1, Math.min(100, Number.isFinite(pageSize) ? pageSize : 10));
     const start = (safePage - 1) * safePageSize;
     return {
       items: all.slice(start, start + safePageSize),
@@ -2139,7 +2139,7 @@ export class AiService {
     };
   }
 
-  async getConversation(actorId: string, page = 1, pageSize = 50) {
+  async getConversation(actorId: string, page = 1, pageSize = 10) {
     const guestIdHash = actorId.startsWith('guest:')
       ? actorId.slice('guest:'.length)
       : null;

@@ -344,7 +344,7 @@ export class AiController {
     return this.ai.listConversations(
       q,
       page ? Number(page) : 1,
-      pageSize ? Number(pageSize) : 20,
+      pageSize ? Number(pageSize) : 10,
     );
   }
 
@@ -424,7 +424,7 @@ export class AiController {
   usage(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
     return this.aiNative.usageAnalytics(
       page ? Number(page) : 1,
-      pageSize ? Number(pageSize) : 15,
+      pageSize ? Number(pageSize) : 10,
     );
   }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="comment-item" :class="{ 'comment-hot': comment.hot }">
+  <div :id="`comment-${comment.id}`" class="comment-item" :class="{ 'comment-hot': comment.hot }">
     <img class="comment-avatar" :src="mediaUrl(comment.avatar)" :alt="comment.name">
     <div class="comment-body">
       <div class="comment-meta-row">
@@ -50,7 +50,7 @@
 
       <div v-if="hasVisibleReplies" class="comment-replies">
         <template v-for="r in displayReplies" :key="r.id">
-          <div class="reply-item" :class="{ 'pending-local': r.status === 'pending' }">
+          <div :id="`comment-${r.id}`" class="reply-item" :class="{ 'pending-local': r.status === 'pending' }">
             <img class="reply-avatar" :src="mediaUrl(r.avatar)" :alt="r.name">
             <div class="reply-body">
               <div class="reply-meta-row">

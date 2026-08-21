@@ -2,7 +2,7 @@
   <main
     ref="portalRef"
     class="portal"
-    :class="{ 'scene-online': sceneReady && graphLoaded }"
+    :class="{ 'scene-online': sceneReady && graphLoaded, 'entry-ready': entryReady }"
   >
     <div ref="sceneLayerRef" class="portal-scene" aria-hidden="true">
       <TimeConstellationScene
@@ -23,6 +23,8 @@
         <i v-for="index in 48" :key="index" :style="fallbackStar(index)" />
       </div>
       <div class="scene-vignette" />
+      <div class="scene-grid" aria-hidden="true" />
+      <div class="scene-scanline" aria-hidden="true" />
       <div v-if="!entryReady" class="entry-loading" aria-live="polite">
         <span class="entry-loader"><i /><i /><i /></span>
         <strong>{{ sceneStatus }}</strong>
@@ -523,13 +525,17 @@ useHead({ title: computed(() => siteTitle.value) });
 .scene-fallback.visible {
   opacity: 1;
 }
-.entry-loading { position:fixed; z-index:12; inset:50% auto auto 50%; display:grid; min-width:190px; gap:10px; transform:translate(-50%,-50%); color:var(--space-text); text-align:center; pointer-events:none; }
-.entry-loading strong { font-size:.78rem; font-weight:650; }
-.entry-loading small { color:var(--space-muted); font-size:.54rem; }
-.entry-loader { display:flex; justify-content:center; gap:6px; }
-.entry-loader i { width:6px; height:6px; border-radius:50%; background:var(--space-accent); box-shadow:0 0 12px var(--space-accent); animation:entry-pulse 1.1s ease-in-out infinite; }
+.entry-loading { position:fixed; z-index:30; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:32px; color:var(--space-text); text-align:center; pointer-events:auto; background:linear-gradient(180deg,rgb(3 7 18 / 97%),rgb(5 12 25 / 94%)); backdrop-filter:blur(22px); transition:opacity .7s ease, visibility .7s ease; }
+.entry-loading::after { position:absolute; right:clamp(22px,5vw,72px); bottom:clamp(22px,5vw,58px); left:clamp(22px,5vw,72px); height:1px; background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--space-accent) 42%,transparent),transparent); content:""; opacity:.48; }
+.entry-loading > * { position:relative; z-index:1; }
+.entry-ready .entry-loading { opacity:0; visibility:hidden; pointer-events:none; }
+.entry-loading strong { display:flex; align-items:center; gap:8px; color:var(--space-text); font-family:var(--font-mono); font-size:.62rem; font-weight:650; letter-spacing:.08em; }
+.entry-loading strong::before { width:5px; height:5px; border:1px solid var(--space-accent); background:var(--space-accent); box-shadow:0 0 12px color-mix(in srgb,var(--space-accent) 76%,transparent); content:""; }
+.entry-loading small { color:color-mix(in srgb,var(--space-muted) 84%,transparent); font-size:.54rem; letter-spacing:.04em; }
+.entry-loader { display:flex; width:min(180px,58vw); height:2px; justify-content:stretch; gap:4px; margin-bottom:6px; overflow:hidden; background:rgb(255 255 255 / 10%); }
+.entry-loader i { display:block; flex:1; height:100%; background:var(--space-accent); box-shadow:0 0 14px color-mix(in srgb,var(--space-accent) 68%,transparent); animation:entry-pulse 1.35s ease-in-out infinite; transform-origin:left center; }
 .entry-loader i:nth-child(2) { animation-delay:.15s; }.entry-loader i:nth-child(3) { animation-delay:.3s; }
-@keyframes entry-pulse { 0%,100% { opacity:.25; transform:scale(.7) } 50% { opacity:1; transform:scale(1) } }
+@keyframes entry-pulse { 0%,100% { opacity:.24; transform:scaleX(.38) } 50% { opacity:1; transform:scaleX(1) } }
 .scene-fallback i {
   position: absolute;
   width: var(--star-size);
@@ -539,6 +545,10 @@ useHead({ title: computed(() => siteTitle.value) });
   box-shadow: 0 0 10px var(--space-accent);
   animation: star-breathe 3.2s ease-in-out infinite alternate;
 }
+.scene-grid { position:absolute; inset:-20%; opacity:.18; background-image:linear-gradient(color-mix(in srgb,var(--space-accent) 14%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--space-accent) 14%,transparent) 1px,transparent 1px); background-size:72px 72px; transform:perspective(600px) rotateX(62deg) translateY(28%); transform-origin:center bottom; mask-image:linear-gradient(transparent 0%,#000 50%,transparent 100%); animation:grid-drift 18s linear infinite; pointer-events:none; }
+.scene-scanline { position:absolute; inset:0; background:linear-gradient(180deg,transparent 0%,color-mix(in srgb,var(--space-accent) 14%,transparent) 49%,transparent 51%,transparent 100%); background-size:100% 220px; mix-blend-mode:screen; opacity:.24; animation:scan-drift 8s linear infinite; pointer-events:none; }
+@keyframes grid-drift { to { background-position:0 72px,0 72px; } }
+@keyframes scan-drift { to { background-position:0 220px; } }
 .portal-nav {
   position: fixed;
   z-index: 20;
@@ -550,7 +560,6 @@ useHead({ title: computed(() => siteTitle.value) });
   align-items: center;
   justify-content: space-between;
   padding: 0;
-  border-bottom: 1px solid rgb(255 255 255 / 10%);
   pointer-events: none;
 }
 .brand-mark {

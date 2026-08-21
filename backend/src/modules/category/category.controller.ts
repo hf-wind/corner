@@ -37,7 +37,7 @@ export class CategoryController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.cat.findPosts(slug, page ?? 1, limit ?? 20);
+    return this.cat.findPosts(slug, page ?? 1, limit ?? 10);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

@@ -1,5 +1,5 @@
 <template>
-  <aside id="z-aside" class="sidebar-right">
+  <aside id="z-aside" class="sidebar-right" :class="{ 'immersive-sidebar': immersive }">
     <header class="widget-head">
       <div class="head-title">
         <Icon name="ph:list-bullets-bold" class="head-icon" />
@@ -15,18 +15,9 @@
 
     <div ref="catalogWrapRef" class="catalog-wrap">
       <ClientOnly>
-        <MdCatalog
-          v-if="resolvedScrollEl"
-          :key="catalogKey"
-          :editor-id="editorId"
-          :scroll-element="resolvedScrollEl"
-          :theme="mdTheme"
-          :offset-top="110"
-          sync-with="preview"
-          class="article-md-catalog"
-          :on-active="onCatalogActive"
-          :on-click="onCatalogClick"
-        />
+        <MdCatalog v-if="resolvedScrollEl" :key="catalogKey" :editor-id="editorId" :scroll-element="resolvedScrollEl"
+          :theme="mdTheme" :offset-top="110" sync-with="preview" class="article-md-catalog" :on-active="onCatalogActive"
+          :on-click="onCatalogClick" />
       </ClientOnly>
     </div>
 
@@ -34,65 +25,33 @@
       <slot name="pet" />
     </div>
 
-    <div class="sidebar-actions">
-      <button
-        type="button"
-        class="action-btn visible"
-        :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
-        @click="emit('toggle-immersive')"
-      >
-        <Icon
-          :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'"
-        />
+    <div v-if="!immersive" class="sidebar-actions">
+      <button type="button" class="action-btn" title="评论区" @click="emit('scroll-comment')">
+        <Icon name="ph:chat-circle-text-bold" />
       </button>
-      <button
-        type="button"
-        class="action-btn"
-        :class="{ visible: showTop }"
-        title="回到顶部"
-        @click="emit('scroll-top')"
-      >
+      <button type="button" class="action-btn" :class="{ visible: showTop }" title="回到顶部" @click="emit('scroll-top')">
         <Icon name="ph:arrow-up-bold" />
       </button>
-      <button
-        type="button"
-        class="action-btn"
-        title="评论区"
-        @click="emit('scroll-comment')"
-      >
-        <Icon name="ph:chat-circle-text-bold" />
+      <button type="button" class="action-btn visible" :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+        @click="emit('toggle-immersive')">
+        <Icon name="ph:book-open-text-bold" />
       </button>
     </div>
   </aside>
 
   <Transition name="immersive-ui">
     <div v-if="immersive" class="immersive-ui">
-      <button
-        type="button"
-        class="immersive-catalog-bar"
-        :class="{ open: immersiveCatalogOpen }"
-        title="文章目录"
-        aria-label="文章目录"
-        @click="immersiveCatalogOpen = !immersiveCatalogOpen"
-      >
+      <button type="button" class="immersive-catalog-bar" :class="{ open: immersiveCatalogOpen }" title="文章目录"
+        aria-label="文章目录" @click="immersiveCatalogOpen = !immersiveCatalogOpen">
         <Icon name="ph:list-bullets-bold" />
         <span class="bar-title">文章目录</span>
         <span class="bar-progress">{{ percent }}%</span>
-        <Icon
-          :name="
-            immersiveCatalogOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'
-          "
-          class="bar-caret"
-        />
+        <Icon :name="immersiveCatalogOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'
+          " class="bar-caret" />
       </button>
 
       <Transition name="immersive-catalog">
-        <section
-          v-if="immersiveCatalogOpen"
-          class="immersive-catalog-panel"
-          role="dialog"
-          aria-label="文章目录"
-        >
+        <section v-if="immersiveCatalogOpen" class="immersive-catalog-panel" role="dialog" aria-label="文章目录">
           <header class="immersive-catalog-head">
             <div>
               <Icon name="ph:list-bullets-bold" class="head-icon" />
@@ -100,133 +59,68 @@
             </div>
             <div class="head-right">
               <span class="head-progress">已阅读 {{ percent }}%</span>
-              <button
-                type="button"
-                class="head-close"
-                aria-label="收起目录"
-                title="收起目录"
-                @click="immersiveCatalogOpen = false"
-              >
+              <button type="button" class="head-close" aria-label="收起目录" title="收起目录"
+                @click="immersiveCatalogOpen = false">
                 <Icon name="ph:x-bold" />
               </button>
             </div>
           </header>
-          <div
-            ref="immersiveCatalogWrapRef"
-            class="immersive-catalog-content catalog-wrap"
-          >
+          <div ref="immersiveCatalogWrapRef" class="immersive-catalog-content catalog-wrap">
             <ClientOnly>
-              <MdCatalog
-                v-if="resolvedScrollEl"
-                :key="`${catalogKey}-immersive`"
-                :editor-id="editorId"
-                :scroll-element="resolvedScrollEl"
-                :theme="mdTheme"
-                :offset-top="110"
-                sync-with="preview"
-                class="article-md-catalog"
-                :on-active="onCatalogActive"
-                :on-click="onCatalogClick"
-              />
+              <MdCatalog v-if="resolvedScrollEl" :key="`${catalogKey}-immersive`" :editor-id="editorId"
+                :scroll-element="resolvedScrollEl" :theme="mdTheme" :offset-top="110" sync-with="preview"
+                class="article-md-catalog" :on-active="onCatalogActive" :on-click="onCatalogClick" />
             </ClientOnly>
           </div>
         </section>
       </Transition>
 
       <div class="immersive-actions">
-        <button
-          type="button"
-          class="im-action"
-          title="去评论区"
-          aria-label="去评论区"
-          @click="emit('scroll-comment')"
-        >
+        <button type="button" class="im-action" title="去评论区" aria-label="去评论区" @click="emit('scroll-comment')">
           <Icon name="ph:chat-circle-text-bold" />
         </button>
-        <button
-          v-if="showTop"
-          type="button"
-          class="im-action"
-          title="回到顶部"
-          aria-label="回到顶部"
-          @click="emit('scroll-top')"
-        >
+        <button v-if="showTop" type="button" class="im-action" title="回到顶部" aria-label="回到顶部"
+          @click="emit('scroll-top')">
           <Icon name="ph:arrow-up-bold" />
         </button>
-        <button
-          type="button"
-          class="im-action im-exit"
-          title="退出沉浸阅读"
-          aria-label="退出沉浸阅读"
-          @click="emit('toggle-immersive')"
-        >
-          <Icon name="ph:corners-in-bold" />
+        <button type="button" class="im-action im-exit" title="退出沉浸阅读" aria-label="退出沉浸阅读"
+          @click="emit('toggle-immersive')">
+          <Icon name="ph:book-open-bold" />
         </button>
       </div>
     </div>
   </Transition>
 
-  <div
-    class="mobile-article-tools"
-    :class="{ expanded: mobileActionsOpen }"
-    v-show="!immersive"
-  >
+  <div class="mobile-article-tools" :class="{ expanded: mobileActionsOpen }" v-show="!immersive">
     <Transition name="catalog-backdrop">
-      <button
-        v-if="mobileCatalogOpen"
-        type="button"
-        class="mobile-catalog-backdrop"
-        aria-label="关闭文章目录"
-        @click="mobileCatalogOpen = false"
-      />
+      <button v-if="mobileCatalogOpen" type="button" class="mobile-catalog-backdrop" aria-label="关闭文章目录"
+        @click="mobileCatalogOpen = false" />
     </Transition>
 
     <Transition name="mobile-catalog">
-      <section
-        v-if="mobileCatalogOpen"
-        class="mobile-catalog-panel"
-        role="dialog"
-        aria-label="文章目录"
-      >
+      <section v-if="mobileCatalogOpen" class="mobile-catalog-panel" role="dialog" aria-label="文章目录">
         <header class="mobile-catalog-head">
           <div>
-            <span class="mobile-catalog-icon"
-              ><Icon name="ph:list-bullets-bold"
-            /></span>
+            <span class="mobile-catalog-icon">
+              <Icon name="ph:list-bullets-bold" />
+            </span>
             <div>
               <strong>文章目录</strong>
               <span>已阅读 {{ percent }}%</span>
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="关闭目录"
-            @click="mobileCatalogOpen = false"
-          >
+          <button type="button" aria-label="关闭目录" @click="mobileCatalogOpen = false">
             <Icon name="ph:x-bold" />
           </button>
         </header>
         <div class="mobile-catalog-progress" aria-hidden="true">
           <i :style="{ width: `${percent}%` }" />
         </div>
-        <div
-          ref="mobileCatalogWrapRef"
-          class="mobile-catalog-content"
-          @click="handleMobileCatalogClick"
-        >
+        <div ref="mobileCatalogWrapRef" class="mobile-catalog-content" @click="handleMobileCatalogClick">
           <ClientOnly>
-            <MdCatalog
-              v-if="resolvedScrollEl"
-              :key="`${catalogKey}-mobile`"
-              :editor-id="editorId"
-              :scroll-element="resolvedScrollEl"
-              :theme="mdTheme"
-              :offset-top="88"
-              sync-with="preview"
-              class="article-md-catalog"
-              :on-active="onCatalogActive"
-              :on-click="onCatalogClick"
-            />
+            <MdCatalog v-if="resolvedScrollEl" :key="`${catalogKey}-mobile`" :editor-id="editorId"
+              :scroll-element="resolvedScrollEl" :theme="mdTheme" :offset-top="88" sync-with="preview"
+              class="article-md-catalog" :on-active="onCatalogActive" :on-click="onCatalogClick" />
           </ClientOnly>
         </div>
       </section>
@@ -234,54 +128,34 @@
 
     <Transition name="mobile-tool-menu">
       <div v-if="mobileActionsOpen" class="mobile-tool-menu">
-        <button
-          type="button"
-          aria-label="文章目录"
-          title="文章目录"
-          @click="openMobileCatalog"
-        >
-          <i><Icon name="ph:list-bullets-bold" /></i>
+        <button type="button" aria-label="文章目录" title="文章目录" @click="openMobileCatalog">
+          <i>
+            <Icon name="ph:list-bullets-bold" />
+          </i>
         </button>
-        <button
-          type="button"
-          :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
-          :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
-          @click="runMobileAction('immersive')"
-        >
-          <i
-            ><Icon
-              :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'"
-          /></i>
+        <button type="button" :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'" :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+          @click="runMobileAction('immersive')">
+          <i>
+            <Icon :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'" />
+          </i>
         </button>
-        <button
-          type="button"
-          aria-label="去评论区"
-          title="去评论区"
-          @click="runMobileAction('comment')"
-        >
-          <i><Icon name="ph:chat-circle-text-bold" /></i>
+        <button type="button" aria-label="去评论区" title="去评论区" @click="runMobileAction('comment')">
+          <i>
+            <Icon name="ph:chat-circle-text-bold" />
+          </i>
         </button>
-        <button
-          type="button"
-          aria-label="回到顶部"
-          title="回到顶部"
-          :class="{ muted: !showTop }"
-          @click="runMobileAction('top')"
-        >
-          <i><Icon name="ph:arrow-up-bold" /></i>
+        <button type="button" aria-label="回到顶部" title="回到顶部" :class="{ muted: !showTop }"
+          @click="runMobileAction('top')">
+          <i>
+            <Icon name="ph:arrow-up-bold" />
+          </i>
         </button>
       </div>
     </Transition>
 
-    <button
-      type="button"
-      class="mobile-tool-trigger"
-      :class="{ active: mobileActionsOpen }"
-      :style="{ '--reading-progress': `${percent * 3.6}deg` }"
-      :aria-expanded="mobileActionsOpen"
-      :aria-label="mobileActionsOpen ? '收起文章快捷操作' : '展开文章快捷操作'"
-      @click="mobileActionsOpen = !mobileActionsOpen"
-    >
+    <button type="button" class="mobile-tool-trigger" :class="{ active: mobileActionsOpen }"
+      :style="{ '--reading-progress': `${percent * 3.6}deg` }" :aria-expanded="mobileActionsOpen"
+      :aria-label="mobileActionsOpen ? '收起文章快捷操作' : '展开文章快捷操作'" @click="mobileActionsOpen = !mobileActionsOpen">
       <span>
         <Icon :name="mobileActionsOpen ? 'ph:x-bold' : 'ph:compass-bold'" />
       </span>
@@ -452,8 +326,15 @@ onUnmounted(() => {
 }
 
 @keyframes article-sidebar-arrive {
-  from { opacity: 0; transform: translate3d(14px, 0, 0); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translate3d(14px, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .widget-head {
@@ -592,28 +473,34 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 92px;
-  padding: 10px 0 6px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  min-height: 0;
+  padding: 0;
+  border-top: 0;
 }
 
 .sidebar-actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
-  padding-top: 6px;
+  padding: 4px 0 0;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ld-shadow) 76%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .action-btn {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: 50%;
+  border: 1px solid transparent;
+  border-radius: 9px;
   background: transparent;
   color: var(--c-text-3);
   font-size: 0.95rem;
@@ -679,8 +566,7 @@ onUnmounted(() => {
   transform: translateX(-50%) translateY(-1px);
   color: var(--c-primary);
   border-color: color-mix(in srgb, var(--c-primary) 32%, transparent);
-  box-shadow: 0 10px 26px
-    color-mix(in srgb, var(--c-primary) 10%, var(--ld-shadow));
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--c-primary) 10%, var(--ld-shadow));
 }
 
 .immersive-catalog-bar .bar-title {
@@ -738,12 +624,10 @@ onUnmounted(() => {
   right: 14px;
   height: 2px;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--c-primary) 55%, transparent),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      color-mix(in srgb, var(--c-primary) 55%, transparent),
+      transparent);
   opacity: 0.8;
   pointer-events: none;
 }
@@ -759,7 +643,7 @@ onUnmounted(() => {
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 
-.immersive-catalog-head > div:first-child {
+.immersive-catalog-head>div:first-child {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -779,7 +663,7 @@ onUnmounted(() => {
   font-size: 0.9rem;
 }
 
-.immersive-catalog-head > div:first-child span {
+.immersive-catalog-head>div:first-child span {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--c-text);
@@ -867,8 +751,7 @@ onUnmounted(() => {
 .im-action:hover {
   transform: translateY(-2px);
   color: var(--c-primary);
-  box-shadow: 0 10px 24px
-    color-mix(in srgb, var(--c-primary) 14%, var(--ld-shadow));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--c-primary) 14%, var(--ld-shadow));
 }
 
 .im-action.im-exit {
@@ -964,6 +847,10 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
+  .sidebar-actions {
+    display: none;
+  }
+
   .immersive-catalog-bar {
     top: max(12px, env(safe-area-inset-top));
     left: max(12px, env(safe-area-inset-left));
@@ -1020,10 +907,8 @@ onUnmounted(() => {
     border: 0;
     border-radius: 50%;
     color: var(--c-primary);
-    background: conic-gradient(
-      var(--c-primary) var(--reading-progress),
-      color-mix(in srgb, var(--border) 58%, transparent) 0
-    );
+    background: conic-gradient(var(--c-primary) var(--reading-progress),
+        color-mix(in srgb, var(--border) 58%, transparent) 0);
     box-shadow: 0 6px 18px color-mix(in srgb, #000 12%, var(--ld-shadow));
     cursor: pointer;
     transition:
@@ -1031,7 +916,7 @@ onUnmounted(() => {
       box-shadow 0.2s ease;
   }
 
-  .mobile-tool-trigger > span {
+  .mobile-tool-trigger>span {
     width: 38px;
     height: 38px;
     display: grid;
@@ -1047,8 +932,7 @@ onUnmounted(() => {
 
   .mobile-tool-trigger.active {
     transform: rotate(90deg) scale(0.94);
-    box-shadow: 0 5px 14px
-      color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
   }
 
   .mobile-tool-menu {
@@ -1169,13 +1053,13 @@ onUnmounted(() => {
     background: color-mix(in srgb, var(--c-primary-soft) 42%, transparent);
   }
 
-  .mobile-catalog-head > div {
+  .mobile-catalog-head>div {
     display: flex;
     align-items: center;
     gap: 10px;
   }
 
-  .mobile-catalog-head > div > div {
+  .mobile-catalog-head>div>div {
     display: flex;
     flex-direction: column;
   }
@@ -1185,7 +1069,7 @@ onUnmounted(() => {
     font-size: 0.9rem;
   }
 
-  .mobile-catalog-head > div > div span {
+  .mobile-catalog-head>div>div span {
     margin-top: 2px;
     color: var(--c-text-3);
     font-size: 0.64rem;
@@ -1203,7 +1087,7 @@ onUnmounted(() => {
     box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 14%, transparent);
   }
 
-  .mobile-catalog-head > button {
+  .mobile-catalog-head>button {
     width: 32px;
     height: 32px;
     display: grid;
@@ -1337,7 +1221,10 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-right { animation: none; }
+  .sidebar-right {
+    animation: none;
+  }
+
   .immersive-ui-enter-active,
   .immersive-ui-leave-active,
   .immersive-catalog-enter-active,
@@ -1346,6 +1233,7 @@ onUnmounted(() => {
     transition: none;
     animation: none;
   }
+
   .mobile-tool-trigger,
   .mobile-tool-menu-enter-active,
   .mobile-tool-menu-leave-active,
