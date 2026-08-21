@@ -6,8 +6,12 @@
     </header>
 
     <div class="album-toolbar table-toolbar">
-      <a-segmented v-model:value="filter.status" :options="statusOptions" @change="resetAndLoad" />
-      <a-input-search v-model:value="filter.search" allow-clear placeholder="搜索相册名称或说明" @search="resetAndLoad" />
+      <a-input v-model:value="filter.search" allow-clear placeholder="搜索相册名称或说明" class="album-search" @press-enter="resetAndLoad"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-select v-model:value="filter.status" :options="statusOptions" style="width:132px" />
+      <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="load" />
     </div>
 
     <div class="table-shell">
@@ -69,6 +73,7 @@ function formatDate(value?: string) { return value ? value.slice(0, 10) : '未�
 function statusText(status: string) { return status === 'published' ? '已发布' : status === 'private' ? '私密' : '草稿' }
 function statusColor(status: string) { return status === 'published' ? 'green' : status === 'private' ? 'purple' : 'default' }
 function resetAndLoad() { page.value = 1; void load() }
+function resetFilters() { Object.assign(filter, { status: 'all', search: '' }); resetAndLoad() }
 async function load() {
   loading.value = true
   try {
@@ -105,6 +110,6 @@ useHead({ title: '相册管理' })
 </script>
 
 <style scoped>
-.album-admin { width:100%; margin:0 auto; }.admin-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:20px; }.admin-heading h1 { margin:0 0 3px; color:var(--c-text); font-size:1.5rem; }.admin-heading p { margin:0; color:var(--c-text-3); font-size:.76rem; }.album-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }.album-toolbar :deep(.ant-input-search) { width:min(360px,100%); }.table-shell { overflow:hidden; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); }.album-cell { display:flex; min-width:0; align-items:center; gap:10px; }.album-thumb { display:grid; width:64px; height:46px; flex:0 0 64px; overflow:hidden; border-radius:6px; background:var(--c-bg-2); color:var(--c-primary); place-items:center; }.album-thumb img { width:100%; height:100%; object-fit:cover; }.change-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 18%,transparent); }.album-copy { display:flex; min-width:0; flex-direction:column; gap:4px; }.album-copy>div { display:flex; align-items:center; gap:7px; }.album-copy strong,.album-copy span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.album-copy strong { color:var(--c-text); font-size:.82rem; }.album-copy span { color:var(--c-text-3); font-size:.68rem; }.table-actions { display:flex; flex-wrap:nowrap; white-space:nowrap; }.pagination { display:flex; justify-content:center; margin-top:18px; }
-@media(max-width:680px){.admin-heading,.album-toolbar{align-items:stretch;flex-direction:column}.album-toolbar :deep(.ant-input-search){width:100%}}
+.album-admin { width:100%; margin:0 auto; }.admin-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:20px; }.admin-heading h1 { margin:0 0 3px; color:var(--c-text); font-size:1.5rem; }.admin-heading p { margin:0; color:var(--c-text-3); font-size:.76rem; }.album-toolbar { display:flex; align-items:center; gap:8px; margin-bottom:14px; }.album-search { width:min(360px,100%); }.table-shell { overflow:hidden; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); }.album-cell { display:flex; min-width:0; align-items:center; gap:10px; }.album-thumb { display:grid; width:64px; height:46px; flex:0 0 64px; overflow:hidden; border-radius:6px; background:var(--c-bg-2); color:var(--c-primary); place-items:center; }.album-thumb img { width:100%; height:100%; object-fit:cover; }.change-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 18%,transparent); }.album-copy { display:flex; min-width:0; flex-direction:column; gap:4px; }.album-copy>div { display:flex; align-items:center; gap:7px; }.album-copy strong,.album-copy span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.album-copy strong { color:var(--c-text); font-size:.82rem; }.album-copy span { color:var(--c-text-3); font-size:.68rem; }.table-actions { display:flex; flex-wrap:nowrap; white-space:nowrap; }.pagination { display:flex; justify-content:center; margin-top:18px; }
+@media(max-width:680px){.admin-heading,.album-toolbar{align-items:stretch;flex-direction:column}.album-search{width:100%}}
 </style>

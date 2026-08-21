@@ -143,10 +143,20 @@ export class FriendLinkService {
     page?: number;
     limit?: number;
     status?: string;
+    search?: string;
   }) {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-    const where = query.status ? { status: query.status } : {};
+    const keyword = query.search?.trim();
+    const where: any = {};
+    if (query.status) where.status = query.status;
+    if (keyword) {
+      where.OR = [
+        { siteName: { contains: keyword, mode: 'insensitive' } },
+        { siteUrl: { contains: keyword, mode: 'insensitive' } },
+        { contactEmail: { contains: keyword, mode: 'insensitive' } },
+      ];
+    }
     const [items, total] = await Promise.all([
       this.prisma.friendApplication.findMany({
         where,
@@ -386,7 +396,7 @@ export class FriendLinkService {
           type: 'system',
           title,
           content,
-          link: '/admin/friend-applications',
+          link: '/admin/comments?section=applications',
         }),
       ),
     );

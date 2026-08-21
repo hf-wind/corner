@@ -1,9 +1,12 @@
 <template>
   <div class="admin-page-shell">
-    <header class="admin-page-head"><div><span>CONTENT TAXONOMY</span><h1>分类管理</h1><p>维护文章的主分类、视觉标识与内容归属。</p></div></header>
+    <header class="admin-page-head"><div><span>CONTENT TAXONOMY</span><h1>分类管理</h1><p>维护文章的主分类、视觉标识与内容归属。</p></div><a-button type="primary" @click="openAdd"><PlusOutlined /> 添加分类</a-button></header>
     <div class="table-toolbar">
-      <a-input v-model:value="keyword" allow-clear placeholder="搜索分类名称或 Slug" style="width:min(300px,100%)"><template #prefix><Icon name="ph:magnifying-glass-bold" /></template></a-input>
-      <a-button type="primary" @click="openAdd"><PlusOutlined /> 添加</a-button>
+      <a-input v-model:value="keywordInput" allow-clear placeholder="搜索分类名称或 Slug" style="width:min(300px,100%)" @press-enter="applySearch"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-button type="primary" @click="applySearch"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetSearch"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="load" />
     </div>
 
     <a-spin :spinning="loading" class="table-spin">
@@ -94,6 +97,7 @@ const toast = useToast()
 const loading = ref(true)
 const categories = ref<any[]>([])
 const keyword = ref('')
+const keywordInput = ref('')
 const page = ref(1)
 const pageSize = 10
 const addDialog = reactive({ open: false, name: '', slug: '', icon: 'ph:folder-open-bold', color: '', editing: false, editingSlug: '' })
@@ -103,6 +107,9 @@ const filteredCategories = computed(() => {
 })
 const pagedCategories = computed(() => filteredCategories.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 watch(keyword, () => { page.value = 1 })
+
+function applySearch() { keyword.value = keywordInput.value.trim(); page.value = 1 }
+function resetSearch() { keywordInput.value = ''; keyword.value = ''; page.value = 1 }
 
 const columns = [
   { title: '', key: 'icon', width: 36, align: 'center' as const },

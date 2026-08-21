@@ -20,7 +20,7 @@
               <div class="avatar-editor">
                 <div class="avatar-preview"><img :src="avatarPreview" alt="头像预览"></div>
                 <a-button size="small" @click="chooseAvatar"><Icon name="ph:image-bold" /> 选择头像</a-button>
-                <a-button v-if="profile.avatarUrl" type="link" size="small" danger @click="profile.avatarUrl = ''">恢复默认</a-button>
+                <a-button v-if="profile.avatarUrl" type="link" size="small" danger @click="profile.avatarUrl = ''"><Icon name="ph:arrow-counter-clockwise-bold" /> 恢复默认</a-button>
               </div>
               <a-form layout="vertical" class="identity-form">
                 <div class="two-cols">

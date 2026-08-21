@@ -124,6 +124,7 @@ watch(() => toasts.value.length, () => {
   line-height: 1.4;
   color: var(--c-text-1);
   word-break: break-word;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

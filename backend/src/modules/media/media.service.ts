@@ -92,13 +92,26 @@ export class MediaService implements OnModuleInit {
     if (!existsSync(original)) mkdirSync(original, { recursive: true });
   }
 
-  async findAll(page = 1, limit = 30, type?: string, folder?: string) {
+  async findAll(
+    page = 1,
+    limit = 30,
+    type?: string,
+    folder?: string,
+    search?: string,
+  ) {
     const where: any = {};
     if (type && type !== 'all' && mimeTypeMap[type]) {
       where.mimeType = { in: mimeTypeMap[type] };
     }
     if (folder !== undefined) {
       where.folder = folder === '' ? null : folder;
+    }
+    const keyword = search?.trim();
+    if (keyword) {
+      where.OR = [
+        { filename: { contains: keyword, mode: 'insensitive' } },
+        { originalName: { contains: keyword, mode: 'insensitive' } },
+      ];
     }
     const [items, total] = await Promise.all([
       this.prisma.media.findMany({

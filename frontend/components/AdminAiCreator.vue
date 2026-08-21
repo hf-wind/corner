@@ -6,7 +6,7 @@
         <div><p>AI CREATION STUDIO</p><h1>AI 创作台</h1></div>
         <em>Beta</em>
       </div>
-      <a-button @click="router.push(mode === 'article' ? '/admin/posts' : '/admin/moments')">返回{{ modeConfig.listName }}</a-button>
+      <a-button @click="router.push(mode === 'article' ? '/admin/posts' : '/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回{{ modeConfig.listName }}</a-button>
     </header>
 
     <section class="mode-hero">

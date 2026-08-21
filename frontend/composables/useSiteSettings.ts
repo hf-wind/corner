@@ -13,10 +13,9 @@ export function useSiteSettings() {
     if (loadPromise) return loadPromise
 
     const api = useApi()
-    loadPromise = Promise.all([
-      api.get<unknown>('/settings/site_title'),
-      api.get<unknown>('/settings/site_description'),
-    ]).then(([title, description]) => {
+    loadPromise = api.get<Record<string, unknown>>('/settings/site').then((settings) => {
+      const title = settings?.site_title
+      const description = settings?.site_description
       if (typeof title === 'string' && title.trim()) siteTitle.value = title.trim()
       if (typeof description === 'string' && description.trim()) siteDescription.value = description.trim()
       loaded.value = true

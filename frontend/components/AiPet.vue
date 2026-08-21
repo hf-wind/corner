@@ -200,7 +200,7 @@
       <Transition name="pet-actions">
         <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
           <button
-            v-for="action in quickActions.slice(0, 3)"
+              v-for="action in homeActions"
             :key="action.label"
             type="button"
             @click="runQuickAction(action)"
@@ -221,7 +221,7 @@
           <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
         </span>
         <Transition name="pet-hint" appear>
-          <span v-if="showHint" class="pet-hint">{{ hintText }}</span>
+          <span v-if="petReady && showHint" class="pet-hint">{{ hintText }}</span>
         </Transition>
       </button>
     </div>
@@ -346,7 +346,8 @@ const input = ref("");
 const messages = ref<Msg[]>([]);
 const listRef = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
-const showHint = ref(true);
+const showHint = ref(false);
+const petReady = ref(false);
 const historyLoaded = ref(false);
 const historyLoading = ref(false);
 let streamController: AbortController | null = null;
@@ -704,6 +705,7 @@ const quickActions = computed<QuickAction[]>(() =>
         },
       ],
 );
+const homeActions = computed(() => quickActions.value.filter((action) => action.label !== "推荐一首歌").slice(0, 3));
 
 function chooseGreeting() {
   const list = greetings.value.length
@@ -798,6 +800,7 @@ function closeChat() {
 }
 
 async function toggleChat() {
+  if (!petReady.value) return;
   showHint.value = false;
   if (chatOpen.value) {
     closeChat();
@@ -1163,14 +1166,20 @@ function waitForTypingDrain() {
   return new Promise<void>((resolve) => typingDrainResolvers.push(resolve));
 }
 
-onMounted(() => {
+onMounted(async () => {
   syncViewport();
   window.addEventListener("resize", syncViewport);
   chooseGreeting();
-  loadPetMeta();
-  hintTimer = setTimeout(() => {
-    showHint.value = false;
-  }, 6000);
+  const spriteReady = new Promise<void>((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = spriteUrl;
+  });
+  await Promise.all([loadPetMeta(), spriteReady]);
+  petReady.value = true;
+  showHint.value = true;
+  hintTimer = setTimeout(() => { showHint.value = false; }, 6000);
 });
 
 onUnmounted(() => {
@@ -1658,7 +1667,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
+  min-height: 28px;
   max-width: 100%;
   padding: 7px 11px;
   border-radius: 12px 12px 4px 12px;
@@ -1728,11 +1737,11 @@ onUnmounted(() => {
 .pet-input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
-  max-height: 88px;
+  min-height: 32px;
+  max-height: 72px;
   border: none;
   border-radius: 0;
-  padding: 9px 2px 7px;
+  padding: 6px 2px 5px;
   overflow-y: auto;
   resize: none;
   background: transparent;

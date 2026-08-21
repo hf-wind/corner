@@ -36,14 +36,16 @@ describe('AiService model configuration compatibility', () => {
         ai_base_url: 'https://api.deepseek.com',
         ai_model: 'deepseek-chat',
       }),
+      set: jest.fn(),
     };
     const service = new AiService(
       prisma as any,
       settings as any,
       {} as any,
       {} as any,
+      {} as any,
     );
-    return { service, prisma };
+    return { service, prisma, settings };
   }
 
   it('falls back to legacy settings when the model table is missing', async () => {
@@ -68,6 +70,38 @@ describe('AiService model configuration compatibility', () => {
     prisma.aiModelConfig.findMany.mockRejectedValue(databaseError);
 
     await expect(service.listModelConfigs()).rejects.toBe(databaseError);
+  });
+
+  it('previews knowledge with temporary settings without persisting them', async () => {
+    const { service, settings } = createService();
+    const buildKnowledgeContext = jest
+      .spyOn(service, 'buildKnowledgeContext')
+      .mockResolvedValue('preview context');
+
+    const result = await service.previewKnowledge('测试问题', {
+      ai_knowledge_enabled: false,
+      ai_knowledge_catalog_limit: 12,
+      ai_knowledge_top_k: 3,
+      ai_knowledge_snippet_len: 480,
+    });
+
+    expect(settings.set).not.toHaveBeenCalled();
+    expect(buildKnowledgeContext).toHaveBeenCalledWith(
+      '测试问题',
+      expect.objectContaining({
+        ai_knowledge_enabled: false,
+        ai_knowledge_catalog_limit: 12,
+        ai_knowledge_top_k: 3,
+        ai_knowledge_snippet_len: 480,
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        context: 'preview context',
+        limits: { catalog: 12, topK: 3, snippetLen: 480 },
+      }),
+    );
   });
 
   it('creates AI taxonomy records with complete visual metadata', async () => {

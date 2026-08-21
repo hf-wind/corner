@@ -17,6 +17,17 @@ export class SettingsService {
     return s ? s.value : null;
   }
 
+  async getMany(keys: string[]) {
+    const settings = await this.prisma.setting.findMany({
+      where: { key: { in: keys } },
+      select: { key: true, value: true },
+    });
+    return settings.reduce<Record<string, any>>((result, item) => {
+      result[item.key] = item.value;
+      return result;
+    }, {});
+  }
+
   async health() {
     const settings = await this.findAll();
     const env = (key: string) => Boolean(process.env[key]?.trim());

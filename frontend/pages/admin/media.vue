@@ -21,20 +21,23 @@
       </div>
       <div class="media-main">
         <div class="media-toolbar">
-          <a-radio-group v-model:value="typeFilter" @change="changeType">
-            <a-radio-button value="all">全部</a-radio-button>
-            <a-radio-button value="image">图片</a-radio-button>
-            <a-radio-button value="video">视频</a-radio-button>
-            <a-radio-button value="audio">音频</a-radio-button>
-            <a-radio-button value="document">文档</a-radio-button>
-          </a-radio-group>
+          <a-input v-model:value="keywordInput" allow-clear placeholder="搜索文件名" class="media-search" @press-enter="applyMediaFilters"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+          <a-select v-model:value="typeFilter" style="width:128px">
+            <a-select-option value="all">全部类型</a-select-option>
+            <a-select-option value="image">图片</a-select-option>
+            <a-select-option value="video">视频</a-select-option>
+            <a-select-option value="audio">音频</a-select-option>
+            <a-select-option value="document">文档</a-select-option>
+          </a-select>
+          <a-button type="primary" @click="applyMediaFilters"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+          <a-button @click="resetMediaFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
         </div>
 
         <div v-if="selectedIds.size" class="selection-bar">
           <span class="selection-count">已选中 {{ selectedIds.size }} 项</span>
           <a-button size="small" @click="openMoveDialog"><FolderAddOutlined /> 移动到</a-button>
           <a-button size="small" danger @click="handleBatchRemove"><DeleteOutlined /> 删除</a-button>
-          <a-button size="small" @click="selectedIds.clear()">取消选择</a-button>
+          <a-button size="small" @click="selectedIds.clear()"><Icon name="ph:x-bold" /> 取消选择</a-button>
         </div>
 
         <div class="media-content-scroll">
@@ -62,7 +65,7 @@
                 <div class="media-meta">
                   <span class="media-name" :title="item.filename">{{ item.filename }}</span>
                   <a-button type="link" size="small" @click.stop="previewItem(item)"><Icon name="ph:eye-bold" /> 预览</a-button>
-                  <a-button type="link" size="small" danger @click.stop="handleRemove(item)">删除</a-button>
+                  <a-button type="link" size="small" danger @click.stop="handleRemove(item)"><Icon name="ph:trash-bold" /> 删除</a-button>
                 </div>
               </div>
               </div>
@@ -105,6 +108,8 @@ const totalPages = ref(1)
 const page = ref(1)
 const pageSize = ref(10)
 const typeFilter = ref('all')
+const keywordInput = ref('')
+const keyword = ref('')
 const folders = ref<{ key: string; label: string; preset?: boolean }[]>([])
 const activeFolder = ref('all')
 const showNewFolder = ref(false)
@@ -174,7 +179,7 @@ function onFolderClick({ key }: { key: string }) {
 async function loadMedia() {
   loading.value = true
   try {
-    const params: any = { page: page.value, limit: pageSize.value, type: typeFilter.value }
+    const params: any = { page: page.value, limit: pageSize.value, type: typeFilter.value, search: keyword.value || undefined }
     if (activeFolder.value === '__none__') params.folder = ''
     else if (activeFolder.value !== 'all') params.folder = activeFolder.value
     const res = await api.get<any>('/media', params)
@@ -199,7 +204,16 @@ async function loadFolders() {
   }
 }
 
-function changeType() {
+function applyMediaFilters() {
+  keyword.value = keywordInput.value.trim()
+  page.value = 1
+  void loadMedia()
+}
+
+function resetMediaFilters() {
+  keywordInput.value = ''
+  keyword.value = ''
+  typeFilter.value = 'all'
   page.value = 1
   void loadMedia()
 }

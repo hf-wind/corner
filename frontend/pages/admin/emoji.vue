@@ -1,13 +1,14 @@
 <template>
   <div class="emoji-admin admin-page-shell">
-    <header class="admin-page-head"><div><h1>表情资源</h1><p>管理表情包、Unicode 字符和动态图片资源。</p></div></header>
+    <header class="admin-page-head"><div><h1>表情资源</h1><p>管理表情包、Unicode 字符和动态图片资源。</p></div><a-button type="primary" @click="openAddPack"><PlusOutlined /> 添加表情包</a-button></header>
     <div class="table-toolbar">
-      <a-input v-model:value="packKeyword" allow-clear placeholder="搜索表情包" class="pack-search">
+      <a-input v-model:value="packKeywordInput" allow-clear placeholder="搜索表情包" class="pack-search" @press-enter="applyPackSearch">
         <template #prefix><Icon name="ph:magnifying-glass" /></template>
       </a-input>
-      <a-button type="primary" @click="openAddPack">
-        <PlusOutlined /> 添加表情包
-      </a-button>
+      <a-button type="primary" @click="applyPackSearch"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetPackSearch"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="loadPacks" />
     </div>
 
     <a-table
@@ -79,7 +80,8 @@
             <a-input v-model:value="ensureItemState(pack.id).keyword" allow-clear size="small" placeholder="搜索标签、字符或 URL" class="item-search" @press-enter="searchPackItems(pack.id)">
               <template #prefix><Icon name="ph:magnifying-glass" /></template>
             </a-input>
-            <a-button size="small" @click="searchPackItems(pack.id)">搜索</a-button>
+            <a-button type="primary" size="small" @click="searchPackItems(pack.id)"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+            <a-button size="small" @click="resetPackItemSearch(pack.id)"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
             <a-button size="small" @click="openAddItem(pack)"
               ><PlusOutlined /> 添加表情</a-button
             >
@@ -119,14 +121,14 @@
                     type="link"
                     size="small"
                     @click="openEditItem(pack, item)"
-                    >编辑</a-button
+                    ><Icon name="ph:pencil-simple-bold" /> 编辑</a-button
                   >
                   <a-button
                     type="link"
                     size="small"
                     danger
                     @click="removeItem(pack, item)"
-                    >删除</a-button
+                    ><Icon name="ph:trash-bold" /> 删除</a-button
                   >
                 </div>
               </template>
@@ -253,6 +255,7 @@ const loading = ref(true);
 const saving = ref(false);
 const packs = ref<any[]>([]);
 const packKeyword = ref("");
+const packKeywordInput = ref("");
 const packPage = ref(1);
 const packPageSize = 10;
 const filteredPacks = computed(() => {
@@ -264,6 +267,8 @@ const filteredPacks = computed(() => {
 });
 const pagedPacks = computed(() => filteredPacks.value.slice((packPage.value - 1) * packPageSize, packPage.value * packPageSize));
 watch(packKeyword, () => { packPage.value = 1; });
+function applyPackSearch() { packKeyword.value = packKeywordInput.value.trim(); packPage.value = 1; }
+function resetPackSearch() { packKeywordInput.value = ""; packKeyword.value = ""; packPage.value = 1; }
 const expandedPackIds = ref<string[]>([]);
 const itemStates = reactive<Record<string, ItemState>>({});
 const packColumns = [
@@ -365,6 +370,11 @@ function searchPackItems(packId: string) {
   const state = ensureItemState(packId);
   state.loaded = false;
   void loadPackItems(packId, 1);
+}
+
+function resetPackItemSearch(packId: string) {
+  ensureItemState(packId).keyword = "";
+  searchPackItems(packId);
 }
 
 function openAddPack() {

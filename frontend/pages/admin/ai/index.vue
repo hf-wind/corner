@@ -1,7 +1,6 @@
 <template>
   <div class="ai-admin admin-page-shell">
     <header class="admin-page-head"><div><span>AI CONTROL</span><h1>功能与模型</h1><p>统一管理模型能力、使用统计与全部用户及访客会话。</p></div></header>
-    <AdminAiUsage />
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="base" tab="基础配置" />
       <a-tab-pane key="content" tab="内容生成" />
@@ -23,12 +22,12 @@
       />
       <a-space class="page-action-buttons" :size="8">
         <a-button type="primary" :loading="saving" @click="saveConfig"
-          >保存配置</a-button
+          ><Icon name="ph:floppy-disk-bold" /> 保存配置</a-button
         >
         <a-button :loading="testing" @click="testConnection"
-          >测试连接</a-button
+          ><Icon name="ph:plugs-connected-bold" /> 测试连接</a-button
         >
-        <a-button @click="resetDefaults">恢复默认</a-button>
+        <a-button @click="resetDefaults"><Icon name="ph:arrow-counter-clockwise-bold" /> 恢复默认</a-button>
       </a-space>
     </div>
 
@@ -96,13 +95,13 @@
                       size="small"
                       :loading="testingModelId === item.id"
                       @click="testModel(item)"
-                      >测试</a-button
+                      ><Icon name="ph:plugs-connected-bold" /> 测试</a-button
                     >
                     <a-button size="small" @click="openEditModel(item)"
-                      >编辑</a-button
+                      ><Icon name="ph:pencil-simple-bold" /> 编辑</a-button
                     >
                     <a-button size="small" danger @click="removeModel(item)"
-                      >删除</a-button
+                      ><Icon name="ph:trash-bold" /> 删除</a-button
                     >
                   </a-space>
                 </div>
@@ -656,13 +655,14 @@
                 </a-col>
                 <a-col :xs="24" :sm="16">
                   <a-form-item label="预览检索">
-                    <a-input-search
-                      v-model:value="previewQuery"
-                      placeholder="输入问题，预览会注入的知识上下文"
-                      enter-button="预览"
-                      :loading="previewLoading"
-                      @search="runPreview"
-                    />
+                    <div class="knowledge-preview-search">
+                      <a-input
+                        v-model:value="previewQuery"
+                        placeholder="输入问题，预览会注入的知识上下文"
+                        @press-enter="runPreview"
+                      ><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+                      <a-button type="primary" :loading="previewLoading" @click="runPreview"><Icon name="ph:eye-bold" /> 预览</a-button>
+                    </div>
                   </a-form-item>
                 </a-col>
               </a-row>
@@ -824,103 +824,8 @@
       </a-spin>
     </div>
 
-    <div v-show="tab === 'chats'" class="tab-body chats-layout">
-      <a-card size="small" :bordered="false" class="section-card conv-list">
-        <template #title>会话用户</template>
-        <template #extra>
-          <a-input-search
-            v-model:value="convQuery"
-            size="small"
-            placeholder="用户名 / 邮箱"
-            style="width: 180px"
-            allow-clear
-            @search="searchConversations"
-          />
-        </template>
-        <a-spin :spinning="convLoading">
-          <a-empty v-if="!conversations.length" description="暂无对话" />
-          <div
-            v-for="conversation in conversations"
-            :key="conversation.userId"
-            class="conv-item"
-            :class="{ active: selectedUserId === conversation.userId }"
-            @click="selectConversation(conversation.userId)"
-          >
-            <div class="conv-top">
-              <strong>{{ conversation.username }}</strong>
-              <span class="muted">{{ conversation.messageCount }} 条</span>
-            </div>
-            <div class="conv-preview">
-              {{ conversation.lastMessage?.content || "—" }}
-            </div>
-            <div class="muted tiny">
-              {{ formatTime(conversation.lastMessage?.createdAt) }}
-            </div>
-          </div>
-          <AdminPagination
-            v-model:current="conversationPage"
-            :page-size="conversationPageSize"
-            :total="conversationTotal"
-            :show-size-changer="false"
-            @change="loadConversations"
-          />
-        </a-spin>
-      </a-card>
-
-      <a-card size="small" :bordered="false" class="section-card conv-detail">
-        <template #title>
-          <span v-if="detail?.user"
-            >{{ detail.user.username }} · {{ detail.total }} 条消息</span
-          >
-          <span v-else>选择左侧用户查看对话</span>
-        </template>
-        <template #extra>
-          <a-space>
-            <AdminRefreshButton
-              size="small"
-              :disabled="!selectedUserId"
-              :loading="detailLoading"
-              @click="loadDetail"
-            />
-            <a-popconfirm
-              title="确认清空这个用户的全部对话？"
-              ok-text="清空"
-              cancel-text="取消"
-              @confirm="clearConversation"
-            >
-              <a-button size="small" danger :disabled="!selectedUserId"
-                >清空</a-button
-              >
-            </a-popconfirm>
-          </a-space>
-        </template>
-        <a-spin :spinning="detailLoading">
-          <div v-if="detail?.messages?.length" class="msg-list">
-            <div
-              v-for="message in detail.messages"
-              :key="message.id"
-              class="msg-row"
-              :class="message.role"
-            >
-              <div class="msg-meta">
-                <span>{{ message.role === "user" ? "用户" : "哆啦A梦" }}</span>
-                <span class="muted">{{ formatTime(message.createdAt) }}</span>
-              </div>
-              <AdminMarkdown class="msg-bubble" :content="message.content" />
-            </div>
-          </div>
-          <a-empty v-else-if="selectedUserId" description="暂无消息" />
-          <a-empty v-else description="从左侧选择会话" />
-          <AdminPagination
-            v-if="detail"
-            v-model:current="detailPage"
-            :page-size="detailPageSize"
-            :total="detail.total || 0"
-            :show-size-changer="false"
-            @change="loadDetail"
-          />
-        </a-spin>
-      </a-card>
+    <div v-show="tab === 'chats'" class="tab-body chats-tab">
+      <AdminAiUsage />
     </div>
 
     <a-modal
@@ -1017,9 +922,14 @@ const toast = useToast();
 const validTabs = new Set(["base", "content", "chat", "moderation", "chats"]);
 const tab = ref(validTabs.has(String(route.query.tab)) ? String(route.query.tab) : "base");
 watch(tab, (value) => {
-  router.replace({ query: value === "base" ? {} : { tab: value } });
-  if (value === "chats" && !conversations.value.length)
-    void loadConversations();
+  const query = { ...route.query };
+  if (value === "base") delete query.tab;
+  else query.tab = value;
+  router.replace({ query });
+});
+watch(() => route.query.tab, (value) => {
+  const nextTab = validTabs.has(String(value)) ? String(value) : "base";
+  if (nextTab !== tab.value) tab.value = nextTab;
 });
 
 const cfgLoading = ref(true);
@@ -1063,18 +973,6 @@ const previewQuery = ref("");
 const previewLoading = ref(false);
 const previewText = ref("");
 
-const convLoading = ref(false);
-const conversations = ref<any[]>([]);
-const convQuery = ref("");
-const selectedUserId = ref("");
-const detailLoading = ref(false);
-const detail = ref<any>(null);
-const detailPage = ref(1);
-const detailPageSize = 50;
-const conversationPage = ref(1);
-const conversationPageSize = 20;
-const conversationTotal = ref(0);
-
 const knowledgeListLoading = ref(false);
 const knowledgeList = ref<{ total: number; items: any[] }>({
   total: 0,
@@ -1084,7 +982,6 @@ const knowledgeList = ref<{ total: number; items: any[] }>({
 onMounted(async () => {
   await Promise.all([loadConfig(), loadModels()]);
   await loadKnowledgeList();
-  if (tab.value === "chats") await loadConversations();
 });
 
 async function loadModels() {
@@ -1273,16 +1170,12 @@ function resetDefaults() {
 async function runPreview() {
   previewLoading.value = true;
   try {
-    await api.put("/ai/admin/config", {
-      config: {
-        ai_knowledge_enabled: form.ai_knowledge_enabled,
-        ai_knowledge_catalog_limit: form.ai_knowledge_catalog_limit,
-        ai_knowledge_top_k: form.ai_knowledge_top_k,
-        ai_knowledge_snippet_len: form.ai_knowledge_snippet_len,
-      },
-    });
     const res = await api.post<any>("/ai/admin/knowledge/preview", {
       query: previewQuery.value,
+      enabled: form.ai_knowledge_enabled,
+      catalogLimit: form.ai_knowledge_catalog_limit,
+      topK: form.ai_knowledge_top_k,
+      snippetLen: form.ai_knowledge_snippet_len,
     });
     previewText.value = res.context || "";
   } catch {
@@ -1304,66 +1197,6 @@ async function loadKnowledgeList() {
   }
 }
 
-async function loadConversations() {
-  convLoading.value = true;
-  try {
-    const result = await api.get<any>("/ai/admin/conversations", {
-      q: convQuery.value || undefined,
-      page: conversationPage.value,
-      pageSize: conversationPageSize,
-    });
-    conversations.value = result.items || [];
-    conversationTotal.value = result.total || 0;
-  } catch {
-    toast.error("加载会话失败");
-  } finally {
-    convLoading.value = false;
-  }
-}
-
-function searchConversations() {
-  conversationPage.value = 1;
-  void loadConversations();
-}
-
-async function selectConversation(userId: string) {
-  selectedUserId.value = userId;
-  detailPage.value = 1;
-  await loadDetail(1);
-}
-
-async function loadDetail(page = detailPage.value) {
-  if (!selectedUserId.value) return;
-  detailPage.value = page;
-  detailLoading.value = true;
-  try {
-    detail.value = await api.get(
-      `/ai/admin/conversations/${selectedUserId.value}`,
-      {
-        page,
-        pageSize: detailPageSize,
-      },
-    );
-  } catch {
-    toast.error("加载对话失败");
-  } finally {
-    detailLoading.value = false;
-  }
-}
-
-async function clearConversation() {
-  if (!selectedUserId.value) return;
-  try {
-    await api.delete(`/ai/admin/conversations/${selectedUserId.value}`);
-    toast.success("已清空");
-    detail.value = null;
-    selectedUserId.value = "";
-    await loadConversations();
-  } catch {
-    toast.error("清空失败");
-  }
-}
-
 function formatTime(value?: string) {
   if (!value) return "";
   return String(value).slice(0, 16).replace("T", " ");
@@ -1380,6 +1213,8 @@ useHead({ title: "功能与模型" });
 .tab-body {
   margin-top: 4px;
 }
+.knowledge-preview-search { display:flex; align-items:center; gap:8px; }
+.knowledge-preview-search :deep(.ant-input-affix-wrapper) { flex:1; min-width:0; }
 
 .cost-limit-alert {
   margin-bottom: 16px;

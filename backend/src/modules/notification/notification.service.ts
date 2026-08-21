@@ -42,15 +42,16 @@ export class NotificationService {
     return notification;
   }
 
-  async findAll(userId: string, page = 1, limit = 20) {
+  async findAll(userId: string, page = 1, limit = 20, unreadOnly = false) {
+    const where = unreadOnly ? { userId, read: false } : { userId };
     const [items, total] = await Promise.all([
       this.prisma.notification.findMany({
-        where: { userId },
+        where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.notification.count({ where: { userId } }),
+      this.prisma.notification.count({ where }),
     ]);
 
     return {

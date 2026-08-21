@@ -10,7 +10,7 @@
               <h1>写下一条瞬间</h1>
             </div>
           </div>
-          <a-button @click="router.push('/admin/moments')">返回列表</a-button>
+          <a-button @click="router.push('/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回列表</a-button>
         </header>
 
         <section class="quick-create-shell">
@@ -72,9 +72,9 @@
             </div>
           </div>
           <div class="header-actions">
-            <a-button @click="router.push('/admin/moments')">返回列表</a-button>
-            <a-button @click="openPreview">预览</a-button>
-            <a-button type="primary" :loading="saving" @click="save">保存</a-button>
+            <a-button @click="router.push('/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回列表</a-button>
+            <a-button @click="openPreview"><Icon name="ph:eye-bold" /> 预览</a-button>
+            <a-button type="primary" :loading="saving" @click="save"><Icon name="ph:floppy-disk-bold" /> 保存</a-button>
           </div>
         </header>
 
@@ -108,7 +108,7 @@
 
             <div class="field-label-row">
               <label class="field-label" for="moment-excerpt">摘要</label>
-              <a-button type="link" size="small" :loading="generatingExcerpt" @click="generateExcerpt">重新生成摘要</a-button>
+              <a-button type="link" size="small" :loading="generatingExcerpt" @click="generateExcerpt"><Icon name="ph:arrows-clockwise-bold" /> 重新生成摘要</a-button>
             </div>
             <a-textarea id="moment-excerpt" v-model:value="form.excerpt" :rows="6" placeholder="可选。前台会以摘要样式展示，不会和正文混在一起。" />
 

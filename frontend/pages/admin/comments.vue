@@ -1,23 +1,30 @@
 <template>
   <div class="comment-admin admin-page-shell">
-    <header class="admin-page-head"><div><span>MODERATION</span><h1>审核中心</h1><p>直接处理文章评论、瞬间评论和友链申请，不设置重复入口。</p></div><AdminRefreshButton :loading="loading" @click="loadComments" /></header>
-    <section aria-labelledby="comment-review-title">
-      <div class="review-section-head"><div><h2 id="comment-review-title">文章与瞬间评论</h2><p>按来源、状态和关键字定位评论。</p></div></div>
+    <header class="admin-page-head"><div><span>MODERATION</span><h1>审核中心</h1><p>集中处理文章评论、瞬间评论和友链申请。</p></div></header>
+    <a-tabs v-model:active-key="activeReviewTab" class="review-tabs" size="small" @change="changeReviewTab">
+      <a-tab-pane key="article" tab="文章评论" />
+      <a-tab-pane key="moment" tab="瞬间评论" />
+      <a-tab-pane key="applications" tab="友链申请" />
+    </a-tabs>
+
+    <AdminFriendApplications v-if="activeReviewTab === 'applications'" />
+    <section v-else aria-label="评论审核列表">
     <a-spin :spinning="loading" class="table-spin">
       <div class="admin-table-shell">
         <div class="comment-filter table-toolbar">
-          <a-segmented v-model:value="source" :options="sourceOptions" @change="resetAndLoad" />
-          <a-select v-model:value="status" style="width: 120px" @change="resetAndLoad">
+          <a-input v-model:value="keyword" allow-clear placeholder="搜索内容、作者或所属内容" class="comment-search" @press-enter="resetAndLoad">
+            <template #prefix><Icon name="ph:magnifying-glass" /></template>
+          </a-input>
+          <a-select v-model:value="status" style="width: 128px">
             <a-select-option value="">全部状态</a-select-option>
             <a-select-option value="pending">待审核</a-select-option>
             <a-select-option value="approved">已发布</a-select-option>
             <a-select-option value="rejected">已拒绝</a-select-option>
           </a-select>
-          <a-input v-model:value="keyword" allow-clear placeholder="搜索内容、作者或所属内容" class="comment-search" @press-enter="resetAndLoad">
-            <template #prefix><Icon name="ph:magnifying-glass" /></template>
-          </a-input>
           <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
           <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+          <span class="toolbar-spacer" />
+          <AdminRefreshButton :loading="loading" @click="loadComments" />
         </div>
         <a-table :dataSource="comments" :columns="columns" rowKey="id" size="small" :pagination="false" :locale="{ emptyText: '暂无评论' }">
           <template #bodyCell="{ column, record }">
@@ -49,7 +56,6 @@
       </div>
     </a-spin>
     </section>
-    <AdminFriendApplications />
 
     <a-modal v-model:open="detail.open" title="评论详情" width="640px" :footer="null" @cancel="detail.open = false">
       <div v-if="detail.item" class="detail-wrap">
@@ -102,9 +108,9 @@
         </div>
 
         <div class="detail-actions">
-          <a-button v-if="detail.item.status==='pending'" type="primary" size="small" @click="handleApprove(detail.item)">通过</a-button>
-          <a-button v-if="detail.item.status==='pending'" danger size="small" @click="openReject(detail.item)">驳回</a-button>
-          <a-button v-if="detail.item.status==='rejected'" type="primary" size="small" @click="handleApprove(detail.item)">通过</a-button>
+          <a-button v-if="detail.item.status==='pending'" type="primary" size="small" @click="handleApprove(detail.item)"><Icon name="ph:check-bold" /> 通过</a-button>
+          <a-button v-if="detail.item.status==='pending'" danger size="small" @click="openReject(detail.item)"><Icon name="ph:x-bold" /> 驳回</a-button>
+          <a-button v-if="detail.item.status==='rejected'" type="primary" size="small" @click="handleApprove(detail.item)"><Icon name="ph:check-bold" /> 通过</a-button>
         </div>
       </div>
     </a-modal>
@@ -127,6 +133,8 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
+const route = useRoute()
+const router = useRouter()
 const { mediaUrl } = useMediaUrl()
 const loading = ref(true)
 const comments = ref<any[]>([])
@@ -134,10 +142,12 @@ const currentPage = ref(1)
 const total = ref(0)
 const totalPages = ref(1)
 const pageSize = 20
-const source = ref<'article' | 'moment'>('article')
+type ReviewTab = 'article' | 'moment' | 'applications'
+const querySection = String(route.query.section || '')
+const activeReviewTab = ref<ReviewTab>(['article', 'moment', 'applications'].includes(querySection) ? querySection as ReviewTab : 'article')
+const source = computed<'article' | 'moment'>(() => activeReviewTab.value === 'moment' ? 'moment' : 'article')
 const status = ref('')
 const keyword = ref('')
-const sourceOptions = [{ label: '文章评论', value: 'article' }, { label: '瞬间评论', value: 'moment' }]
 const rejectDialog = reactive({ open: false, comment: null as any, reason: '', customReason: '' })
 const detail = reactive({ open: false, item: null as any })
 
@@ -183,9 +193,31 @@ async function loadComments() {
 }
 
 function resetAndLoad() { currentPage.value = 1; void loadComments() }
-function resetFilters() { status.value = ''; keyword.value = ''; source.value = 'article'; resetAndLoad() }
+function resetFilters() { status.value = ''; keyword.value = ''; resetAndLoad() }
 
-onMounted(loadComments)
+function changeReviewTab(key: string | number) {
+  const next = String(key) as ReviewTab
+  currentPage.value = 1
+  detail.open = false
+  rejectDialog.open = false
+  void router.replace({ query: { ...route.query, section: next === 'article' ? undefined : next } })
+  if (next !== 'applications') void loadComments()
+}
+
+watch(() => route.query.section, (value) => {
+  const section = String(value || '')
+  const next: ReviewTab = ['article', 'moment', 'applications'].includes(section) ? section as ReviewTab : 'article'
+  if (activeReviewTab.value === next) return
+  activeReviewTab.value = next
+  currentPage.value = 1
+  detail.open = false
+  rejectDialog.open = false
+  if (next !== 'applications') void loadComments()
+})
+
+onMounted(() => {
+  if (activeReviewTab.value !== 'applications') void loadComments()
+})
 
 async function handleApprove(c: any) {
   try {
@@ -225,9 +257,10 @@ async function confirmReject() {
 </script>
 
 <style scoped>
-.review-section-head { margin-bottom: 12px; }.review-section-head h2 { margin:0; font-size:1rem; }.review-section-head p { margin:3px 0 0; color:var(--c-text-3); font-size:.68rem; }
+.review-tabs :deep(.ant-tabs-content-holder) { display:none; }
 .comment-filter { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 .comment-search { width:260px; }
+.toolbar-spacer { flex:1; }
 .comment-author { font-weight:500; font-size:0.82rem; }
 .moderation-content { white-space:pre-wrap; word-break:break-word; }
 .reply-mention { color:var(--c-primary); font-weight:600; }

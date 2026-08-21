@@ -5,7 +5,7 @@
       <header><div><Icon :name="configHealth.requiredMissing ? 'ph:warning-circle-bold' : 'ph:check-circle-bold'" /><span><strong>{{ configHealth.requiredMissing ? `${configHealth.requiredMissing} 项必要配置缺失` : '必要配置已齐全' }}</strong><small>{{ configHealth.configuredCount }} / {{ configHealth.checks.length }} 项已配置</small></span></div><time v-if="configHealth.checkedAt">{{ String(configHealth.checkedAt).slice(0, 16).replace('T', ' ') }}</time></header>
       <div class="health-grid"><article v-for="item in configHealth.checks" :key="item.key"><i :class="{ ok: item.configured }"><Icon :name="item.configured ? 'ph:check-bold' : 'ph:x-bold'" /></i><span><strong>{{ item.label }}</strong><small>{{ item.source }}</small></span><a-tag :color="item.configured ? 'green' : item.required ? 'red' : 'default'">{{ item.configured ? '已配置' : item.required ? '必需' : '可选' }}</a-tag></article></div>
     </section>
-    <a-tabs v-model:activeKey="tab" size="small" @change="handleSettingsTab">
+    <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="website" tab="网站信息" />
       <a-tab-pane key="basic" tab="基本设置" />
       <a-tab-pane key="email" tab="邮件配置" />
@@ -64,7 +64,7 @@
         </AdminCard>
 
         <AdminCard
-          icon="ph:bottle-bold"
+          icon="game-icons:round-bottom-flask"
           title="时光海额度"
           desc="控制同一访客每天投瓶与打捞的次数"
         >
@@ -151,7 +151,7 @@
               <a-button
                 :disabled="!emailPasswordDirty || !email.email_smtp_pass.trim()"
                 @click="saveEmailPassword"
-                >更新密钥</a-button
+                ><Icon name="ph:key-bold" /> 更新密钥</a-button
               >
             </div>
             <div class="hint">
@@ -187,7 +187,7 @@
               style="width: 200px; margin-right: 8px"
             />
             <a-button type="primary" :loading="emailTesting" @click="testEmail"
-              >发送测试</a-button
+              ><Icon name="ph:paper-plane-tilt-bold" /> 发送测试</a-button
             >
           </a-form-item>
           </a-form>
@@ -502,7 +502,7 @@
             type="primary"
             :loading="sourcePicker.loading"
             @click="loadSourceTracks"
-            >获取歌曲</a-button
+            ><Icon name="ph:download-simple-bold" /> 获取歌曲</a-button
           >
         </div>
         <a-input
@@ -574,18 +574,18 @@
           />
         </a-spin>
         <template #footer>
-          <a-button @click="sourcePicker.open = false">取消</a-button>
+          <a-button @click="sourcePicker.open = false"><Icon name="ph:x-bold" /> 取消</a-button>
           <a-button
             :disabled="!sourcePicker.tracks.length"
             @click="adoptWholeSource"
-            >整单采用</a-button
+            ><Icon name="ph:list-plus-bold" /> 整单采用</a-button
           >
           <a-button
             type="primary"
             :disabled="!selectedSourceKeys.size"
             @click="confirmSourceTracks"
           >
-            添加选中歌曲
+            <Icon name="ph:plus-bold" /> 添加选中歌曲
           </a-button>
         </template>
       </a-modal>
@@ -594,6 +594,8 @@
 </template>
 
 <script setup lang="ts">
+import { Modal } from "ant-design-vue";
+
 definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
 
 const api = useApi();
@@ -733,8 +735,6 @@ onMounted(async () => {
   settings.value.site_url ||= siteForm.url;
   settings.value.site_description ||= siteForm.description;
 });
-
-function handleSettingsTab() {}
 
 async function loadSiteInfo() {
   try {
@@ -1298,7 +1298,15 @@ function removePlaylist(i: number) {
     toast.warning("至少保留一个歌单");
     return;
   }
-  music.music_playlists.splice(i, 1);
+  const playlist = music.music_playlists[i];
+  Modal.confirm({
+    title: "移除歌单",
+    content: `确认从配置中移除「${playlist?.name || "当前歌单"}」？保存设置后生效。`,
+    okText: "移除",
+    cancelText: "取消",
+    okType: "danger",
+    onOk: () => music.music_playlists.splice(i, 1),
+  });
 }
 
 async function saveMusic() {

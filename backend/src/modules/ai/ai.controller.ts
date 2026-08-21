@@ -318,7 +318,12 @@ export class AiController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   previewKnowledge(@Body() dto: PreviewKnowledgeDto) {
-    return this.ai.previewKnowledge(dto.query || '');
+    return this.ai.previewKnowledge(dto.query || '', {
+      ai_knowledge_enabled: dto.enabled,
+      ai_knowledge_catalog_limit: dto.catalogLimit,
+      ai_knowledge_top_k: dto.topK,
+      ai_knowledge_snippet_len: dto.snippetLen,
+    });
   }
 
   @Get('admin/knowledge/list')

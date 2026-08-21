@@ -45,13 +45,19 @@ async function doSearch(q: string) {
     results.value = (res ?? []).map((item: any) => ({
       type: item.type,
       sourceId: item.sourceId,
-      href: item.href,
+      href: withHighlight(item.href, q),
       title: item.title,
       excerpt: item.excerpt || '',
       icon: icons[item.type] || 'ph:sparkle-bold',
     }))
   } catch { results.value = [] }
   searching.value = false
+}
+
+function withHighlight(href: string, value: string) {
+  if (!href || !value.trim()) return href
+  const separator = href.includes('?') ? '&' : '?'
+  return `${href}${separator}highlight=${encodeURIComponent(value.trim().slice(0, 80))}`
 }
 
 function onInput() {
@@ -99,8 +105,8 @@ onUnmounted(() => {
 .search-result-row + .search-result-row { border-top: 1px solid var(--border); }
 .search-row-icon { font-size: 1rem; margin-top: 2px; flex-shrink: 0; }
 .search-row-body { flex: 1; min-width: 0; }
-.search-row-title { font-size: 0.85rem; font-weight: 700; color: var(--c-text); line-height: 1.4; margin-bottom: 2px; }
-.search-row-desc { font-size: 0.75rem; color: var(--c-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-row-title { font-size: 0.85rem; font-weight: 700; color: var(--c-text); line-height: 1.4; margin-bottom: 2px; user-select: text; }
+.search-row-desc { font-size: 0.75rem; color: var(--c-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; }
 .search-empty { padding: 28px 18px; text-align: center; font-size: 0.82rem; color: var(--c-text-2); }
 
 @media (max-width: 640px) {

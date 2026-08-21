@@ -1,14 +1,15 @@
 <template>
-  <section class="review-section" aria-labelledby="friend-review-title">
-    <header class="review-section-head"><div><h2 id="friend-review-title">友链申请</h2><p>审核互链信息并同步加入友链资源。</p></div><AdminRefreshButton :loading="loading" @click="load(page)" /></header>
+  <section class="review-section" aria-label="友链申请审核列表">
     <div class="table-toolbar">
       <a-input v-model:value="keyword" allow-clear placeholder="搜索站点名称、地址或邮箱" @press-enter="resetAndLoad"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
       <a-select v-model:value="status" style="width:130px"><a-select-option value="">全部状态</a-select-option><a-select-option value="pending">待审核</a-select-option><a-select-option value="approved">已通过</a-select-option><a-select-option value="rejected">已拒绝</a-select-option></a-select>
       <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
       <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="load(page)" />
     </div>
     <div class="admin-table-shell">
-      <a-table :data-source="filteredItems" :columns="columns" row-key="id" size="small" :loading="loading" :pagination="false" :scroll="{ x: 1080 }" :locale="{ emptyText: '暂无友链申请' }">
+      <a-table :data-source="items" :columns="columns" row-key="id" size="small" :loading="loading" :pagination="false" :scroll="{ x: 1080 }" :locale="{ emptyText: '暂无友链申请' }">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'siteUrl'"><a :href="record.siteUrl" target="_blank">{{ record.siteUrl }}</a></template>
           <template v-else-if="column.key === 'status'"><a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag></template>
@@ -38,17 +39,13 @@ const pageSize = 10
 const total = ref(0)
 const detail = reactive({ open: false, record: null as any })
 const reject = reactive({ open: false, record: null as any, reason: '' })
-const filteredItems = computed(() => {
-  const query = keyword.value.trim().toLowerCase()
-  return query ? items.value.filter((item) => `${item.siteName} ${item.siteUrl} ${item.contactEmail}`.toLowerCase().includes(query)) : items.value
-})
 const columns = [{ title:'站点名称',dataIndex:'siteName',key:'siteName',width:150 },{ title:'站点 URL',key:'siteUrl',width:250 },{ title:'邮箱',dataIndex:'contactEmail',key:'contactEmail',width:180 },{ title:'状态',key:'status',width:90 },{ title:'AI 审核',key:'aiReviewResult',width:100 },{ title:'申请时间',key:'createdAt',width:150 },{ title:'操作',key:'actions',width:260,fixed:'right' as const }]
 function statusColor(value:string){return value==='approved'?'green':value==='rejected'?'red':'orange'}
 function statusText(value:string){return value==='approved'?'已通过':value==='rejected'?'已拒绝':'待审核'}
 function aiColor(value?:string){return value?.includes('approved')?'blue':value?.includes('rejected')?'red':'orange'}
 function aiText(value?:string){return ({approved:'AI 通过',rejected:'AI 拒绝',manual_approved:'人工通过',manual_rejected:'人工拒绝'} as Record<string,string>)[String(value)] || '待审核'}
 function formatTime(value?:string){return value?String(value).slice(0,16).replace('T',' '):''}
-async function load(target=page.value){page.value=target;loading.value=true;try{const params:any={page:target,limit:pageSize};if(status.value)params.status=status.value;const result=await api.get<any>('/friend-link/applications',params);items.value=result?.items||[];total.value=result?.total||0}catch(error:any){items.value=[];toast.error(error?.message||'友链申请加载失败')}finally{loading.value=false}}
+async function load(target=page.value){page.value=target;loading.value=true;try{const params:any={page:target,limit:pageSize,search:keyword.value.trim()||undefined};if(status.value)params.status=status.value;const result=await api.get<any>('/friend-link/applications',params);items.value=result?.items||[];total.value=result?.total||0}catch(error:any){items.value=[];toast.error(error?.message||'友链申请加载失败')}finally{loading.value=false}}
 function resetAndLoad(){page.value=1;void load(1)}
 function resetFilters(){keyword.value='';status.value='';resetAndLoad()}
 function openDetail(record:any){Object.assign(detail,{open:true,record})}
@@ -60,5 +57,5 @@ onMounted(load)
 </script>
 
 <style scoped>
-.review-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}.review-section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}.review-section-head h2{margin:0;font-size:1rem}.review-section-head p{margin:3px 0 0;color:var(--c-text-3);font-size:.68rem}.table-toolbar{justify-content:flex-start}.table-toolbar :deep(.ant-input-affix-wrapper){width:min(360px,100%)}@media(max-width:640px){.review-section-head{align-items:flex-start;flex-direction:column}}
+.review-section{min-width:0}.table-toolbar{justify-content:flex-start}.table-toolbar :deep(.ant-input-affix-wrapper){width:min(360px,100%)}.toolbar-spacer{flex:1}
 </style>

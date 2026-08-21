@@ -29,14 +29,10 @@
         <a-card :bordered="false" class="section-card">
           <div class="section-title"><span>01</span> 基本资料</div>
           <a-form layout="vertical">
-            <div class="type-switch" role="group" aria-label="内容类型">
-              <button type="button" :class="{ active: form.type === 'book' }" @click="setType('book')">
-                <Icon name="ph:book-open-text-bold" /> 书籍
-              </button>
-              <button type="button" :class="{ active: form.type === 'film' }" @click="setType('film')">
-                <Icon name="ph:film-strip-bold" /> 影视
-              </button>
-            </div>
+            <a-tabs :active-key="form.type" class="type-tabs" size="small" @change="changeType">
+              <a-tab-pane key="book"><template #tab><span><Icon name="ph:book-open-text-bold" /> 书籍</span></template></a-tab-pane>
+              <a-tab-pane key="film"><template #tab><span><Icon name="ph:film-strip-bold" /> 影视</span></template></a-tab-pane>
+            </a-tabs>
             <div class="two-columns">
               <a-form-item label="名称" required extra="输入名称后，AI 会补全作品资料、体会草稿、摘录与名句；状态、日期、评分和排名仍由你填写">
                 <div class="ai-title-row">
@@ -201,6 +197,10 @@ function setType(type: LibraryType) {
   if (type === 'book') form.releaseYear = undefined
 }
 
+function changeType(value: string | number) {
+  if (value === 'book' || value === 'film') setType(value)
+}
+
 function monthOnly(value?: string | null) {
   return value ? value.slice(0, 7) : ''
 }
@@ -362,9 +362,10 @@ async function performSave(confirmExactLocation: boolean) {
 .section-card { border:1px solid color-mix(in srgb, var(--border) 72%, transparent); border-radius:14px; background:var(--ld-bg-card); box-shadow:0 8px 30px color-mix(in srgb, var(--ld-shadow) 35%, transparent); }
 .section-title { display:flex; align-items:center; gap:10px; margin-bottom:20px; color:var(--c-text); font-size:.92rem; font-weight:700; }
 .section-title span { color:var(--c-primary); font-size:.65rem; letter-spacing:.08em; }
-.type-switch { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:20px; padding:5px; border-radius:12px; background:var(--c-bg-2); }
-.type-switch button { display:flex; height:42px; align-items:center; justify-content:center; gap:8px; border:0; border-radius:9px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.84rem; }
-.type-switch button.active { background:var(--ld-bg-card); color:var(--c-primary); box-shadow:0 3px 12px var(--ld-shadow); font-weight:700; }
+.type-tabs { margin-bottom:20px; }
+.type-tabs :deep(.ant-tabs-nav) { margin-bottom:0; }
+.type-tabs :deep(.ant-tabs-tab-btn > span) { display:inline-flex; align-items:center; gap:6px; }
+.type-tabs :deep(.ant-tabs-content-holder) { display:none; }
 .two-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:16px; }
 .ai-title-row { display:flex; gap:8px; }.ai-title-row>:first-child { min-width:0; flex:1; }.ai-fill-button { border-color:color-mix(in srgb,var(--c-primary) 45%,var(--border)); color:var(--c-primary); font-weight:650; }
 .date-input { width:100%; height:32px; padding:0 11px; border:1px solid var(--border); border-radius:6px; background:var(--ld-bg-card); color:var(--c-text); outline:0; }

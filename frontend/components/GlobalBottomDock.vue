@@ -26,8 +26,10 @@
 </template>
 
 <script setup lang="ts">
-import MusicCapsule from "~/components/MusicCapsule.vue";
+import { defineAsyncComponent } from "vue";
 import { useBottomDockState } from "~/composables/useBottomDockState";
+
+const MusicCapsule = defineAsyncComponent(() => import("~/components/MusicCapsule.vue"));
 
 const {
   activeBottomDock,

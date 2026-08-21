@@ -19,6 +19,7 @@ type BackupManifest = {
   sha256: string;
   gitCommit: string;
   encryptedSecrets: boolean;
+  assets?: Record<string, boolean>;
   email?: {
     archive?: { recipient: string; status: string; attached: boolean };
     notification?: { recipient: string; status: string };
@@ -61,7 +62,9 @@ export class BackupService {
   async inventory() {
     const { items } = await this.list();
     const latest = items[0];
-    const encrypted = Boolean(latest?.encryptedSecrets);
+    const managed = (key: string) => latest?.assets?.[key] === true;
+    const encrypted = (key: string) =>
+      Boolean(latest?.encryptedSecrets) && managed(key);
     return {
       latestBackupId: latest?.backupId || null,
       checkedAt: new Date().toISOString(),
@@ -70,72 +73,72 @@ export class BackupService {
           'database',
           'PostgreSQL 数据库',
           'database/blog.dump',
-          Boolean(latest),
+          managed('database'),
         ),
         this.asset(
           'uploads',
           '上传与媒体文件',
           'uploads/uploads.tar.zst',
-          Boolean(latest),
+          managed('uploads'),
         ),
         this.asset(
           'docker',
           'Docker Compose 配置',
           'config/docker/',
-          Boolean(latest),
+          managed('docker'),
         ),
-        this.asset('caddy', 'Caddy 站点配置', 'config/caddy/', Boolean(latest)),
+        this.asset('caddy', 'Caddy 站点配置', 'config/caddy/', managed('caddy')),
         this.asset(
           'systemd',
           'systemd 服务与定时器',
           'config/systemd/',
-          Boolean(latest),
+          managed('systemd'),
         ),
         this.asset(
           'cron',
           'crontab 与 cron.d',
           'config/cron/',
-          Boolean(latest),
+          managed('cron'),
         ),
         this.asset(
           'runtime',
           '服务器运行环境清单',
           'config/runtime/',
-          Boolean(latest),
+          managed('runtime'),
         ),
         this.asset(
           'source',
           '完整 Git 源码 Bundle',
           'project/corner-source.bundle',
-          Boolean(latest),
+          managed('source'),
         ),
         this.asset(
           'production-env',
           '生产环境变量与全部应用密钥',
           'secrets/secrets.tar.enc',
-          encrypted,
-          true,
+          managed('productionEnv'),
+          encrypted('productionEnv'),
         ),
         this.asset(
           'development-env',
           '开发数据环境变量',
           'secrets/secrets.tar.enc',
-          encrypted,
-          true,
+          managed('developmentEnv'),
+          encrypted('developmentEnv'),
         ),
         this.asset(
           'ssh',
           '服务器 SSH 配置、授权与部署密钥',
           'secrets/secrets.tar.enc',
-          encrypted,
-          true,
+          managed('ssh'),
+          encrypted('ssh'),
         ),
         this.asset(
           'certificates',
           'Caddy TLS 证书和账户状态',
           'secrets/secrets.tar.enc',
-          encrypted,
-          true,
+          managed('certificates'),
+          encrypted('certificates'),
         ),
       ],
     };

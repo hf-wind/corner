@@ -31,26 +31,25 @@
     <a-tabs v-model:active-key="activeTab" class="visitor-tabs">
       <a-tab-pane key="messages" :tab="`留言与漂流瓶${pendingTotal ? `（${pendingTotal} 待审）` : ''}`">
         <div class="table-toolbar">
-          <a-space wrap>
             <a-input v-model:value="msgFilter.keyword" allow-clear placeholder="搜索内容、署名或账号" class="message-search" @press-enter="loadMessages(1)">
               <template #prefix><Icon name="ph:magnifying-glass" /></template>
             </a-input>
-            <a-select v-model:value="msgFilter.type" style="width: 130px" @change="loadMessages(1)">
+            <a-select v-model:value="msgFilter.type" style="width: 130px">
               <a-select-option value="">全部类型</a-select-option>
               <a-select-option value="message">留言</a-select-option>
               <a-select-option value="bottle">漂流瓶</a-select-option>
             </a-select>
-            <a-select v-model:value="msgFilter.status" style="width: 130px" @change="loadMessages(1)">
+            <a-select v-model:value="msgFilter.status" style="width: 130px">
               <a-select-option value="">全部状态</a-select-option>
               <a-select-option value="approved">已通过</a-select-option>
               <a-select-option value="rejected">已拒绝</a-select-option>
               <a-select-option value="caught">已被捞起</a-select-option>
               <a-select-option value="pending">待审核</a-select-option>
             </a-select>
-            <a-button type="primary" @click="loadMessages(1)">搜索</a-button>
+            <a-button type="primary" @click="loadMessages(1)"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
             <a-button @click="resetMessageFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+            <span class="toolbar-spacer" />
             <AdminRefreshButton :loading="loadingMsgs" @click="loadMessages(msgPagination.current)" />
-          </a-space>
         </div>
         <a-spin :spinning="loadingMsgs">
           <div class="admin-table-shell">
@@ -86,9 +85,9 @@
                 </template>
                 <template v-else-if="column.key === 'createdAt'">{{ formatTime(record.createdAt) }}</template>
                 <template v-else-if="column.key === 'actions'">
-                  <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
-                  <a-button v-if="record.status !== 'approved' && record.status !== 'caught'" type="link" size="small" @click="handleApprove(record)">通过</a-button>
-                  <a-button v-if="record.status !== 'rejected' && record.status !== 'caught'" type="link" size="small" danger @click="openReject(record)">拒绝</a-button>
+                  <a-button type="link" size="small" @click="openDetail(record)"><Icon name="ph:eye-bold" /> 详情</a-button>
+                  <a-button v-if="record.status !== 'approved' && record.status !== 'caught'" type="link" size="small" @click="handleApprove(record)"><Icon name="ph:check-bold" /> 通过</a-button>
+                  <a-button v-if="record.status !== 'rejected' && record.status !== 'caught'" type="link" size="small" danger @click="openReject(record)"><Icon name="ph:x-bold" /> 拒绝</a-button>
                 </template>
               </template>
             </a-table>
@@ -99,17 +98,17 @@
 
       <a-tab-pane key="profiles" :tab="'访客列表'">
         <div class="table-toolbar">
-          <a-space>
-            <a-input v-model:value="profileFilter.keyword" placeholder="搜索昵称" allow-clear style="width: 200px" @press-enter="loadProfiles(1)" @change="loadProfiles(1)" />
-            <a-select v-model:value="profileFilter.type" style="width: 140px" @change="loadProfiles(1)">
+            <a-input v-model:value="profileFilter.keyword" placeholder="搜索昵称" allow-clear style="width: 220px" @press-enter="loadProfiles(1)"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+            <a-select v-model:value="profileFilter.type" style="width: 140px">
               <a-select-option value="">全部身份</a-select-option>
               <a-select-option value="user">登录用户</a-select-option>
               <a-select-option value="registered">登记访客</a-select-option>
               <a-select-option value="anonymous">未登记访客</a-select-option>
             </a-select>
+            <a-button type="primary" @click="loadProfiles(1)"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
             <a-button @click="resetProfileFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+            <span class="toolbar-spacer" />
             <AdminRefreshButton :loading="loadingProfiles" @click="loadProfiles(profilePagination.current)" />
-          </a-space>
         </div>
         <a-spin :spinning="loadingProfiles">
           <div class="admin-table-shell">
@@ -375,7 +374,8 @@ function handleProfileChange(pag: any) {
 .pending-dot { position: absolute; top: 8px; right: 10px; padding: 1px 6px; border-radius: 8px; background: color-mix(in srgb, var(--c-primary) 14%, transparent); color: var(--c-primary); font-size: .58rem; font-style: normal; }
 
 .visitor-tabs :deep(.ant-tabs-nav) { margin-bottom: 12px; }
-.table-toolbar { margin-bottom: 12px; }
+.table-toolbar { margin-bottom: 12px; flex-wrap:wrap; }
+.toolbar-spacer { flex:1; }
 .message-search { width: 240px; }
 .list-card { border-radius: 8px; }
 .content-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }

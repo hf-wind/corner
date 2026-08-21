@@ -23,7 +23,7 @@ const cards=computed(()=>[
   {label:'CPU 核心',value:info.value.cpuCores,icon:'ph:cpu-bold',note:'操作系统可见核心'},
 ])
 function formatTime(value?:string){return value?new Date(value).toLocaleString('zh-CN',{hour12:false}):'—'}
-async function load(){loading.value=true;try{info.value=await api.get('/stats/system')}finally{loading.value=false}}
+async function load(){loading.value=true;try{info.value=await api.get('/stats/system')}catch{info.value={}}finally{loading.value=false}}
 onMounted(load); useHead({title:'系统信息'})
 </script>
 <style scoped>

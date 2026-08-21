@@ -6,18 +6,19 @@
     </header>
 
     <div class="table-toolbar">
-      <a-segmented v-model:value="filter.type" :options="typeOptions" @change="resetAndLoad" />
-      <a-select v-model:value="filter.status" style="width:112px" @change="resetAndLoad">
+      <a-input v-model:value="filter.search" allow-clear placeholder="搜索名称、作者或导演" class="search-input" @press-enter="resetAndLoad"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-select v-model:value="filter.type" :options="typeOptions" style="width:112px" />
+      <a-select v-model:value="filter.status" style="width:128px">
         <a-select-option value="all">全部状态</a-select-option>
         <a-select-option value="published">已发布</a-select-option>
         <a-select-option value="draft">草稿</a-select-option>
         <a-select-option value="private">私密</a-select-option>
         <a-select-option value="pending">有新内容</a-select-option>
       </a-select>
-      <a-input v-model:value="filter.search" allow-clear placeholder="搜索名称、作者、导演..." class="search-input" @pressEnter="resetAndLoad">
-        <template #prefix><Icon name="ph:magnifying-glass" /></template>
-      </a-input>
-      <a-button @click="resetAndLoad">搜索</a-button>
+      <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="load" />
     </div>
 
     <a-spin :spinning="loading">
@@ -93,6 +94,7 @@ const columns = [
 
 function creatorLabel(item: LibraryItem) { return item.type === 'book' ? item.creator || '未知作者' : item.director || '未知导演' }
 function resetAndLoad() { page.value = 1; load() }
+function resetFilters() { Object.assign(filter, { type: 'all', status: 'all', search: '' }); resetAndLoad() }
 function statusText(status: string) { return status === 'published' ? '已发布' : status === 'private' ? '私密' : '草稿' }
 function statusColor(status: string) { return status === 'published' ? 'green' : status === 'private' ? 'purple' : 'default' }
 

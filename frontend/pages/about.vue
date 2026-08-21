@@ -195,6 +195,9 @@ function observeSections() {
     blocks?.forEach((block) => block.classList.add('is-visible'))
     return
   }
+  // Keep the first viewport painted while the observer is being attached; this
+  // avoids a blank frame when navigating from another public page.
+  blocks[0]?.classList.add('is-visible')
   revealObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) return

@@ -42,7 +42,7 @@
             <a-textarea v-model:value="form.bio" :rows="4" :maxlength="500" show-count placeholder="介绍一下自己" />
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" html-type="submit" :loading="saving">保存修改</a-button>
+            <a-button type="primary" html-type="submit" :loading="saving"><Icon name="ph:floppy-disk-bold" /> 保存修改</a-button>
           </a-form-item>
         </a-form>
       </a-card>
@@ -59,12 +59,13 @@
             <div class="code-row">
               <a-input v-model:value="pwdForm.code" placeholder="请输入验证码" :maxlength="6" />
               <a-button :disabled="codeCooldown > 0" @click="sendChangePasswordCode">
+                <Icon name="ph:paper-plane-tilt-bold" />
                 {{ codeCooldown > 0 ? `${codeCooldown}s` : '发送验证码' }}
               </a-button>
             </div>
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" html-type="submit" :loading="pwdSaving">修改密码</a-button>
+            <a-button type="primary" html-type="submit" :loading="pwdSaving"><Icon name="ph:key-bold" /> 修改密码</a-button>
           </a-form-item>
         </a-form>
       </a-card>

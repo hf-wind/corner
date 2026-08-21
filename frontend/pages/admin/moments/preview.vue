@@ -2,7 +2,7 @@
   <div class="moment-preview-page">
     <header class="preview-header">
       <AppLink to="/admin/moments"><Icon name="ph:arrow-left-bold" /> 返回列表</AppLink>
-      <a-button v-if="moment.slug" type="primary" @click="router.push(`/admin/moments/${moment.slug}`)">继续编辑</a-button>
+      <a-button v-if="moment.slug" type="primary" @click="router.push(`/admin/moments/${moment.slug}`)"><Icon name="ph:pencil-simple-bold" /> 继续编辑</a-button>
     </header>
 
     <a-spin :spinning="loading">

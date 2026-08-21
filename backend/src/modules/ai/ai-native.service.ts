@@ -23,6 +23,11 @@ const PUBLIC_TYPES = [
 
 @Injectable()
 export class AiNativeService {
+  private readonly searchCache = new Map<
+    string,
+    { expiresAt: number; items: ReturnType<AiNativeService['card']>[] }
+  >();
+
   constructor(
     private prisma: PrismaService,
     private ai: AiService,
@@ -192,6 +197,7 @@ export class AiNativeService {
       await this.prisma.aiContentIndex.deleteMany({
         where: { id: { in: stale } },
       });
+    this.searchCache.clear();
     return {
       indexed: nodes.length,
       removed: stale.length,
@@ -204,22 +210,49 @@ export class AiNativeService {
   }
 
   async search(query: string, types: string[] = [], limit = 6) {
+    const normalizedQuery = this.plain(query, 240).toLocaleLowerCase();
+    if (!normalizedQuery) return [];
     await this.ensureIndex();
     const allowed = types.filter((item) => PUBLIC_TYPES.includes(item));
-    const items = await this.prisma.aiContentIndex.findMany({
-      where: allowed.length ? { contentType: { in: allowed } } : undefined,
-      orderBy: { occurredAt: 'desc' },
-      take: 1000,
-    });
-    const queryVector = this.vector(query);
-    return items
+    const cacheKey = `${normalizedQuery}|${allowed.sort().join(',')}|${Math.max(1, Math.min(12, limit))}`;
+    const cached = this.searchCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.items;
+    const typeFilter = allowed.length ? { contentType: { in: allowed } } : {};
+    const [textMatches, recentItems] = await Promise.all([
+      this.prisma.aiContentIndex.findMany({
+        where: {
+          ...typeFilter,
+          OR: [
+            { title: { contains: normalizedQuery, mode: 'insensitive' } },
+            { excerpt: { contains: normalizedQuery, mode: 'insensitive' } },
+            { body: { contains: normalizedQuery, mode: 'insensitive' } },
+          ],
+        },
+        orderBy: { occurredAt: 'desc' },
+        take: 240,
+      }),
+      this.prisma.aiContentIndex.findMany({
+        where: typeFilter,
+        orderBy: { occurredAt: 'desc' },
+        take: 240,
+      }),
+    ]);
+    const items = [...new Map(
+      [...textMatches, ...recentItems].map((item) => [item.id, item]),
+    ).values()];
+    const queryVector = this.vector(normalizedQuery);
+    const result = items
       .map((item) => ({
         item,
-        score:
-          this.cosine(
+        score: (() => {
+          const haystack = `${item.title} ${item.excerpt || ''} ${item.body}`.toLocaleLowerCase();
+          const exact = haystack.includes(normalizedQuery) ? 0.65 : 0;
+          const title = item.title.toLocaleLowerCase().includes(normalizedQuery) ? 0.9 : 0;
+          return this.cosine(
             queryVector,
             Array.isArray(item.embedding) ? item.embedding.map(Number) : [],
-          ) + (item.title.includes(query) ? 0.5 : 0),
+          ) + exact + title;
+        })(),
       }))
       .sort(
         (left, right) =>
@@ -229,6 +262,8 @@ export class AiNativeService {
       )
       .slice(0, Math.max(1, Math.min(12, limit)))
       .map(({ item, score }) => this.card(item, score));
+    this.searchCache.set(cacheKey, { expiresAt: Date.now() + 15_000, items: result });
+    return result;
   }
 
   async explore(query: string, types: string[] = [], limit = 6) {

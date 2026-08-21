@@ -23,6 +23,11 @@
         <i v-for="index in 48" :key="index" :style="fallbackStar(index)" />
       </div>
       <div class="scene-vignette" />
+      <div v-if="!entryReady" class="entry-loading" aria-live="polite">
+        <span class="entry-loader"><i /><i /><i /></span>
+        <strong>{{ sceneStatus }}</strong>
+        <small>正在整理这座记忆花园</small>
+      </div>
     </div>
 
     <header class="portal-nav">
@@ -181,7 +186,7 @@
               <button
                 class="primary-action"
                 type="button"
-                :disabled="navigating"
+                :disabled="navigating || !entryReady"
                 @click="navigate('/home')"
               >
                 <span class="action-icon"><Icon name="ph:article-bold" /></span>
@@ -191,7 +196,7 @@
               <button
                 class="secondary-action"
                 type="button"
-                :disabled="navigating"
+                :disabled="navigating || !entryReady"
                 @click="navigate('/time/constellation')"
               >
                 <span class="action-icon"><Icon name="ph:planet-bold" /></span>
@@ -245,6 +250,7 @@ const visitorCount = ref(0);
 const sceneReady = ref(false);
 const sceneFailed = ref(false);
 const graphLoaded = ref(false);
+const settingsLoaded = ref(false);
 const scrollProgress = ref(0);
 const sceneProgress = ref(0);
 const activePanel = ref(0);
@@ -264,6 +270,7 @@ const sceneStatus = computed(() =>
       ? `${graph.nodes.length} 枚记忆在线`
       : "星图正在苏醒",
 );
+const entryReady = computed(() => graphLoaded.value && settingsLoaded.value && (sceneReady.value || sceneFailed.value));
 
 function compactNumber(value: number) {
   return new Intl.NumberFormat("zh-CN", {
@@ -395,6 +402,23 @@ function initializeMotion() {
       },
     });
 
+    gsap.to(sceneLayerRef.value, {
+      scale: 1.12,
+      yPercent: 4,
+      ease: "none",
+      force3D: true,
+      scrollTrigger: { scroller, trigger: ".portal-scroll", start: "top top", end: "bottom bottom", scrub: 1.2 },
+    });
+    gsap.utils.toArray<HTMLElement>("[data-parallax]").forEach((element) => {
+      const strength = Number(element.dataset.parallax || 0.04);
+      gsap.to(element, {
+        y: () => -Math.max(10, scroller.clientHeight * strength),
+        ease: "none",
+        force3D: true,
+        scrollTrigger: { scroller, trigger: element.closest(".portal-panel") || element, start: "top bottom", end: "bottom top", scrub: 1 },
+      });
+    });
+
     ScrollTrigger.create({
       scroller,
       trigger: ".portal-scroll",
@@ -412,7 +436,7 @@ function initializeMotion() {
 onMounted(async () => {
   const motionReady = nextTick().then(initializeMotion);
   await Promise.allSettled([
-    loadSiteSettings(),
+    loadSiteSettings().finally(() => { settingsLoaded.value = true }),
     api
       .get<any>("/memories/graph", { view: "constellation", limit: 320 })
       .then((result) => {
@@ -499,6 +523,13 @@ useHead({ title: computed(() => siteTitle.value) });
 .scene-fallback.visible {
   opacity: 1;
 }
+.entry-loading { position:fixed; z-index:12; inset:50% auto auto 50%; display:grid; min-width:190px; gap:10px; transform:translate(-50%,-50%); color:var(--space-text); text-align:center; pointer-events:none; }
+.entry-loading strong { font-size:.78rem; font-weight:650; }
+.entry-loading small { color:var(--space-muted); font-size:.54rem; }
+.entry-loader { display:flex; justify-content:center; gap:6px; }
+.entry-loader i { width:6px; height:6px; border-radius:50%; background:var(--space-accent); box-shadow:0 0 12px var(--space-accent); animation:entry-pulse 1.1s ease-in-out infinite; }
+.entry-loader i:nth-child(2) { animation-delay:.15s; }.entry-loader i:nth-child(3) { animation-delay:.3s; }
+@keyframes entry-pulse { 0%,100% { opacity:.25; transform:scale(.7) } 50% { opacity:1; transform:scale(1) } }
 .scene-fallback i {
   position: absolute;
   width: var(--star-size);

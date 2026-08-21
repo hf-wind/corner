@@ -24,15 +24,10 @@
       <LeftSidebar @open-search="openSearch" />
     </div>
 
-    <div class="layout-page">
+    <div ref="pageRef" class="layout-page">
       <slot />
     </div>
     <SearchModal :visible="showSearch" @close="showSearch = false" />
-    <LegalDialog v-model="legalOpen" :initial-tab="legalTab" />
-    <div class="legal-links" aria-label="法律信息">
-      <button type="button" @click="openLegal('terms')">用户协议</button><i />
-      <button type="button" @click="openLegal('privacy')">隐私政策</button>
-    </div>
     <ClientOnly
       ><AiPet v-if="showContextAi" mode="context" :article="pageContext"
     /></ClientOnly>
@@ -40,11 +35,13 @@
 </template>
 
 <script setup lang="ts">
+import { focusSearchHighlight } from "~/composables/useSearchHighlight";
+
 const showSearch = ref(false);
-const legalOpen = ref(false);
-const legalTab = ref<"terms" | "privacy">("terms");
 const mobileNavOpen = ref(false);
 const route = useRoute();
+const pageRef = ref<HTMLElement | null>(null);
+let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 const { selectedMemory } = useMemorySelection();
 const showContextAi = computed(() =>
   /^\/(moments|library|places|albums|stories|journeys|time)\//.test(route.path),
@@ -95,11 +92,6 @@ function openSearch() {
   showSearch.value = true;
 }
 
-function openLegal(tab: "terms" | "privacy") {
-  legalTab.value = tab;
-  legalOpen.value = true;
-}
-
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape" && mobileNavOpen.value) {
     mobileNavOpen.value = false;
@@ -112,8 +104,28 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => document.addEventListener("keydown", onKeydown));
+onMounted(() => {
+  document.addEventListener("keydown", onKeydown);
+  focusRouteHighlight();
+});
 onUnmounted(() => document.removeEventListener("keydown", onKeydown));
+
+function focusRouteHighlight() {
+  const query = String(route.query.highlight || "");
+  if (!query || !pageRef.value) return;
+  let attempts = 0;
+  const run = () => {
+    attempts += 1;
+    if (focusSearchHighlight(query, pageRef.value) || attempts >= 10) return;
+    highlightTimer = window.setTimeout(run, 120);
+  };
+  nextTick(run);
+}
+
+watch(() => route.fullPath, focusRouteHighlight, { immediate: true });
+onUnmounted(() => {
+  if (highlightTimer !== null) window.clearTimeout(highlightTimer);
+});
 
 watch(
   () => route.fullPath,
@@ -159,28 +171,7 @@ watch(
   display: none;
 }
 
-.legal-links {
-  position: fixed;
-  z-index: 20;
-  right: 14px;
-  bottom: max(8px, env(safe-area-inset-bottom));
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  opacity: .48;
-  transition: opacity .18s ease;
-}
-.legal-links:hover { opacity: 1; }
-.legal-links button { padding: 2px; border: 0; background: transparent; color: var(--c-text-3); cursor: pointer; font: inherit; font-size: .5rem; }
-.legal-links button:hover { color: var(--c-primary); }
-.legal-links i { width: 1px; height: 8px; background: var(--border); }
-
 @media (max-width: 900px) {
-  .legal-links {
-    right: auto;
-    left: max(10px, env(safe-area-inset-left));
-    bottom: max(5px, env(safe-area-inset-bottom));
-  }
   .mobile-menu-trigger {
     position: fixed;
     top: max(12px, env(safe-area-inset-top));

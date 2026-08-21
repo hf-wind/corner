@@ -76,7 +76,7 @@
                 :loading="saving"
                 style="margin-left: auto"
               >
-                {{ saving ? "保存中…" : "保存" }}
+                <Icon name="ph:floppy-disk-bold" /> {{ saving ? "保存中…" : "保存" }}
               </a-button>
             </div>
           </a-card>
@@ -181,7 +181,7 @@
           @click="pickWallpaper"
           class="cover-modal-btn"
         >
-          换一张壁纸
+          <Icon name="ph:shuffle-bold" /> 换一张壁纸
         </a-button>
         <div class="cover-modal-divider"><span>或</span></div>
         <div class="cover-modal-url">
@@ -195,7 +195,7 @@
             type="primary"
             :disabled="!coverUrlInput.trim()"
             @click="coverConfirmUrl"
-            >确定</a-button
+            ><Icon name="ph:check-bold" /> 确定</a-button
           >
         </div>
       </div>

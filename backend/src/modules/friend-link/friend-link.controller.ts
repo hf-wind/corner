@@ -57,11 +57,13 @@ export class FriendLinkController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
+    @Query('search') search?: string,
   ) {
     return this.friendLinkService.getApplications({
       page: Math.max(1, Math.min(500, page ? parseInt(page) || 1 : 1)),
       limit: Math.max(1, Math.min(100, limit ? parseInt(limit) || 20 : 20)),
       status,
+      search,
     });
   }
 

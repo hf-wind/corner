@@ -295,6 +295,8 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 async function loadPersonalization() {
+  if (sessionStorage.getItem("corner:ai-discovery:loaded") === "1") return;
+  sessionStorage.setItem("corner:ai-discovery:loaded", "1");
   void api
     .post("/ai/events", {
       scene: "home",

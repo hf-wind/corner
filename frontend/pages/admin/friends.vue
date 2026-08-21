@@ -3,9 +3,9 @@
     <header class="admin-page-head"><div><span>CONTENT RESOURCES</span><h1>友链管理</h1><p>维护前台友链、展示状态并处理互链资料。</p></div><a-button type="primary" @click="openAddFriend"><PlusOutlined /> 新增友链</a-button></header>
 
     <div class="table-toolbar">
-        <a-input v-model:value="keyword" allow-clear placeholder="搜索名称、URL、站长或描述" @press-enter="resetPage"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
-        <a-select v-model:value="statusFilter" style="width:130px" @change="resetPage"><a-select-option value="all">全部状态</a-select-option><a-select-option value="enabled">已启用</a-select-option><a-select-option value="disabled">已停用</a-select-option></a-select>
-        <a-button type="primary" @click="resetPage"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+        <a-input v-model:value="keywordInput" allow-clear placeholder="搜索名称、URL、站长或描述" @press-enter="applyFilters"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+        <a-select v-model:value="statusInput" style="width:130px"><a-select-option value="all">全部状态</a-select-option><a-select-option value="enabled">已启用</a-select-option><a-select-option value="disabled">已停用</a-select-option></a-select>
+        <a-button type="primary" @click="applyFilters"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
         <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
         <span class="toolbar-spacer" />
         <AdminRefreshButton :loading="loading" @click="loadFriends" />
@@ -94,7 +94,9 @@ const toast = useToast()
 const loading = ref(true)
 const friends = ref<any[]>([])
 const keyword = ref('')
+const keywordInput = ref('')
 const statusFilter = ref<'all' | 'enabled' | 'disabled'>('all')
+const statusInput = ref<'all' | 'enabled' | 'disabled'>('all')
 const page = ref(1)
 const pageSize = 10
 const dialog = reactive({ open: false, isEdit: false, editIndex: -1, form: emptyFriend() })
@@ -173,8 +175,8 @@ function openAddFriend() {
   dialog.open = true
 }
 
-function resetPage() { page.value = 1 }
-function resetFilters() { keyword.value = ''; statusFilter.value = 'all'; page.value = 1 }
+function applyFilters() { keyword.value = keywordInput.value.trim(); statusFilter.value = statusInput.value; page.value = 1 }
+function resetFilters() { keywordInput.value = ''; keyword.value = ''; statusInput.value = 'all'; statusFilter.value = 'all'; page.value = 1 }
 
 function editFriend(record: any) {
   const index = friends.value.findIndex((item) => item._key === record._key)

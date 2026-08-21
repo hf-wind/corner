@@ -2,16 +2,25 @@
   <div class="journey-admin admin-page-shell">
     <header class="admin-page-head"><div><span>STORY ROUTES</span><h1>故事航线</h1><p>编排旅行停靠点与可播放的记忆故事。</p></div><a-button type="primary" @click="tab==='journeys'?openJourney():openStory()"><Icon name="ph:plus-bold" />{{ tab==='journeys'?'新建旅行':'新建故事' }}</a-button></header>
     <a-tabs v-model:activeKey="tab"><a-tab-pane key="journeys" tab="旅行" /><a-tab-pane key="stories" tab="故事" /></a-tabs>
-    <a-spin :spinning="loading">
-      <div v-if="tab==='journeys'" class="rows">
-        <article v-for="item in journeys" :key="item.id"><div><b>{{ item.title }}</b><span>{{ statusText(item.status) }} · {{ item._count?.stops||0 }} 站 · {{ formatDate(item.updatedAt) }}</span></div><div><a-button size="small" @click="openJourney(item)"><Icon name="ph:pencil-simple-bold" />编辑</a-button><a-button size="small" danger @click="removeJourney(item)"><Icon name="ph:trash-bold" /></a-button></div></article>
-        <a-empty v-if="!journeys.length" description="还没有旅行" />
-      </div>
-      <div v-else class="rows">
-        <article v-for="item in stories" :key="item.id"><div><b>{{ item.title }}</b><span>{{ statusText(item.status) }} · {{ item._count?.steps||0 }} 步 · {{ formatDate(item.updatedAt) }}</span></div><div><a-button v-if="item.status==='published'" size="small" @click="router.push(`/stories/${item.slug}`)"><Icon name="ph:play-bold" />播放</a-button><a-button size="small" @click="openStory(item)"><Icon name="ph:pencil-simple-bold" />编辑</a-button><a-button size="small" danger @click="removeStory(item)"><Icon name="ph:trash-bold" /></a-button></div></article>
-        <a-empty v-if="!stories.length" description="还没有故事" />
-      </div>
-    </a-spin>
+    <div class="table-toolbar">
+      <a-input v-model:value="keywordInput" allow-clear :placeholder="tab === 'journeys' ? '搜索旅行标题或简介' : '搜索故事标题或简介'" class="route-search" @press-enter="applySearch"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-button type="primary" @click="applySearch"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetSearch"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="loadAll" />
+    </div>
+    <div class="admin-table-shell">
+      <a-table :data-source="pagedRoutes" :columns="routeColumns" row-key="id" size="small" :loading="loading" :pagination="false" :locale="{ emptyText: tab === 'journeys' ? '还没有旅行' : '还没有故事' }" :scroll="{ x: 720 }">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'title'"><div class="route-title"><strong>{{ record.title }}</strong><span>{{ record.description || '暂无简介' }}</span></div></template>
+          <template v-else-if="column.key === 'status'"><a-tag :color="record.status === 'published' ? 'green' : record.status === 'private' ? 'purple' : 'default'">{{ statusText(record.status) }}</a-tag></template>
+          <template v-else-if="column.key === 'count'">{{ tab === 'journeys' ? (record._count?.stops || 0) + ' 站' : (record._count?.steps || 0) + ' 步' }}</template>
+          <template v-else-if="column.key === 'updatedAt'">{{ formatDate(record.updatedAt) }}</template>
+          <template v-else-if="column.key === 'actions'"><div class="admin-row-actions"><a-button v-if="tab === 'stories' && record.status==='published'" type="link" size="small" @click="router.push(`/stories/${record.slug}`)"><Icon name="ph:play-bold" /> 播放</a-button><a-button type="link" size="small" @click="tab === 'journeys' ? openJourney(record) : openStory(record)"><Icon name="ph:pencil-simple-bold" /> 编辑</a-button><a-button type="link" size="small" danger @click="tab === 'journeys' ? removeJourney(record) : removeStory(record)"><Icon name="ph:trash-bold" /> 删除</a-button></div></template>
+        </template>
+      </a-table>
+      <AdminPagination v-model:current="routePage" :page-size="routePageSize" :total="filteredRoutes.length" :show-size-changer="false" />
+    </div>
 
     <a-modal v-model:open="journeyModal" :title="journeyForm.id?'编辑旅行':'新建旅行'" width="min(920px, calc(100vw - 24px))" :confirm-loading="saving" ok-text="保存" @ok="saveJourney">
       <a-form layout="vertical"><div class="form-grid"><a-form-item label="标题"><a-input v-model:value="journeyForm.title" /></a-form-item><a-form-item label="Slug"><a-input v-model:value="journeyForm.slug" /></a-form-item><a-form-item label="状态"><a-select v-model:value="journeyForm.status" :options="statusOptions" /></a-form-item><a-form-item label="主时间"><a-input v-model:value="journeyForm.happenedAt" type="datetime-local" /></a-form-item></div><a-form-item label="简介"><a-textarea v-model:value="journeyForm.description" :rows="2" /></a-form-item></a-form>
@@ -41,6 +50,12 @@
 import { Modal } from 'ant-design-vue'
 definePageMeta({layout:'admin',middleware:'auth',ssr:false})
 const api=useApi(),toast=useToast(),router=useRouter(),{openItems}=useMediaLibrary();const tab=ref('journeys'),loading=ref(true),saving=ref(false),aiLoading=ref(false),journeyModal=ref(false),storyModal=ref(false),aiDialog=ref(false);const journeys=ref<any[]>([]),stories=ref<any[]>([]),placeOptions=ref<any[]>([]),nodeOptions=ref<any[]>([]);let dragIndex=-1
+const keywordInput=ref(''),keyword=ref(''),routePage=ref(1),routePageSize=10
+const routeColumns=[{title:'名称',key:'title',minWidth:280},{title:'状态',key:'status',width:100},{title:'内容',key:'count',width:90},{title:'更新时间',key:'updatedAt',width:120},{title:'操作',key:'actions',width:230,fixed:'right' as const}]
+const filteredRoutes=computed(()=>{const source=tab.value==='journeys'?journeys.value:stories.value;const query=keyword.value.toLowerCase();return query?source.filter((item:any)=>`${item.title} ${item.description||''}`.toLowerCase().includes(query)):source})
+const pagedRoutes=computed(()=>filteredRoutes.value.slice((routePage.value-1)*routePageSize,routePage.value*routePageSize))
+watch(tab,()=>{keywordInput.value='';keyword.value='';routePage.value=1})
+function applySearch(){keyword.value=keywordInput.value.trim();routePage.value=1}function resetSearch(){keywordInput.value='';keyword.value='';routePage.value=1}
 const statusOptions=[{label:'草稿',value:'draft'},{label:'公开',value:'published'},{label:'私密',value:'private'}],visibilityOptions=[{label:'地点私密',value:'private'},{label:'模糊公开',value:'blurred'},{label:'精确公开',value:'public'}]
 const journeyForm=reactive<any>({id:'',title:'',slug:'',description:'',status:'draft',happenedAt:'',stops:[]});const storyForm=reactive<any>({id:'',title:'',slug:'',description:'',status:'draft',journeyId:null,steps:[]});const aiForm=reactive({theme:'我的绍兴时光',durationMinutes:5});const journeyOptions=computed(()=>journeys.value.map(i=>({label:i.title,value:i.id})))
 onMounted(loadAll)
@@ -81,5 +96,5 @@ function filterNode(input:string,option:any){return String(option.label).toLower
 </script>
 
 <style scoped>
-.journey-admin{width:min(1180px,100%);margin:0 auto}.journey-admin>header,.rows article,.editor-head,.inline-fields{display:flex;align-items:center}.journey-admin>header{justify-content:space-between;gap:20px}.journey-admin h1{margin:0;color:var(--c-text);font-size:1.5rem}.journey-admin header p{margin:4px 0;color:var(--c-text-3);font-size:.76rem}.rows{border-top:1px solid var(--border)}.rows article{justify-content:space-between;gap:15px;padding:14px 4px;border-bottom:1px solid var(--border)}.rows article>div:first-child{display:flex;flex-direction:column;gap:4px}.rows b{color:var(--c-text);font-size:.84rem}.rows span{color:var(--c-text-3);font-size:.68rem}.rows article>div:last-child{display:flex;gap:6px}.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.editor-head{justify-content:space-between;margin:8px 0 10px}.editor-head>div{display:flex;gap:6px}.sortable-list{display:flex;max-height:55vh;flex-direction:column;gap:8px;overflow:auto}.sortable-list article{display:grid;grid-template-columns:20px 30px 1fr 28px;align-items:start;gap:8px;padding:10px;border:1px solid var(--border);border-radius:7px;background:var(--c-bg-2)}.drag{margin-top:9px;color:var(--c-text-3);cursor:grab}.step-number{display:grid;width:28px;height:28px;border-radius:50%;background:var(--c-primary-soft);color:var(--c-primary);font-size:.65rem;place-items:center}.step-fields{display:grid;grid-template-columns:1.2fr 1fr 180px 120px;gap:7px}.step-fields textarea{grid-column:1/-1}.story-steps .step-fields{grid-template-columns:1.2fr 1fr}.story-steps .inline-fields,.story-steps textarea,.story-steps .step-fields>input:last-child{grid-column:1/-1}.inline-fields{gap:7px}.sortable-list article>button{display:grid;width:26px;height:26px;border:0;background:none;color:var(--c-text-3);place-items:center}@media(max-width:760px){.form-grid{grid-template-columns:1fr 1fr}.step-fields{grid-template-columns:1fr}.step-fields>*{grid-column:1!important}.journey-admin>header{align-items:flex-start}.rows article{align-items:flex-start}.rows article>div:last-child{flex-wrap:wrap;justify-content:flex-end}}
+.journey-admin{width:100%;margin:0 auto}.journey-admin>header,.editor-head,.inline-fields{display:flex;align-items:center}.route-search{width:min(340px,100%)}.route-title{display:flex;min-width:0;flex-direction:column;gap:4px}.route-title strong{color:var(--c-text);font-size:.82rem}.route-title span{overflow:hidden;color:var(--c-text-3);font-size:.68rem;text-overflow:ellipsis;white-space:nowrap}.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.editor-head{justify-content:space-between;margin:8px 0 10px}.editor-head>div{display:flex;gap:6px}.sortable-list{display:flex;max-height:55vh;flex-direction:column;gap:8px;overflow:auto}.sortable-list article{display:grid;grid-template-columns:20px 30px 1fr 28px;align-items:start;gap:8px;padding:10px;border:1px solid var(--border);border-radius:7px;background:var(--c-bg-2)}.drag{margin-top:9px;color:var(--c-text-3);cursor:grab}.step-number{display:grid;width:28px;height:28px;border-radius:50%;background:var(--c-primary-soft);color:var(--c-primary);font-size:.65rem;place-items:center}.step-fields{display:grid;grid-template-columns:1.2fr 1fr 180px 120px;gap:7px}.step-fields textarea{grid-column:1/-1}.story-steps .step-fields{grid-template-columns:1.2fr 1fr}.story-steps .inline-fields,.story-steps textarea,.story-steps .step-fields>input:last-child{grid-column:1/-1}.inline-fields{gap:7px}.sortable-list article>button{display:grid;width:26px;height:26px;border:0;background:none;color:var(--c-text-3);place-items:center}@media(max-width:760px){.form-grid{grid-template-columns:1fr 1fr}.step-fields{grid-template-columns:1fr}.step-fields>*{grid-column:1!important}.journey-admin>header{align-items:flex-start}}
 </style>

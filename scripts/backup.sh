@@ -127,6 +127,14 @@ git remote -v > "$staging/project/git-remotes.txt"
 git bundle create "$staging/project/corner-source.bundle" --all
 
 secret_paths=()
+has_development_env=false
+has_ssh=false
+has_certificates=false
+[[ -f /srv/corner/dev-data/.env ]] && has_development_env=true
+[[ -e /home/ubuntu/.ssh ]] && has_ssh=true
+if [[ -e "$data_root/caddy/data" || -e "$data_root/caddy/config" ]]; then
+  has_certificates=true
+fi
 for secret_path in \
   "$project_dir/.env" \
   "/srv/corner/dev-data/.env" \
@@ -153,6 +161,10 @@ jq -n \
   --arg database "database/blog.dump" \
   --arg uploads "$(if [[ -f "$staging/uploads/uploads.tar.zst" ]]; then echo uploads/uploads.tar.zst; fi)" \
   --arg secrets "secrets/secrets.tar.enc" \
+  --argjson hasUploads "$(if [[ -f "$staging/uploads/uploads.tar.zst" ]]; then echo true; else echo false; fi)" \
+  --argjson hasDevelopmentEnv "$has_development_env" \
+  --argjson hasSsh "$has_ssh" \
+  --argjson hasCertificates "$has_certificates" \
   '{
     version: 2,
     backupId: $backupId,
@@ -164,6 +176,20 @@ jq -n \
       config: "config/",
       project: "project/corner-source.bundle",
       encryptedSecrets: $secrets
+    },
+    assets: {
+      database: true,
+      uploads: $hasUploads,
+      docker: true,
+      caddy: true,
+      systemd: true,
+      cron: true,
+      runtime: true,
+      source: true,
+      productionEnv: true,
+      developmentEnv: $hasDevelopmentEnv,
+      ssh: $hasSsh,
+      certificates: $hasCertificates
     },
     encryption: {
       algorithm: "AES-256-CBC",
@@ -267,6 +293,10 @@ jq -n \
   --arg notificationMailStatus "$notification_mail_status" \
   --argjson attached "$attach_archive" \
   --argjson mailLimitMb "$max_mail_mb" \
+  --argjson hasUploads "$(if [[ -f "$staging/uploads/uploads.tar.zst" ]]; then echo true; else echo false; fi)" \
+  --argjson hasDevelopmentEnv "$has_development_env" \
+  --argjson hasSsh "$has_ssh" \
+  --argjson hasCertificates "$has_certificates" \
   '{
     version: 2,
     backupId: $backupId,
@@ -277,6 +307,20 @@ jq -n \
     sha256: $sha256,
     gitCommit: $gitCommit,
     encryptedSecrets: true,
+    assets: {
+      database: true,
+      uploads: $hasUploads,
+      docker: true,
+      caddy: true,
+      systemd: true,
+      cron: true,
+      runtime: true,
+      source: true,
+      productionEnv: true,
+      developmentEnv: $hasDevelopmentEnv,
+      ssh: $hasSsh,
+      certificates: $hasCertificates
+    },
     email: {
       archive: { recipient: $archiveEmail, status: $archiveMailStatus, attached: $attached },
       notification: { recipient: $notificationEmail, status: $notificationMailStatus },

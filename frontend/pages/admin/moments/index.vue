@@ -2,26 +2,15 @@
   <div class="moment-admin-page admin-page-shell">
     <header class="admin-page-head">
       <div><span>CONTENT MANAGEMENT</span><h1>瞬间管理</h1><p>管理瞬间草稿、发布状态与公开版本。</p></div>
+      <a-button type="primary" @click="$router.push('/admin/moments/create')"><Icon name="ph:plus-bold" /> 写瞬间</a-button>
     </header>
     <div class="toolbar table-toolbar">
-      <a-segmented
-        v-model:value="filter.status"
-        :options="statusOptions"
-        @change="onFilterChange"
-      />
-      <div class="toolbar-actions">
-        <a-input-search
-          v-model:value="filter.search"
-          placeholder="搜索标题、摘要或内容..."
-          allow-clear
-          class="search-input"
-          @search="onFilterChange"
-        />
-        <a-button type="primary" @click="$router.push('/admin/moments/create')">
-          <Icon name="ph:plus-bold" />
-          写瞬间
-        </a-button>
-      </div>
+      <a-input v-model:value="filter.search" placeholder="搜索标题、摘要或内容" allow-clear class="search-input" @press-enter="onFilterChange"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-select v-model:value="filter.status" :options="statusOptions" style="width:132px" />
+      <a-button type="primary" @click="onFilterChange"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="loadMoments" />
     </div>
 
     <div class="admin-table-shell moment-table-card">
@@ -111,6 +100,11 @@ function statusColor(status: string) { return status === 'published' ? 'green' :
 function onFilterChange() {
   page.value = 1
   void loadMoments()
+}
+
+function resetFilters() {
+  Object.assign(filter, { status: 'all', search: '' })
+  onFilterChange()
 }
 
 async function loadMoments() {
@@ -223,13 +217,8 @@ onMounted(() => {
   gap: 14px;
 }
 
-.toolbar-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .search-input {
-  max-width: 320px;
+  width: 320px;
 }
 
 .moment-table-card {
@@ -289,7 +278,6 @@ onMounted(() => {
     flex-direction: column;
   }
 
-  .toolbar-actions { width: 100%; }
   .search-input { max-width: none; flex: 1; }
 }
 </style>

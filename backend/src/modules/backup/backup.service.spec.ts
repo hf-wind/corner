@@ -45,6 +45,20 @@ describe('BackupService', () => {
         sha256: 'abc',
         gitCommit: 'commit',
         encryptedSecrets: true,
+        assets: {
+          database: true,
+          uploads: true,
+          docker: true,
+          caddy: true,
+          systemd: true,
+          cron: true,
+          runtime: true,
+          source: true,
+          productionEnv: true,
+          developmentEnv: true,
+          ssh: true,
+          certificates: true,
+        },
       }),
     );
   }
@@ -58,6 +72,30 @@ describe('BackupService', () => {
     expect(records.items[0].backupId).toBe('20260820T120000Z');
     expect(inventory.assets.every((asset) => asset.managed)).toBe(true);
     expect(inventory.assets.filter((asset) => asset.encrypted)).toHaveLength(4);
+  });
+
+  it('reports optional assets from the manifest instead of assuming presence', async () => {
+    await createBackup();
+    const manifestPath = join(
+      backupRoot,
+      '20260820T120000Z',
+      'manifest.json',
+    );
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    manifest.assets.uploads = false;
+    manifest.assets.developmentEnv = false;
+    manifest.assets.ssh = false;
+    manifest.assets.certificates = false;
+    await writeFile(manifestPath, JSON.stringify(manifest));
+
+    const inventory = await service.inventory();
+
+    expect(
+      inventory.assets
+        .filter((asset) => !asset.managed)
+        .map((asset) => asset.key),
+    ).toEqual(['uploads', 'development-env', 'ssh', 'certificates']);
+    expect(inventory.assets.filter((asset) => asset.encrypted)).toHaveLength(1);
   });
 
   it('writes one backup request and rejects concurrent work', async () => {

@@ -20,7 +20,7 @@ const FONT_STORAGE_KEY = 'font-preset'
 const WENKAI_STYLESHEET_ID = 'font-wenkai-stylesheet'
 
 export function useTypography() {
-  const fontPreset: Ref<FontPresetId> = useState('font-preset', () => 'ayuan')
+  const fontPreset: Ref<FontPresetId> = useState('font-preset', () => 'system-rounded')
 
   function isFontPreset(value: string | null): value is FontPresetId {
     return fontPresetOptions.some(option => option.id === value)
@@ -45,7 +45,7 @@ export function useTypography() {
 
   function init() {
     const saved = localStorage.getItem(FONT_STORAGE_KEY)
-    fontPreset.value = isFontPreset(saved) ? saved : 'ayuan'
+    fontPreset.value = isFontPreset(saved) ? saved : 'system-rounded'
     applyFont(fontPreset.value)
   }
 

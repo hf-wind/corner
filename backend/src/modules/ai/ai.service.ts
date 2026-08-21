@@ -1730,8 +1730,22 @@ export class AiService {
     return `【本站文章目录】\n${catalog}\n\n【与问题相关的内容】\n${relatedBlock}`;
   }
 
-  async previewKnowledge(query = '') {
+  async previewKnowledge(
+    query = '',
+    overrides: Partial<
+      Pick<
+        AiConfig,
+        | 'ai_knowledge_enabled'
+        | 'ai_knowledge_catalog_limit'
+        | 'ai_knowledge_top_k'
+        | 'ai_knowledge_snippet_len'
+      >
+    > = {},
+  ) {
     const cfg = await this.getConfig();
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value !== undefined) (cfg as any)[key] = value;
+    }
     const context = await this.buildKnowledgeContext(query, cfg);
     return {
       enabled: cfg.ai_knowledge_enabled,

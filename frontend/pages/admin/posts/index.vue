@@ -2,13 +2,15 @@
   <div class="admin-page-shell">
     <header class="admin-page-head">
       <div><span>CONTENT MANAGEMENT</span><h1>文章管理</h1><p>管理文章草稿、发布状态与公开版本。</p></div>
+      <a-button type="primary" @click="$router.push('/admin/posts/create')"><Icon name="ph:plus-bold" /> 写文章</a-button>
     </header>
     <div class="table-toolbar post-toolbar">
-      <a-segmented v-model:value="filter.status" :options="statusOptions" @change="onFilterChange" />
-      <div class="post-toolbar-actions">
-        <a-input-search v-model:value="filter.search" placeholder="搜索文章标题..." allow-clear class="post-search" @search="onFilterChange" />
-        <a-button type="primary" @click="$router.push('/admin/posts/create')"><Icon name="ph:plus-bold" /> 写文章</a-button>
-      </div>
+      <a-input v-model:value="filter.search" placeholder="搜索文章标题" allow-clear class="post-search" @press-enter="onFilterChange"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-select v-model:value="filter.status" :options="statusOptions" style="width:132px" />
+      <a-button type="primary" @click="onFilterChange"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
+      <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <AdminRefreshButton :loading="loading" @click="loadPosts" />
     </div>
 
     <a-spin :spinning="loading" class="table-spin">
@@ -53,8 +55,8 @@
         <label>定时发布<a-date-picker v-model:value="settingDialog.scheduledAt" show-time style="width:100%" placeholder="不设置则取消定时发布" /></label>
         <p>定时发布只适用于文章，到达时间后会发布当前已保存版本。</p>
         <div class="setting-actions">
-          <a-button @click="settingDialog.open = false">取消</a-button>
-          <a-button type="primary" :loading="settingDialog.saving" @click="saveSchedule">保存设置</a-button>
+          <a-button @click="settingDialog.open = false"><Icon name="ph:x-bold" /> 取消</a-button>
+          <a-button type="primary" :loading="settingDialog.saving" @click="saveSchedule"><Icon name="ph:floppy-disk-bold" /> 保存设置</a-button>
         </div>
       </div>
     </a-modal>
@@ -103,6 +105,11 @@ function statusColor(status: string) { return status === 'published' ? 'green' :
 function onFilterChange() {
   page.value = 1
   loadPosts()
+}
+
+function resetFilters() {
+  filter.value = { status: 'all', search: '' }
+  onFilterChange()
 }
 
 async function loadPosts() {
@@ -235,8 +242,6 @@ onMounted(loadPosts)
 
 <style scoped>
 .table-toolbar { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
-.post-toolbar { justify-content:space-between; }
-.post-toolbar-actions { display:flex; gap:8px; }
 .post-search { width:260px; }
 .list-card { border-radius:8px; }
 .post-title { font-weight:500; font-size:0.85rem; display:inline-flex; align-items:center; gap:8px; }
@@ -247,7 +252,6 @@ onMounted(loadPosts)
 .table-pagination { display:flex; justify-content:center; padding:16px 0 4px; }
 @media (max-width:700px) {
   .post-toolbar { align-items:stretch; flex-direction:column; }
-  .post-toolbar-actions { width:100%; }
   .post-search { width:auto; flex:1; }
 }
 </style>

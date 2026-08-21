@@ -10,7 +10,7 @@
       :class="{ 'article-ready': articleReady }"
       @scroll.passive="handleArticleScroll"
     >
-      <template v-if="!articleLoading">
+      <template v-if="!articleLoading && article.id">
         <AppLink to="/home" class="back-btn">
           <Icon name="ph:arrow-left-bold" />
           返回首页
@@ -91,12 +91,8 @@
             <span class="excerpt-content">
               <small><b>文章导读</b><i>READING NOTE</i></small>
               <span class="excerpt-copy">
-                <span>{{ typedExcerpt }}</span>
-                <span
-                  v-if="excerptTyping"
-                  class="excerpt-caret"
-                  aria-hidden="true"
-                />
+                <span class="excerpt-measure" aria-hidden="true">{{ article.excerpt }}</span>
+                <span class="excerpt-typed">{{ typedExcerpt }}<span v-if="excerptTyping" class="excerpt-caret" aria-hidden="true" /></span>
               </span>
             </span>
           </div>
@@ -191,10 +187,19 @@
 
         <ArticleComments :post-id="article.id" />
       </template>
+      <section v-else-if="!articleLoading" class="article-state" aria-live="polite">
+        <Icon name="ph:file-x-bold" />
+        <h1>文章暂时无法打开</h1>
+        <p>它可能已经下线，或网络暂时不可用，请稍后再试。</p>
+        <AppLink to="/home">
+          <Icon name="ph:arrow-left-bold" />
+          返回首页
+        </AppLink>
+      </section>
     </main>
 
     <ArticleSidebar
-      v-if="!articleLoading"
+      v-if="!articleLoading && article.id"
       :editor-id="editorId"
       scroll-element="#main-content"
       :progress="readingProgress"
@@ -258,6 +263,7 @@ const typedExcerpt = computed(() =>
 const excerptTyping = computed(
   () => excerptVisibleCount.value < excerptCharacters.value.length,
 );
+const highlightQuery = computed(() => String(route.query.highlight || '').trim().slice(0, 80));
 const articleContext = computed(() => ({
   title: article.value?.title || "",
   content: article.value?.content || "",
@@ -373,38 +379,15 @@ function setImmersive(active: boolean) {
   document.documentElement.classList.toggle("article-immersive", active);
 }
 
-async function toggleImmersive() {
-  if (!immersiveMode.value) {
-    setImmersive(true);
-    if (!document.fullscreenElement) {
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch {
-        // Fullscreen can be denied by browser policy; page-level immersion remains usable.
-      }
-    }
-    return;
-  }
-
-  setImmersive(false);
-  if (document.fullscreenElement) {
-    try {
-      await document.exitFullscreen();
-    } catch {
-      /* the fullscreen state may have changed between the check and request */
-    }
-  }
-}
-
-function onFullscreenChange() {
-  if (!document.fullscreenElement && immersiveMode.value) setImmersive(false);
+function toggleImmersive() {
+  const next = !immersiveMode.value;
+  requestAnimationFrame(() => setImmersive(next));
 }
 
 function onPageKeydown(event: KeyboardEvent) {
   if (
     event.key === "Escape" &&
-    immersiveMode.value &&
-    !document.fullscreenElement
+    immersiveMode.value
   ) {
     setImmersive(false);
   }
@@ -490,15 +473,46 @@ function checkOutdated() {
   }
 }
 
+function focusSearchResult() {
+  const query = highlightQuery.value.toLocaleLowerCase();
+  const root = articleContentRef.value;
+  if (!query || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node: Text | null = null;
+  while (walker.nextNode()) {
+    const current = walker.currentNode as Text;
+    if (current.textContent?.toLocaleLowerCase().includes(query)) {
+      node = current;
+      break;
+    }
+  }
+  if (!node || !node.textContent) return;
+  const start = node.textContent.toLocaleLowerCase().indexOf(query);
+  const range = document.createRange();
+  range.setStart(node, start);
+  range.setEnd(node, start + query.length);
+  const mark = document.createElement('mark');
+  mark.className = 'search-highlight';
+  range.surroundContents(mark);
+  requestAnimationFrame(() => {
+    const container = articleMainRef.value;
+    const target = mark.getBoundingClientRect();
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
+    container.scrollTo({ top: Math.max(0, container.scrollTop + target.top - bounds.top - 72), behavior: 'smooth' });
+    window.setTimeout(() => mark.classList.add('is-settled'), 900);
+  });
+}
+
 onMounted(async () => {
   document.addEventListener("keydown", onPageKeydown);
-  document.addEventListener("fullscreenchange", onFullscreenChange);
   await loadArticle();
   await nextTick();
   requestAnimationFrame(() => {
     articleReady.value = true;
   });
   typeExcerpt();
+  focusSearchResult();
   checkOutdated();
   updateArticleScrollState();
 
@@ -511,9 +525,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("keydown", onPageKeydown);
-  document.removeEventListener("fullscreenchange", onFullscreenChange);
   setImmersive(false);
-  if (document.fullscreenElement) void document.exitFullscreen();
   if (articleMainRef.value) gsap.killTweensOf(articleMainRef.value);
   articleResizeObserver?.disconnect();
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
@@ -561,12 +573,14 @@ onUnmounted(() => {
 }
 
 .article-page.is-immersive .article-main {
+  flex-basis: 100%;
+  width: 100%;
   padding-right: clamp(24px, 4vw, 88px);
   padding-left: clamp(24px, 4vw, 88px);
 }
 
 .article-page.is-immersive .article-main > * {
-  width: min(100%, 760px);
+  width: min(100%, 900px);
 }
 
 .article-page.is-immersive :deep(.sidebar-right) {
@@ -577,6 +591,13 @@ onUnmounted(() => {
   padding-left: 0;
   overflow: hidden;
   pointer-events: none;
+  visibility: hidden;
+}
+
+.article-page.is-immersive .post-title,
+.article-page.is-immersive .article-shell,
+.article-page.is-immersive .article-lead {
+  transition: max-width .36s var(--ui-ease-out), width .36s var(--ui-ease-out);
 }
 
 .article-shell {
@@ -864,8 +885,8 @@ onUnmounted(() => {
 }
 
 .excerpt-copy {
-  display: inline;
-  flex: 1;
+  position: relative;
+  display: block;
   min-width: 0;
   color: color-mix(in srgb, var(--c-text) 84%, var(--c-text-2));
   font-family: var(--font-summary);
@@ -873,6 +894,9 @@ onUnmounted(() => {
   overflow-wrap: anywhere;
   text-wrap: pretty;
 }
+
+.excerpt-measure { display: block; visibility: hidden; }
+.excerpt-typed { position: absolute; inset: 0; display: block; }
 
 .excerpt-caret {
   display: inline-block;
@@ -895,6 +919,15 @@ onUnmounted(() => {
     opacity: 0;
   }
 }
+
+:deep(.search-highlight) {
+  padding: 0 .12em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-primary) 24%, transparent);
+  color: inherit;
+  transition: background-color .45s ease;
+}
+:deep(.search-highlight.is-settled) { background: color-mix(in srgb, var(--c-primary) 12%, transparent); }
 
 @keyframes article-fade-up {
   from {

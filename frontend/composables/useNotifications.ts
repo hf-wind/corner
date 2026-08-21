@@ -52,6 +52,8 @@ export function useNotifications() {
     try {
       const response = await api.get<{ items?: AppNotification[] }>('/notifications', { limit: 8 })
       latestItems.value = response.items ?? []
+    } catch {
+      // 限流或短暂网络失败时保留已有通知，避免轮询产生未处理异常。
     } finally {
       latestLoading.value = false
     }

@@ -1,18 +1,18 @@
 <template>
   <div class="messages-page admin-page-shell">
-    <header class="admin-page-head"><div><span>ACCOUNT</span><h1>我的消息</h1><p>集中查看评论、回复、点赞和系统通知。</p></div><AdminRefreshButton :loading="loading" @click="loadNotifications" /></header>
+    <header class="admin-page-head"><div><span>ACCOUNT</span><h1>我的消息</h1><p>集中查看评论、回复、点赞和系统通知。</p></div></header>
+    <div class="table-toolbar">
+      <a-select v-model:value="filterType" style="width: 150px">
+        <a-select-option value="all">全部消息</a-select-option>
+        <a-select-option value="unread">未读消息</a-select-option>
+      </a-select>
+      <a-button type="primary" @click="applyFilter"><Icon name="ph:funnel-bold" /> 筛选</a-button>
+      <a-button @click="resetFilter"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
+      <span class="toolbar-spacer" />
+      <a-button @click="markAllRead" :disabled="unreadCount === 0"><Icon name="ph:checks-bold" /> 全部已读</a-button>
+      <AdminRefreshButton :loading="loading" @click="loadNotifications" />
+    </div>
     <div class="admin-table-shell">
-        <div class="card-header">
-          <strong>消息列表</strong>
-          <a-space>
-            <a-badge :count="unreadCount" :overflow-count="99">
-              <a-button size="small" @click="filterType = 'unread'; loadNotifications()">未读</a-button>
-            </a-badge>
-            <a-button size="small" @click="filterType = 'all'; loadNotifications()">全部</a-button>
-            <a-button size="small" @click="markAllRead" :disabled="unreadCount === 0">全部已读</a-button>
-          </a-space>
-        </div>
-
       <a-spin :spinning="loading">
         <div v-if="notifications.length === 0" class="empty">
           <Icon name="ph:bell-slash-bold" class="empty-icon" />
@@ -39,8 +39,8 @@
               <div class="notification-time">{{ formatTime(item.createdAt) }}</div>
             </div>
             <div class="notification-actions">
-              <a-button v-if="!item.read" type="link" size="small" @click.stop="markRead(item)">标为已读</a-button>
-              <a-button type="link" size="small" danger @click.stop="deleteNotification(item)">删除</a-button>
+              <a-button v-if="!item.read" type="link" size="small" @click.stop="markRead(item)"><Icon name="ph:check-bold" /> 标为已读</a-button>
+              <a-button type="link" size="small" danger @click.stop="deleteNotification(item)"><Icon name="ph:trash-bold" /> 删除</a-button>
             </div>
           </div>
         </div>
@@ -57,8 +57,8 @@
         <p>{{ detail.item.content || '暂无详细内容' }}</p>
       </div>
       <template #footer>
-        <a-button @click="detail.open = false">关闭</a-button>
-        <a-button v-if="detail.item?.link" type="primary" @click="goToLinkedPage">查看相关页面</a-button>
+        <a-button @click="detail.open = false"><Icon name="ph:x-bold" /> 关闭</a-button>
+        <a-button v-if="detail.item?.link" type="primary" @click="goToLinkedPage"><Icon name="ph:arrow-square-out-bold" /> 查看相关页面</a-button>
       </template>
     </a-modal>
   </div>
@@ -81,7 +81,6 @@ const {
 const loading = ref(true)
 const notifications = ref<any[]>([])
 const total = ref(0)
-const totalPages = ref(0)
 const currentPage = ref(1)
 const pageSize = 20
 const filterType = ref<'all' | 'unread'>('all')
@@ -97,19 +96,31 @@ onMounted(async () => {
 async function loadNotifications() {
   loading.value = true
   try {
-    const params: Record<string, any> = { page: currentPage.value, limit: pageSize }
-    const res = await api.get<any>('/notifications', params)
-    let items = res.items || []
-    if (filterType.value === 'unread') {
-      items = items.filter((i: any) => !i.read)
+    const params: Record<string, any> = {
+      page: currentPage.value,
+      limit: pageSize,
+      unread: filterType.value === 'unread' ? true : undefined,
     }
-    notifications.value = items
+    const res = await api.get<any>('/notifications', params)
+    notifications.value = res.items || []
     total.value = res.total || 0
-    totalPages.value = res.totalPages || 0
   } catch (e: any) {
-    console.error('加载消息失败:', e)
+    notifications.value = []
+    total.value = 0
+    toast.error(e?.message || '加载消息失败')
+  } finally {
+    loading.value = false
   }
-  loading.value = false
+}
+
+function applyFilter() {
+  currentPage.value = 1
+  void loadNotifications()
+}
+
+function resetFilter() {
+  filterType.value = 'all'
+  applyFilter()
 }
 
 async function loadUnreadCount() {
@@ -138,6 +149,7 @@ async function markRead(item: any) {
   try {
     await markNotificationRead(item.id)
     item.read = true
+    if (filterType.value === 'unread') await loadNotifications()
   } catch {
     toast.error('操作失败')
   }
@@ -146,7 +158,8 @@ async function markRead(item: any) {
 async function markAllRead() {
   try {
     await markAllNotificationsRead()
-    notifications.value.forEach(i => i.read = true)
+    if (filterType.value === 'unread') await loadNotifications()
+    else notifications.value.forEach(i => i.read = true)
     toast.success('已全部标为已读')
   } catch {
     toast.error('操作失败')
@@ -155,7 +168,12 @@ async function markAllRead() {
 
 async function deleteNotification(item: any) {
   Modal.confirm({ title: '删除消息', content: `确认删除「${item.title || '这条消息'}」？删除后无法恢复。`, okText: '删除', cancelText: '取消', okType: 'danger', onOk: async () => {
-    try { await removeSharedNotification(item.id, !item.read); notifications.value = notifications.value.filter(i => i.id !== item.id); total.value-- }
+    try {
+      await removeSharedNotification(item.id, !item.read)
+      const nextTotal = Math.max(0, total.value - 1)
+      currentPage.value = Math.min(currentPage.value, Math.max(1, Math.ceil(nextTotal / pageSize)))
+      await loadNotifications()
+    }
     catch { toast.error('删除失败') }
   } })
 }
@@ -180,15 +198,6 @@ function formatDetailTime(date: string) {
 
 <style scoped>
 .messages-page { width: 100%; }
-.section-card { border-radius: 10px; overflow: visible; }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  :deep(.ant-badge) { overflow: visible; }
-  :deep(.ant-badge-count) { box-shadow: 0 0 0 2px var(--c-bg, #fff); }
-}
 .empty {
   display: flex;
   flex-direction: column;
@@ -281,7 +290,6 @@ function formatDetailTime(date: string) {
 }
 
 @media (max-width: 640px) {
-  .card-header { align-items:flex-start; flex-direction:column; gap:10px; }
   .notification-item { gap:10px; padding:12px 4px; }
   .notification-actions { flex-direction:row; }
   .notification-text { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; }

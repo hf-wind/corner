@@ -6,7 +6,7 @@
         <div><h1>{{ form.title || '新建相册' }}</h1><span>{{ items.length }} 张照片 · 原图保留，公开位置由你确认</span></div>
       </div>
       <div class="heading-actions">
-        <a-button type="primary" :loading="saving" @click="save">保存</a-button>
+        <a-button type="primary" :loading="saving" @click="save"><Icon name="ph:floppy-disk-bold" /> 保存</a-button>
       </div>
     </header>
 
@@ -74,7 +74,7 @@
               </div>
             </article>
           </div>
-          <div v-else class="photo-empty"><Icon name="ph:images-square" /><h3>还没有照片</h3><p>从媒体库批量加入图片，拖拽决定它们讲述故事的顺序。</p><a-button type="primary" @click="pickPhotos">选择照片</a-button></div>
+          <div v-else class="photo-empty"><Icon name="ph:images-square" /><h3>还没有照片</h3><p>从媒体库批量加入图片，拖拽决定它们讲述故事的顺序。</p><a-button type="primary" @click="pickPhotos"><Icon name="ph:images-square-bold" /> 选择照片</a-button></div>
         </section>
       </main>
 
@@ -97,7 +97,7 @@
           <label>确认拍摄时间<a-date-picker v-model:value="metadataDialog.dateValue" show-time style="width:100%" /></label>
           <label>确认地点<PlacePicker v-model="metadataDialog.place" /></label>
           <a-button v-if="hasGpsCandidate && !metadataDialog.place" @click="createPlaceFromExif"><Icon name="ph:map-pin-plus-bold" /> 从 GPS 创建地点候选</a-button>
-          <a-button v-if="metadataDialog.metadata?.status === 'failed'" @click="retryMetadata">重新解析</a-button>
+          <a-button v-if="metadataDialog.metadata?.status === 'failed'" @click="retryMetadata"><Icon name="ph:arrows-clockwise-bold" /> 重新解析</a-button>
         </div>
       </a-spin>
     </a-modal>

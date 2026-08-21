@@ -23,6 +23,11 @@ export class SettingsController {
     return this.settings.health();
   }
 
+  @Get('site')
+  site() {
+    return this.settings.getMany(['site_title', 'site_description', 'site_url', 'site_keywords']);
+  }
+
   @Get(':key')
   async get(@Param('key') key: string) {
     const publicKeys = new Set([

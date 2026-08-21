@@ -81,11 +81,13 @@ export class NotificationController {
     @Req() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('unread') unread?: string,
   ) {
     return this.notificationService.findAll(
       req.user.id,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
+      unread === 'true',
     );
   }
 

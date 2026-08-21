@@ -40,20 +40,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import("./pages/time/constellation.vue"),
     meta: { layout: "welcome" },
   },
-  { path: "/journeys", component: () => import("./pages/journeys/index.vue") },
-  {
-    path: "/journeys/:slug",
-    component: () => import("./pages/journeys/[slug].vue"),
-  },
-  { path: "/stories", component: () => import("./pages/stories/index.vue") },
-  {
-    path: "/stories/share/:token",
-    component: () => import("./pages/stories/share/[token].vue"),
-  },
-  {
-    path: "/stories/:slug",
-    component: () => import("./pages/stories/[slug].vue"),
-  },
   { path: "/albums", component: () => import("./pages/albums/index.vue") },
   {
     path: "/albums/:slug",
@@ -83,6 +69,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/admin/about",
     component: () => import("./pages/admin/about.vue"),
+    meta: adminMeta,
+  },
+  {
+    path: "/admin/backups",
+    component: () => import("./pages/admin/backups.vue"),
     meta: adminMeta,
   },
   {
@@ -148,11 +139,6 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/admin/library",
     component: () => import("./pages/admin/library/index.vue"),
-    meta: adminMeta,
-  },
-  {
-    path: "/admin/journeys",
-    component: () => import("./pages/admin/journeys.vue"),
     meta: adminMeta,
   },
   {
@@ -275,15 +261,6 @@ router.beforeEach(async (to) => {
   if (to.path === "/time/constellation") {
     const { constellationEnabled } = useFeatureFlags();
     if (!constellationEnabled) return "/home";
-  }
-  if (
-    to.path === "/stories" ||
-    to.path.startsWith("/stories/") ||
-    to.path === "/journeys" ||
-    to.path.startsWith("/journeys/")
-  ) {
-    const { storiesEnabled } = useFeatureFlags();
-    if (!storiesEnabled) return "/home";
   }
   if (to.path === "/time/map") {
     const { mapEnabled } = useFeatureFlags();

@@ -29,39 +29,18 @@
 
     <div class="sidebar-scroll">
       <nav class="nav-menu">
-        <section
-          v-for="group in navGroups"
-          :key="group.key"
-          class="nav-group"
-          :class="{ 'is-open': isGroupOpen(group) }"
-        >
-          <button
-            v-if="!collapsed"
-            type="button"
-            class="nav-group-toggle"
-            :aria-expanded="isGroupOpen(group)"
-            @click="toggleGroup(group.key)"
-          >
-            <span>{{ group.label }}</span
-            ><Icon name="ph:caret-down-bold" />
+        <section v-for="group in navGroups" :key="group.key" class="nav-group"
+          :class="{ 'is-open': isGroupOpen(group) }">
+          <button v-if="!collapsed" type="button" class="nav-group-toggle" :aria-expanded="isGroupOpen(group)"
+            @click="toggleGroup(group.key)">
+            <span>{{ group.label }}</span>
+            <Icon name="ph:caret-down-bold" />
           </button>
-          <div
-            class="nav-group-items"
-            :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }"
-          >
+          <div class="nav-group-items" :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }">
             <div class="nav-group-inner">
-              <AppLink
-                v-for="item in group.items"
-                :key="item.to"
-                :to="item.to"
-                class="nav-item"
-                :class="{ active: isNavActive(item.to) }"
-                :title="collapsed ? item.label : undefined"
-              >
-                <Icon :name="item.icon" class="nav-icon" /><span
-                  class="nav-label"
-                  >{{ item.label }}</span
-                >
+              <AppLink v-for="item in group.items" :key="item.to" :to="item.to" class="nav-item"
+                :class="{ active: isNavActive(item.to) }" :title="collapsed ? item.label : undefined">
+                <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
               </AppLink>
             </div>
           </div>
@@ -79,72 +58,43 @@
           <div class="user-row">
             <button type="button" class="user-main" @click="goPanel">
               <div class="avatar-wrapper">
-                <img
-                  v-if="user?.avatar"
-                  :src="avatarSrc"
-                  alt=""
-                  class="avatar-img"
-                />
+                <img v-if="user?.avatar" :src="avatarSrc" alt="" class="avatar-img" />
                 <Icon v-else name="ph:user-circle-fill" class="avatar-icon" />
               </div>
               <span class="user-name">{{ user?.username ?? "用户" }}</span>
               <span v-if="isUserAdmin" class="user-badge">管</span>
             </button>
             <NotificationBell />
-            <button
-              type="button"
-              class="user-logout"
-              title="退出登录"
-              @click="handleLogout"
-            >
+            <button type="button" class="user-logout" title="退出登录" @click="handleLogout">
               <Icon name="ph:sign-out-bold" />
             </button>
           </div>
-          <AppLink v-if="isPanel" to="/home" class="user-back">
-            <Icon name="ph:arrow-left-bold" />
-            <span>返回前台</span>
+        </div>
+        <div class="sidebar-tools" aria-label="侧栏快捷操作">
+          <AppLink v-if="isPanel" to="/home" class="sidebar-tool user-back" title="返回前台" aria-label="返回前台">
+            <Icon name="icon-park-solid:back" />
           </AppLink>
-        </div>
-        <div class="theme-pill" :class="`theme-${theme}`">
-          <button
-            :class="{ active: theme === 'light' }"
-            @click="setTheme('light')"
-            title="亮色"
-          >
-            <Icon name="ph:sun-bold" />
-          </button>
-          <button
-            :class="{ active: theme === 'dark' }"
-            @click="setTheme('dark')"
-            title="深色"
-          >
-            <Icon name="ph:moon-bold" />
-          </button>
-          <button
-            :class="{ active: theme === 'auto' }"
-            @click="setTheme('auto')"
-            title="跟随系统"
-          >
-            <Icon name="ph:monitor-bold" />
+          <div class="theme-pill" :class="`theme-${theme}`" role="group" aria-label="主题">
+            <button type="button" :class="{ active: theme === 'light' }" title="亮色" aria-label="亮色"
+              @click="setTheme('light')">
+              <Icon name="ph:sun-bold" />
+            </button>
+            <button type="button" :class="{ active: theme === 'dark' }" title="深色" aria-label="深色"
+              @click="setTheme('dark')">
+              <Icon name="ph:moon-bold" />
+            </button>
+            <button type="button" :class="{ active: theme === 'auto' }" title="跟随系统" aria-label="跟随系统"
+              @click="setTheme('auto')">
+              <Icon name="ph:monitor-bold" />
+            </button>
+          </div>
+          <button v-if="isPanel && isUserAdmin && allowCollapse" type="button"
+            class="sidebar-tool admin-collapse-button" :title="collapsed ? '展开管理侧栏' : '收起管理侧栏'"
+            :aria-label="collapsed ? '展开管理侧栏' : '收起管理侧栏'" @click="emit('toggle-collapse')">
+            <Icon :name="collapsed ? 'material-symbols:devices-fold' : 'material-symbols:devices-fold'
+              " />
           </button>
         </div>
-        <button
-          v-if="isPanel && isUserAdmin && allowCollapse"
-          class="admin-collapse-button"
-          type="button"
-          :title="collapsed ? '展开管理侧栏' : '折叠管理侧栏'"
-          @click="emit('toggle-collapse')"
-        >
-          <Icon
-            :name="
-              collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-simple-bold'
-            "
-          />
-          <span>{{ collapsed ? "展开侧栏" : "收起侧栏" }}</span>
-          <Icon
-            :name="collapsed ? 'ph:caret-right-bold' : 'ph:caret-left-bold'"
-          />
-        </button>
         <!-- 字体切换暂不展示，保留结构与样式便于后续恢复。
       <div v-if="!isPanel" class="font-pill" role="group" aria-label="全局字体">
         <button
@@ -159,7 +109,8 @@
           {{ option.short }}
         </button>
       </div>
-      --></div>
+      -->
+      </div>
     </div>
   </aside>
 </template>
@@ -221,7 +172,6 @@ const siteNav = [
   { to: "/time/map", icon: "ph:map-trifold-bold", label: "地图" },
   { to: "/time/constellation", icon: "ph:graph-bold", label: "星图" },
   { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
-  { to: "/stories", icon: "ph:path-bold", label: "航线" },
   { to: "/guestbook", icon: "ph:chat-circle-dots-bold", label: "时光留言" },
   { to: "/friends", icon: "ph:handshake-bold", label: "友链" },
   { to: "/about", icon: "ph:info-bold", label: "关于" },
@@ -489,14 +439,13 @@ watch(
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
   border-radius: 16px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--c-primary-soft) 64%, var(--ld-bg-card)),
-    var(--ld-bg-card) 70%
-  );
+  background: linear-gradient(145deg,
+      color-mix(in srgb, var(--c-primary-soft) 64%, var(--ld-bg-card)),
+      var(--ld-bg-card) 70%);
   box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
   isolation: isolate;
 }
+
 .hero::after {
   position: absolute;
   top: -58px;
@@ -508,6 +457,7 @@ watch(
   content: "";
   animation: hero-orbit 24s linear infinite;
 }
+
 .hero-glow {
   position: absolute;
   z-index: -1;
@@ -515,6 +465,7 @@ watch(
   filter: blur(18px);
   opacity: 0.5;
 }
+
 .hero-glow-one {
   top: -28px;
   left: -20px;
@@ -523,6 +474,7 @@ watch(
   background: color-mix(in srgb, var(--c-primary) 18%, transparent);
   animation: hero-drift 7s ease-in-out infinite alternate;
 }
+
 .hero-glow-two {
   right: -24px;
   bottom: -32px;
@@ -531,31 +483,33 @@ watch(
   background: color-mix(in srgb, #9b78df 14%, transparent);
   animation: hero-drift 9s ease-in-out -2s infinite alternate-reverse;
 }
+
 .wind-stroke {
   position: absolute;
   z-index: -1;
   height: 1px;
   border-radius: 99px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--c-primary) 35%, transparent),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      color-mix(in srgb, var(--c-primary) 35%, transparent),
+      transparent);
   transform: rotate(-8deg);
 }
+
 .wind-stroke-one {
   top: 20px;
   right: -8px;
   width: 94px;
   animation: wind-pass 5.4s ease-in-out infinite;
 }
+
 .wind-stroke-two {
   right: 8px;
   bottom: 16px;
   width: 64px;
   animation: wind-pass 6.8s ease-in-out -2s infinite;
 }
+
 .hero-content {
   position: relative;
   z-index: 1;
@@ -580,8 +534,7 @@ watch(
   padding: 7px;
   border-radius: 14px;
   background: color-mix(in srgb, var(--ld-bg-card) 80%, transparent);
-  box-shadow: inset 0 0 0 5px
-    color-mix(in srgb, var(--c-primary-soft) 38%, transparent);
+  box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--c-primary-soft) 38%, transparent);
   color: var(--c-primary);
   place-items: center;
 }
@@ -600,6 +553,7 @@ watch(
   letter-spacing: 0.04em;
   line-height: 1.3;
 }
+
 .hero-kicker {
   color: var(--c-primary);
   font-family: var(--font-accent);
@@ -607,6 +561,7 @@ watch(
   font-weight: 760;
   letter-spacing: 0.11em;
 }
+
 .hero-status {
   display: grid;
   width: 14px;
@@ -618,6 +573,7 @@ watch(
   background: color-mix(in srgb, var(--ld-bg-card) 82%, transparent);
   place-items: center;
 }
+
 .hero-status i {
   width: 5px;
   height: 5px;
@@ -644,22 +600,27 @@ watch(
     transform: rotate(360deg);
   }
 }
+
 @keyframes hero-drift {
   to {
     transform: translate3d(10px, 8px, 0) scale(1.12);
   }
 }
+
 @keyframes wind-pass {
+
   0%,
   100% {
     opacity: 0.15;
     transform: translateX(-12px) rotate(-8deg);
   }
+
   50% {
     opacity: 0.75;
     transform: translateX(12px) rotate(-8deg);
   }
 }
+
 @keyframes logo-breathe {
   50% {
     opacity: 0.5;
@@ -722,14 +683,17 @@ watch(
   flex-direction: column;
   gap: 2px;
 }
+
 .nav-group {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.nav-group + .nav-group {
+
+.nav-group+.nav-group {
   margin-top: 8px;
 }
+
 .nav-group-toggle {
   display: flex;
   align-items: center;
@@ -745,16 +709,20 @@ watch(
   letter-spacing: 0.12em;
   text-align: left;
 }
+
 .nav-group-toggle svg {
   font-size: 0.62rem;
   transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
 .nav-group.is-open .nav-group-toggle svg {
   transform: rotate(0deg);
 }
+
 .nav-group:not(.is-open) .nav-group-toggle svg {
   transform: rotate(-90deg);
 }
+
 .nav-group-items {
   display: grid;
   grid-template-rows: 1fr;
@@ -763,9 +731,11 @@ watch(
     grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.28s ease;
 }
+
 .nav-group-inner {
   min-height: 0;
 }
+
 .nav-group-items.is-collapsed-group {
   grid-template-rows: 0fr;
   opacity: 0;
@@ -823,37 +793,135 @@ watch(
   overflow: visible;
 }
 
+.sidebar-tools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sidebar-tool {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--c-bg-2) 76%, transparent);
+  color: var(--c-text-2);
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.theme-pill {
+  --theme-pill-pad: 3px;
+  --theme-pill-ease: cubic-bezier(0.47, 1.64, 0.41, 0.8);
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  padding: var(--theme-pill-pad);
+  width: fit-content;
+  box-sizing: border-box;
+  margin: 0;
+  background: var(--c-bg-2);
+  border-radius: 1.2rem;
+  isolation: isolate;
+}
+
+.theme-pill::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  /* background: color-mix(in srgb, var(--c-bg-2) 88%, transparent); */
+  content: "";
+  transition:
+    inset 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.theme-pill:focus-within::after {
+  inset: -3px;
+  /* box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 14%, transparent); */
+}
+
+.theme-pill::before {
+  position: absolute;
+  z-index: 0;
+  top: var(--theme-pill-pad);
+  bottom: var(--theme-pill-pad);
+  left: var(--theme-pill-pad);
+  width: 34px;
+  box-sizing: border-box;
+  border-radius: 1rem;
+  background: var(--ld-bg-card);
+  box-shadow:
+    inset 0 1px 1px color-mix(in srgb, #fff 32%, transparent),
+    0.1em 0.2em 0.5em var(--ld-shadow);
+  content: "";
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 0.5s var(--theme-pill-ease),
+    background-color 0.5s ease,
+    box-shadow 0.5s ease;
+}
+
+.theme-pill.theme-dark::before {
+  transform: translate3d(37px, 0, 0);
+}
+
+.theme-pill.theme-auto::before {
+  transform: translate3d(74px, 0, 0);
+}
+
+.theme-pill button {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 1rem;
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.75;
+  transition:
+    color 0.15s ease,
+    opacity 0.3s ease;
+}
+
+.theme-pill button.active {
+  background: transparent;
+  color: var(--c-text);
+  opacity: 1;
+}
+
+.admin-collapse-button {
+  color: var(--c-text-2);
+}
+
 .sidebar-divider {
   height: 1px;
   background: var(--border);
   opacity: 0.5;
   margin: 0 0 4px;
-}
-
-.admin-collapse-button {
-  display: flex;
-  width: 100%;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 11px;
-  background: var(--c-bg-1);
-  color: var(--c-text-3);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.68rem;
-  transition: 0.2s;
-}
-.admin-collapse-button:hover {
-  border-color: color-mix(in srgb, var(--c-primary) 35%, var(--border));
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-}
-.admin-collapse-button :deep(svg:last-child) {
-  margin-left: auto;
 }
 
 .login-link {
@@ -985,116 +1053,6 @@ watch(
   background: color-mix(in srgb, #ef4444 8%, transparent);
 }
 
-.user-back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 100%;
-  padding: 7px 8px;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  text-decoration: none;
-  color: var(--c-text-2);
-  background: color-mix(in srgb, var(--ld-bg-card) 70%, transparent);
-  transition: all 0.15s;
-}
-
-.user-back:hover {
-  color: var(--c-primary);
-  background: var(--c-primary-soft);
-}
-
-.theme-pill {
-  --theme-pill-pad: 3px;
-  --theme-pill-ease: cubic-bezier(0.47, 1.64, 0.41, 0.8);
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 3px;
-  padding: var(--theme-pill-pad);
-  width: fit-content;
-  margin: 4px auto;
-  background: var(--c-bg-2);
-  border-radius: 1.2rem;
-  isolation: isolate;
-}
-.theme-pill::after {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--c-bg-2) 88%, transparent);
-  content: "";
-  transition:
-    inset 0.25s ease,
-    box-shadow 0.25s ease;
-}
-.theme-pill::before {
-  position: absolute;
-  z-index: 0;
-  top: var(--theme-pill-pad);
-  bottom: var(--theme-pill-pad);
-  left: var(--theme-pill-pad);
-  width: 34px;
-  border-radius: 1rem;
-  background: var(--ld-bg-card);
-  box-shadow:
-    inset 0 1px 1px color-mix(in srgb, #fff 32%, transparent),
-    0.1em 0.2em 0.5em var(--ld-shadow);
-  content: "";
-  transform: translate3d(0, 0, 0);
-  transition:
-    transform 0.5s var(--theme-pill-ease),
-    background-color 0.5s ease,
-    box-shadow 0.5s ease;
-}
-.theme-pill.theme-dark::before {
-  transform: translate3d(37px, 0, 0);
-}
-.theme-pill.theme-auto::before {
-  transform: translate3d(74px, 0, 0);
-}
-/* .theme-pill:focus-within::after { inset:-3px; box-shadow:0 0 0 3px color-mix(in srgb,var(--c-primary) 14%,transparent); } */
-
-.theme-pill button {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px 10px;
-  border-radius: 1rem;
-  border: none;
-  background: transparent;
-  color: var(--c-text-2);
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.15s;
-  line-height: 1;
-}
-
-.theme-pill button:hover {
-  color: var(--c-text);
-}
-
-.theme-pill.theme-light:hover::before {
-  transform: translate3d(2px, 0, 0);
-}
-.theme-pill.theme-dark:hover::before {
-  transform: translate3d(39px, 0, 0);
-}
-.theme-pill.theme-auto:hover::before {
-  transform: translate3d(76px, 0, 0);
-}
-
-.theme-pill button.active {
-  background: transparent;
-  color: var(--c-text);
-  box-shadow: none;
-}
-
 .font-pill {
   display: flex;
   justify-content: center;
@@ -1140,21 +1098,26 @@ watch(
   width: 72px;
   padding-inline: 9px;
 }
+
 .is-collapsed .sidebar-scroll {
   padding-right: 0;
 }
+
 .is-collapsed .hero {
   padding: 8px;
   border-radius: 14px;
 }
+
 .is-collapsed .hero-row {
   justify-content: center;
 }
+
 .is-collapsed .logo-wrap {
   width: 42px;
   height: 42px;
   border-radius: 13px;
 }
+
 .is-collapsed .hero-text,
 .is-collapsed .hero-status,
 .is-collapsed .search-box,
@@ -1165,76 +1128,112 @@ watch(
 .is-collapsed .user-back span {
   display: none;
 }
+
 .is-collapsed .nav-menu {
   gap: 5px;
 }
+
+.is-collapsed .nav-group-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .is-collapsed .nav-item {
+  width: 42px;
+  margin-inline: auto;
   justify-content: center;
   padding: 9px 0;
 }
+
 .is-collapsed .nav-icon {
-  width: auto;
+  width: 18px;
   font-size: 1.08rem;
 }
+
 .is-collapsed .sidebar-bottom {
   align-items: center;
 }
+
 .is-collapsed .login-link {
   width: 42px;
   height: 42px;
   padding: 0;
   font-size: 0;
 }
+
 .is-collapsed .login-link :deep(svg) {
   font-size: 1rem;
 }
+
 .is-collapsed .user-card {
   width: 44px;
   padding: 6px;
 }
+
 .is-collapsed .user-row,
 .is-collapsed .user-main {
   justify-content: center;
 }
+
 .is-collapsed .user-main {
   flex: 0 0 auto;
   padding: 0;
 }
+
 .is-collapsed .user-card :deep(.notif-bell-wrap) {
   display: none;
 }
+
+.is-collapsed .sidebar-tools {
+  flex-direction: column;
+  gap: 7px;
+}
+
+.is-collapsed .user-back {
+  width: 28px;
+  flex-basis: 28px;
+}
+
 .is-collapsed .theme-pill {
   width: 42px;
+  height: 105px;
   flex-direction: column;
+  align-items: center;
   border-radius: 14px;
 }
+
 .is-collapsed .theme-pill button {
   width: 34px;
-  padding: 7px 0;
+  height: 31px;
+  flex: 0 0 31px;
+  padding: 0;
 }
+
 .is-collapsed .theme-pill::before {
   top: 3px;
-  left: 4px;
+  left: 50%;
   width: 34px;
   height: 31px;
   bottom: auto;
+  transform: translate3d(-50%, 0, 0);
 }
+
 .is-collapsed .theme-pill.theme-dark::before {
-  transform: translate3d(0, 34px, 0);
+  transform: translate3d(-50%, 34px, 0);
 }
+
 .is-collapsed .theme-pill.theme-auto::before {
-  transform: translate3d(0, 68px, 0);
+  transform: translate3d(-50%, 68px, 0);
 }
+
 .is-collapsed .admin-collapse-button {
-  width: 42px;
-  padding: 8px 0;
-}
-.is-collapsed .admin-collapse-button span,
-.is-collapsed .admin-collapse-button :deep(svg:last-child) {
-  display: none;
+  width: 30px;
+  flex-basis: 30px;
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .hero::after,
   .hero-glow,
   .wind-stroke,

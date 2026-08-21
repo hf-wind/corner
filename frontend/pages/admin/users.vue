@@ -2,15 +2,15 @@
   <div class="users-admin admin-page-shell">
     <header class="admin-page-head"><div><span>ACCESS CONTROL</span><h1>用户管理</h1><p>管理账号角色、启用状态与内容归属。</p></div></header>
     <div class="users-toolbar table-toolbar">
-      <a-input-search
+      <a-input
         v-model:value="search"
         class="user-search"
         placeholder="搜索用户名或邮箱"
         allow-clear
-        @search="resetAndLoad"
-      />
-      <a-select v-model:value="role" class="filter-select" :options="roleOptions" @change="resetAndLoad" />
-      <a-select v-model:value="status" class="filter-select" :options="statusOptions" @change="resetAndLoad" />
+        @press-enter="resetAndLoad"
+      ><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-select v-model:value="role" class="filter-select" :options="roleOptions" />
+      <a-select v-model:value="status" class="filter-select" :options="statusOptions" />
       <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
       <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
       <span class="toolbar-spacer" />

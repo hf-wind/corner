@@ -9,16 +9,28 @@ export function configureMarkdownEditor() {
   if (initialization) return initialization
 
   initialization = Promise.all([
-    import('highlight.js'),
+    import('highlight.js/lib/core'),
+    import('highlight.js/lib/languages/javascript'),
+    import('highlight.js/lib/languages/typescript'),
+    import('highlight.js/lib/languages/json'),
+    import('highlight.js/lib/languages/css'),
+    import('highlight.js/lib/languages/xml'),
+    import('highlight.js/lib/languages/markdown'),
     import('prettier/standalone'),
     import('prettier/plugins/markdown'),
     import('cropperjs'),
     import('screenfull'),
     import('mermaid'),
     import('katex'),
-    import('echarts'),
+    import('./echartsLite'),
   ]).then(([
     highlight,
+    javascript,
+    typescript,
+    json,
+    css,
+    xml,
+    markdownLanguage,
     prettier,
     prettierMarkdown,
     cropper,
@@ -27,9 +39,16 @@ export function configureMarkdownEditor() {
     katex,
     echarts,
   ]) => {
+    const highlightInstance = highlight.default
+    highlightInstance.registerLanguage('javascript', javascript.default)
+    highlightInstance.registerLanguage('typescript', typescript.default)
+    highlightInstance.registerLanguage('json', json.default)
+    highlightInstance.registerLanguage('css', css.default)
+    highlightInstance.registerLanguage('xml', xml.default)
+    highlightInstance.registerLanguage('markdown', markdownLanguage.default)
     config({
       editorExtensions: {
-        highlight: { instance: highlight.default },
+        highlight: { instance: highlightInstance },
         prettier: {
           prettierInstance: prettier.default,
           parserMarkdownInstance: prettierMarkdown.default,
@@ -38,7 +57,7 @@ export function configureMarkdownEditor() {
         screenfull: { instance: screenfull.default },
         mermaid: { instance: mermaid.default },
         katex: { instance: katex.default },
-        echarts: { instance: echarts },
+        echarts: { instance: echarts.default },
       },
     })
   })

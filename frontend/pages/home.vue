@@ -75,12 +75,18 @@
             loading="lazy"
           />萌ICP备20266886号</a
         >
+        <span class="records-legal" aria-label="法律信息">
+          <button type="button" @click="openLegal('terms')">用户协议</button>
+          <i aria-hidden="true" />
+          <button type="button" @click="openLegal('privacy')">隐私政策</button>
+        </span>
       </footer>
     </main>
 
     <aside class="sidebar-right">
       <HomeSidebar />
     </aside>
+    <LegalDialog v-model="legalOpen" :initial-tab="legalTab" />
   </div>
 </template>
 
@@ -101,6 +107,8 @@ const loading = ref(true);
 const refreshing = ref(false);
 const page = ref(1);
 const totalPages = ref(1);
+const legalOpen = ref(false);
+const legalTab = ref<"terms" | "privacy">("terms");
 const homeReady = ref(false);
 const mainContentRef = ref<HTMLElement>();
 const recordsRef = ref<HTMLElement>();
@@ -110,6 +118,11 @@ setBottomDockContentReady(false);
 let requestId = 0;
 let enterFrame = 0;
 let recordsObserver: IntersectionObserver | null = null;
+
+function openLegal(tab: "terms" | "privacy") {
+  legalTab.value = tab;
+  legalOpen.value = true;
+}
 
 async function loadArticles() {
   const id = ++requestId;
@@ -341,6 +354,10 @@ onUnmounted(() => {
   height: 10px;
   background: var(--border);
 }
+.records-legal { display:inline-flex; align-items:center; gap:7px; margin-left:4px; padding-left:10px; border-left:1px solid var(--border); }
+.records-legal button { padding:0; border:0; background:transparent; color:inherit; cursor:pointer; font:inherit; }
+.records-legal button:hover { color:var(--c-primary); }
+.records-legal i { width:1px; height:10px; background:var(--border); }
 
 @keyframes article-loading {
   from {
@@ -407,5 +424,6 @@ onUnmounted(() => {
   .site-records > i {
     display: none;
   }
+  .records-legal { margin-left:0; padding-left:0; border-left:0; }
 }
 </style>

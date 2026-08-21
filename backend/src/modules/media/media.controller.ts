@@ -45,12 +45,14 @@ export class MediaController {
     @Query('limit') limit?: number,
     @Query('type') type?: string,
     @Query('folder') folder?: string,
+    @Query('search') search?: string,
   ) {
     return this.media.findAll(
       Math.max(1, Math.min(500, Number(page) || 1)),
       Math.max(1, Math.min(100, Number(limit) || 30)),
       type,
       folder,
+      search,
     );
   }
 
