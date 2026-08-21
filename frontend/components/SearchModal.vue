@@ -14,13 +14,16 @@
         <div class="search-hints" v-if="!query && !history.length">输入关键词搜索站内全部内容...</div>
         <div class="search-hints" v-if="query && searching">搜索中...</div>
         <div class="search-results" v-if="query && !searching && results.length > 0">
-          <AppLink v-for="(r, index) in results" :key="`${r.type}:${r.sourceId}`" :to="r.href" class="search-result-row" :class="{ selected: selectedIndex === index }" @pointerenter="selectedIndex = index" @click="rememberAndClose">
-            <div class="search-row-icon"><Icon :name="r.icon" /></div>
-            <div class="search-row-body">
-              <div class="search-row-title" v-html="highlight(r.title)" />
-              <div class="search-row-desc" v-html="highlight(r.excerpt)" />
-            </div>
-          </AppLink>
+          <template v-for="group in resultGroups" :key="group.type">
+            <div class="search-group-label"><Icon :name="group.icon" />{{ group.label }}<span>{{ group.items.length }}</span></div>
+            <AppLink v-for="r in group.items" :key="`${r.type}:${r.sourceId}`" :to="r.href" class="search-result-row" :class="{ selected: selectedIndex === flatResultIndex(r) }" @pointerenter="selectedIndex = flatResultIndex(r)" @click="rememberAndClose">
+              <div class="search-row-icon"><Icon :name="r.icon" /></div>
+              <div class="search-row-body">
+                <div class="search-row-title" v-html="highlight(r.title)" />
+                <div class="search-row-desc" v-html="highlight(r.excerpt)" />
+              </div>
+            </AppLink>
+          </template>
         </div>
         <div class="search-empty" v-if="query && !searching && results.length === 0">未找到相关文章</div>
       </div>
@@ -49,7 +52,7 @@ async function doSearch(q: string) {
   searching.value = true
   try {
     const res = await api.get<any[]>('/ai/search', { q, limit: 12 })
-    const icons: Record<string, string> = { post: 'ph:article-bold', moment: 'ph:sparkle-bold', album: 'ph:images-square-bold', photo: 'ph:image-bold', library: 'ph:books-bold', place: 'ph:map-pin-bold', journey: 'ph:path-bold', story: 'ph:film-strip-bold', comment: 'ph:chat-circle-text-bold', 'moment-comment': 'ph:chat-circle-text-bold' }
+    const icons: Record<string, string> = { post: 'ph:article-bold', moment: 'ph:sparkle-bold', album: 'ph:images-square-bold', photo: 'ph:image-bold', library: 'ph:books-bold', place: 'ph:map-pin-bold', journey: 'ph:path-bold', story: 'ph:film-strip-bold', tag: 'ph:tag-bold', comment: 'ph:chat-circle-text-bold', 'moment-comment': 'ph:chat-circle-text-bold' }
     if (sequence !== searchSequence) return
     results.value = (Array.isArray(res) ? res : []).map((item: any) => ({
       type: item.type,
@@ -62,6 +65,14 @@ async function doSearch(q: string) {
   } catch { if (sequence === searchSequence) results.value = [] }
   if (sequence === searchSequence) searching.value = false
 }
+
+const typeLabels: Record<string, string> = { post: '文章', moment: '瞬间', album: '相册', photo: '照片', library: '书影', place: '地点', journey: '旅程', story: '故事', tag: '标签', comment: '评论', 'moment-comment': '瞬间评论' }
+const resultGroups = computed(() => {
+  const groups = new Map<string, any[]>()
+  results.value.forEach((item) => groups.set(item.type, [...(groups.get(item.type) || []), item]))
+  return [...groups].map(([type, items]) => ({ type, items, label: typeLabels[type] || '内容', icon: items[0]?.icon || 'ph:sparkle-bold' }))
+})
+function flatResultIndex(item: any) { return results.value.findIndex((result) => result.sourceId === item.sourceId && result.type === item.type) }
 
 function highlight(value: string) {
   const escaped = String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char))
@@ -147,7 +158,10 @@ onUnmounted(() => {
 .search-section-head button { border:0; background:transparent; color:var(--c-primary); cursor:pointer; font:inherit; }
 .history-chip { display:inline-flex; align-items:center; gap:6px; margin:0 6px 6px 0; padding:6px 9px; border:1px solid var(--border); border-radius:999px; background:var(--c-bg-1); color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.68rem; transition:.18s ease; }
 .history-chip:hover { border-color:var(--c-primary); color:var(--c-primary); transform:translateY(-1px); }
-.search-results { max-height: 360px; overflow-y: auto; }
+.search-results { max-height: 420px; overflow-y: auto; }
+.search-group-label { display:flex; align-items:center; gap:6px; padding:9px 18px 6px; border-top:1px solid var(--border); color:var(--c-primary); font-size:.58rem; font-weight:700; letter-spacing:.06em; }
+.search-group-label:first-child { border-top:0; }
+.search-group-label span { margin-left:auto; color:var(--c-text-3); font-weight:500; }
 .search-result-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 18px; cursor: pointer; text-decoration: none; color: inherit; transition: background 0.15s; }
 .search-result-row:hover, .search-result-row.selected { background: var(--c-primary-soft); box-shadow:inset 3px 0 var(--c-primary); }
 .search-result-row + .search-result-row { border-top: 1px solid var(--border); }

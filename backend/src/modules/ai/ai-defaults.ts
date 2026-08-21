@@ -280,7 +280,7 @@ export const AI_DEFAULTS: AiConfig = {
   ai_article_model_config_id: '',
   ai_article_temperature: 0.7,
   ai_article_max_tokens: 4096,
-  ai_wallpaper_source_url: 'https://wallhaven.cc/toplist',
+  ai_wallpaper_source_url: 'https://images.unsplash.com/photo-1500534623283-312aede485b7?auto=format&fit=crop&w=1600&q=85',
 
   ai_moment_enabled: true,
   ai_moment_prompt: [

@@ -150,7 +150,7 @@ function prefetchArticle() {
   filter: saturate(1.12) brightness(1.04);
 }
 
-.article-card:hover .card-title { color: var(--c-text); }
+.article-card:hover .card-title { color: var(--c-primary); }
 
 @keyframes article-card-enter {
   from { opacity: 0; transform: translate3d(0, 12px, 0); }

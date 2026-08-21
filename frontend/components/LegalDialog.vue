@@ -1,5 +1,5 @@
 <template>
-  <a-modal v-model:open="visible" width="min(760px, calc(100vw - 24px))" :footer="null" :title="title" @cancel="close">
+  <a-modal v-model:open="visible" class="legal-modal" width="min(760px, calc(100vw - 24px))" :footer="null" :title="title" centered @cancel="close">
     <a-tabs v-model:active-key="activeTab" class="legal-tabs">
       <a-tab-pane key="terms" tab="用户协议" />
       <a-tab-pane key="privacy" tab="隐私政策" />
@@ -41,5 +41,20 @@ function close(){ emit('update:modelValue',false) }
 </script>
 
 <style scoped>
-.legal-tabs :deep(.ant-tabs-nav){margin-bottom:10px}.legal-content{max-height:min(64vh,680px);overflow-y:auto;padding:0 8px 10px;color:var(--c-text-2);font-size:.76rem;line-height:1.85}.legal-content h3{margin:20px 0 6px;color:var(--c-text);font-size:.84rem}.legal-content p{margin:0}.legal-content a{color:var(--c-primary)}.legal-meta{padding:8px 10px;border-radius:6px;background:var(--c-bg-1);color:var(--c-text-3);font-size:.65rem}
+.legal-modal :deep(.ant-modal-content) { overflow: hidden; border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border)); border-radius: var(--ui-radius-panel, 14px); background: var(--ld-bg-card); color: var(--c-text); box-shadow: 0 24px 80px color-mix(in srgb, var(--ld-shadow) 60%, transparent); }
+.legal-modal :deep(.ant-modal-header) { margin-bottom: 0; padding: 20px 24px 8px; background: transparent; }
+.legal-modal :deep(.ant-modal-title) { color: var(--c-text); font-size: 1rem; }
+.legal-modal :deep(.ant-modal-close) { color: var(--c-text-3); }
+.legal-modal :deep(.ant-modal-body) { padding: 0 24px 22px; }
+.legal-tabs :deep(.ant-tabs-nav) { margin-bottom: 10px; }
+.legal-tabs :deep(.ant-tabs-tab) { color: var(--c-text-2); font-size: .72rem; }
+.legal-tabs :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) { color: var(--c-primary); }
+.legal-tabs :deep(.ant-tabs-ink-bar) { background: var(--c-primary); }
+.legal-content { max-height: min(64vh, 680px); overflow-y: auto; padding: 0 8px 10px 0; color: var(--c-text-2); font-size: .76rem; line-height: 1.85; scrollbar-gutter: stable; }
+.legal-content h3 { margin: 20px 0 6px; color: var(--c-text); font-size: .84rem; }
+.legal-content p { margin: 0; }
+.legal-content a { color: var(--c-primary); }
+.legal-meta { padding: 8px 10px; border-radius: 6px; background: var(--c-bg-1); color: var(--c-text-3); font-size: .65rem; }
+@media (max-width: 640px) { .legal-modal :deep(.ant-modal) { max-width: calc(100vw - 20px); margin: 10px auto; } .legal-modal :deep(.ant-modal-header) { padding: 16px 18px 6px; } .legal-modal :deep(.ant-modal-body) { padding: 0 18px 16px; } .legal-content { max-height: min(68dvh, 560px); font-size: .72rem; line-height: 1.8; } .legal-content h3 { margin-top: 16px; font-size: .8rem; } }
+@media (prefers-reduced-motion: reduce) { .legal-modal :deep(.ant-modal-wrap), .legal-modal :deep(.ant-modal) { transition: none !important; animation: none !important; } }
 </style>

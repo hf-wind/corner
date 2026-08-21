@@ -312,6 +312,8 @@ onUnmounted(() => {
 
 <style scoped>
 .sidebar-right {
+  position: relative;
+  z-index: 3;
   width: var(--article-aside-w, 236px);
   animation: article-sidebar-arrive 0.56s cubic-bezier(0.16, 1, 0.3, 1) both;
   flex-basis: var(--article-aside-w, 236px);
@@ -323,6 +325,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
   background: transparent;
+  isolation: isolate;
 }
 
 @keyframes article-sidebar-arrive {

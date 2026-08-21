@@ -19,6 +19,7 @@ const PUBLIC_TYPES = [
   'photo',
   'journey',
   'story',
+  'tag',
 ];
 
 @Injectable()
@@ -193,7 +194,7 @@ export class AiNativeService {
 
   private async searchPublishedContent(query: string, limit: number) {
     const contains = { contains: query, mode: 'insensitive' as const };
-    const [posts, moments, albums, libraryItems, journeys, stories, places, photos] =
+    const [posts, moments, albums, libraryItems, journeys, stories, places, photos, tags] =
       await Promise.all([
         this.prisma.post.findMany({
           where: {
@@ -279,6 +280,18 @@ export class AiNativeService {
           select: { id: true, caption: true, album: { select: { title: true, slug: true } } },
           take: 80,
         }),
+        this.prisma.tag.findMany({
+          where: { name: contains },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            icon: true,
+            color: true,
+            _count: { select: { posts: { where: { post: { status: 'published' } } } } },
+          },
+          take: 80,
+        }),
       ]);
 
     const createCard = (
@@ -310,6 +323,7 @@ export class AiNativeService {
       ...stories.map((item) => createCard('story', item.id, item.title, `/stories/${item.slug}`, item.description, item.publishedAt)),
       ...places.map((item) => createCard('place', item.id, item.name, `/places/${item.slug}`, [item.address, item.city, item.province, item.country].filter(Boolean).join(' · '))),
       ...photos.map((item) => createCard('photo', item.id, `照片 · ${item.album.title}`, `/albums/${item.album.slug}?photo=${item.id}`, item.caption, null, { albumTitle: item.album.title })),
+      ...tags.map((item) => createCard('tag', item.id, `标签 · ${item.name}`, `/tags?tag=${encodeURIComponent(item.slug)}`, `${item.name} · ${item._count.posts} 篇文章`, null, { slug: item.slug, icon: item.icon, color: item.color, postCount: item._count.posts })),
     ]
       .filter((card) =>
         `${card.title} ${card.excerpt}`
@@ -337,11 +351,13 @@ export class AiNativeService {
     });
     const keys: Array<{ contentType: string; sourceId: string }> = [];
     for (const node of nodes) {
-      const body = [
-        node.title,
-        node.excerpt || '',
-        JSON.stringify(node.metadata || {}),
-      ].join('\n');
+      const metadata = this.metadata(node.metadata);
+      const searchableMetadata = Object.entries(metadata)
+        .filter(([key]) => !/image|thumbnail|cover|path|url|src/i.test(key))
+        .map(([, value]) => this.plain(value, 1200))
+        .filter(Boolean)
+        .join(' ');
+      const body = [node.title, node.excerpt || '', searchableMetadata].filter(Boolean).join('\n');
       const contentHash = this.hash({
         body,
         href: node.href,

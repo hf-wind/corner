@@ -18,6 +18,12 @@ import {
   type AiSettingKey,
 } from './ai-defaults';
 
+const DEFAULT_COVER_SOURCES = [
+  'https://images.unsplash.com/photo-1500534623283-312aede485b7?auto=format&fit=crop&w=1600&q=85',
+  'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1600&q=85',
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1600&q=85',
+];
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -1077,6 +1083,9 @@ export class AiService {
     const r = Math.min(24, Math.max(1, rows || 9));
     const cfg = await this.getConfig();
     const configured = String(cfg.ai_wallpaper_source_url || '').trim();
+    if (/^https:\/\/images\.unsplash\.com\//i.test(configured)) {
+      return { items: [{ id: createHash('sha256').update(configured).digest('hex').slice(0, 16), url: configured, thumb: configured }], source: configured };
+    }
     const sourceUrl = this.safeWallpaperSource(configured);
 
     if (sourceUrl.hostname === 'wallhaven.cc' || sourceUrl.hostname.endsWith('.wallhaven.cc')) {
@@ -1129,19 +1138,17 @@ export class AiService {
     }
 
     // Fallback: known CDN image pattern with IDs extracted from homepage once
-    return {
-      items: [] as { id: string; url: string; thumb: string }[],
-      source: null,
-    };
+    const fallback = DEFAULT_COVER_SOURCES.slice(0, r).map((url) => ({ id: createHash('sha256').update(url).digest('hex').slice(0, 16), url, thumb: url }));
+    return { items: fallback, source: 'bundled-stable-cover-sources' };
   }
 
   private safeWallpaperSource(value: string) {
     try {
-      const url = new URL(value || 'https://wallhaven.cc/toplist');
+      const url = new URL(value || DEFAULT_COVER_SOURCES[0]);
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
       return url;
     } catch {
-      return new URL('https://wallhaven.cc/toplist');
+      return new URL(DEFAULT_COVER_SOURCES[0]);
     }
   }
 

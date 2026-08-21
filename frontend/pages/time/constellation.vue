@@ -29,10 +29,7 @@
         :selected-id="selected?.id"
         @select="handleSceneSelect"
       />
-      <div v-else class="constellation-loading" aria-live="polite">
-        <span class="loading-orbit"><i /><i /><i /></span>
-        <small>正在展开你的时间轨道</small>
-      </div>
+      <Loading v-else variant="space" text="正在展开你的时间轨道" />
     </section>
 
     <header class="constellation-nav">

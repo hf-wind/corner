@@ -25,11 +25,7 @@
       <div class="scene-vignette" />
       <div class="scene-grid" aria-hidden="true" />
       <div class="scene-scanline" aria-hidden="true" />
-      <div v-if="!entryReady" class="entry-loading" aria-live="polite">
-        <span class="entry-loader"><i /><i /><i /></span>
-        <strong>{{ sceneStatus }}</strong>
-        <small>正在整理这座记忆花园</small>
-      </div>
+      <Loading v-if="!entryReady" variant="space" :title="sceneStatus" text="正在整理这座记忆花园" />
     </div>
 
     <header class="portal-nav">

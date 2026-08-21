@@ -534,6 +534,13 @@ export class EmailService {
   ) {
     const stored = (await this.getStoredTemplates())[key];
     if (!stored?.custom || !stored.subject?.trim() || !stored.html?.trim()) {
+      const definition = this.templateDefinitions(String(variables.siteUrl || 'https://corner.ink')).find((item) => item.key === key);
+      if (definition) {
+        return {
+          subject: this.renderTemplateText(definition.defaultSubject, variables),
+          html: this.renderTemplateText(definition.defaultHtml, variables),
+        };
+      }
       return { subject: fallbackSubject, html: fallbackHtml };
     }
     return {
@@ -557,12 +564,14 @@ export class EmailService {
 
   private templateDefinitions(siteUrl: string) {
     const sampleBase = { siteName: '风隅随笔', siteUrl };
+    const logoUrl = `${siteUrl.replace(/\/$/, '')}/logo.png`;
     const layout = (title: string, body: string) => `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:24px;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#27303f">
-<main style="max-width:560px;margin:0 auto;padding:32px;background:#fff;border:1px solid #e7eaf0;border-radius:12px">
-<p style="margin:0 0 22px;color:#57708f;font-weight:700">{{siteName}}</p><h1 style="margin:0 0 20px;font-size:22px">${title}</h1>${body}
-<footer style="margin-top:28px;padding-top:18px;border-top:1px solid #edf0f4;color:#8a94a3;font-size:12px">此邮件由 {{siteName}} 自动发送，请勿直接回复。</footer>
+<body style="margin:0;padding:28px 16px;background:#eef3f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;color:#223043">
+<main style="max-width:580px;margin:0 auto;padding:0 0 28px;background:#fff;border:1px solid #dce6ee;border-radius:16px;overflow:hidden;box-shadow:0 16px 42px rgba(28,54,76,.10)">
+<header style="padding:28px 32px 24px;background:#18354c;color:#fff"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:middle"><img src="${logoUrl}" width="42" height="42" alt="{{siteName}}" style="display:block;border-radius:10px"></td><td style="padding-left:12px;vertical-align:middle"><strong style="display:block;font-size:18px;line-height:1.2">{{siteName}}</strong><span style="display:block;margin-top:4px;color:#b9d2e4;font-size:11px;letter-spacing:1.4px">把日子写进星海</span></td></tr></table></header>
+<section style="padding:30px 32px"><p style="margin:0 0 7px;color:#6b879b;font-size:11px;letter-spacing:1.6px">PERSONAL MEMORY ARCHIVE</p><h1 style="margin:0 0 22px;font-size:24px;line-height:1.35;color:#18354c">${title}</h1>${body}</section>
+<footer style="margin:0 32px;padding-top:18px;border-top:1px solid #e6edf2;color:#8193a2;font-size:12px;line-height:1.7">此邮件由 {{siteName}} 自动发送，请勿直接回复。<br><a href="{{siteUrl}}" style="color:#3d789d;text-decoration:none">访问 {{siteName}}</a></footer>
 </main></body></html>`;
     return [
       {

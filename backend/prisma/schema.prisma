@@ -78,6 +78,8 @@ model Tag {
   color String?   @db.VarChar(20)
   posts PostTag[]
 
+  @@index([name])
+
   @@map("tags")
 }
 
@@ -210,6 +212,7 @@ model PostTag {
   tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([postId, tagId])
+  @@index([tagId])
   @@map("post_tags")
 }
 

@@ -72,7 +72,7 @@
         </div>
         <div class="sidebar-tools" aria-label="侧栏快捷操作">
           <AppLink v-if="isPanel" to="/home" class="sidebar-tool user-back" title="返回前台" aria-label="返回前台">
-            <Icon name="icon-park-solid:back" />
+            <Icon name="ph:arrow-u-up-left-bold" />
           </AppLink>
           <div class="theme-pill" :class="`theme-${theme}`" role="group" aria-label="主题">
             <button type="button" :class="{ active: theme === 'light' }" title="亮色" aria-label="亮色"
@@ -91,7 +91,7 @@
           <button v-if="isPanel && isUserAdmin && allowCollapse" type="button"
             class="sidebar-tool admin-collapse-button" :title="collapsed ? '展开管理侧栏' : '收起管理侧栏'"
             :aria-label="collapsed ? '展开管理侧栏' : '收起管理侧栏'" @click="emit('toggle-collapse')">
-            <Icon :name="collapsed ? 'material-symbols:devices-fold' : 'material-symbols:devices-fold'
+            <Icon :name="collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-bold'
               " />
           </button>
         </div>

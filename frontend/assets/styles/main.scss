@@ -71,6 +71,7 @@
   --ui-accent-warm: #d58a45;
   --ui-radius-hero: 18px;
   --ui-radius-panel: 14px;
+  --ui-radius-control: 9px;
   --ui-shadow-panel: 0 10px 32px
     color-mix(in srgb, var(--ld-shadow) 32%, transparent);
   --ui-shadow-soft: 0 6px 20px
@@ -239,7 +240,7 @@ body,
 
 /* Public pages share one quiet entrance so route changes do not feel abrupt. */
 .layout-page > .page-layout {
-  animation: page-content-enter 0.46s var(--ui-ease-out) both;
+  animation: none;
   transform-origin: center top;
 }
 
@@ -289,6 +290,28 @@ html.theme-switching
     transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
     box-shadow 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
     background-color 0.24s ease;
+}
+
+.ui-card {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ld-bg-card);
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.ui-control {
+  min-height: var(--admin-control-height, 28px);
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: var(--ui-radius-control);
+  background: var(--ld-bg-card);
+  color: var(--c-text-2);
+  font: inherit;
+}
+
+.ui-focus-ring:focus-visible,
+.ui-control:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -519,6 +542,19 @@ a {
   animation: content-reveal 0.42s var(--ui-ease-out) both;
 }
 
+[data-reveal],
+.reveal-block {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition: opacity .56s var(--ui-ease-out), transform .56s var(--ui-ease-out);
+}
+
+[data-reveal].is-visible,
+.reveal-block.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
 .content-switch-enter-active,
 .content-switch-leave-active {
   transition:
@@ -546,6 +582,12 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  .reveal-block {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
   .content-reveal {
     animation: none;
   }

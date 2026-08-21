@@ -1301,7 +1301,7 @@ onUnmounted(() => {
     0 18px 46px color-mix(in srgb, #000 20%, var(--ld-shadow)),
     0 1px 0 color-mix(in srgb, #fff 60%, transparent) inset;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 12%, var(--border));
+  border: 0;
 }
 
 .pet-chat-head {

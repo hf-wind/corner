@@ -1,5 +1,5 @@
 <template>
-  <main class="detail-page">
+  <main ref="detailPageRef" class="detail-page">
     <div v-if="!loading && !item" class="not-found content-reveal">
       <Icon name="ph:books" />
       <h1>没有找到这份记录</h1>
@@ -7,7 +7,7 @@
       <AppLink to="/library">返回书影</AppLink>
     </div>
     <template v-else-if="item">
-      <section class="detail-hero content-reveal">
+      <section class="detail-hero content-reveal reveal-block">
         <div class="hero-backdrop" :style="item.coverImage
             ? { backgroundImage: `url(${mediaUrl(item.coverImage)})` }
             : {}
@@ -75,7 +75,7 @@
 
       <div class="detail-body">
         <article class="detail-main">
-          <section v-if="item.reflection" class="content-section reflection-section">
+          <section v-if="item.reflection" class="content-section reflection-section reveal-block">
             <header>
               <span>01</span>
               <div>
@@ -85,7 +85,7 @@
             </header>
             <div class="reflection-text"><span v-if="reflectionParts.prefix">{{ reflectionParts.prefix }}</span><b v-if="reflectionParts.lead">{{ reflectionParts.lead }}</b>{{ reflectionParts.rest }}</div>
           </section>
-          <section v-if="item.summary" class="content-section">
+          <section v-if="item.summary" class="content-section reveal-block">
             <header>
               <span>02</span>
               <div>
@@ -95,7 +95,7 @@
             </header>
             <p class="body-copy">{{ item.summary }}</p>
           </section>
-          <section v-if="item.highlights?.length" class="content-section">
+          <section v-if="item.highlights?.length" class="content-section reveal-block">
             <header>
               <span>03</span>
               <div>
@@ -112,7 +112,7 @@
               </blockquote>
             </div>
           </section>
-          <section v-if="item.quotes?.length" class="content-section quote-section">
+          <section v-if="item.quotes?.length" class="content-section quote-section reveal-block">
             <header>
               <span>04</span>
               <div>
@@ -132,7 +132,7 @@
         </article>
 
         <aside class="detail-aside">
-          <section class="info-card">
+          <section class="info-card reveal-block">
             <span class="card-label">档案 / ARCHIVE</span>
             <dl>
               <template v-for="row in infoRows" :key="row.label">
@@ -143,7 +143,7 @@
               </template>
             </dl>
           </section>
-          <section class="timeline-card">
+          <section class="timeline-card reveal-block">
             <span class="card-label">我的时间线</span>
             <div class="timeline">
               <div v-if="item.experienceDate">
@@ -161,7 +161,7 @@
         </aside>
       </div>
 
-      <section v-if="related.length" class="related-section">
+      <section v-if="related.length" class="related-section reveal-block">
         <header>
           <div>
             <small>KEEP EXPLORING</small>
@@ -175,7 +175,7 @@
           <LibraryCard v-for="entry in related" :key="entry.id" :item="entry" />
         </div>
       </section>
-      <footer class="detail-footer">
+      <footer class="detail-footer reveal-block">
         <AppLink to="/library">
           <Icon name="ph:arrow-left" /> 回到书影收藏馆
         </AppLink><span>风隅随笔 · PERSONAL COLLECTION</span>
@@ -192,6 +192,8 @@ const { mediaUrl } = useMediaUrl();
 const loading = ref(true);
 const item = ref<LibraryItem | null>(null);
 const related = ref<LibraryItem[]>([]);
+const detailPageRef = ref<HTMLElement | null>(null);
+useScrollReveal(detailPageRef, '.reveal-block');
 const progressLabels: Record<string, string> = {
   "want-to-read": "想读",
   reading: "在读",

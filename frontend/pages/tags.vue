@@ -68,6 +68,7 @@
 
 <script setup lang="ts">
 const api = useApi()
+const route = useRoute()
 const allTags = ref<any[]>([])
 const tagPosts = ref<any[]>([])
 const loading = ref(true)
@@ -129,6 +130,9 @@ onMounted(async () => {
     latestTag.value = allTags.value.at(-1)?.name || ''
   } catch { allTags.value = [] }
   finally { loading.value = false }
+  const requested = String(route.query.tag || '')
+  const match = allTags.value.find((tag: any) => tag.slug === requested || tag.name === requested)
+  if (match) void selectTag(match)
 })
 
 useHead({ title: '文章标签' })

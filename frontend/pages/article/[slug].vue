@@ -530,6 +530,7 @@ onUnmounted(() => {
 
 .article-main {
   position: relative;
+  z-index: 1;
   flex: 1;
   overflow-y: auto;
   padding: 28px var(--article-inline-pad) 60px;
@@ -551,6 +552,14 @@ onUnmounted(() => {
     flex-basis 0.32s var(--ui-ease-out),
     opacity 0.24s ease,
     padding 0.32s var(--ui-ease-out);
+}
+
+.article-page :deep(.sidebar-right) {
+  position: relative;
+  z-index: 3;
+  min-width: var(--article-aside-w, 236px);
+  background: var(--c-bg);
+  isolation: isolate;
 }
 
 .article-page.is-immersive .article-main {
