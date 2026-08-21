@@ -125,8 +125,7 @@ async function loadCategoryPosts(slug: string) {
     const res = await api.get<any>('/posts', { ...(slug ? { category: slug } : {}), limit: 12 })
     categoryPosts.value = (res.items ?? []).map((post: any) => ({
       slug: post.slug, title: post.title, cover: post.coverImage, excerpt: post.excerpt,
-      publishedAt: post.publishedAt, tag: post.category?.name || activeCategoryName.value || '随笔',
-      tagIcon: post.category?.icon || 'ph:folder-open-bold', tagColor: post.category?.color || '',
+      publishedAt: post.publishedAt,
     }))
   } catch { categoryPosts.value = [] }
   finally { postsLoading.value = false }
@@ -171,4 +170,5 @@ useHead({ title: '文章分类' })
 .category-count strong,.category-arrow { color:var(--category-color); }
 .category-icon { width:42px; height:42px; border:1px solid color-mix(in srgb,var(--category-color) 14%,transparent); border-radius:10px; background:linear-gradient(145deg,color-mix(in srgb,var(--category-color) 12%,transparent),color-mix(in srgb,var(--ld-bg-card) 72%,transparent)); color:var(--category-color); font-size:1.25rem; }
 .result-icon { width:34px; height:34px; border:1px solid color-mix(in srgb,var(--c-primary) 12%,transparent); border-radius:10px; background:linear-gradient(145deg,var(--c-primary-soft),color-mix(in srgb,var(--ld-bg-card) 72%,transparent)); box-shadow:none; color:var(--c-primary); }
+.article-list :deep(.compact-article:hover) { border-color:color-mix(in srgb,var(--border) 68%,transparent); }
 </style>

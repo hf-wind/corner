@@ -567,11 +567,11 @@ export class EmailService {
     const logoUrl = `${siteUrl.replace(/\/$/, '')}/logo.png`;
     const layout = (title: string, body: string) => `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:28px 16px;background:#eef3f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;color:#223043">
-<main style="max-width:580px;margin:0 auto;padding:0 0 28px;background:#fff;border:1px solid #dce6ee;border-radius:16px;overflow:hidden;box-shadow:0 16px 42px rgba(28,54,76,.10)">
-<header style="padding:28px 32px 24px;background:#18354c;color:#fff"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:middle"><img src="${logoUrl}" width="42" height="42" alt="{{siteName}}" style="display:block;border-radius:10px"></td><td style="padding-left:12px;vertical-align:middle"><strong style="display:block;font-size:18px;line-height:1.2">{{siteName}}</strong><span style="display:block;margin-top:4px;color:#b9d2e4;font-size:11px;letter-spacing:1.4px">把日子写进星海</span></td></tr></table></header>
-<section style="padding:30px 32px"><p style="margin:0 0 7px;color:#6b879b;font-size:11px;letter-spacing:1.6px">PERSONAL MEMORY ARCHIVE</p><h1 style="margin:0 0 22px;font-size:24px;line-height:1.35;color:#18354c">${title}</h1>${body}</section>
-<footer style="margin:0 32px;padding-top:18px;border-top:1px solid #e6edf2;color:#8193a2;font-size:12px;line-height:1.7">此邮件由 {{siteName}} 自动发送，请勿直接回复。<br><a href="{{siteUrl}}" style="color:#3d789d;text-decoration:none">访问 {{siteName}}</a></footer>
+<body style="margin:0;padding:32px 16px;background:#f4f5f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;color:#30343b">
+<main style="max-width:580px;margin:0 auto;padding:0 0 28px;background:#fff;border:1px solid #e1e4e8;border-radius:12px;overflow:hidden;box-shadow:0 14px 38px rgba(34,39,46,.08)">
+<header style="padding:24px 32px 22px;background:#2b2f36;color:#fff"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:middle"><img src="${logoUrl}" width="42" height="42" alt="{{siteName}}" style="display:block;border-radius:9px"></td><td style="padding-left:12px;vertical-align:middle"><strong style="display:block;font-size:18px;line-height:1.2">{{siteName}}</strong><span style="display:block;margin-top:4px;color:#d58a45;font-size:11px;letter-spacing:1.4px">听风于隅，漫写人间</span></td></tr></table></header>
+<section style="padding:30px 32px"><p style="margin:0 0 7px;color:#d58a45;font-size:11px;letter-spacing:1.6px">WIND · CORNER NOTES</p><h1 style="margin:0 0 22px;font-size:24px;line-height:1.35;color:#2b2f36">${title}</h1>${body}</section>
+<footer style="margin:0 32px;padding-top:18px;border-top:1px solid #e5e7ea;color:#7b828c;font-size:12px;line-height:1.7">此邮件由 {{siteName}} 自动发送，请勿直接回复。<br><a href="{{siteUrl}}" style="color:#b36f32;text-decoration:none">访问 {{siteName}}</a></footer>
 </main></body></html>`;
     return [
       {
@@ -583,7 +583,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】{{type}}验证码',
         defaultHtml: layout(
           '{{type}}验证码',
-          '<p style="color:#5f6b7a">您的验证码是：</p><div style="margin:22px 0;padding:18px;border-radius:8px;background:#eef4fb;color:#315b87;font:700 32px/1 monospace;text-align:center;letter-spacing:6px">{{code}}</div><p style="color:#8a94a3;font-size:13px">验证码 5 分钟内有效，请勿向他人泄露。</p>',
+          '<p style="color:#5f6670">您的验证码是：</p><div style="margin:22px 0;padding:18px;border-radius:8px;background:#fff5e9;color:#a86227;font:700 32px/1 monospace;text-align:center;letter-spacing:6px">{{code}}</div><p style="color:#8a9098;font-size:13px">验证码 5 分钟内有效，请勿向他人泄露。</p>',
         ),
       },
       {
@@ -615,7 +615,7 @@ export class EmailService {
           '【{{siteName}}】{{senderName}} 评论了你的{{sourceType}}',
         defaultHtml: layout(
           '收到一条新评论',
-          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 评论了你的{{sourceType}}《{{sourceTitle}}》。</p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #57708f;background:#f7f9fb">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#315b87">查看详情</a>',
+          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 评论了你的{{sourceType}}《{{sourceTitle}}》。 </p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #d58a45;background:#faf7f2">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#b36f32">查看详情</a>',
         ),
       },
       {
@@ -644,7 +644,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】{{senderName}} 回复了你的评论',
         defaultHtml: layout(
           '你的评论收到回复',
-          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 回复了你在《{{sourceTitle}}》的评论。</p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #57708f;background:#f7f9fb">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#315b87">查看详情</a>',
+          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 回复了你在《{{sourceTitle}}》的评论。</p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #d58a45;background:#faf7f2">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#b36f32">查看详情</a>',
         ),
       },
       {
@@ -679,7 +679,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】评论审核{{approved}}：{{sourceTitle}}',
         defaultHtml: layout(
           '评论审核结果：{{approved}}',
-          '<p>Hi <strong>{{recipientName}}</strong>，你在{{sourceType}}《{{sourceTitle}}》下的评论已完成审核。</p><blockquote style="margin:20px 0;padding:14px;background:#f7f9fb">{{{contentHtml}}}</blockquote><p>审核结果：<strong>{{approved}}</strong></p><p>说明：{{reason}}</p><a href="{{detailUrl}}" style="color:#315b87">查看内容</a>',
+          '<p>Hi <strong>{{recipientName}}</strong>，你在{{sourceType}}《{{sourceTitle}}》下的评论已完成审核。</p><blockquote style="margin:20px 0;padding:14px;background:#faf7f2">{{{contentHtml}}}</blockquote><p>审核结果：<strong>{{approved}}</strong></p><p>说明：{{reason}}</p><a href="{{detailUrl}}" style="color:#b36f32">查看内容</a>',
         ),
       },
       {
@@ -704,7 +704,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】{{senderName}} 赞了你的评论',
         defaultHtml: layout(
           '你的评论收到点赞',
-          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 赞了你在《{{sourceTitle}}》下的评论。</p><a href="{{detailUrl}}" style="color:#315b87">查看详情</a>',
+          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 赞了你在《{{sourceTitle}}》下的评论。</p><a href="{{detailUrl}}" style="color:#b36f32">查看详情</a>',
         ),
       },
       {
@@ -716,7 +716,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】邮件测试',
         defaultHtml: layout(
           '邮件服务测试成功',
-          '<p>如果你看到这封邮件，说明 SMTP 发信配置可用。</p><a href="{{siteUrl}}" style="color:#315b87">访问站点</a>',
+          '<p>如果你看到这封邮件，说明 SMTP 发信配置可用。</p><a href="{{siteUrl}}" style="color:#b36f32">访问站点</a>',
         ),
       },
     ];
@@ -825,14 +825,14 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
+      <h1 style="color:#2b2f36;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">${type}验证码</h2>
     
     <p style="color:#666;line-height:1.6;margin-bottom:16px;">您好，您的验证码是：</p>
     
-    <div style="background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;font-size:36px;font-weight:700;letter-spacing:6px;padding:24px;border-radius:12px;text-align:center;margin:24px 0;font-family:monospace;">
+    <div style="background:#d58a45;color:#fff;font-size:36px;font-weight:700;letter-spacing:6px;padding:24px;border-radius:12px;text-align:center;margin:24px 0;font-family:monospace;">
       ${code}
     </div>
     
@@ -869,7 +869,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
+      <h1 style="color:#2b2f36;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">💬 新评论通知</h2>
@@ -879,14 +879,14 @@ export class EmailService {
       <strong>${data.senderName}</strong> 评论了你的${data.sourceType || '文章'} <strong>${data.postTitle}</strong>
     </p>
     
-      <div style="background:#f8f9fa;border-left:4px solid #5b8def;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
+      <div style="background:#faf7f2;border-left:4px solid #d58a45;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
         <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
           "${this.renderEmailContent(data.content, siteUrl)}"
         </p>
       </div>
       
       <div style="text-align:center;margin-top:32px;">
-        <a href="${data.link ? `${siteUrl}${data.link}` : `${siteUrl}/article/${data.postId}`}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
+        <a href="${data.link ? `${siteUrl}${data.link}` : `${siteUrl}/article/${data.postId}`}" style="display:inline-block;background:#d58a45;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
           查看详情
         </a>
       </div>
@@ -919,7 +919,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
+      <h1 style="color:#2b2f36;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">↩️ 新回复通知</h2>
@@ -929,14 +929,14 @@ export class EmailService {
       <strong>${data.senderName}</strong> 回复了你在 <strong>${data.postTitle}</strong> 的评论
     </p>
     
-      <div style="background:#f8f9fa;border-left:4px solid #7c6bef;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
+      <div style="background:#faf7f2;border-left:4px solid #d58a45;padding:16px;border-radius:0 8px 8px 0;margin:24px 0;">
         <p style="color:#333;margin:0;line-height:1.6;font-style:italic;">
           "${this.renderEmailContent(data.content, siteUrl)}"
         </p>
       </div>
     
     <div style="text-align:center;margin-top:32px;">
-      <a href="${data.link ? `${siteUrl}${data.link}` : `${siteUrl}/article/${data.postId}`}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
+      <a href="${data.link ? `${siteUrl}${data.link}` : `${siteUrl}/article/${data.postId}`}" style="display:inline-block;background:#d58a45;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
         查看详情
       </a>
     </div>
@@ -1008,7 +1008,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
+      <h1 style="color:#2b2f36;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">❤️ 新点赞通知</h2>
@@ -1023,7 +1023,7 @@ export class EmailService {
     </div>
     
     <div style="text-align:center;margin-top:32px;">
-      <a href="${siteUrl}/article/${data.postId}" style="display:inline-block;background:linear-gradient(135deg,#5b8def,#7c6bef);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
+      <a href="${siteUrl}/article/${data.postId}" style="display:inline-block;background:#d58a45;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;">
         查看详情
       </a>
     </div>
@@ -1047,7 +1047,7 @@ export class EmailService {
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#5b8def;margin:0;font-size:24px;">风隅随笔</h1>
+      <h1 style="color:#2b2f36;margin:0;font-size:24px;">风隅随笔</h1>
     </div>
     
     <h2 style="text-align:center;color:#333;margin-bottom:24px;font-size:20px;">✅ 邮件测试成功</h2>

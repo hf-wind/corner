@@ -29,7 +29,7 @@
         :selected-id="selected?.id"
         @select="handleSceneSelect"
       />
-      <Loading v-else variant="space" text="正在展开你的时间轨道" />
+      <Loading v-else variant="space" fullscreen text="正在展开你的时间轨道" />
     </section>
 
     <header class="constellation-nav">

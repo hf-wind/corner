@@ -1222,19 +1222,6 @@ onUnmounted(() => {
   will-change: transform;
 }
 
-.pet-fab::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  left: 22%;
-  right: 22%;
-  bottom: 3px;
-  height: 7px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--c-primary) 18%, transparent);
-  box-shadow: 0 4px 10px color-mix(in srgb, var(--c-primary) 16%, transparent);
-}
-
 .pet-fab:hover {
   cursor: pointer;
 }

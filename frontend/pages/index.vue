@@ -25,7 +25,7 @@
       <div class="scene-vignette" />
       <div class="scene-grid" aria-hidden="true" />
       <div class="scene-scanline" aria-hidden="true" />
-      <Loading v-if="!entryReady" variant="space" :title="sceneStatus" text="正在整理这座记忆花园" />
+      <Loading v-if="!entryReady" variant="space" fullscreen :title="sceneStatus" text="正在整理这座记忆花园" />
     </div>
 
     <header class="portal-nav">

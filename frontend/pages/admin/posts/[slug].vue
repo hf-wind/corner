@@ -240,6 +240,9 @@
               <p>{{ item.excerpt || "该版本未填写摘要" }}</p>
               <small>{{ formatVersionTime(item.createdAt) }} · {{ item.createdBy?.username || "系统" }} · 正文 {{ item.contentLength }} 字符</small>
             </div>
+            <a-button size="small" @click="previewVersion(item)">
+              <Icon name="ph:eye-bold" />预览
+            </a-button>
             <a-button
               size="small"
               :loading="restoringVersion === item.id"
@@ -251,6 +254,13 @@
         </div>
         <a-empty v-else-if="!versionsLoading" description="暂无版本记录" />
       </a-spin>
+    </a-modal>
+    <a-modal v-model:open="versionPreview.open" :title="versionPreview.item ? `V${versionPreview.item.version} · ${versionPreview.item.title || '未命名版本'}` : '版本预览'" width="min(860px, calc(100vw - 24px))" :footer="null">
+      <div v-if="versionPreview.item" class="version-preview">
+        <div class="version-preview-meta"><span>{{ versionSource(versionPreview.item.source) }}</span><small>{{ formatVersionTime(versionPreview.item.createdAt) }} · {{ versionPreview.item.createdBy?.username || '系统' }}</small></div>
+        <p v-if="versionPreview.item.excerpt" class="version-preview-excerpt">{{ versionPreview.item.excerpt }}</p>
+        <pre>{{ versionPreview.item.content || '该版本没有正文内容' }}</pre>
+      </div>
     </a-modal>
   </div>
 </template>
@@ -311,6 +321,7 @@ const versionsOpen = ref(false);
 const versionsLoading = ref(false);
 const restoringVersion = ref("");
 const versions = ref<any[]>([]);
+const versionPreview = reactive({ open: false, item: null as any });
 const aiSelection = reactive({ start: 0, end: 0 });
 const aiActions = [
   { action: "polish", label: "润色", icon: "ph:magic-wand-bold" },
@@ -690,7 +701,12 @@ async function openVersions() {
 }
 
 function versionSource(source: string) {
-  return source === "publish" ? "发布快照" : "历史发布";
+  return source === "publish" ? "发布快照" : source === "draft-preserve" ? "恢复前草稿快照" : "历史版本";
+}
+
+function previewVersion(item: any) {
+  versionPreview.item = item;
+  versionPreview.open = true;
 }
 
 function formatVersionTime(value: string) {
@@ -700,7 +716,7 @@ function formatVersionTime(value: string) {
 function confirmRestoreVersion(item: any) {
   Modal.confirm({
     title: `恢复到 V${item.version}？`,
-    content: "恢复会把该发布版本替换为当前草稿，线上页面保持不变；确认内容后需要再次点击发布。",
+    content: needsPublish.value ? "当前还有未发布内容。系统会先发布并保留当前草稿，再恢复所选历史版本；恢复结果会作为新的草稿，确认后可再次发布。" : "恢复会把所选历史版本载入为新的草稿，当前线上版本保持不变。",
     okText: "确认恢复",
     cancelText: "取消",
     onOk: async () => {
@@ -1024,6 +1040,11 @@ function confirmRestoreVersion(item: any) {
   white-space: nowrap;
 }
 .version-list small { color: var(--c-text-4); font-size: 0.52rem; }
+.version-preview { display: grid; gap: 14px; }
+.version-preview-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--c-primary); font-size: .64rem; }
+.version-preview-meta small { color: var(--c-text-3); font-size: .56rem; }
+.version-preview-excerpt { margin: 0; padding: 11px 13px; border-left: 3px solid var(--c-primary); background: var(--c-bg-1); color: var(--c-text-2); font-size: .7rem; line-height: 1.7; }
+.version-preview pre { max-height: min(62vh, 620px); margin: 0; padding: 16px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--c-bg-1); color: var(--c-text-1); font: .72rem/1.85 var(--font-body); white-space: pre-wrap; word-break: break-word; }
 @media (max-width: 700px) {
   .ai-diff {
     grid-template-columns: 1fr;

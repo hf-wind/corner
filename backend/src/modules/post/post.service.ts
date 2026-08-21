@@ -390,6 +390,8 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
         createdBy: item.createdBy,
         title: snapshot?.title || '',
         excerpt: snapshot?.excerpt || '',
+        content: snapshot?.content || '',
+        coverImage: snapshot?.coverImage || '',
         contentLength: snapshot?.content?.length || 0,
       };
     });
@@ -409,6 +411,21 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
 
     const restoredSlug = await this.uniqueSlug(snapshot.slug, existing.id);
     const restored = await this.prisma.$transaction(async (tx) => {
+      const currentSnapshot = this.buildSnapshotFromPost(existing);
+      const needsPreservePublish = existing.needsPublish || existing.status !== 'published';
+      if (needsPreservePublish) {
+        // Publish the current draft first so restoring an old version never discards it.
+        await this.createVersion(tx, existing, actorId, 'draft-preserve');
+        await tx.post.update({
+          where: { id: existing.id },
+          data: {
+            status: 'published',
+            needsPublish: false,
+            publishedSnapshot: currentSnapshot as unknown as Prisma.InputJsonValue,
+            publishedAt: existing.publishedAt ?? new Date(),
+          },
+        });
+      }
       const [category, place, tags] = await Promise.all([
         snapshot.category?.id
           ? tx.category.findUnique({
@@ -450,7 +467,9 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
           locationExactConfirmedAt: snapshot.locationExactConfirmedAt
             ? new Date(snapshot.locationExactConfirmedAt)
             : null,
+          status: 'draft',
           needsPublish: true,
+          publishedSnapshot: currentSnapshot as unknown as Prisma.InputJsonValue,
           tags: tags.length
             ? { create: tags.map((tag) => ({ tagId: tag.id })) }
             : undefined,
@@ -468,7 +487,7 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     tx: Prisma.TransactionClient,
     post: any,
     createdById: string | undefined,
-    source: 'publish',
+    source: 'publish' | 'draft-preserve',
   ) {
     const latest = await tx.postVersion.findFirst({
       where: { postId: post.id },

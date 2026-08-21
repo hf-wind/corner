@@ -78,6 +78,7 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <div class="admin-row-actions">
+              <a-button type="link" size="small" @click="openDetail(record)"><Icon name="ph:eye-bold" /> 详情</a-button>
               <a-button type="link" size="small" :disabled="busy" @click="openRestore(record)"><Icon name="ph:clock-counter-clockwise-bold" /> 恢复数据</a-button>
             </div>
           </template>
@@ -86,6 +87,17 @@
       <AdminPagination v-model:current="page" :page-size="pageSize" :total="backups.length" :show-size-changer="false" />
     </section>
 
+    <a-modal v-model:open="detail.open" title="备份详情" :footer="null" width="min(680px, calc(100vw - 24px))">
+      <div v-if="detail.item" class="backup-detail">
+        <div><span>恢复点</span><strong>{{ detail.item.backupId }}</strong></div>
+        <div><span>创建时间</span><strong>{{ formatDate(detail.item.createdAt) }}</strong></div>
+        <div><span>归档大小</span><strong>{{ formatBytes(detail.item.archiveBytes) }}</strong></div>
+        <div><span>Git 提交</span><code>{{ detail.item.gitCommit || '—' }}</code></div>
+        <div><span>归档邮件</span><strong>{{ detail.item.email?.archive?.status || '未记录' }} · {{ detail.item.email?.archive?.recipient || '—' }}</strong></div>
+        <div><span>管理员通知</span><strong>{{ detail.item.email?.notification?.status || '未记录' }} · {{ detail.item.email?.notification?.recipient || '—' }}</strong></div>
+        <section><span>原始记录</span><pre>{{ JSON.stringify(detail.item, null, 2) }}</pre></section>
+      </div>
+    </a-modal>
     <a-modal v-model:open="restore.open" title="恢复历史数据" :confirm-loading="restore.loading" ok-text="创建安全备份并恢复" ok-type="danger" width="540px" @ok="confirmRestore">
       <a-alert type="warning" show-icon message="恢复会替换当前数据库与上传文件" description="系统会先自动创建一份完整安全备份。SSH、证书、环境变量和系统服务不会被网页恢复覆盖。" />
       <div class="restore-fields">
@@ -111,6 +123,7 @@ const pagedBackups = computed(() => backups.value.slice((page.value - 1) * pageS
 const inventory = reactive<any>({ latestBackupId: null, assets: [] });
 const status = reactive<any>({ action: null, status: "idle", message: "" });
 const restore = reactive({ open: false, loading: false, backupId: "", token: "", confirmation: "" });
+const detail = reactive({ open: false, item: null as any });
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const columns = [
@@ -178,6 +191,11 @@ function openRestore(record: any) {
   restore.open = true;
 }
 
+function openDetail(record: any) {
+  detail.item = record;
+  detail.open = true;
+}
+
 async function confirmRestore() {
   if (!restore.token || restore.confirmation !== `RESTORE ${restore.backupId}`) {
     toast.warning("请输入恢复口令和完整确认文本");
@@ -220,5 +238,5 @@ useHead({ title: "备份与恢复" });
 </script>
 
 <style scoped>
-.backup-page{width:min(1280px,100%);margin:0 auto}.task-status{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.status-icon{display:grid;width:36px;height:36px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.task-status.running .status-icon :deep(svg){animation:spin 1s linear infinite}.task-status.failed{border-color:color-mix(in srgb,#d95c5c 34%,var(--border))}.task-status.failed .status-icon{background:color-mix(in srgb,#d95c5c 12%,transparent);color:#d95c5c}.task-status strong{font-size:.75rem}.task-status p{margin:3px 0 0;color:var(--c-text-3);font-size:.58rem}.task-status small{color:var(--c-text-3);font-size:.56rem}.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.summary-grid article{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;padding:15px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.summary-grid article>svg{width:36px;height:36px;padding:9px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary)}.summary-grid small,.summary-grid p{color:var(--c-text-3);font-size:.54rem}.summary-grid strong{display:block;margin-top:2px;font-size:.86rem}.summary-grid p{margin:4px 0 0}.asset-section,.records-section{margin-top:12px;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.asset-section>header,.records-section>header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.asset-section header span,.records-section header span{color:var(--c-primary);font-size:.52rem;letter-spacing:.12em}.asset-section h2,.records-section h2{margin:3px 0 0;font-size:.9rem}.asset-section header small{color:var(--c-text-3);font-size:.58rem}.asset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.asset-grid article{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;border:1px solid var(--border);border-radius:7px;background:var(--c-bg-1)}.asset-state{display:grid;width:28px;height:28px;border-radius:7px;background:color-mix(in srgb,#d79d37 12%,transparent);color:#b87914;place-items:center}.asset-state.managed{background:color-mix(in srgb,#43a977 12%,transparent);color:#34875e}.asset-grid strong{display:block;font-size:.62rem}.asset-grid code{display:block;margin-top:3px;color:var(--c-text-3);font-size:.5rem;overflow:hidden;text-overflow:ellipsis}.backup-id strong{display:block;font-size:.64rem}.backup-id small,.mail-state small,.mail-state span{display:block;margin-top:3px;color:var(--c-text-3);font-size:.52rem}.mail-state strong{font-size:.6rem}.restore-fields{display:grid;gap:14px;margin-top:18px}.restore-fields label>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.65rem}.restore-fields label>small{display:block;margin-top:5px;color:var(--c-text-3);font-size:.56rem}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:1000px){.summary-grid{grid-template-columns:repeat(2,1fr)}.asset-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.task-status{grid-template-columns:36px minmax(0,1fr)}.task-status>small{grid-column:2}.summary-grid,.asset-grid{grid-template-columns:1fr}.asset-section,.records-section{padding:12px}}
+.backup-page{width:min(1280px,100%);margin:0 auto}.task-status{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.status-icon{display:grid;width:36px;height:36px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.task-status.running .status-icon :deep(svg){animation:spin 1s linear infinite}.task-status.failed{border-color:color-mix(in srgb,#d95c5c 34%,var(--border))}.task-status.failed .status-icon{background:color-mix(in srgb,#d95c5c 12%,transparent);color:#d95c5c}.task-status strong{font-size:.75rem}.task-status p{margin:3px 0 0;color:var(--c-text-3);font-size:.58rem}.task-status small{color:var(--c-text-3);font-size:.56rem}.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.summary-grid article{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;padding:15px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.summary-grid article>svg{width:36px;height:36px;padding:9px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary)}.summary-grid small,.summary-grid p{color:var(--c-text-3);font-size:.54rem}.summary-grid strong{display:block;margin-top:2px;font-size:.86rem}.summary-grid p{margin:4px 0 0}.asset-section,.records-section{margin-top:12px;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.asset-section>header,.records-section>header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.asset-section header span,.records-section header span{color:var(--c-primary);font-size:.52rem;letter-spacing:.12em}.asset-section h2,.records-section h2{margin:3px 0 0;font-size:.9rem}.asset-section header small{color:var(--c-text-3);font-size:.58rem}.asset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.asset-grid article{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;border:1px solid var(--border);border-radius:7px;background:var(--c-bg-1)}.asset-state{display:grid;width:28px;height:28px;border-radius:7px;background:color-mix(in srgb,#d79d37 12%,transparent);color:#b87914;place-items:center}.asset-state.managed{background:color-mix(in srgb,#43a977 12%,transparent);color:#34875e}.asset-grid strong{display:block;font-size:.62rem}.asset-grid code{display:block;margin-top:3px;color:var(--c-text-3);font-size:.5rem;overflow:hidden;text-overflow:ellipsis}.backup-id strong{display:block;font-size:.64rem}.backup-id small,.mail-state small,.mail-state span{display:block;margin-top:3px;color:var(--c-text-3);font-size:.52rem}.mail-state strong{font-size:.6rem}.restore-fields{display:grid;gap:14px;margin-top:18px}.restore-fields label>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.65rem}.restore-fields label>small{display:block;margin-top:5px;color:var(--c-text-3);font-size:.56rem}.backup-detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.backup-detail>div{display:grid;gap:4px;padding:10px;border-radius:7px;background:var(--c-bg-1)}.backup-detail span{color:var(--c-text-3);font-size:.58rem}.backup-detail strong,.backup-detail code{overflow:hidden;color:var(--c-text);font-size:.65rem;text-overflow:ellipsis}.backup-detail section{grid-column:1/-1}.backup-detail pre{max-height:240px;margin:6px 0 0;padding:10px;overflow:auto;border-radius:7px;background:var(--c-bg-2);color:var(--c-text-2);font:10px/1.5 var(--font-mono);white-space:pre-wrap;word-break:break-word}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:1000px){.summary-grid{grid-template-columns:repeat(2,1fr)}.asset-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.task-status{grid-template-columns:36px minmax(0,1fr)}.task-status>small{grid-column:2}.summary-grid,.asset-grid,.backup-detail{grid-template-columns:1fr}.asset-section,.records-section{padding:12px}}
 </style>

@@ -9,16 +9,15 @@
     <section v-show="tab === 'templates'" class="template-workspace">
       <aside class="template-list">
         <button v-for="item in templates" :key="item.key" type="button" :class="{ active: selected?.key === item.key }" @click="selectTemplate(item)">
-          <span><Icon :name="templateIcon(item.key)" /></span><div><strong>{{ item.name }}</strong><small>{{ item.description }}</small></div><a-tag :color="item.custom ? 'blue' : 'default'">{{ item.custom ? '自定义' : '系统默认' }}</a-tag>
+          <span><Icon :name="templateIcon(item.key)" /></span><div><strong>{{ item.name }}</strong><small>{{ item.description }}</small></div><a-tag :color="item.custom ? 'orange' : 'default'">{{ item.custom ? '自定义' : '系统默认' }}</a-tag>
         </button>
       </aside>
       <a-spin :spinning="templatesLoading" class="template-editor-spin">
         <div v-if="selected" class="template-editor">
-          <header><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><a-tag :color="editor.custom ? 'blue' : 'default'">{{ editor.custom ? '自定义模板' : '系统默认' }}</a-tag></header>
+          <header class="editor-header"><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><div class="editor-header-actions"><a-tag :color="editor.custom ? 'blue' : 'default'">{{ editor.custom ? '自定义模板' : '系统默认' }}</a-tag><a-button v-if="!editor.custom" size="small" @click="startEditing"><Icon name="ph:pencil-simple-bold" /> 编辑</a-button><a-button size="small" @click="previewTemplate"><Icon name="ph:eye-bold" /> 预览</a-button><a-button v-if="editor.custom && selected.custom" size="small" danger @click="restoreDefault"><Icon name="ph:arrow-counter-clockwise-bold" /> 恢复默认</a-button><a-button v-if="editor.custom" type="primary" size="small" :loading="templateSaving" @click="saveTemplate"><Icon name="ph:floppy-disk-bold" /> 保存</a-button></div></header>
           <label><span>邮件主题</span><a-input v-model:value="editor.subject" :disabled="!editor.custom" /></label>
-          <label><span>HTML 模板</span><a-textarea v-model:value="editor.html" :rows="18" :disabled="!editor.custom" class="html-editor" /></label>
+          <section class="html-template-section"><header><span>HTML 模板</span><a-button type="text" size="small" @click="editor.htmlExpanded = !editor.htmlExpanded"><Icon :name="editor.htmlExpanded ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" />{{ editor.htmlExpanded ? '收起模板' : '展开模板' }}</a-button></header><div v-if="!editor.htmlExpanded" class="html-template-collapsed"><Icon name="ph:code-bold" /><span>模板代码已折叠，点击展开后编辑</span><small>{{ editor.html.length }} 字符</small></div><a-textarea v-else v-model:value="editor.html" :rows="18" :disabled="!editor.custom" class="html-editor" /></section>
           <div class="variables"><span>预设变量</span><p>在主题或 HTML 中插入变量，发送时系统会替换为当前通知的实际内容。</p><button v-for="variable in selected.variables" :key="variable" type="button" :disabled="!editor.custom" @click="insertVariable(variable)"><code v-text="formatVariable(variable)" /><small>{{ variableDescription(variable) }}</small></button><em>富文本正文使用 <code v-text="formatVariable('contentHtml', true)" />，其余变量均自动转义。</em></div>
-          <footer><a-button v-if="!editor.custom" @click="editor.custom = true"><Icon name="ph:pencil-simple-bold" /> 编辑模板</a-button><a-button @click="previewTemplate"><Icon name="ph:eye-bold" /> 预览</a-button><a-button v-if="editor.custom && selected.custom" danger @click="restoreDefault"><Icon name="ph:arrow-counter-clockwise-bold" /> 恢复默认</a-button><a-button v-if="editor.custom" type="primary" :loading="templateSaving" @click="saveTemplate"><Icon name="ph:floppy-disk-bold" /> 保存模板</a-button></footer>
         </div>
         <a-empty v-else description="请选择邮件模板" />
       </a-spin>
@@ -142,7 +141,7 @@ const templatesLoading = ref(false)
 const templateSaving = ref(false)
 const templates = ref<any[]>([])
 const selected = ref<any>(null)
-const editor = reactive({ custom: false, subject: '', html: '' })
+const editor = reactive({ custom: false, subject: '', html: '', htmlExpanded: false })
 const preview = reactive({ open: false, subject: '', html: '' })
 
 const pagination = reactive({
@@ -183,7 +182,12 @@ async function loadTemplates() {
 
 function selectTemplate(item: any) {
   selected.value = item
-  Object.assign(editor, { custom: Boolean(item.custom), subject: item.subject, html: item.html })
+  Object.assign(editor, { custom: Boolean(item.custom), subject: item.subject, html: item.html, htmlExpanded: false })
+}
+
+function startEditing() {
+  editor.custom = true
+  editor.htmlExpanded = true
 }
 
 function insertVariable(variable: string) {
@@ -225,7 +229,7 @@ async function saveTemplate() {
   if (!editor.subject.trim() || !editor.html.trim()) { toast.warning('主题和 HTML 不能为空'); return }
   templateSaving.value = true
   try {
-    const result = await api.put<any>(`/email/templates/${selected.value.key}`, { ...editor })
+    const result = await api.put<any>(`/email/templates/${selected.value.key}`, { custom: editor.custom, subject: editor.subject, html: editor.html })
     const index = templates.value.findIndex(item => item.key === result.key)
     if (index >= 0) templates.value[index] = result
     selectTemplate(result)
@@ -355,7 +359,7 @@ function stripHtml(html: string) {
 .email-logs-page {
   padding: 0;
 }
-.template-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:620px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.template-list{display:flex;min-height:0;flex-direction:column;gap:3px;overflow-y:auto;padding:8px;border-right:1px solid var(--border);background:var(--c-bg-1)}.template-list button{display:grid;grid-template-columns:32px minmax(0,1fr) 58px;align-items:center;gap:9px;padding:10px;border:0;border-radius:7px;background:transparent;color:var(--c-text);cursor:pointer;text-align:left;min-width:0}.template-list button:hover,.template-list button.active{background:var(--ld-bg-card)}.template-list button.active{box-shadow:0 1px 4px var(--ld-shadow)}.template-list button>span{display:grid;width:30px;height:30px;line-height: 30px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.template-list button>div{min-width:0}.template-list strong,.template-list small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.template-list strong{font-size:.64rem}.template-list small{margin-top:3px;color:var(--c-text-3);font-size:.5rem;line-height:1.4}.template-list :deep(.ant-tag){display:block;max-width:58px;width:58px;margin:0;padding-inline:4px;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.template-editor-spin{min-width:0}.template-editor{display:flex;min-width:0;flex-direction:column;gap:14px;padding:18px}.template-editor>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.template-editor h2{margin:0;font-size:.86rem}.template-editor header p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem}.template-editor>label>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.62rem}.html-editor :deep(textarea){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.variables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:12px;border-radius:7px;background:var(--c-bg-1)}.variables>span,.variables>p,.variables>em{grid-column:1/-1}.variables>span{color:var(--c-text-2);font-size:.65rem;font-weight:700}.variables>p,.variables>em{margin:0;color:var(--c-text-3);font-size:.56rem;font-style:normal}.variables button{display:flex;min-width:0;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--ld-bg-card);color:var(--c-primary);cursor:pointer;text-align:left}.variables button:disabled{cursor:not-allowed;opacity:.55}.variables button code{flex:0 0 auto;font:10px/1.2 ui-monospace,monospace}.variables button small{min-width:0;color:var(--c-text-3);font-size:.52rem}.template-editor>footer{display:flex;justify-content:flex-end;gap:8px}.email-preview{display:block;width:100%;height:620px;border:0;border-radius:6px;background:#fff}
+.template-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);height:min(680px,calc(100dvh - 170px));min-height:420px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.template-list{display:flex;min-height:0;flex-direction:column;gap:3px;overflow-y:auto;padding:8px;border-right:1px solid var(--border);background:var(--c-bg-1)}.template-list button{display:grid;grid-template-columns:32px minmax(0,1fr) 58px;align-items:center;gap:9px;padding:10px;border:0;border-radius:7px;background:transparent;color:var(--c-text);cursor:pointer;text-align:left;min-width:0}.template-list button:hover,.template-list button.active{background:var(--ld-bg-card)}.template-list button.active{box-shadow:0 1px 4px var(--ld-shadow)}.template-list button>span{display:grid;width:30px;height:30px;line-height:30px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.template-list button>div{min-width:0}.template-list strong,.template-list small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.template-list strong{font-size:.64rem}.template-list small{margin-top:3px;color:var(--c-text-3);font-size:.5rem;line-height:1.4}.template-list :deep(.ant-tag){display:block;max-width:58px;width:58px;margin:0;padding-inline:4px;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.template-editor-spin{min-width:0;min-height:0;overflow:hidden}.template-editor{display:flex;min-width:0;height:100%;flex-direction:column;gap:14px;overflow-y:auto;padding:18px}.editor-header{position:sticky;z-index:4;top:-18px;margin:-18px -18px 0;padding:18px;border-bottom:1px solid var(--border);background:var(--ld-bg-card)}.editor-header,.editor-header-actions{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.editor-header-actions{align-items:center;justify-content:flex-end;flex-wrap:wrap}.template-editor h2{margin:0;font-size:.86rem}.template-editor header p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem}.template-editor>label>span,.html-template-section>header>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.62rem}.html-template-section>header{display:flex;align-items:center;justify-content:space-between}.html-template-section>header .ant-btn{padding-inline:4px;color:var(--c-primary);font-size:.6rem}.html-template-collapsed{display:flex;min-height:52px;align-items:center;gap:8px;padding:12px;border:1px dashed var(--border);border-radius:7px;background:var(--c-bg-1);color:var(--c-text-3);font-size:.6rem}.html-template-collapsed :deep(svg){color:var(--c-primary)}.html-template-collapsed small{margin-left:auto;color:var(--c-text-3);font-family:var(--font-mono);font-size:.52rem}.html-editor :deep(textarea){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.variables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:12px;border-radius:7px;background:var(--c-bg-1)}.variables>span,.variables>p,.variables>em{grid-column:1/-1}.variables>span{color:var(--c-text-2);font-size:.65rem;font-weight:700}.variables>p,.variables>em{margin:0;color:var(--c-text-3);font-size:.56rem;font-style:normal}.variables button{display:flex;min-width:0;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--ld-bg-card);color:var(--c-primary);cursor:pointer;text-align:left}.variables button:disabled{cursor:not-allowed;opacity:.55}.variables button code{flex:0 0 auto;font:10px/1.2 ui-monospace,monospace}.variables button small{min-width:0;color:var(--c-text-3);font-size:.52rem}.email-preview{display:block;width:100%;height:min(620px,calc(100dvh - 180px));border:0;border-radius:6px;background:#fff}
 
 .section-card {
   border-radius: 8px;
@@ -435,7 +439,7 @@ function stripHtml(html: string) {
 @media (max-width: 700px) {
   .card-header { align-items: stretch; flex-direction: column; gap: 10px; }
   .filter-bar, .type-filter, .status-filter { width: 100%; }
-  .template-workspace{grid-template-columns:1fr}.template-list{overflow-x:auto;flex-direction:row;border-right:0;border-bottom:1px solid var(--border)}.template-list button{min-width:230px}.template-editor{padding:12px}.email-preview{height:70vh}
+  .template-workspace{grid-template-columns:1fr;height:min(760px,calc(100dvh - 150px));min-height:420px}.template-list{overflow-x:auto;flex-direction:row;border-right:0;border-bottom:1px solid var(--border)}.template-list button{min-width:230px}.template-editor{padding:12px}.editor-header{top:-12px;margin:-12px -12px 0;padding:12px}.email-preview{height:min(620px,calc(100dvh - 160px))}
 }
 
 @media (max-width: 480px) {

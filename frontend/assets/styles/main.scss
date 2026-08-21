@@ -700,6 +700,33 @@ a {
   margin-bottom: 18px;
 }
 
+/* Keep page actions available while long admin forms and tables are scrolled. */
+.admin-main :where(.admin-page-head, .form-header, .editor-heading, .dashboard-head, .analytics-header, .page-header) {
+  position: sticky;
+  z-index: 40;
+  top: -20px;
+  padding-top: 20px;
+  padding-bottom: 12px;
+  background: color-mix(in srgb, var(--c-bg) 92%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.admin-main :where(.admin-page-head + .table-toolbar, .admin-page-head + .album-toolbar) {
+  position: sticky;
+  z-index: 39;
+  top: 72px;
+  padding-top: 8px;
+  padding-bottom: 10px;
+  background: color-mix(in srgb, var(--c-bg) 92%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+/* Ant Design modals must stay inside the viewport; only their content may scroll. */
+.ant-modal-wrap { overflow: hidden !important; }
+.ant-modal { top: 0; max-height: calc(100dvh - 24px); margin: 12px auto; }
+.ant-modal-content { display: flex; max-height: calc(100dvh - 24px); flex-direction: column; overflow: hidden; }
+.ant-modal-body { min-height: 0; overflow: auto; }
+
 .admin-main .admin-page-head > div > span {
   color: var(--c-primary);
   font-size: 0.54rem;
