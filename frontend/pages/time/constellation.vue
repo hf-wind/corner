@@ -264,7 +264,6 @@ type DiscoveryId =
   | "sun"
   | "mercury"
   | "venus"
-  | "earth"
   | "mars"
   | "jupiter"
   | "saturn"
@@ -284,7 +283,15 @@ type DiscoveryCommandId =
   | "signal"
   | "orbit"
   | "bridge"
-  | "warp";
+  | "warp"
+  | "frost"
+  | "soil"
+  | "cloud"
+  | "dust"
+  | "storm"
+  | "rings"
+  | "tilt"
+  | "darkspot";
 
 type Discovery = {
   id: DiscoveryId;
@@ -315,6 +322,7 @@ type SolarPlanetSpec = {
   period: string;
   temperature: string;
   feature: string;
+  commands: { id: DiscoveryCommandId; label: string; icon: string }[];
 };
 
 const api = useApi();
@@ -366,14 +374,13 @@ const typeOptions = [
 ];
 
 const solarPlanetSpecs: SolarPlanetSpec[] = [
-  { id: "mercury", name: "水星", catalog: "MERCURY · 类地行星", status: "昼夜温差极端", description: "距离太阳最近的行星，布满撞击坑，没有真正的大气层，缓慢的自转让一昼夜接近两个水星年。", distance: "0.39 AU", period: "87.97 日", temperature: "−173 至 427 °C", feature: "撞击坑与铁质核心" },
-  { id: "venus", name: "金星", catalog: "VENUS · 类地行星", status: "厚重云层覆盖", description: "被二氧化碳大气和硫酸云层包裹的高温世界，逆向自转，表面气压约为地球的九十倍。", distance: "0.72 AU", period: "224.70 日", temperature: "约 464 °C", feature: "硫酸云带与温室效应" },
-  { id: "earth", name: "地球", catalog: "EARTH · 类地行星", status: "液态海洋稳定", description: "目前已知唯一拥有大规模液态海洋与生命生态的行星，磁层屏蔽着太阳风，云层和大陆持续变化。", distance: "1.00 AU", period: "365.25 日", temperature: "平均 15 °C", feature: "海洋、大陆与云层" },
-  { id: "mars", name: "火星", catalog: "MARS · 类地行星", status: "尘暴季节活跃", description: "红色来自含铁矿物氧化物，稀薄大气中可见极冠、古老河谷与全球性沙尘暴的痕迹。", distance: "1.52 AU", period: "686.98 日", temperature: "平均 −63 °C", feature: "铁锈地表与极冠" },
-  { id: "jupiter", name: "木星", catalog: "JUPITER · 气态巨行星", status: "大气带高速流动", description: "太阳系最大的行星，氢氦大气形成明暗条带，大红斑是持续数百年的巨大反气旋风暴。", distance: "5.20 AU", period: "11.86 年", temperature: "云顶约 −110 °C", feature: "大红斑与条带云系" },
-  { id: "saturn", name: "土星", catalog: "SATURN · 气态巨行星", status: "环系层次清晰", description: "由冰粒、尘埃和碎石组成的复杂环系围绕着土星，卡西尼缝等结构在引力共振作用下保持清晰。", distance: "9.58 AU", period: "29.45 年", temperature: "云顶约 −140 °C", feature: "冰尘星环与卡西尼缝" },
-  { id: "uranus", name: "天王星", catalog: "URANUS · 冰巨行星", status: "横躺姿态运行", description: "自转轴几乎平行于轨道面，甲烷让它呈现青绿色，季节变化会持续数十年。", distance: "19.2 AU", period: "84.02 年", temperature: "约 −195 °C", feature: "甲烷冰层与极端倾角" },
-  { id: "neptune", name: "海王星", catalog: "NEPTUNE · 冰巨行星", status: "超音速风暴活跃", description: "距离太阳最远的主行星，深蓝色大气中存在太阳系最快的行星风和不断消散、重现的暗斑。", distance: "30.1 AU", period: "164.79 年", temperature: "约 −200 °C", feature: "深蓝色大气与暗斑" },
+  { id: "mercury", name: "水星", catalog: "MERCURY · 类地行星", status: "昼夜温差极端", description: "距离太阳最近的行星，布满撞击坑，没有真正的大气层，缓慢的自转让一昼夜接近两个水星年。", distance: "0.39 AU", period: "87.97 日", temperature: "−173 至 427 °C", feature: "撞击坑与铁质核心", commands: [{ id: "frost", label: "冻结外框", icon: "ph:snowflake-bold" }, { id: "soil", label: "采集土质", icon: "ph:flask-bold" }] },
+  { id: "venus", name: "金星", catalog: "VENUS · 类地行星", status: "厚重云层覆盖", description: "被二氧化碳大气和硫酸云层包裹的高温世界，逆向自转，表面气压约为地球的九十倍。", distance: "0.72 AU", period: "224.70 日", temperature: "约 464 °C", feature: "硫酸云带与温室效应", commands: [{ id: "cloud", label: "解析云层", icon: "ph:cloud-fog-bold" }, { id: "sample", label: "读取光谱", icon: "ph:wave-sine-bold" }] },
+  { id: "mars", name: "火星", catalog: "MARS · 类地行星", status: "尘暴季节活跃", description: "红色来自含铁矿物氧化物，稀薄大气中可见极冠、古老河谷与全球性沙尘暴的痕迹。", distance: "1.52 AU", period: "686.98 日", temperature: "平均 −63 °C", feature: "铁锈地表与极冠", commands: [{ id: "soil", label: "采集土质", icon: "ph:flask-bold" }, { id: "dust", label: "追踪尘暴", icon: "ph:wind-bold" }] },
+  { id: "jupiter", name: "木星", catalog: "JUPITER · 气态巨行星", status: "大气带高速流动", description: "太阳系最大的行星，氢氦大气形成明暗条带，大红斑是持续数百年的巨大反气旋风暴。", distance: "5.20 AU", period: "11.86 年", temperature: "云顶约 −110 °C", feature: "大红斑与条带云系", commands: [{ id: "storm", label: "追踪大红斑", icon: "ph:wind-bold" }, { id: "sample", label: "采集云层谱", icon: "ph:wave-sine-bold" }] },
+  { id: "saturn", name: "土星", catalog: "SATURN · 气态巨行星", status: "环系层次清晰", description: "由冰粒、尘埃和碎石组成的复杂环系围绕着土星，卡西尼缝等结构在引力共振作用下保持清晰。", distance: "9.58 AU", period: "29.45 年", temperature: "云顶约 −140 °C", feature: "冰尘星环与卡西尼缝", commands: [{ id: "rings", label: "解析星环", icon: "ph:circle-dashed-bold" }, { id: "sample", label: "读取冰尘谱", icon: "ph:wave-sine-bold" }] },
+  { id: "uranus", name: "天王星", catalog: "URANUS · 冰巨行星", status: "横躺姿态运行", description: "自转轴几乎平行于轨道面，甲烷让它呈现青绿色，季节变化会持续数十年。", distance: "19.2 AU", period: "84.02 年", temperature: "约 −195 °C", feature: "甲烷冰层与极端倾角", commands: [{ id: "tilt", label: "校准横躺姿态", icon: "ph:compass-bold" }, { id: "sample", label: "读取甲烷谱", icon: "ph:wave-sine-bold" }] },
+  { id: "neptune", name: "海王星", catalog: "NEPTUNE · 冰巨行星", status: "超音速风暴活跃", description: "距离太阳最远的主行星，深蓝色大气中存在太阳系最快的行星风和不断消散、重现的暗斑。", distance: "30.1 AU", period: "164.79 年", temperature: "约 −200 °C", feature: "深蓝色大气与暗斑", commands: [{ id: "storm", label: "测量超音速风", icon: "ph:wind-bold" }, { id: "darkspot", label: "锁定暗斑", icon: "ph:crosshair-bold" }] },
 ];
 
 const discoveries: Discovery[] = [
@@ -472,10 +479,7 @@ const discoveries: Discovery[] = [
     description: spec.description,
     signalLabel: "行星表面遥测",
     icon: "ph:planet-bold",
-    commands: [
-      { id: "scan" as DiscoveryCommandId, label: "扫描表面", icon: "ph:scan-bold" },
-      { id: "sample" as DiscoveryCommandId, label: "读取光谱", icon: "ph:wave-sine-bold" },
-    ],
+    commands: spec.commands,
   })),
 ];
 
@@ -848,6 +852,32 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
   if (commandId === "pulse") {
     discoveryResult.value = `星核脉冲已穿过 ${graph.nodes.length} 枚记忆坐标，云层正在回应最近一次书写。`;
     sceneRef.value?.triggerDiscoveryEffect("planet");
+  } else if (commandId === "frost") {
+    discoveryResult.value = "表面温度骤降模拟已启动：外框结霜层正在形成，极夜区冰影信号已被标记。";
+    sceneRef.value?.triggerDiscoveryEffect("mercury");
+  } else if (commandId === "soil") {
+    discoveryResult.value = `${discovery.title}土质采样完成：铁硅比例与遥感光谱吻合，样本已封存进近地实验舱。`;
+    sceneRef.value?.triggerDiscoveryEffect(discovery.id);
+  } else if (commandId === "cloud") {
+    discoveryResult.value = "云层剖面已展开：硫酸气溶胶高度与二氧化碳热循环保持稳定，逆向自转风场已锁定。";
+    sceneRef.value?.triggerDiscoveryEffect("venus");
+  } else if (commandId === "dust") {
+    discoveryResult.value = "全球尘暴追踪已接入：赤道喷流正在向南半球扩散，极冠边缘反射率下降 3.8%。";
+    sceneRef.value?.triggerDiscoveryEffect("mars");
+  } else if (commandId === "storm") {
+    discoveryResult.value = discovery.id === "jupiter"
+      ? "大红斑追踪完成：风暴边界仍以逆时针旋转，边缘剪切层出现新的浅色涡旋。"
+      : "超音速风场采样完成：暗斑边缘的剪切波正在向高纬度传播。";
+    sceneRef.value?.triggerDiscoveryEffect(discovery.id);
+  } else if (commandId === "rings") {
+    discoveryResult.value = "星环谱线已拆分：卡西尼缝、A 环和 B 环的冰尘粒径分布已写入观测日志。";
+    sceneRef.value?.triggerDiscoveryEffect("saturn");
+  } else if (commandId === "tilt") {
+    discoveryResult.value = "姿态解算完成：自转轴倾角 97.8°，季节阴影已投影到北半球环带。";
+    sceneRef.value?.triggerDiscoveryEffect("uranus");
+  } else if (commandId === "darkspot") {
+    discoveryResult.value = "暗斑锁定：高层甲烷云正在绕过风暴核心，预计 18 小时后重新显影。";
+    sceneRef.value?.triggerDiscoveryEffect("neptune");
   } else if (commandId === "sample") {
     discoveryResult.value = solarPlanetSpecs.some((item) => item.id === discovery.id)
       ? `${discovery.title}光谱采样完成：表面反射峰与${solarPlanetSpecs.find((item) => item.id === discovery.id)?.feature || "行星特征"}吻合。`
@@ -1731,6 +1761,37 @@ useHead({ title: "时光星图" });
   box-shadow:
     0 30px 100px rgb(0 0 0 / 0.7),
     inset 0 0 70px color-mix(in srgb, var(--c-primary) 8%, transparent);
+}
+.discovery-mercury {
+  --discovery-accent: #b9e8ff;
+  box-shadow: 0 26px 90px rgb(0 0 0 / 0.62), inset 0 0 34px rgb(183 232 255 / 0.1);
+}
+.discovery-mercury::after {
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgb(194 236 255 / 0.16);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+.discovery-venus {
+  --discovery-accent: #f0c27c;
+}
+.discovery-mars {
+  --discovery-accent: #e88968;
+}
+.discovery-jupiter {
+  --discovery-accent: #e8bd8e;
+}
+.discovery-saturn {
+  --discovery-accent: #e4cf9d;
+  box-shadow: 0 28px 92px rgb(0 0 0 / 0.62), inset 0 0 42px rgb(228 207 157 / 0.1);
+}
+.discovery-uranus {
+  --discovery-accent: #9ee6e6;
+}
+.discovery-neptune {
+  --discovery-accent: #82a9ff;
 }
 .discovery-identity {
   display: grid;

@@ -59,7 +59,6 @@ type DiscoveryId =
   | "sun"
   | "mercury"
   | "venus"
-  | "earth"
   | "mars"
   | "jupiter"
   | "saturn"
@@ -2385,40 +2384,24 @@ function addSolarSystem() {
   if (!scene) return;
   const system = new THREE.Group();
   system.name = "reference-solar-system";
-  system.position.set(-8, -18, -148);
-  const star = new THREE.Mesh(
-    track(new THREE.SphereGeometry(5.2, lowQuality ? 18 : 32, lowQuality ? 12 : 20)),
-    track(new THREE.MeshBasicMaterial({ color: 0xffd36b })),
-  );
-  system.add(star);
-  const starGlow = new THREE.Sprite(
-    track(new THREE.SpriteMaterial({
-      map: glowTexture("#ffb84d"),
-      color: 0xffc45a,
-      transparent: true,
-      opacity: 0.36,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    })),
-  );
-  starGlow.scale.set(24, 24, 1);
-  system.add(starGlow);
+  system.position.set(0, -7, 0);
+  system.rotation.set(0.22, -0.16, -0.08);
   const planets = [
-    ["水星", 14, 1.15, 0x8a8b84],
-    ["金星", 23, 1.75, 0xd7a56f],
-    ["地球", 33, 1.9, 0x3e86c7],
-    ["火星", 45, 1.5, 0xb9573e],
-    ["木星", 62, 4.8, 0xc99469],
-    ["土星", 82, 4.1, 0xd8bf92],
-    ["天王星", 104, 3.1, 0x7fbfd0],
-    ["海王星", 128, 3.1, 0x4168b4],
+    ["水星", 24, 1.15, 0x8a8b84],
+    ["金星", 38, 1.75, 0xd7a56f],
+    ["火星", 56, 1.5, 0xb9573e],
+    ["木星", 78, 4.8, 0xc99469],
+    ["土星", 104, 4.1, 0xd8bf92],
+    ["天王星", 132, 3.1, 0x7fbfd0],
+    ["海王星", 160, 3.1, 0x4168b4],
   ] as const;
-  const discoveryIds: DiscoveryId[] = ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"];
+  const discoveryIds: DiscoveryId[] = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"];
   planets.forEach(([name, orbitRadius, radius, color], index) => {
-    const angle = -1.22 + index * 0.61;
+    const angle = -1.9 + index * 0.9;
     const body = new THREE.Group();
     body.name = `solar-${name}`;
-    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 0.9) * 2.8, Math.sin(angle) * orbitRadius * 0.42);
+    body.userData.discoveryId = discoveryIds[index];
+    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 0.9) * 4.8, Math.sin(angle) * orbitRadius * 0.48);
     body.userData.spin = 0.012 + index * 0.002;
     const material = track(new THREE.MeshStandardMaterial({
       color,
@@ -2434,21 +2417,32 @@ function addSolarSystem() {
       map: glowTexture(`#${color.toString(16).padStart(6, "0")}`),
       color,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.48,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     })));
     glow.name = "solar-planet-glow";
     glow.scale.set(radius * 3.8, radius * 3.8, 1);
+    glow.userData.baseScale = glow.scale.x;
     body.add(glow);
-    if (name === "地球") {
-      const cloud = new THREE.Mesh(track(new THREE.SphereGeometry(radius * 1.035, lowQuality ? 12 : 20, lowQuality ? 8 : 14)), track(new THREE.MeshBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.18, wireframe: true })));
-      body.add(cloud);
-    }
     if (name === "土星") {
-      const ring = new THREE.Mesh(track(new THREE.RingGeometry(radius * 1.35, radius * 2.15, lowQuality ? 48 : 96)), track(new THREE.MeshBasicMaterial({ color: 0xd7c39a, transparent: true, opacity: 0.46, side: THREE.DoubleSide, depthWrite: false })));
-      ring.rotation.x = Math.PI / 2.35;
-      body.add(ring);
+      const rings = new THREE.Group();
+      rings.name = "saturn-rings";
+      for (const [inner, outer, opacity, tint] of [
+        [1.28, 1.48, 0.72, 0xd8c69e],
+        [1.52, 1.72, 0.44, 0x9f8a69],
+        [1.79, 2.03, 0.6, 0xe3d6b4],
+        [2.08, 2.22, 0.26, 0x8b795f],
+      ] as const) {
+        const ring = new THREE.Mesh(
+          track(new THREE.RingGeometry(radius * inner, radius * outer, lowQuality ? 72 : 144)),
+          track(new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })),
+        );
+        ring.rotation.x = Math.PI / 2.35;
+        rings.add(ring);
+      }
+      rings.rotation.z = 0.08;
+      body.add(rings);
     }
     system.add(body);
     solarSystemBodies.push(body);
@@ -3051,6 +3045,8 @@ function focusDiscovery(id: DiscoveryId, distanceMultiplier = 1) {
   discoveryTourId = "";
   pendingDiscoveryTourId = "";
   focusedDiscoveryId = id;
+  discoveryEffect = id;
+  discoveryEffectStartedAt = performance.now();
   if (id === "spacecraft") spacecraftLaunchActive = false;
   const target = object.getWorldPosition(new THREE.Vector3());
   const direction = camera.position.clone().sub(controls.target).normalize();
@@ -3484,7 +3480,17 @@ function animate(now = performance.now()) {
     }
     for (const body of solarSystemBodies) {
       if (body.name === "reference-solar-system") body.rotation.y += delta * 0.006;
-      else body.rotation.y += delta * Number(body.userData.spin || 0.01);
+      else {
+        body.rotation.y += delta * Number(body.userData.spin || 0.01);
+        const glow = body.getObjectByName("solar-planet-glow") as THREE.Sprite | undefined;
+        if (glow) {
+          const id = body.userData.discoveryId as DiscoveryId;
+          const active = focusedDiscoveryId === id;
+          const pulse = active ? 1 + Math.sin(elapsed * 3.2) * 0.12 : 1;
+          glow.scale.setScalar((Number(glow.userData.baseScale) || glow.scale.x) * pulse);
+          (glow.material as THREE.SpriteMaterial).opacity = active ? 0.76 : 0.48;
+        }
+      }
     }
     nebulaSprites.forEach((sprite, index) => {
       sprite.material.opacity = 0.09 + Math.sin(elapsed * 0.18 + index) * 0.018;
