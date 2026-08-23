@@ -16,7 +16,6 @@ const PUBLIC_TYPES = [
   'library',
   'place',
   'album',
-  'photo',
   'journey',
   'story',
   'tag',
@@ -468,18 +467,30 @@ export class AiNativeService {
             Number(left.item.occurredAt || 0),
       )
       .slice(0, Math.max(1, Math.min(12, limit)))
-      .map(({ item, score }) => this.card(item, score));
+      .map(({ item, score }) => ({
+        ...this.card(item, score),
+        excerpt: this.searchSnippet(item.body || item.excerpt, normalizedQuery),
+      }));
     const [contentResultDirect, commentResult] = await Promise.all([
       this.searchPublishedContent(normalizedQuery, Math.max(1, Math.min(80, limit * 5))),
       this.searchCommentCards(normalizedQuery, Math.max(1, Math.min(80, limit * 4))),
     ]);
-    const result = [...contentResult, ...contentResultDirect, ...commentResult]
+    // 索引是增量缓存，实时查询可能同时命中同一条内容；合并时按实体去重，避免搜索结果重复。
+    const merged = [...contentResult, ...contentResultDirect, ...commentResult]
       .sort(
         (left, right) =>
           Number(right.score || 0) - Number(left.score || 0) ||
           new Date(right.occurredAt || 0).getTime() -
             new Date(left.occurredAt || 0).getTime(),
       )
+    const unique = new Map<string, (typeof merged)[number]>();
+    for (const item of merged) {
+      const key = `${item.type}:${item.sourceId}`;
+      const previous = unique.get(key);
+      if (!previous || Number(item.score || 0) > Number(previous.score || 0)) unique.set(key, item);
+    }
+    const result = [...unique.values()]
+      .filter((item) => item.type !== 'photo')
       .slice(0, Math.max(1, Math.min(12, limit)));
     this.searchCache.set(cacheKey, { expiresAt: Date.now() + 15_000, items: result });
     return result;

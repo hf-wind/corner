@@ -29,7 +29,7 @@
         <p>{{ sectionDescription }}</p>
       </div>
 
-      <Transition name="content-switch" mode="out-in">
+      <Transition name="content-switch">
         <div v-if="items.length" :key="`items-${contentVersion}`" class="card-grid content-reveal" :class="{ 'is-updating': switching }"><LibraryCard v-for="item in items" :key="item.id" :item="item" /></div>
         <div v-else-if="!loading" :key="`empty-${contentVersion}`" class="empty-state content-reveal"><span><Icon name="ph:books" /></span><h3>这一格还空着</h3><p>或许下一本书、下一部电影就会出现在这里。</p></div>
       </Transition>
@@ -60,6 +60,7 @@ const page = ref(1)
 const totalPages = ref(1)
 const meta = reactive({ books: 0, films: 0, total: 0 })
 let requestSequence = 0
+let localQuerySync = false
 const activeTabIndex = computed(() => Math.max(0, ['all', 'book', 'film'].indexOf(activeType.value)))
 const tabs = computed(() => [
   { value: 'all' as FilterType, label: '全部收藏', icon: 'ph:squares-four-bold', count: meta.total },
@@ -84,12 +85,13 @@ async function loadItems() {
   finally { if (sequence === requestSequence) { loading.value = false; switching.value = false } }
 }
 async function loadMeta() { try { Object.assign(meta, await api.get('/library/meta')) } catch { /* decorative counts */ } }
-function syncQuery() { router.replace({ query: { ...(activeType.value !== 'all' ? { type: activeType.value } : {}), ...(search.value ? { q: search.value } : {}) } }) }
+function syncQuery() { localQuerySync = true; void router.replace({ query: { ...(activeType.value !== 'all' ? { type: activeType.value } : {}), ...(search.value ? { q: search.value } : {}) } }) }
 function changeType(type: FilterType) { if (type === activeType.value) return; activeType.value = type; page.value = 1; syncQuery(); void loadItems() }
 function searchItems() { page.value = 1; syncQuery(); loadItems() }
 function clearSearch() { search.value = ''; searchItems() }
 function goPage(next: number) { page.value = next; loadItems(); document.querySelector('.collection-section')?.scrollIntoView({ behavior: 'smooth' }) }
 watch(() => [route.query.type, route.query.q], ([type, query]) => {
+  if (localQuerySync) { localQuerySync = false; return }
   const nextType: FilterType = ['book', 'film'].includes(String(type)) ? String(type) as LibraryType : 'all'
   const nextSearch = String(query || '')
   if (nextType === activeType.value && nextSearch === search.value) return

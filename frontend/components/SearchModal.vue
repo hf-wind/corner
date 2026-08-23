@@ -54,7 +54,13 @@ async function doSearch(q: string) {
     const res = await api.get<any[]>('/ai/search', { q, limit: 12 })
     const icons: Record<string, string> = { post: 'ph:article-bold', moment: 'ph:sparkle-bold', album: 'ph:images-square-bold', photo: 'ph:image-bold', library: 'ph:books-bold', place: 'ph:map-pin-bold', journey: 'ph:path-bold', story: 'ph:film-strip-bold', tag: 'ph:tag-bold', comment: 'ph:chat-circle-text-bold', 'moment-comment': 'ph:chat-circle-text-bold' }
     if (sequence !== searchSequence) return
-    results.value = (Array.isArray(res) ? res : []).map((item: any) => ({
+    const unique = new Map<string, any>()
+    for (const item of (Array.isArray(res) ? res : [])) {
+      if (item?.type === 'photo' || !item?.sourceId) continue
+      const key = `${item.type}:${item.sourceId}`
+      if (!unique.has(key)) unique.set(key, item)
+    }
+    results.value = [...unique.values()].map((item: any) => ({
       type: item.type,
       sourceId: item.sourceId,
       href: withHighlight(item.href, q),

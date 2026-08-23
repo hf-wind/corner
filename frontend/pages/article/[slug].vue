@@ -563,8 +563,14 @@ onUnmounted(() => {
 }
 
 .article-page.is-immersive .article-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   flex-basis: 100%;
   width: 100%;
+  min-width: 0;
+  margin-right: auto;
+  margin-left: auto;
   padding-right: clamp(24px, 4vw, 88px);
   padding-left: clamp(24px, 4vw, 88px);
 }
@@ -576,6 +582,7 @@ onUnmounted(() => {
 .article-page.is-immersive :deep(.sidebar-right) {
   width: 0;
   flex-basis: 0;
+  min-width: 0;
   opacity: 0;
   padding-right: 0;
   padding-left: 0;
