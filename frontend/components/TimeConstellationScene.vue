@@ -215,7 +215,8 @@ const INTRO_END_PHASE = -0.18;
 const CRUISE_ANGULAR_SPEED = ((Math.PI * 2) / 60) * 0.18;
 const NARRATIVE_PHASES = [-0.18, -0.52, -1.04, -0.25];
 const NARRATIVE_RADII = [218, 188, 154, 214];
-const NARRATIVE_HEIGHTS = [68, 48, 34, 64];
+const NARRATIVE_HEIGHTS_DESKTOP = [OVERVIEW_HEIGHT_DESKTOP, 48, 34, 64];
+const NARRATIVE_HEIGHTS_MOBILE = [OVERVIEW_HEIGHT_MOBILE, 48, 34, 64];
 const NARRATIVE_TARGET_X = [-44, -30, -10, -44];
 const NARRATIVE_TARGET_Y = [0, -5, 1, 0];
 const planetProfiles: PlanetProfile[] = [
@@ -3414,7 +3415,10 @@ function applyCruiseCamera(now: number, delta: number) {
     const radius =
       narrativeValue(NARRATIVE_RADII, props.narrativeProgress) *
       (mobile ? 1.08 : 1);
-    const height = narrativeValue(NARRATIVE_HEIGHTS, props.narrativeProgress);
+    const height = narrativeValue(
+      mobile ? NARRATIVE_HEIGHTS_MOBILE : NARRATIVE_HEIGHTS_DESKTOP,
+      props.narrativeProgress,
+    );
     const targetX = mobile
       ? 0
       : narrativeValue(NARRATIVE_TARGET_X, props.narrativeProgress);
