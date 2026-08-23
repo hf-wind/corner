@@ -162,7 +162,9 @@ let sunResetActive = false;
 let discoveryTourId: DiscoveryId | "" = "";
 let pendingDiscoveryTourId: DiscoveryId | "" = "";
 let cruisePausedUntil = 0;
-let cruiseHeight = 68;
+const OVERVIEW_HEIGHT_DESKTOP = 90;
+const OVERVIEW_HEIGHT_MOBILE = 78;
+let cruiseHeight = OVERVIEW_HEIGHT_DESKTOP;
 let cruiseOrbitRadius = 218;
 let cruiseBobPhase = 0;
 let cruiseBlendStartedAt = 0;
@@ -2937,7 +2939,7 @@ function overviewPose(): CameraSnapshot {
     target,
     position: new THREE.Vector3(
       target.x + Math.sin(INTRO_END_PHASE) * radius,
-      mobile ? 62 : 68,
+      mobile ? OVERVIEW_HEIGHT_MOBILE : OVERVIEW_HEIGHT_DESKTOP,
       target.z + Math.cos(INTRO_END_PHASE) * radius,
     ),
   };
@@ -2983,7 +2985,11 @@ function applyIntroCamera(now: number) {
   );
   camera.position.set(
     target.x + Math.sin(phase) * radius,
-    THREE.MathUtils.lerp(mobile ? 8 : 12, mobile ? 62 : 68, arrival),
+    THREE.MathUtils.lerp(
+      mobile ? 8 : 12,
+      mobile ? OVERVIEW_HEIGHT_MOBILE : OVERVIEW_HEIGHT_DESKTOP,
+      arrival,
+    ),
     target.z + Math.cos(phase) * radius,
   );
   controls.target.copy(target);
@@ -2994,7 +3000,7 @@ function applyIntroCamera(now: number) {
   if (progress >= 1 && !introCompleted) {
     introCompleted = true;
     cruiseOrbitRadius = radius;
-    cruiseHeight = mobile ? 62 : 68;
+    cruiseHeight = mobile ? OVERVIEW_HEIGHT_MOBILE : OVERVIEW_HEIGHT_DESKTOP;
     cruiseBobPhase = 0;
     cruiseBlendStartedAt = now;
     cruisePausedUntil = 0;
@@ -3840,7 +3846,10 @@ async function initialize() {
     introCompleted = skipIntro;
     ambientOrbitPhase = skipIntro ? INTRO_END_PHASE : INTRO_START_PHASE;
     cruiseOrbitRadius = cruiseRadius();
-    cruiseHeight = window.innerWidth < 720 ? 62 : 68;
+    cruiseHeight =
+      window.innerWidth < 720
+        ? OVERVIEW_HEIGHT_MOBILE
+        : OVERVIEW_HEIGHT_DESKTOP;
     cruiseBobPhase = 0;
     const initialPose = overviewPose();
     if (skipIntro) {
