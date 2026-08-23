@@ -2387,21 +2387,21 @@ function addSolarSystem() {
   system.position.set(0, -7, 0);
   system.rotation.set(0.22, -0.16, -0.08);
   const planets = [
-    ["水星", 24, 1.15, 0x8a8b84],
-    ["金星", 38, 1.75, 0xd7a56f],
-    ["火星", 56, 1.5, 0xb9573e],
-    ["木星", 78, 4.8, 0xc99469],
-    ["土星", 104, 4.1, 0xd8bf92],
-    ["天王星", 132, 3.1, 0x7fbfd0],
-    ["海王星", 160, 3.1, 0x4168b4],
+    ["水星", 16, 1.15, 0x8a8b84],
+    ["金星", 24, 1.75, 0xd7a56f],
+    ["火星", 34, 1.5, 0xb9573e],
+    ["木星", 46, 4.8, 0xc99469],
+    ["土星", 60, 4.1, 0xd8bf92],
+    ["天王星", 76, 3.1, 0x7fbfd0],
+    ["海王星", 92, 3.1, 0x4168b4],
   ] as const;
   const discoveryIds: DiscoveryId[] = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"];
   planets.forEach(([name, orbitRadius, radius, color], index) => {
-    const angle = -1.9 + index * 0.9;
+    const angle = -1.74 + index * 0.98;
     const body = new THREE.Group();
     body.name = `solar-${name}`;
     body.userData.discoveryId = discoveryIds[index];
-    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 0.9) * 4.8, Math.sin(angle) * orbitRadius * 0.48);
+    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 0.9) * 3.8, Math.sin(angle) * orbitRadius * 0.62);
     body.userData.spin = 0.012 + index * 0.002;
     const material = track(new THREE.MeshStandardMaterial({
       color,
