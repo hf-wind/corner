@@ -181,13 +181,13 @@ const spacecraftLaunchControl = new THREE.Vector3();
 const spacecraftLaunchTo = new THREE.Vector3();
 const spacecraftFlightPath = new THREE.CatmullRomCurve3(
   [
-    new THREE.Vector3(118, 20, -72),
-    new THREE.Vector3(32, 58, -132),
-    new THREE.Vector3(-86, 30, -98),
-    new THREE.Vector3(-138, -12, 6),
-    new THREE.Vector3(-72, 42, 112),
-    new THREE.Vector3(42, 18, 138),
-    new THREE.Vector3(136, -20, 62),
+    new THREE.Vector3(168, 28, -96),
+    new THREE.Vector3(46, 74, -178),
+    new THREE.Vector3(-118, 40, -132),
+    new THREE.Vector3(-196, -16, 12),
+    new THREE.Vector3(-104, 56, 152),
+    new THREE.Vector3(58, 26, 188),
+    new THREE.Vector3(190, -28, 84),
   ],
   true,
   "catmullrom",
@@ -337,7 +337,7 @@ function buildPosition(
     date && !Number.isNaN(date.getTime()) ? date.getFullYear() : null;
   const ringIndex =
     year == null ? years.length : Math.max(0, years.indexOf(year));
-  const radius = 46 + ringIndex * 26 + (random() - 0.5) * 12;
+  const radius = 58 + ringIndex * 34 + (random() - 0.5) * 16;
   const angle =
     ringSize > 1
       ? (slot / ringSize) * Math.PI * 2 +
@@ -1371,9 +1371,9 @@ function addBlackHole() {
 
 function stationOrbitPosition(phase: number, target = new THREE.Vector3()) {
   return target.set(
-    Math.cos(phase) * 154,
-    18 + Math.sin(phase * 2.1) * 12,
-    Math.sin(phase) * 112,
+    Math.cos(phase) * 182,
+    22 + Math.sin(phase * 2.1) * 16,
+    Math.sin(phase) * 132,
   );
 }
 
@@ -1572,7 +1572,7 @@ function addSatellite() {
   if (!scene) return;
   satellite = new THREE.Group();
   satellite.name = "signal-satellite";
-  satellite.position.set(-72, -38, -86);
+  satellite.position.set(-112, -52, -126);
   satellite.rotation.set(0.18, 0.42, -0.12);
 
   const hull = track(
@@ -2194,13 +2194,13 @@ function addCosmicBodies() {
   const random = randomFrom(0x6c756d65);
   const bodyTypes = ["place", "library", "album", "journey", "photo"];
   const targetCount = Math.max(
-    lowQuality ? 16 : 22,
-    (lowQuality ? 26 : 42) - props.nodes.length,
+    lowQuality ? 12 : 18,
+    (lowQuality ? 18 : 28) - props.nodes.length,
   );
   for (let index = 0; index < targetCount; index++) {
     const orbitIndex = index % 4;
     const angle = random() * Math.PI * 2 + orbitIndex * 0.31;
-    const orbitRadius = 48 + orbitIndex * 28 + (random() - 0.5) * 12;
+    const orbitRadius = 62 + orbitIndex * 38 + (random() - 0.5) * 16;
     const radius = 0.9 + random() * 1.45;
     const seedNode: MemoryNode = {
       id: `cosmic-seed:${index}`,
@@ -2387,21 +2387,21 @@ function addSolarSystem() {
   system.position.set(0, -7, 0);
   system.rotation.set(0.22, -0.16, -0.08);
   const planets = [
-    ["水星", 16, 1.15, 0x8a8b84],
-    ["金星", 24, 1.75, 0xd7a56f],
-    ["火星", 34, 1.5, 0xb9573e],
-    ["木星", 46, 4.8, 0xc99469],
-    ["土星", 60, 4.1, 0xd8bf92],
-    ["天王星", 76, 3.1, 0x7fbfd0],
-    ["海王星", 92, 3.1, 0x4168b4],
+    ["水星", 30, 1.15, 0x8a8b84],
+    ["金星", 48, 1.75, 0xd7a56f],
+    ["火星", 68, 1.5, 0xb9573e],
+    ["木星", 94, 4.8, 0xc99469],
+    ["土星", 122, 4.1, 0xd8bf92],
+    ["天王星", 152, 3.1, 0x7fbfd0],
+    ["海王星", 184, 3.1, 0x4168b4],
   ] as const;
   const discoveryIds: DiscoveryId[] = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"];
   planets.forEach(([name, orbitRadius, radius, color], index) => {
-    const angle = -1.74 + index * 0.98;
+    const angle = -1.92 + index * 0.88;
     const body = new THREE.Group();
     body.name = `solar-${name}`;
     body.userData.discoveryId = discoveryIds[index];
-    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 0.9) * 3.8, Math.sin(angle) * orbitRadius * 0.62);
+    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 1.17) * (8 + index * 1.2), Math.sin(angle) * orbitRadius * (0.58 + index * 0.018));
     body.userData.spin = 0.012 + index * 0.002;
     const material = track(new THREE.MeshStandardMaterial({
       color,
@@ -2447,8 +2447,8 @@ function addSolarSystem() {
     system.add(body);
     solarSystemBodies.push(body);
     registerDiscovery(discoveryIds[index], `${name} · 太阳系行星`, body, radius * 2.2);
-    const orbit = new THREE.Mesh(track(new THREE.TorusGeometry(orbitRadius, 0.045, 4, lowQuality ? 64 : 110)), track(new THREE.MeshBasicMaterial({ color: 0x6d87a6, transparent: true, opacity: 0.18, depthWrite: false })));
-    orbit.rotation.x = Math.PI / 2;
+    const orbit = new THREE.Mesh(track(new THREE.TorusGeometry(orbitRadius, 0.035, 4, lowQuality ? 72 : 120, Math.PI * 1.28)), track(new THREE.MeshBasicMaterial({ color: 0x6d87a6, transparent: true, opacity: 0.08, depthWrite: false })));
+    orbit.rotation.set(Math.PI / 2 + index * 0.08, 0, -0.48 + index * 0.52);
     system.add(orbit);
   });
   scene.add(system);
@@ -2776,10 +2776,10 @@ function buildScene() {
     ),
   ].sort((a, b) => b - a);
   if (years.length) {
-    years.forEach((year, index) => addOrbit(46 + index * 26, year));
-    addOrbit(46 + years.length * 26, null);
+    years.forEach((year, index) => addOrbit(58 + index * 34, year));
+    addOrbit(58 + years.length * 34, null);
   } else {
-    for (let index = 0; index < 3; index++) addOrbit(46 + index * 28, null);
+    for (let index = 0; index < 3; index++) addOrbit(58 + index * 36, null);
   }
   addCosmicBodies();
   const ringNodes = new Map<number, MemoryNode[]>();
