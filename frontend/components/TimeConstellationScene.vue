@@ -57,6 +57,14 @@ type CameraFlight = CameraSnapshot & {
 type DiscoveryId =
   | "planet"
   | "sun"
+  | "mercury"
+  | "venus"
+  | "earth"
+  | "mars"
+  | "jupiter"
+  | "saturn"
+  | "uranus"
+  | "neptune"
   | "black-hole"
   | "station"
   | "satellite"
@@ -1495,23 +1503,6 @@ function addSpaceStation() {
     moduleWindow.position.set(x + (x > 0 ? 2.8 : -2.8) * scale, y, z);
     spaceStation.add(moduleWindow);
   }
-  for (const side of [-1, 1] as const) {
-    for (const row of [-1, 1] as const) {
-      const truss = new THREE.Mesh(track(new THREE.BoxGeometry(5.5, 0.18, 0.18)), darkHull);
-      truss.position.set(side * 15.6, row * 3.4, 0);
-      spaceStation.add(truss);
-      const panel = new THREE.Mesh(track(new THREE.BoxGeometry(5.2, 0.08, 2.6)), solarMaterial);
-      panel.position.set(side * 20.6, row * 3.4, 0);
-      panel.rotation.x = side * 0.1;
-      spaceStation.add(panel);
-      for (let stripe = -2; stripe <= 2; stripe++) {
-        const line = new THREE.Mesh(track(new THREE.BoxGeometry(0.03, 0.1, 2.5)), windowMaterial);
-        line.position.set(side * 20.6 + stripe * 0.9, row * 3.4 + 0.07, 0);
-        spaceStation.add(line);
-      }
-    }
-  }
-
   const antenna = new THREE.Mesh(
     track(new THREE.CylinderGeometry(0.08, 0.08, 7, 6)),
     hull,
@@ -2250,6 +2241,29 @@ function addCosmicBodies() {
       ),
     );
     group.add(new THREE.Mesh(geometry, material));
+    const signal = new THREE.Sprite(
+      rememberOpacity(
+        track(
+          new THREE.SpriteMaterial({
+            map: glowTexture(profile.accentCss),
+            color: profile.accent,
+            transparent: true,
+            opacity: 0.22 + random() * 0.1,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+        ),
+      ),
+    );
+    signal.name = "cosmic-surface-glow";
+    signal.scale.set(radius * 3.6, radius * 3.6, 1);
+    group.add(signal);
+    if (index % 3 !== 1) {
+      const atmosphere = new THREE.Mesh(geometry, atmosphereMaterial(profile.atmosphere, 0.42));
+      atmosphere.scale.setScalar(1.12);
+      atmosphere.name = "cosmic-atmosphere";
+      group.add(atmosphere);
+    }
     if (index % 7 === 2) {
       const ringMaterial = rememberOpacity(
         track(
@@ -2399,6 +2413,7 @@ function addSolarSystem() {
     ["天王星", 104, 3.1, 0x7fbfd0],
     ["海王星", 128, 3.1, 0x4168b4],
   ] as const;
+  const discoveryIds: DiscoveryId[] = ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"];
   planets.forEach(([name, orbitRadius, radius, color], index) => {
     const angle = -1.22 + index * 0.61;
     const body = new THREE.Group();
@@ -2415,6 +2430,17 @@ function addSolarSystem() {
     }));
     const mesh = new THREE.Mesh(track(new THREE.SphereGeometry(radius, lowQuality ? 14 : 24, lowQuality ? 10 : 16)), material);
     body.add(mesh);
+    const glow = new THREE.Sprite(track(new THREE.SpriteMaterial({
+      map: glowTexture(`#${color.toString(16).padStart(6, "0")}`),
+      color,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })));
+    glow.name = "solar-planet-glow";
+    glow.scale.set(radius * 3.8, radius * 3.8, 1);
+    body.add(glow);
     if (name === "地球") {
       const cloud = new THREE.Mesh(track(new THREE.SphereGeometry(radius * 1.035, lowQuality ? 12 : 20, lowQuality ? 8 : 14)), track(new THREE.MeshBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.18, wireframe: true })));
       body.add(cloud);
@@ -2426,6 +2452,7 @@ function addSolarSystem() {
     }
     system.add(body);
     solarSystemBodies.push(body);
+    registerDiscovery(discoveryIds[index], `${name} · 太阳系行星`, body, radius * 2.2);
     const orbit = new THREE.Mesh(track(new THREE.TorusGeometry(orbitRadius, 0.045, 4, lowQuality ? 64 : 110)), track(new THREE.MeshBasicMaterial({ color: 0x6d87a6, transparent: true, opacity: 0.18, depthWrite: false })));
     orbit.rotation.x = Math.PI / 2;
     system.add(orbit);

@@ -262,6 +262,14 @@ type GraphRelation = {
 type DiscoveryId =
   | "planet"
   | "sun"
+  | "mercury"
+  | "venus"
+  | "earth"
+  | "mars"
+  | "jupiter"
+  | "saturn"
+  | "uranus"
+  | "neptune"
   | "black-hole"
   | "station"
   | "satellite"
@@ -295,6 +303,18 @@ type DiscoveryTelemetry = {
   sampleTime: string;
   basis: string;
   metrics: { label: string; value: string }[];
+};
+
+type SolarPlanetSpec = {
+  id: Exclude<DiscoveryId, "planet" | "sun" | "black-hole" | "station" | "satellite" | "spacecraft">;
+  name: string;
+  catalog: string;
+  status: string;
+  description: string;
+  distance: string;
+  period: string;
+  temperature: string;
+  feature: string;
 };
 
 const api = useApi();
@@ -343,6 +363,17 @@ const typeOptions = [
   { value: "place", label: "地点", icon: "ph:map-pin-bold" },
   { value: "library", label: "书影", icon: "ph:books-bold" },
   { value: "journey", label: "旅行", icon: "ph:path-bold" },
+];
+
+const solarPlanetSpecs: SolarPlanetSpec[] = [
+  { id: "mercury", name: "水星", catalog: "MERCURY · 类地行星", status: "昼夜温差极端", description: "距离太阳最近的行星，布满撞击坑，没有真正的大气层，缓慢的自转让一昼夜接近两个水星年。", distance: "0.39 AU", period: "87.97 日", temperature: "−173 至 427 °C", feature: "撞击坑与铁质核心" },
+  { id: "venus", name: "金星", catalog: "VENUS · 类地行星", status: "厚重云层覆盖", description: "被二氧化碳大气和硫酸云层包裹的高温世界，逆向自转，表面气压约为地球的九十倍。", distance: "0.72 AU", period: "224.70 日", temperature: "约 464 °C", feature: "硫酸云带与温室效应" },
+  { id: "earth", name: "地球", catalog: "EARTH · 类地行星", status: "液态海洋稳定", description: "目前已知唯一拥有大规模液态海洋与生命生态的行星，磁层屏蔽着太阳风，云层和大陆持续变化。", distance: "1.00 AU", period: "365.25 日", temperature: "平均 15 °C", feature: "海洋、大陆与云层" },
+  { id: "mars", name: "火星", catalog: "MARS · 类地行星", status: "尘暴季节活跃", description: "红色来自含铁矿物氧化物，稀薄大气中可见极冠、古老河谷与全球性沙尘暴的痕迹。", distance: "1.52 AU", period: "686.98 日", temperature: "平均 −63 °C", feature: "铁锈地表与极冠" },
+  { id: "jupiter", name: "木星", catalog: "JUPITER · 气态巨行星", status: "大气带高速流动", description: "太阳系最大的行星，氢氦大气形成明暗条带，大红斑是持续数百年的巨大反气旋风暴。", distance: "5.20 AU", period: "11.86 年", temperature: "云顶约 −110 °C", feature: "大红斑与条带云系" },
+  { id: "saturn", name: "土星", catalog: "SATURN · 气态巨行星", status: "环系层次清晰", description: "由冰粒、尘埃和碎石组成的复杂环系围绕着土星，卡西尼缝等结构在引力共振作用下保持清晰。", distance: "9.58 AU", period: "29.45 年", temperature: "云顶约 −140 °C", feature: "冰尘星环与卡西尼缝" },
+  { id: "uranus", name: "天王星", catalog: "URANUS · 冰巨行星", status: "横躺姿态运行", description: "自转轴几乎平行于轨道面，甲烷让它呈现青绿色，季节变化会持续数十年。", distance: "19.2 AU", period: "84.02 年", temperature: "约 −195 °C", feature: "甲烷冰层与极端倾角" },
+  { id: "neptune", name: "海王星", catalog: "NEPTUNE · 冰巨行星", status: "超音速风暴活跃", description: "距离太阳最远的主行星，深蓝色大气中存在太阳系最快的行星风和不断消散、重现的暗斑。", distance: "30.1 AU", period: "164.79 年", temperature: "约 −200 °C", feature: "深蓝色大气与暗斑" },
 ];
 
 const discoveries: Discovery[] = [
@@ -432,6 +463,20 @@ const discoveries: Discovery[] = [
       { id: "warp", label: "曲率跃迁", icon: "ph:lightning-bold" },
     ],
   },
+  ...solarPlanetSpecs.map((spec, index) => ({
+    id: spec.id,
+    title: spec.name,
+    catalog: spec.catalog,
+    kicker: `SOLAR SYSTEM · ${String(index + 2).padStart(2, "0")}`,
+    status: spec.status,
+    description: spec.description,
+    signalLabel: "行星表面遥测",
+    icon: "ph:planet-bold",
+    commands: [
+      { id: "scan" as DiscoveryCommandId, label: "扫描表面", icon: "ph:scan-bold" },
+      { id: "sample" as DiscoveryCommandId, label: "读取光谱", icon: "ph:wave-sine-bold" },
+    ],
+  })),
 ];
 
 const solarReports = [
@@ -573,6 +618,21 @@ function buildDiscoveryTelemetry(
   const solarLongitude =
     (((now.getTime() / 86_400_000) % 27.2753) / 27.2753) * 360;
   const empty = { report: "", sampleTime, basis: "", metrics: [] };
+  const solarSpec = solarPlanetSpecs.find((item) => item.id === id);
+  if (solarSpec) {
+    const orbitPhase = ((now.getTime() / 86_400_000) % 1) * 360;
+    return {
+      report: `${solarSpec.name}表面遥测已锁定。${solarSpec.description}当前模型经度 ${orbitPhase.toFixed(1)}°，特征识别为“${solarSpec.feature}”。`,
+      sampleTime,
+      basis: "参考 NASA 行星物理参数与程序化表面纹理生成，数值用于星图交互展示",
+      metrics: [
+        { label: "日心距离", value: solarSpec.distance },
+        { label: "公转周期", value: solarSpec.period },
+        { label: "典型温度", value: solarSpec.temperature },
+        { label: "表面特征", value: solarSpec.feature },
+      ],
+    };
+  }
   if (id === "planet") {
     const latest = latestNode.value;
     const journeyCount = routeNodeIds.value.length;
@@ -789,11 +849,16 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
     discoveryResult.value = `星核脉冲已穿过 ${graph.nodes.length} 枚记忆坐标，云层正在回应最近一次书写。`;
     sceneRef.value?.triggerDiscoveryEffect("planet");
   } else if (commandId === "sample") {
-    discoveryResult.value = `光谱采样完成：第 ${String(discoverySequence.value).padStart(3, "0")} 组数据已写入日冕档案，氢线与铁离子峰值保持稳定。`;
-    sceneRef.value?.triggerDiscoveryEffect("sun");
+    discoveryResult.value = solarPlanetSpecs.some((item) => item.id === discovery.id)
+      ? `${discovery.title}光谱采样完成：表面反射峰与${solarPlanetSpecs.find((item) => item.id === discovery.id)?.feature || "行星特征"}吻合。`
+      : `光谱采样完成：第 ${String(discoverySequence.value).padStart(3, "0")} 组数据已写入日冕档案，氢线与铁离子峰值保持稳定。`;
+    sceneRef.value?.triggerDiscoveryEffect(solarPlanetSpecs.some((item) => item.id === discovery.id) ? discovery.id : "sun");
   } else if (commandId === "scan") {
-    discoveryResult.value = "光子环扫描完成：近侧亮弧存在 17.2° 偏振偏移，远侧回波在 0.84 秒后抵达。";
-    sceneRef.value?.triggerDiscoveryEffect("black-hole");
+    const solar = solarPlanetSpecs.find((item) => item.id === discovery.id);
+    discoveryResult.value = solar
+      ? `${solar.name}表面扫描完成：${solar.feature}信号清晰，未发现异常遮挡。`
+      : "光子环扫描完成：近侧亮弧存在 17.2° 偏振偏移，远侧回波在 0.84 秒后抵达。";
+    sceneRef.value?.triggerDiscoveryEffect(solar?.id || "black-hole");
   } else if (commandId === "latest") {
     const latest = latestNode.value;
     if (latest) {
