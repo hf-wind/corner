@@ -130,6 +130,7 @@ let spaceStation: THREE.Group | null = null;
 let satellite: THREE.Group | null = null;
 let spacecraft: THREE.Group | null = null;
 let meteor: THREE.Sprite | null = null;
+let meteorComa: THREE.Sprite | null = null;
 let meteorTrail: THREE.Line | null = null;
 let warpLines: THREE.LineSegments | null = null;
 let warpMaterial: THREE.LineBasicMaterial | null = null;
@@ -143,6 +144,7 @@ let spacecraftLaunchAt = -20;
 let spacecraftLaunchActive = false;
 let cameraFlight: CameraFlight | null = null;
 let overviewSnapshot: CameraSnapshot | null = null;
+let focusRestoreSnapshot: CameraSnapshot | null = null;
 let activeSelectionId = "";
 let focusedDiscoveryId: DiscoveryId | "" = "";
 let resettingDiscoveryId: DiscoveryId | "" = "";
@@ -194,6 +196,8 @@ const discoveryInteractive: THREE.Object3D[] = [];
 const discoveryObjects = new Map<DiscoveryId, THREE.Group>();
 const starLayers: THREE.Points[] = [];
 const cosmicBodies: THREE.Group[] = [];
+const solarSystemBodies: THREE.Group[] = [];
+const nebulaSprites: THREE.Sprite[] = [];
 const enginePlumeMaterials: THREE.ShaderMaterial[] = [];
 const disposables = new Set<{ dispose: () => void }>();
 const INTRO_DURATION = 3600;
@@ -1471,6 +1475,43 @@ function addSpaceStation() {
     }
   }
 
+  for (const [x, y, z, scale] of [
+    [-4.8, 4.2, 0, 1],
+    [4.8, -4.2, 0, 0.86],
+    [0, 0, 4.4, 0.72],
+  ] as const) {
+    const module = new THREE.Mesh(
+      track(new THREE.SphereGeometry(2.15 * scale, lowQuality ? 14 : 24, lowQuality ? 10 : 16)),
+      hull,
+    );
+    module.scale.set(1.34, 0.82, 0.82);
+    module.position.set(x, y, z);
+    spaceStation.add(module);
+    const moduleWindow = new THREE.Mesh(
+      track(new THREE.TorusGeometry(1.66 * scale, 0.1 * scale, 6, lowQuality ? 28 : 56)),
+      windowMaterial,
+    );
+    moduleWindow.rotation.y = Math.PI / 2;
+    moduleWindow.position.set(x + (x > 0 ? 2.8 : -2.8) * scale, y, z);
+    spaceStation.add(moduleWindow);
+  }
+  for (const side of [-1, 1] as const) {
+    for (const row of [-1, 1] as const) {
+      const truss = new THREE.Mesh(track(new THREE.BoxGeometry(5.5, 0.18, 0.18)), darkHull);
+      truss.position.set(side * 15.6, row * 3.4, 0);
+      spaceStation.add(truss);
+      const panel = new THREE.Mesh(track(new THREE.BoxGeometry(5.2, 0.08, 2.6)), solarMaterial);
+      panel.position.set(side * 20.6, row * 3.4, 0);
+      panel.rotation.x = side * 0.1;
+      spaceStation.add(panel);
+      for (let stripe = -2; stripe <= 2; stripe++) {
+        const line = new THREE.Mesh(track(new THREE.BoxGeometry(0.03, 0.1, 2.5)), windowMaterial);
+        line.position.set(side * 20.6 + stripe * 0.9, row * 3.4 + 0.07, 0);
+        spaceStation.add(line);
+      }
+    }
+  }
+
   const antenna = new THREE.Mesh(
     track(new THREE.CylinderGeometry(0.08, 0.08, 7, 6)),
     hull,
@@ -2239,6 +2280,174 @@ function addCosmicBodies() {
   }
 }
 
+function solarPlanetTexture(name: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext("2d")!;
+  const random = randomFrom(hash(`solar-surface:${name}`));
+  const fill = (color: string) => {
+    context.fillStyle = color;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  };
+  const band = (color: string, y: number, height: number, alpha = 1) => {
+    context.fillStyle = color;
+    context.globalAlpha = alpha;
+    context.fillRect(0, y, canvas.width, height);
+    context.globalAlpha = 1;
+  };
+  if (name === "水星") {
+    fill("#6f706d");
+    for (let i = 0; i < 100; i++) {
+      const radius = 2 + random() * 12;
+      context.beginPath();
+      context.arc(random() * canvas.width, random() * canvas.height, radius, 0, Math.PI * 2);
+      context.fillStyle = i % 3 ? "rgba(35,35,34,.25)" : "rgba(210,207,195,.28)";
+      context.fill();
+    }
+  } else if (name === "金星") {
+    fill("#d8b87d");
+    for (let i = 0; i < 34; i++) band(i % 2 ? "#f0d9a1" : "#b98d5f", random() * canvas.height, 3 + random() * 13, 0.24);
+    context.globalCompositeOperation = "screen";
+    for (let i = 0; i < 26; i++) band("#fff0bf", random() * canvas.height, 1 + random() * 5, 0.16);
+    context.globalCompositeOperation = "source-over";
+  } else if (name === "地球") {
+    fill("#1a4d87");
+    for (let i = 0; i < 22; i++) {
+      context.beginPath();
+      context.ellipse(random() * canvas.width, 22 + random() * 212, 14 + random() * 38, 7 + random() * 18, random() * 2, 0, Math.PI * 2);
+      context.fillStyle = i % 3 ? "#4d9a60" : "#8ab35c";
+      context.globalAlpha = 0.72;
+      context.fill();
+      context.globalAlpha = 1;
+    }
+    context.globalCompositeOperation = "screen";
+    for (let i = 0; i < 32; i++) band("#e6f5ff", random() * canvas.height, 2 + random() * 5, 0.18);
+    context.globalCompositeOperation = "source-over";
+    band("#eaf6ff", 0, 18, 0.72);
+    band("#eaf6ff", 238, 18, 0.72);
+  } else if (name === "火星") {
+    fill("#a34f35");
+    for (let i = 0; i < 48; i++) band(i % 2 ? "#c86b45" : "#713327", random() * canvas.height, 2 + random() * 10, 0.24);
+    for (let i = 0; i < 24; i++) {
+      context.beginPath();
+      context.arc(random() * canvas.width, random() * canvas.height, 2 + random() * 9, 0, Math.PI * 2);
+      context.fillStyle = "rgba(55,27,22,.32)";
+      context.fill();
+    }
+    band("#e4d6c5", 0, 14, 0.7);
+    band("#e4d6c5", 242, 14, 0.7);
+  } else if (name === "木星") {
+    fill("#d3a77a");
+    const bands = ["#e6c79d", "#a96f4f", "#f0d9ad", "#b77b59", "#e1bb88", "#8d5c4b", "#f1d5a4"];
+    bands.forEach((color, index) => band(color, index * 38, 30 + (index % 2) * 8, 0.92));
+    context.fillStyle = "#b85f4a";
+    context.beginPath();
+    context.ellipse(350, 154, 45, 18, -0.08, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = "rgba(255,220,170,.38)";
+    context.stroke();
+  } else if (name === "土星") {
+    fill("#cbb383");
+    for (let i = 0; i < 17; i++) band(i % 2 ? "#e6d2a7" : "#a99069", i * 16, 10 + random() * 7, 0.78);
+  } else if (name === "天王星") {
+    fill("#83c4cf");
+    for (let i = 0; i < 20; i++) band("#c8f1ef", random() * canvas.height, 2 + random() * 6, 0.12);
+  } else {
+    fill("#3158a0");
+    for (let i = 0; i < 24; i++) band(i % 2 ? "#5275ba" : "#203d80", random() * canvas.height, 3 + random() * 8, 0.34);
+    context.fillStyle = "rgba(20,35,85,.54)";
+    context.beginPath();
+    context.ellipse(320, 92, 25, 10, -0.12, 0, Math.PI * 2);
+    context.fill();
+  }
+  const texture = track(new THREE.CanvasTexture(canvas));
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(4, renderer?.capabilities.getMaxAnisotropy() || 1);
+  return texture;
+}
+
+function addSolarSystem() {
+  if (!scene) return;
+  const system = new THREE.Group();
+  system.name = "reference-solar-system";
+  system.position.set(-8, -18, -148);
+  const star = new THREE.Mesh(
+    track(new THREE.SphereGeometry(5.2, lowQuality ? 18 : 32, lowQuality ? 12 : 20)),
+    track(new THREE.MeshBasicMaterial({ color: 0xffd36b })),
+  );
+  system.add(star);
+  const starGlow = new THREE.Sprite(
+    track(new THREE.SpriteMaterial({
+      map: glowTexture("#ffb84d"),
+      color: 0xffc45a,
+      transparent: true,
+      opacity: 0.36,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })),
+  );
+  starGlow.scale.set(24, 24, 1);
+  system.add(starGlow);
+  const planets = [
+    ["水星", 14, 1.15, 0x8a8b84],
+    ["金星", 23, 1.75, 0xd7a56f],
+    ["地球", 33, 1.9, 0x3e86c7],
+    ["火星", 45, 1.5, 0xb9573e],
+    ["木星", 62, 4.8, 0xc99469],
+    ["土星", 82, 4.1, 0xd8bf92],
+    ["天王星", 104, 3.1, 0x7fbfd0],
+    ["海王星", 128, 3.1, 0x4168b4],
+  ] as const;
+  planets.forEach(([name, orbitRadius, radius, color], index) => {
+    const angle = -1.22 + index * 0.61;
+    const body = new THREE.Group();
+    body.name = `solar-${name}`;
+    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 0.9) * 2.8, Math.sin(angle) * orbitRadius * 0.42);
+    body.userData.spin = 0.012 + index * 0.002;
+    const material = track(new THREE.MeshStandardMaterial({
+      color,
+      map: solarPlanetTexture(name),
+      roughness: index === 4 ? 0.72 : 0.84,
+      metalness: 0.02,
+      emissive: color,
+      emissiveIntensity: index === 2 ? 0.14 : 0.05,
+    }));
+    const mesh = new THREE.Mesh(track(new THREE.SphereGeometry(radius, lowQuality ? 14 : 24, lowQuality ? 10 : 16)), material);
+    body.add(mesh);
+    if (name === "地球") {
+      const cloud = new THREE.Mesh(track(new THREE.SphereGeometry(radius * 1.035, lowQuality ? 12 : 20, lowQuality ? 8 : 14)), track(new THREE.MeshBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.18, wireframe: true })));
+      body.add(cloud);
+    }
+    if (name === "土星") {
+      const ring = new THREE.Mesh(track(new THREE.RingGeometry(radius * 1.35, radius * 2.15, lowQuality ? 48 : 96)), track(new THREE.MeshBasicMaterial({ color: 0xd7c39a, transparent: true, opacity: 0.46, side: THREE.DoubleSide, depthWrite: false })));
+      ring.rotation.x = Math.PI / 2.35;
+      body.add(ring);
+    }
+    system.add(body);
+    solarSystemBodies.push(body);
+    const orbit = new THREE.Mesh(track(new THREE.TorusGeometry(orbitRadius, 0.045, 4, lowQuality ? 64 : 110)), track(new THREE.MeshBasicMaterial({ color: 0x6d87a6, transparent: true, opacity: 0.18, depthWrite: false })));
+    orbit.rotation.x = Math.PI / 2;
+    system.add(orbit);
+  });
+  scene.add(system);
+  solarSystemBodies.push(system);
+}
+
+function addNebulae() {
+  if (!scene) return;
+  for (const [position, color, scale] of [
+    [new THREE.Vector3(-138, 54, -248), "#6b78ff", 150],
+    [new THREE.Vector3(118, -42, -212), "#d36b9f", 126],
+  ] as const) {
+    const sprite = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTexture(color), color, transparent: true, opacity: 0.11, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+    sprite.position.copy(position);
+    sprite.scale.set(scale, scale * 0.68, 1);
+    scene.add(sprite);
+    nebulaSprites.push(sprite);
+  }
+}
+
 function addNode(node: MemoryNode, position: THREE.Vector3) {
   if (!scene) return;
   const group = new THREE.Group();
@@ -2448,6 +2657,21 @@ function addMeteor() {
   meteor.scale.set(2.2, 2.2, 1);
   meteor.userData.target = target?.clone() || new THREE.Vector3(26, -8, 0);
   scene.add(meteor);
+  meteorComa = new THREE.Sprite(
+    track(
+      new THREE.SpriteMaterial({
+        map: glowTexture("#9edcff"),
+        color: 0x9edcff,
+        transparent: true,
+        opacity: 0.38,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    ),
+  );
+  meteorComa.scale.set(8.5, 8.5, 1);
+  meteorComa.userData.target = meteor.userData.target;
+  scene.add(meteorComa);
   const trailPoints = 34;
   const trailGeometry = track(new THREE.BufferGeometry());
   trailGeometry.setAttribute(
@@ -2497,6 +2721,8 @@ function clearSceneContent() {
   discoveryObjects.clear();
   starLayers.length = 0;
   cosmicBodies.length = 0;
+  solarSystemBodies.length = 0;
+  nebulaSprites.length = 0;
   enginePlumeMaterials.length = 0;
   core = null;
   sun = null;
@@ -2505,6 +2731,7 @@ function clearSceneContent() {
   satellite = null;
   spacecraft = null;
   meteor = null;
+  meteorComa = null;
   meteorTrail = null;
   warpLines = null;
   warpMaterial = null;
@@ -2520,6 +2747,8 @@ function buildScene() {
   addSatellite();
   addSpacecraft();
   addCore();
+  addSolarSystem();
+  addNebulae();
   const years = [
     ...new Set(
       props.nodes.map(yearOf).filter((year): year is number => year != null),
@@ -2785,6 +3014,13 @@ function focusDiscovery(id: DiscoveryId, distanceMultiplier = 1) {
   if (!camera || !controls) return;
   const object = discoveryObjects.get(id);
   if (!object) return;
+  if (!focusedDiscoveryId && !focusRestoreSnapshot) {
+    focusRestoreSnapshot = (overviewSnapshot || {
+      position: camera.position.clone(),
+      target: controls.target.clone(),
+      up: camera.up.clone(),
+    });
+  }
   discoveryTourId = "";
   pendingDiscoveryTourId = "";
   focusedDiscoveryId = id;
@@ -2795,16 +3031,16 @@ function focusDiscovery(id: DiscoveryId, distanceMultiplier = 1) {
   const sideOffset = right.multiplyScalar(window.innerWidth < 700 ? 0 : 10);
   const distance = (
     id === "black-hole"
-      ? 118
+      ? 132
       : id === "sun"
-        ? 108
+        ? 122
         : id === "station"
-          ? 78
+          ? 90
           : id === "spacecraft"
-            ? 82
+            ? 96
             : id === "planet"
-              ? 64
-              : 58
+              ? 76
+              : 68
   ) * distanceMultiplier;
   const destination = {
     target: target.clone().add(sideOffset),
@@ -3001,8 +3237,12 @@ function updateCameraFlight(now: number) {
   else controls.enabled = !props.ambient;
   syncCruiseFromCamera();
   cruisePausedUntil = now;
-  if (completion === "reset") emit("focusCleared");
-  if (completion === "reset") resettingDiscoveryId = "";
+  if (completion === "reset") {
+    focusRestoreSnapshot = null;
+    overviewSnapshot = null;
+    emit("focusCleared");
+    resettingDiscoveryId = "";
+  }
 }
 
 function focusPose(target: THREE.Vector3): CameraSnapshot | null {
@@ -3102,10 +3342,10 @@ function resetView() {
   spacecraftLaunchActive = false;
   discoveryTourId = "";
   pendingDiscoveryTourId = "";
-  overviewSnapshot = null;
   controls.enabled = !props.ambient;
   emit("immersiveChange", false);
-  startCameraFlight(overviewPose(), 1550, 12, "reset");
+  const destination = focusRestoreSnapshot || overviewSnapshot || overviewPose();
+  startCameraFlight(destination, 1550, 12, "reset");
 }
 
 // Welcome-page preview control reuses the same tracked discovery camera used by clicks.
@@ -3215,6 +3455,13 @@ function animate(now = performance.now()) {
         (discoveryEffect === "sun" ? effectPulse * 0.18 : 0);
       sun.scale.setScalar(pulse);
     }
+    for (const body of solarSystemBodies) {
+      if (body.name === "reference-solar-system") body.rotation.y += delta * 0.006;
+      else body.rotation.y += delta * Number(body.userData.spin || 0.01);
+    }
+    nebulaSprites.forEach((sprite, index) => {
+      sprite.material.opacity = 0.09 + Math.sin(elapsed * 0.18 + index) * 0.018;
+    });
     if (blackHole) {
       const disk = blackHole.getObjectByName("black-hole-disk");
       if (disk)
@@ -3417,6 +3664,12 @@ function animate(now = performance.now()) {
       const control = target.clone().add(new THREE.Vector3(-35, 78, 48));
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
       meteor.position.copy(curve.getPoint(progress));
+      if (meteorComa) {
+        meteorComa.position.copy(meteor.position);
+        const comaScale = 8.5 + Math.sin(elapsed * 5.2) * 0.8;
+        meteorComa.scale.set(comaScale, comaScale, 1);
+        meteorComa.visible = visible;
+      }
       const positions = meteorTrail.geometry.attributes
         .position as THREE.BufferAttribute;
       for (let index = 0; index < positions.count; index++) {
@@ -3515,11 +3768,10 @@ async function initialize() {
     "(prefers-reduced-motion: reduce)",
   ).matches;
   lowQuality =
-    window.innerWidth < 720 ||
-    navigator.hardwareConcurrency <= 4 ||
+    navigator.hardwareConcurrency <= 2 ||
     Number(
       (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8,
-    ) <= 4;
+    ) <= 2;
   try {
     renderer = new THREE.WebGLRenderer({
       antialias: !lowQuality,

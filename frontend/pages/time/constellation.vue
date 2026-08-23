@@ -42,9 +42,7 @@
         <img src="/logo.png" alt="" width="42" height="42" />
         <span><strong>时光星图</strong><small>TIME CONSTELLATION</small></span>
       </button>
-      <div class="signal" :class="{ offline: !!error }">
-        <i />
-        <span>{{ signalText }}</span>
+      <div class="nav-actions">
         <button
           v-if="error"
           type="button"
@@ -81,49 +79,6 @@
         ></span
       >
     </footer>
-
-    <div
-      v-if="audioUrl"
-      class="constellation-audio"
-      :class="{ playing: audioPlaying }"
-    >
-      <audio
-        ref="audioEl"
-        :src="audioUrl"
-        loop
-        preload="metadata"
-        @play="audioPlaying = true"
-        @pause="audioPlaying = false"
-      />
-      <button
-        type="button"
-        :title="audioPlaying ? '暂停星海氛围音乐' : '播放星海氛围音乐'"
-        :aria-label="audioPlaying ? '暂停星海氛围音乐' : '播放星海氛围音乐'"
-        @click="toggleAudio"
-      >
-        <Icon :name="audioPlaying ? 'ph:pause-fill' : 'ph:play-fill'" />
-      </button>
-      <span aria-hidden="true"><i v-for="index in 4" :key="index" /></span>
-      <button
-        type="button"
-        :title="audioMuted ? '恢复声音' : '静音'"
-        :aria-label="audioMuted ? '恢复声音' : '静音'"
-        @click="toggleMute"
-      >
-        <Icon
-          :name="audioMuted ? 'ph:speaker-slash-fill' : 'ph:speaker-high-fill'"
-        />
-      </button>
-      <input
-        v-model.number="audioVolume"
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        aria-label="背景音乐音量"
-        @input="applyAudioVolume"
-      />
-    </div>
 
     <Transition name="popup">
       <aside v-if="selected" class="memory-popup">
@@ -375,11 +330,6 @@ const fallbackMode = ref(false);
 const graphReady = ref(false);
 const discoveryClosing = ref(false);
 const immersiveMode = ref(false);
-const audioEl = ref<HTMLAudioElement | null>(null);
-const audioUrl = ref("");
-const audioPlaying = ref(false);
-const audioMuted = ref(false);
-const audioVolume = ref(0.36);
 let requestSequence = 0;
 let neighborRequestSequence = 0;
 let telemetryTimer: ReturnType<typeof setInterval> | null = null;
@@ -586,14 +536,6 @@ const latestLabel = computed(() =>
     ? `最近点亮 · ${formatDate(latestNode.value.occurredAt)}`
     : "每一次发布，都会点亮一颗新星",
 );
-const signalText = computed(() =>
-  graph.nodes.length
-    ? `${graph.nodes.length} 枚真实记忆已点亮`
-    : error.value
-      ? "宇宙底图运行中 · 真实记忆暂未连接"
-      : "宇宙底图运行中 · 等待首次点亮",
-);
-
 const stationLogs = [
   "任务日志 184：乘组完成材料暴露载荷回收，样品已转入恒温舱。",
   "任务日志 197：机械臂完成自主巡检，桁架节点热控状态正常。",
@@ -742,53 +684,13 @@ function buildDiscoveryTelemetry(
 
 onMounted(() => {
   void loadGraph();
-  void loadAmbientAudio();
   telemetryTimer = setInterval(() => {
     telemetryNow.value = new Date();
   }, 30_000);
 });
 onBeforeUnmount(() => {
   if (telemetryTimer) clearInterval(telemetryTimer);
-  audioEl.value?.pause();
 });
-
-async function loadAmbientAudio() {
-  try {
-    const value = await api.get<unknown>("/settings/constellation_music_url");
-    if (typeof value === "string" && value.trim())
-      audioUrl.value = mediaUrl(value.trim());
-  } catch {}
-}
-
-async function toggleAudio() {
-  const audio = audioEl.value;
-  if (!audio) return;
-  if (!audio.paused) {
-    audio.pause();
-    return;
-  }
-  audio.volume = audioVolume.value;
-  audio.muted = audioMuted.value;
-  try {
-    await audio.play();
-  } catch {
-    audioPlaying.value = false;
-  }
-}
-
-function applyAudioVolume() {
-  if (!audioEl.value) return;
-  audioEl.value.volume = audioVolume.value;
-  if (audioVolume.value > 0 && audioMuted.value) {
-    audioMuted.value = false;
-    audioEl.value.muted = false;
-  }
-}
-
-function toggleMute() {
-  audioMuted.value = !audioMuted.value;
-  if (audioEl.value) audioEl.value.muted = audioMuted.value;
-}
 
 async function loadGraph() {
   const sequence = ++requestSequence;
@@ -886,6 +788,12 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
   if (commandId === "pulse") {
     discoveryResult.value = `星核脉冲已穿过 ${graph.nodes.length} 枚记忆坐标，云层正在回应最近一次书写。`;
     sceneRef.value?.triggerDiscoveryEffect("planet");
+  } else if (commandId === "sample") {
+    discoveryResult.value = `光谱采样完成：第 ${String(discoverySequence.value).padStart(3, "0")} 组数据已写入日冕档案，氢线与铁离子峰值保持稳定。`;
+    sceneRef.value?.triggerDiscoveryEffect("sun");
+  } else if (commandId === "scan") {
+    discoveryResult.value = "光子环扫描完成：近侧亮弧存在 17.2° 偏振偏移，远侧回波在 0.84 秒后抵达。";
+    sceneRef.value?.triggerDiscoveryEffect("black-hole");
   } else if (commandId === "latest") {
     const latest = latestNode.value;
     if (latest) {
@@ -1158,7 +1066,7 @@ useHead({ title: "时光星图" });
   transform: translateY(18px);
 }
 .brand,
-.signal {
+.nav-actions {
   pointer-events: auto;
 }
 .brand {
@@ -1194,25 +1102,14 @@ useHead({ title: "时光星图" });
   font-size: 0.48rem;
   letter-spacing: 0.13em;
 }
-.signal {
+.nav-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--space-text-3);
   font-size: 0.57rem;
 }
-.signal > i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--space-accent);
-  box-shadow: 0 0 12px var(--space-accent);
-}
-.signal.offline > i {
-  background: #8298ad;
-  box-shadow: 0 0 10px #55758f;
-}
-.signal button {
+.nav-actions button {
   display: grid;
   width: 30px;
   height: 30px;
@@ -1225,7 +1122,7 @@ useHead({ title: "时光星图" });
     background 0.25s ease,
     transform 0.25s ease;
 }
-.signal button:hover {
+.nav-actions button:hover {
   background: rgb(35 91 141 / 0.4);
   transform: translateY(-2px);
 }
@@ -1324,71 +1221,6 @@ useHead({ title: "时光星图" });
   gap: 10px;
   color: #5f8fb6;
   font-size: 0.78rem;
-}
-.constellation-audio {
-  position: absolute;
-  z-index: 12;
-  right: 22px;
-  bottom: 18px;
-  display: flex;
-  height: 38px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 9px;
-  border: 1px solid var(--space-border);
-  border-radius: 6px;
-  background: rgb(4 10 22 / 68%);
-  box-shadow: 0 10px 32px rgb(0 0 0/0.24);
-  backdrop-filter: blur(16px);
-}
-.constellation-audio button {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--space-text-2);
-  cursor: pointer;
-  place-items: center;
-}
-.constellation-audio button:hover {
-  background: color-mix(in srgb, var(--space-accent) 12%, transparent);
-  color: var(--space-text);
-}
-.constellation-audio > span {
-  display: flex;
-  width: 29px;
-  height: 18px;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-.constellation-audio > span i {
-  width: 2px;
-  height: 5px;
-  border-radius: 2px;
-  background: var(--space-text-3);
-  transform-origin: center;
-}
-.constellation-audio.playing > span i {
-  animation: audio-level 0.8s ease-in-out infinite alternate;
-}
-.constellation-audio.playing > span i:nth-child(2) {
-  animation-delay: -0.55s;
-}
-.constellation-audio.playing > span i:nth-child(3) {
-  animation-delay: -0.22s;
-}
-.constellation-audio.playing > span i:nth-child(4) {
-  animation-delay: -0.68s;
-}
-.constellation-audio input {
-  width: 70px;
-  height: 3px;
-  accent-color: var(--space-accent);
-  cursor: pointer;
 }
 .memory-popup {
   --c-primary: var(--space-accent);
@@ -2028,7 +1860,7 @@ useHead({ title: "时光星图" });
   opacity: 0;
   transform: translate(26px, -48%);
 }
-.signal button:focus-visible,
+.nav-actions button:focus-visible,
 .popup-close:focus-visible {
   outline: 2px solid var(--c-primary);
   outline-offset: 3px;
@@ -2043,13 +1875,6 @@ useHead({ title: "时光星图" });
     opacity: 0.34;
   }
 }
-@keyframes audio-level {
-  to {
-    height: 16px;
-    background: var(--space-accent);
-    box-shadow: 0 0 7px var(--space-accent);
-  }
-}
 @media (max-width: 700px) {
   .constellation-nav {
     top: 14px;
@@ -2061,9 +1886,6 @@ useHead({ title: "时光星图" });
     height: 38px;
   }
   .brand span {
-    display: none;
-  }
-  .signal span {
     display: none;
   }
   .constellation-intro {
@@ -2084,13 +1906,6 @@ useHead({ title: "时光星图" });
     left: 14px;
   }
   .constellation-foot > span b {
-    display: none;
-  }
-  .constellation-audio {
-    right: 14px;
-    bottom: 12px;
-  }
-  .constellation-audio input {
     display: none;
   }
   .memory-popup {
@@ -2160,10 +1975,6 @@ useHead({ title: "时光星图" });
   .discovery-details,
   .immersive-actions,
   .loading-orbit,
-  .constellation-audio > span i {
-    transition: none;
-    animation: none;
-  }
   .constellation-intro {
     opacity: 1;
     transform: none;
