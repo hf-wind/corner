@@ -7,6 +7,7 @@
     <div ref="sceneLayerRef" class="portal-scene" aria-hidden="true">
       <TimeConstellationScene
         v-if="graphLoaded"
+        ref="sceneRef"
         :nodes="graph.nodes"
         :relations="graph.relations"
         :graph-version="graph.graphVersion"
@@ -22,10 +23,19 @@
       >
         <i v-for="index in 48" :key="index" :style="fallbackStar(index)" />
       </div>
-      <div class="scene-vignette" />
-      <div class="scene-grid" aria-hidden="true" />
-      <div class="scene-scanline" aria-hidden="true" />
-      <Loading v-if="!entryReady" variant="space" fullscreen :title="sceneStatus" text="正在整理这座记忆花园" />
+    </div>
+    <div
+      v-if="entryOverlayVisible"
+      class="entry-loading"
+      :class="{ leaving: entryLeaving }"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="entry-orbit" aria-hidden="true"><i /><i /><i /></span>
+      <span class="entry-kicker">TIME CONSTELLATION · INITIALIZING</span>
+      <strong>{{ sceneStatus }}</strong>
+      <span class="entry-loader" aria-hidden="true"><i :style="{ transform: `scaleX(${displayProgress / 100})` }" /></span>
+      <small>{{ displayProgress }}% · 正在整理这座记忆花园</small>
     </div>
 
     <header class="portal-nav">
@@ -44,7 +54,7 @@
       <div class="nav-end">
         <span class="chapter-indicator"
           ><b>0{{ activePanel + 1 }}</b
-          ><i />04</span
+          ><i><em :style="{ transform: `scaleX(${chapterProgress})` }" /></i>04</span
         >
         <span class="scene-status"
           ><i :class="{ online: sceneReady && graphLoaded }" />{{
@@ -239,6 +249,7 @@ const { siteTitle, loadSiteSettings } = useSiteSettings();
 const { navigating, navigate } = useCosmicNavigation();
 const portalRef = ref<HTMLElement | null>(null);
 const sceneLayerRef = ref<HTMLElement | null>(null);
+const sceneRef = ref<any>(null);
 const graph = reactive<{
   nodes: GraphNode[];
   relations: any[];
@@ -249,9 +260,16 @@ const sceneReady = ref(false);
 const sceneFailed = ref(false);
 const graphLoaded = ref(false);
 const settingsLoaded = ref(false);
+const assetsLoaded = ref(false);
 const scrollProgress = ref(0);
 const sceneProgress = ref(0);
 const activePanel = ref(0);
+const chapterProgress = ref(0);
+const loadProgress = ref(0);
+const displayProgress = ref(0);
+const entryOverlayVisible = ref(true);
+const entryLeaving = ref(false);
+const reducedMotion = ref(false);
 const currentYear = new Date().getFullYear();
 const chapters = [
   { label: "序章" },
@@ -260,6 +278,11 @@ const chapters = [
   { label: "抵达" },
 ];
 let animationContext: gsap.Context | null = null;
+let scrollFrame = 0;
+let previewFocus: "station" | "spacecraft" | "satellite" | "planet" | "" = "";
+let previewFocusFrame = 0;
+let loadProgressFrame = 0;
+let entryExitTimer: number | null = null;
 
 const sceneStatus = computed(() =>
   !graphLoaded.value
@@ -268,7 +291,40 @@ const sceneStatus = computed(() =>
       ? `${graph.nodes.length} 枚记忆在线`
       : "星图正在苏醒",
 );
-const entryReady = computed(() => graphLoaded.value && settingsLoaded.value && (sceneReady.value || sceneFailed.value));
+const entryReady = computed(() => graphLoaded.value && settingsLoaded.value && assetsLoaded.value && (sceneReady.value || sceneFailed.value));
+
+watch([graphLoaded, settingsLoaded, assetsLoaded, sceneReady, sceneFailed], () => {
+  const loaded = [graphLoaded.value, settingsLoaded.value, assetsLoaded.value, sceneReady.value || sceneFailed.value];
+  loadProgress.value = Math.round((loaded.filter(Boolean).length / loaded.length) * 100);
+}, { immediate: true });
+
+watch(loadProgress, (target) => {
+  if (loadProgressFrame) cancelAnimationFrame(loadProgressFrame);
+  const animate = () => {
+    const distance = target - displayProgress.value;
+    if (Math.abs(distance) < 0.5) {
+      displayProgress.value = target;
+      loadProgressFrame = 0;
+      return;
+    }
+    displayProgress.value = Math.round(displayProgress.value + distance * 0.18);
+    loadProgressFrame = requestAnimationFrame(animate);
+  };
+  loadProgressFrame = requestAnimationFrame(animate);
+}, { immediate: true });
+
+watch(entryReady, (ready) => {
+  if (!ready || entryLeaving.value) return;
+  const release = () => {
+    entryLeaving.value = true;
+    entryExitTimer = window.setTimeout(() => {
+      entryOverlayVisible.value = false;
+      entryExitTimer = null;
+    }, reducedMotion.value ? 40 : 780);
+  };
+  if (reducedMotion.value) release();
+  else window.setTimeout(release, 280);
+});
 
 function compactNumber(value: number) {
   return new Intl.NumberFormat("zh-CN", {
@@ -290,14 +346,76 @@ function scrollToPanel(index: number) {
   });
 }
 
+async function preloadWelcomeAssets() {
+  const sources = [
+    "/logo.png",
+    ...graph.nodes
+      .map((node) => node.image)
+      .filter((source): source is string => Boolean(source))
+      .map((source) => mediaUrl(source)),
+  ];
+  await Promise.all(
+    [...new Set(sources)].map(
+      (source) =>
+        new Promise<void>((resolve) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => resolve();
+          image.onerror = () => resolve();
+          image.src = source;
+        }),
+    ),
+  );
+}
+
+function updatePreviewFocus(progress: number) {
+  const scene = sceneRef.value as any;
+  if (!scene || !entryReady.value || reducedMotion.value) return;
+  const next =
+    progress < 0.18 ? "" :
+    progress < 0.34 ? "station" :
+    progress < 0.48 ? "" :
+    progress < 0.64 ? "spacecraft" :
+    progress < 0.76 ? "" :
+    progress < 0.87 ? "satellite" :
+    progress < 0.94 ? "" : "planet";
+  if (next === previewFocus) return;
+  previewFocus = next;
+  if (previewFocusFrame) cancelAnimationFrame(previewFocusFrame);
+  previewFocusFrame = requestAnimationFrame(() => {
+    previewFocusFrame = 0;
+    if (next) scene.previewDiscovery?.(next);
+    else scene.previewReset?.();
+  });
+}
+
+function sampleScroll() {
+  scrollFrame = 0;
+  const scroller = portalRef.value;
+  if (!scroller) return;
+  const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+  const progress = Math.min(1, Math.max(0, scroller.scrollTop / max));
+  scrollProgress.value = progress;
+  sceneProgress.value = progress;
+  chapterProgress.value = Math.min(1, (progress * chapters.length) % 1 || (progress === 1 ? 1 : 0));
+  const nextPanel = Math.min(chapters.length - 1, Math.floor(progress * chapters.length));
+  if (nextPanel !== activePanel.value) activePanel.value = nextPanel;
+  updatePreviewFocus(progress);
+}
+
+function onPortalScroll() {
+  if (scrollFrame) return;
+  scrollFrame = requestAnimationFrame(sampleScroll);
+}
+
 function initializeMotion() {
   const scroller = portalRef.value;
-  if (
-    !scroller ||
-    !sceneLayerRef.value ||
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  )
+  if (!scroller) return;
+  scroller.addEventListener("scroll", onPortalScroll, { passive: true });
+  if (!sceneLayerRef.value || reducedMotion.value) {
+    onPortalScroll();
     return;
+  }
   gsap.registerPlugin(ScrollTrigger);
   animationContext = gsap.context(() => {
     const panels = gsap.utils.toArray<HTMLElement>(".portal-panel");
@@ -400,13 +518,7 @@ function initializeMotion() {
       },
     });
 
-    gsap.to(sceneLayerRef.value, {
-      scale: 1.12,
-      yPercent: 4,
-      ease: "none",
-      force3D: true,
-      scrollTrigger: { scroller, trigger: ".portal-scroll", start: "top top", end: "bottom bottom", scrub: 1.2 },
-    });
+    gsap.set(sceneLayerRef.value, { clearProps: "transform" });
     gsap.utils.toArray<HTMLElement>("[data-parallax]").forEach((element) => {
       const strength = Number(element.dataset.parallax || 0.04);
       gsap.to(element, {
@@ -422,16 +534,15 @@ function initializeMotion() {
       trigger: ".portal-scroll",
       start: "top top",
       end: "bottom bottom",
-      onUpdate: (self) => {
-        scrollProgress.value = self.progress;
-        sceneProgress.value = self.progress;
-      },
+      onUpdate: () => onPortalScroll(),
     });
   }, portalRef.value);
   ScrollTrigger.refresh();
+  onPortalScroll();
 }
 
 onMounted(async () => {
+  reducedMotion.value = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const motionReady = nextTick().then(initializeMotion);
   await Promise.allSettled([
     loadSiteSettings().finally(() => { settingsLoaded.value = true }),
@@ -451,10 +562,19 @@ onMounted(async () => {
     }),
     motionReady,
   ]);
+  await Promise.all([preloadWelcomeAssets(), import("~/components/TimeConstellationScene.vue")]);
+  assetsLoaded.value = true;
   graphLoaded.value = true;
+  await nextTick();
+  onPortalScroll();
 });
 
 onBeforeUnmount(() => {
+  portalRef.value?.removeEventListener("scroll", onPortalScroll);
+  if (scrollFrame) cancelAnimationFrame(scrollFrame);
+  if (previewFocusFrame) cancelAnimationFrame(previewFocusFrame);
+  if (loadProgressFrame) cancelAnimationFrame(loadProgressFrame);
+  if (entryExitTimer) window.clearTimeout(entryExitTimer);
   animationContext?.revert();
   animationContext = null;
 });
@@ -498,18 +618,13 @@ useHead({ title: computed(() => siteTitle.value) });
   z-index: -3;
   inset: 0;
   overflow: hidden;
+  background: #030712;
 }
 .portal-scene :deep(.constellation-scene) {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-}
-.scene-vignette {
-  position: absolute;
-  inset: 0;
-  box-shadow: inset 0 0 190px 40px rgb(2 7 18 / 72%);
-  pointer-events: none;
 }
 .scene-fallback {
   position: absolute;
@@ -521,17 +636,23 @@ useHead({ title: computed(() => siteTitle.value) });
 .scene-fallback.visible {
   opacity: 1;
 }
-.entry-loading { position:fixed; z-index:30; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:32px; color:var(--space-text); text-align:center; pointer-events:auto; background:linear-gradient(180deg,rgb(3 7 18 / 97%),rgb(5 12 25 / 94%)); backdrop-filter:blur(22px); transition:opacity .7s ease, visibility .7s ease; }
-.entry-loading::after { position:absolute; right:clamp(22px,5vw,72px); bottom:clamp(22px,5vw,58px); left:clamp(22px,5vw,72px); height:1px; background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--space-accent) 42%,transparent),transparent); content:""; opacity:.48; }
+.entry-loading { position:fixed; z-index:30; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:32px; color:var(--space-text); text-align:center; pointer-events:auto; background:#030712; opacity:1; transform:none; transition:opacity .78s cubic-bezier(.22,1,.36,1), transform .78s cubic-bezier(.22,1,.36,1), filter .78s ease, visibility 0s linear 0s; }
+.entry-loading.leaving { opacity:0; transform:scale(1.018); filter:blur(5px); visibility:hidden; pointer-events:none; transition-delay:0s,0s,0s,.78s; }
 .entry-loading > * { position:relative; z-index:1; }
-.entry-ready .entry-loading { opacity:0; visibility:hidden; pointer-events:none; }
-.entry-loading strong { display:flex; align-items:center; gap:8px; color:var(--space-text); font-family:var(--font-mono); font-size:.62rem; font-weight:650; letter-spacing:.08em; }
-.entry-loading strong::before { width:5px; height:5px; border:1px solid var(--space-accent); background:var(--space-accent); box-shadow:0 0 12px color-mix(in srgb,var(--space-accent) 76%,transparent); content:""; }
+.entry-orbit { position:relative; display:block; width:74px; height:74px; margin-bottom:10px; border:1px solid rgb(158 215 255 / 38%); border-radius:50%; animation:entry-orbit-spin 8s linear infinite; }
+.entry-orbit::before,.entry-orbit::after { position:absolute; inset:9px; border:1px solid rgb(255 255 255 / 12%); border-radius:50%; content:""; }
+.entry-orbit::after { inset:22px; border-color:rgb(158 215 255 / 28%); }
+.entry-orbit i { position:absolute; width:5px; height:5px; border-radius:50%; background:#9ed7ff; box-shadow:0 0 14px rgb(158 215 255 / 84%); }
+.entry-orbit i:nth-child(1) { top:-3px; left:50%; transform:translateX(-50%); }
+.entry-orbit i:nth-child(2) { right:3px; bottom:12px; }
+.entry-orbit i:nth-child(3) { bottom:5px; left:12px; }
+.entry-kicker { color:rgb(158 215 255 / 72%); font-family:var(--font-mono); font-size:.48rem; letter-spacing:.16em; }
+.entry-loading strong { display:flex; align-items:center; gap:8px; color:var(--space-text); font-family:var(--font-mono); font-size:.64rem; font-weight:650; letter-spacing:.08em; }
+.entry-loading strong::before { width:5px; height:5px; border:1px solid #9ed7ff; background:#9ed7ff; box-shadow:0 0 12px rgb(158 215 255 / 76%); content:""; }
 .entry-loading small { color:color-mix(in srgb,var(--space-muted) 84%,transparent); font-size:.54rem; letter-spacing:.04em; }
-.entry-loader { display:flex; width:min(180px,58vw); height:2px; justify-content:stretch; gap:4px; margin-bottom:6px; overflow:hidden; background:rgb(255 255 255 / 10%); }
-.entry-loader i { display:block; flex:1; height:100%; background:var(--space-accent); box-shadow:0 0 14px color-mix(in srgb,var(--space-accent) 68%,transparent); animation:entry-pulse 1.35s ease-in-out infinite; transform-origin:left center; }
-.entry-loader i:nth-child(2) { animation-delay:.15s; }.entry-loader i:nth-child(3) { animation-delay:.3s; }
-@keyframes entry-pulse { 0%,100% { opacity:.24; transform:scaleX(.38) } 50% { opacity:1; transform:scaleX(1) } }
+.entry-loader { display:block; width:min(260px,62vw); height:2px; margin:8px 0 1px; overflow:hidden; background:rgb(255 255 255 / 12%); }
+.entry-loader i { display:block; width:100%; height:100%; background:#9ed7ff; box-shadow:0 0 14px rgb(158 215 255 / 68%); transform:scaleX(0); transform-origin:left center; transition:transform .22s ease-out; }
+@keyframes entry-orbit-spin { to { transform:rotate(360deg); } }
 .scene-fallback i {
   position: absolute;
   width: var(--star-size);
@@ -541,10 +662,6 @@ useHead({ title: computed(() => siteTitle.value) });
   box-shadow: 0 0 10px var(--space-accent);
   animation: star-breathe 3.2s ease-in-out infinite alternate;
 }
-.scene-grid { position:absolute; inset:-20%; opacity:.18; background-image:linear-gradient(color-mix(in srgb,var(--space-accent) 14%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--space-accent) 14%,transparent) 1px,transparent 1px); background-size:72px 72px; transform:perspective(600px) rotateX(62deg) translateY(28%); transform-origin:center bottom; mask-image:linear-gradient(transparent 0%,#000 50%,transparent 100%); animation:grid-drift 18s linear infinite; pointer-events:none; }
-.scene-scanline { position:absolute; inset:0; background:linear-gradient(180deg,transparent 0%,color-mix(in srgb,var(--space-accent) 14%,transparent) 49%,transparent 51%,transparent 100%); background-size:100% 220px; mix-blend-mode:screen; opacity:.24; animation:scan-drift 8s linear infinite; pointer-events:none; }
-@keyframes grid-drift { to { background-position:0 72px,0 72px; } }
-@keyframes scan-drift { to { background-position:0 220px; } }
 .portal-nav {
   position: fixed;
   z-index: 20;
@@ -619,9 +736,22 @@ useHead({ title: computed(() => siteTitle.value) });
   font-size: 0.58rem;
 }
 .chapter-indicator i {
-  width: 28px;
-  height: 1px;
+  position: relative;
+  display: block;
+  width: 42px;
+  height: 2px;
+  overflow: hidden;
   background: rgb(255 255 255 / 18%);
+}
+.chapter-indicator i em {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #9ed7ff;
+  box-shadow: 0 0 8px rgb(158 215 255 / 72%);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .18s ease-out;
 }
 .scene-status {
   display: flex;
@@ -740,7 +870,7 @@ useHead({ title: computed(() => siteTitle.value) });
   z-index: 2;
 }
 .portal-stage {
-  background: rgb(3 7 18 / 24%);
+  background: transparent;
 }
 .portal-panel {
   position: relative;
@@ -1224,7 +1354,8 @@ useHead({ title: computed(() => siteTitle.value) });
   }
   .scroll-cue i,
   .scene-fallback i,
-  .archive-orbit > i {
+  .archive-orbit > i,
+  .entry-orbit {
     animation: none;
   }
   .portal-actions button {

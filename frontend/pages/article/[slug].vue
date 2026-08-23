@@ -84,14 +84,13 @@
         <section
           v-if="article.excerpt"
           class="article-lead article-anim"
-          aria-label="文章导读"
+          aria-label="摘要"
         >
           <div v-if="article.excerpt" class="md-excerpt">
             <span class="excerpt-mark"><Icon name="ph:quotes-bold" /></span>
             <span class="excerpt-content">
-              <small><b>文章导读</b><i>READING NOTE</i></small>
+              <small><b>摘要</b><i>SUMMARY</i></small>
               <span class="excerpt-copy">
-                <span class="excerpt-measure" aria-hidden="true">{{ article.excerpt }}</span>
                 <span class="excerpt-typed">{{ typedExcerpt }}<span v-if="excerptTyping" class="excerpt-caret" aria-hidden="true" /></span>
               </span>
             </span>
@@ -261,7 +260,7 @@ const showBackTop = ref(false);
 const immersiveMode = ref(false);
 const excerptVisibleCount = ref(0);
 const excerptCharacters = computed(() =>
-  Array.from(String(article.value?.excerpt || "")),
+  Array.from(String(article.value?.excerpt || "").replace(/\s+/g, " ").trim()),
 );
 const typedExcerpt = computed(() =>
   excerptCharacters.value.slice(0, excerptVisibleCount.value).join(""),
@@ -796,6 +795,7 @@ onUnmounted(() => {
   position: relative;
   margin-bottom: 22px;
   overflow: hidden;
+  overflow-anchor: none;
   border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
   border-radius: 8px;
   background: color-mix(in srgb, var(--c-primary-soft) 28%, var(--ld-bg-card));
@@ -885,15 +885,16 @@ onUnmounted(() => {
   position: relative;
   display: block;
   min-width: 0;
+  min-height: 0;
   color: color-mix(in srgb, var(--c-text) 84%, var(--c-text-2));
   font-family: var(--font-summary);
   font-weight: 500;
-  overflow-wrap: anywhere;
-  text-wrap: pretty;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
 }
 
-.excerpt-measure { display: block; visibility: hidden; }
-.excerpt-typed { position: absolute; inset: 0; display: block; }
+.excerpt-typed { display: block; min-height: 0; }
 
 .excerpt-caret {
   display: inline-block;

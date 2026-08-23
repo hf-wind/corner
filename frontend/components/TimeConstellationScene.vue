@@ -2781,7 +2781,7 @@ function startCameraFlight(
   };
 }
 
-function focusDiscovery(id: DiscoveryId) {
+function focusDiscovery(id: DiscoveryId, distanceMultiplier = 1) {
   if (!camera || !controls) return;
   const object = discoveryObjects.get(id);
   if (!object) return;
@@ -2793,7 +2793,7 @@ function focusDiscovery(id: DiscoveryId) {
   const direction = camera.position.clone().sub(controls.target).normalize();
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const sideOffset = right.multiplyScalar(window.innerWidth < 700 ? 0 : 10);
-  const distance =
+  const distance = (
     id === "black-hole"
       ? 118
       : id === "sun"
@@ -2804,7 +2804,8 @@ function focusDiscovery(id: DiscoveryId) {
             ? 82
             : id === "planet"
               ? 64
-              : 58;
+              : 58
+  ) * distanceMultiplier;
   const destination = {
     target: target.clone().add(sideOffset),
     position: target
@@ -3105,6 +3106,17 @@ function resetView() {
   controls.enabled = !props.ambient;
   emit("immersiveChange", false);
   startCameraFlight(overviewPose(), 1550, 12, "reset");
+}
+
+// Welcome-page preview control reuses the same tracked discovery camera used by clicks.
+function previewDiscovery(id: DiscoveryId) {
+  if (!props.ambient || !discoveryObjects.has(id)) return;
+  focusDiscovery(id, 1.18);
+}
+
+function previewReset() {
+  if (!props.ambient) return;
+  resetView();
 }
 
 function narrativeValue(values: number[], progress: number) {
@@ -3655,6 +3667,8 @@ defineExpose({
   resumeDiscoveryFocus,
   triggerDiscoveryEffect,
   startDiscoveryTour,
+  previewDiscovery,
+  previewReset,
   resetView,
 });
 </script>
