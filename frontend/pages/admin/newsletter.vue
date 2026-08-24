@@ -1,12 +1,17 @@
 <template>
   <div class="newsletter-admin admin-page-shell">
-    <header class="admin-page-head"><div><h1>订阅周报</h1><p>管理邮件订阅者与周报发送计划。</p></div><AdminRefreshButton :loading="loading" @click="loadAll()" /></header>
+    <header class="admin-page-head"><div><span>CONTENT MANAGEMENT</span><h1>订阅周报</h1><p>管理邮件订阅者与周报发送计划。</p></div></header>
 
+    <div class="table-toolbar newsletter-config-toolbar">
+      <strong>发送计划</strong>
+      <span class="toolbar-spacer" />
+      <span class="last-sent">上次发送：{{ form.lastSentAt ? formatDate(form.lastSentAt) : '尚未发送过' }}</span>
+      <AdminRefreshButton :loading="loading" @click="loadAll()" />
+    </div>
     <section class="newsletter-config admin-table-shell">
-      <header class="section-heading">
-        <div><h2>发送计划</h2><p>设置周报发送时间与当前运行状态。</p></div>
-        <span class="last-sent">上次发送：{{ form.lastSentAt ? formatDate(form.lastSentAt) : '尚未发送过' }}</span>
-      </header>
+      <div class="section-heading">
+        <div><p>设置周报发送时间与当前运行状态。</p></div>
+      </div>
       <div class="panel-body">
         <div class="config-form">
           <div class="config-item switch-item">
@@ -16,10 +21,10 @@
           <div class="config-item">
             <label>发送时间</label>
             <div class="config-controls">
-              <a-select v-model:value="form.day" class="day-select" :get-popup-container="() => document.body">
+              <a-select v-model:value="form.day" class="day-select">
                 <a-select-option v-for="(label, idx) in DAY_LABELS" :key="idx + 1" :value="idx + 1">每{{ label }}</a-select-option>
               </a-select>
-              <a-select v-model:value="form.time" class="time-select" :get-popup-container="() => document.body">
+              <a-select v-model:value="form.time" class="time-select">
                 <a-select-option v-for="t in TIME_OPTIONS" :key="t" :value="t">{{ t }}</a-select-option>
               </a-select>
             </div>
@@ -31,7 +36,9 @@
     </section>
 
     <div class="table-toolbar newsletter-toolbar">
-      <div><strong>订阅者</strong><span>管理已订阅邮箱及确认状态。</span></div>
+      <strong>订阅者</strong>
+      <span class="toolbar-description">管理已订阅邮箱及确认状态。</span>
+      <span class="toolbar-spacer" />
       <div class="filter-bar">
           <a-input v-model:value="query.q" placeholder="搜索邮箱" allow-clear class="search-input" @press-enter="applyFilters" />
           <a-select v-model:value="query.status" placeholder="全部状态" allow-clear class="status-filter">
@@ -267,7 +274,7 @@ onMounted(loadAll)
 }
 
 .section-heading p,
-.newsletter-toolbar span {
+.newsletter-toolbar .toolbar-description {
   margin: 4px 0 0;
   color: var(--c-text-3);
   font-size: 0.68rem;
@@ -326,8 +333,9 @@ onMounted(loadAll)
 }
 
 .newsletter-toolbar { margin-bottom: 0; }
-.newsletter-toolbar > div:first-child { min-width: 150px; }
 .newsletter-toolbar .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.newsletter-config-toolbar .last-sent { margin-top: 0; }
+.newsletter-toolbar .toolbar-description { margin-top: 0; }
 
 .sub-email {
   color: var(--c-text);
@@ -343,7 +351,7 @@ onMounted(loadAll)
 @media (max-width: 720px) {
   .section-heading,
   .newsletter-toolbar { align-items: stretch; flex-direction: column; }
-  .newsletter-toolbar .filter-bar { justify-content: stretch; }
+  .newsletter-toolbar .filter-bar { width: 100%; justify-content: stretch; }
   .newsletter-toolbar .filter-bar > * { flex: 1 1 140px; }
   .newsletter-toolbar .search-input,
   .newsletter-toolbar .status-filter { width: auto; }

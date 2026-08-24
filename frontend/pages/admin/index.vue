@@ -179,14 +179,25 @@ function normalizeDashboardPayload(payload: any) {
 
 function chartTheme() {
   const styles = getComputedStyle(document.documentElement)
+  const resolveColor = (name: string, fallback: string) => {
+    const raw = styles.getPropertyValue(name).trim()
+    if (!raw || raw.includes('var(')) return fallback
+    const probe = document.createElement('span')
+    probe.style.color = raw
+    document.body.appendChild(probe)
+    const resolved = getComputedStyle(probe).color
+    probe.remove()
+    return resolved && resolved !== 'rgba(0, 0, 0, 0)' ? resolved : fallback
+  }
   return {
-    text: styles.getPropertyValue('--c-text-3').trim() || '#6b7280',
-    line: styles.getPropertyValue('--border').trim() || '#e5e7eb',
-    primary: styles.getPropertyValue('--c-primary').trim() || '#1677ff',
+    text: resolveColor('--c-text-3', '#6b7280'),
+    line: resolveColor('--border', '#e5e7eb'),
+    primary: resolveColor('--c-primary', '#1677ff'),
   }
 }
 
-function withAlpha(color: string, opacity: number) {
+function withAlpha(color: string | undefined, opacity: number) {
+  if (!color) return `rgba(22, 119, 255, ${opacity})`
   const alpha = Math.min(1, Math.max(0, opacity))
   if (/^hsl\([^/]+\)$/i.test(color)) {
     return color.replace(/\)$/, ` / ${Math.round(alpha * 100)}%)`)
