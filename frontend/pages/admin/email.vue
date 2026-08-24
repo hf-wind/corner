@@ -16,7 +16,7 @@
         <div v-if="selected" class="template-editor">
           <header class="editor-header"><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><div class="editor-header-actions"><a-tag :color="editor.custom ? 'blue' : 'default'">{{ editor.custom ? '自定义模板' : '系统默认' }}</a-tag><a-button v-if="!editor.custom" size="small" @click="startEditing"><Icon name="ph:pencil-simple-bold" /> 编辑</a-button><a-button size="small" @click="previewTemplate"><Icon name="ph:eye-bold" /> 预览</a-button><a-button v-if="editor.custom && selected.custom" size="small" danger @click="restoreDefault"><Icon name="ph:arrow-counter-clockwise-bold" /> 恢复默认</a-button><a-button v-if="editor.custom" type="primary" size="small" :loading="templateSaving" @click="saveTemplate"><Icon name="ph:floppy-disk-bold" /> 保存</a-button></div></header>
           <label><span>邮件主题</span><a-input v-model:value="editor.subject" :disabled="!editor.custom" /></label>
-          <section class="html-template-section"><header><span>HTML 模板</span><a-button type="text" size="small" @click="editor.htmlExpanded = !editor.htmlExpanded"><Icon :name="editor.htmlExpanded ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" />{{ editor.htmlExpanded ? '收起模板' : '展开模板' }}</a-button></header><div v-if="!editor.htmlExpanded" class="html-template-collapsed"><Icon name="ph:code-bold" /><span>模板代码已折叠，点击展开后编辑</span><small>{{ editor.html.length }} 字符</small></div><a-textarea v-else v-model:value="editor.html" :auto-size="{ minRows: 28 }" :disabled="!editor.custom" class="html-editor" /></section>
+          <section class="html-template-section"><header><span>HTML 模板</span><a-button type="text" size="small" @click="editor.htmlExpanded = !editor.htmlExpanded"><Icon :name="editor.htmlExpanded ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" />{{ editor.htmlExpanded ? '收起模板' : '展开模板' }}</a-button></header><div v-if="!editor.htmlExpanded" class="html-template-collapsed"><Icon name="ph:code-bold" /><span>模板代码已折叠，点击展开后编辑</span><small>{{ editor.html.length }} 字符</small></div><a-textarea v-else v-model:value="editor.html" :rows="28" :disabled="!editor.custom" class="html-editor" /></section>
           <div class="variables"><span>预设变量</span><p>在主题或 HTML 中插入变量，发送时系统会替换为当前通知的实际内容。</p><button v-for="variable in selected.variables" :key="variable" type="button" :disabled="!editor.custom" @click="insertVariable(variable)"><code v-text="formatVariable(variable)" /><small>{{ variableDescription(variable) }}</small></button><em>富文本正文使用 <code v-text="formatVariable('contentHtml', true)" />，其余变量均自动转义。</em></div>
         </div>
         <a-empty v-else description="请选择邮件模板" />
@@ -160,8 +160,8 @@ const pagination = reactive({
 const columns = [
   { title: '收件人', dataIndex: 'to', key: 'to', width: 180 },
   { title: '主题', dataIndex: 'subject', key: 'subject', width: 300 },
-  { title: '类型', dataIndex: 'type', key: 'type', width: 110 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
+  { title: '类型', dataIndex: 'type', key: 'type', width: 150 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
   { title: '内容', dataIndex: 'content', key: 'content', width: 300 },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
   { title: '发送时间', dataIndex: 'sentAt', key: 'sentAt', width: 150 },
@@ -260,9 +260,11 @@ async function previewTemplate() {
 }
 
 function syncPreviewHeight() {
-  const body = previewFrame.value?.contentDocument?.body
-  if (!body) return
-  previewHeight.value = Math.max(560, Math.ceil(body.scrollHeight + 16))
+  const document = previewFrame.value?.contentDocument
+  const body = document?.body
+  const root = document?.documentElement
+  if (!body || !root) return
+  previewHeight.value = Math.max(560, Math.ceil(Math.max(body.scrollHeight, body.offsetHeight, root.scrollHeight, root.offsetHeight) + 16))
 }
 
 function templateIcon(key: string) {
@@ -381,8 +383,25 @@ function stripHtml(html: string) {
 }
 .email-preview-modal :deep(.ant-modal-body) { overflow: hidden; padding: 0 20px 20px; }
 .email-preview-stage { height: calc(100dvh - 190px); min-height: 480px; }
-.html-editor :deep(textarea) { overflow: hidden !important; }
 .template-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);height:min(680px,calc(100dvh - 170px));min-height:420px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.template-list{display:flex;min-height:0;flex-direction:column;gap:3px;overflow-y:auto;padding:8px;border-right:1px solid var(--border);background:var(--c-bg-1)}.template-list button{display:grid;grid-template-columns:32px minmax(0,1fr) 58px;align-items:center;gap:9px;padding:10px;border:0;border-radius:7px;background:transparent;color:var(--c-text);cursor:pointer;text-align:left;min-width:0}.template-list button:hover,.template-list button.active{background:var(--ld-bg-card)}.template-list button.active{box-shadow:0 1px 4px var(--ld-shadow)}.template-list button>span{display:grid;width:30px;height:30px;line-height:30px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.template-list button>div{min-width:0}.template-list strong,.template-list small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.template-list strong{font-size:.64rem}.template-list small{margin-top:3px;color:var(--c-text-3);font-size:.5rem;line-height:1.4}.template-list :deep(.ant-tag){display:block;max-width:58px;width:58px;margin:0;padding-inline:4px;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.template-editor-spin{min-width:0;min-height:0;overflow:hidden}.template-editor{display:flex;min-width:0;height:100%;flex-direction:column;gap:14px;overflow-y:auto;padding:18px}.editor-header{position:sticky;z-index:4;top:-18px;margin:-18px -18px 0;padding:18px;border-bottom:1px solid var(--border);background:var(--ld-bg-card)}.editor-header,.editor-header-actions{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.editor-header-actions{align-items:center;justify-content:flex-end;flex-wrap:wrap}.template-editor h2{margin:0;font-size:.86rem}.template-editor header p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem}.template-editor>label>span,.html-template-section>header>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.62rem}.html-template-section>header{display:flex;align-items:center;justify-content:space-between}.html-template-section>header .ant-btn{padding-inline:4px;color:var(--c-primary);font-size:.6rem}.html-template-collapsed{display:flex;min-height:52px;align-items:center;gap:8px;padding:12px;border:1px dashed var(--border);border-radius:7px;background:var(--c-bg-1);color:var(--c-text-3);font-size:.6rem}.html-template-collapsed :deep(svg){color:var(--c-primary)}.html-template-collapsed small{margin-left:auto;color:var(--c-text-3);font-family:var(--font-mono);font-size:.52rem}.html-editor :deep(textarea){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.variables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:12px;border-radius:7px;background:var(--c-bg-1)}.variables>span,.variables>p,.variables>em{grid-column:1/-1}.variables>span{color:var(--c-text-2);font-size:.65rem;font-weight:700}.variables>p,.variables>em{margin:0;color:var(--c-text-3);font-size:.56rem;font-style:normal}.variables button{display:flex;min-width:0;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--ld-bg-card);color:var(--c-primary);cursor:pointer;text-align:left}.variables button:disabled{cursor:not-allowed;opacity:.55}.variables button code{flex:0 0 auto;font:10px/1.2 ui-monospace,monospace}.variables button small{min-width:0;color:var(--c-text-3);font-size:.52rem}.email-preview{display:block;width:100%;height:100%;border:1px solid var(--border);border-radius:8px;background:#fff}.email-preview-stage{display:flex;height:calc(84dvh - 120px);min-height:320px;flex-direction:column;overflow:hidden;border-radius:8px}.email-preview-loading{display:grid;min-height:280px;color:var(--c-text-3);font-size:.78rem;gap:10px;place-items:center}.email-preview-loading .spinning{animation:email-spin 1s linear infinite;font-size:1.4rem}@keyframes email-spin{to{transform:rotate(360deg)}}
+.template-editor-spin,
+.template-editor-spin :deep(.ant-spin-nested-loading),
+.template-editor-spin :deep(.ant-spin-container) { min-height: 0; height: 100%; }
+.template-editor-spin :deep(.ant-spin-container) { display: flex; flex-direction: column; }
+.template-editor { flex: 1 1 auto; }
+.html-template-section { min-width: 0; }
+.html-editor,
+.html-editor :deep(textarea),
+.html-editor :deep(.ant-input) {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 460px;
+  max-height: 520px;
+  overflow-y: auto !important;
+  resize: vertical;
+  font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
 
 .section-card {
   border-radius: 8px;
@@ -394,9 +413,12 @@ function stripHtml(html: string) {
   align-items: center;
 }
 
-.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; }
-.type-filter { width: 140px; }
-.status-filter { width: 120px; }
+.email-logs-page .card-header { align-items: flex-start; flex-wrap: wrap; }
+.filter-bar { display: flex; min-width: 0; flex: 1 1 520px; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.type-filter { width: 150px; min-width: 150px; flex: 0 1 150px; }
+.status-filter { width: 120px; min-width: 120px; flex: 0 1 120px; }
+.email-logs-page :deep(.ant-table-cell) { vertical-align: middle; }
+.email-logs-page :deep(.ant-table-cell .ant-tag) { display: inline-flex; max-width: 100%; margin-inline-end: 0; white-space: nowrap; }
 .subject-text { display: block; overflow: hidden; color: var(--c-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 
 .error-text {
@@ -461,7 +483,7 @@ function stripHtml(html: string) {
 
 @media (max-width: 700px) {
   .card-header { align-items: stretch; flex-direction: column; gap: 10px; }
-  .filter-bar, .type-filter, .status-filter { width: 100%; }
+  .filter-bar, .type-filter, .status-filter { width: 100%; min-width: 0; flex-basis: 100%; }
   .template-workspace{grid-template-columns:1fr;height:min(760px,calc(100dvh - 150px));min-height:420px}.template-list{overflow-x:auto;flex-direction:row;border-right:0;border-bottom:1px solid var(--border)}.template-list button{min-width:230px}.template-editor{padding:12px}.editor-header{top:-12px;margin:-12px -12px 0;padding:12px}.email-preview-stage{height:calc(84dvh - 150px)}
 }
 
@@ -486,15 +508,21 @@ function stripHtml(html: string) {
   font-size: 13px;
 }
 
-.email-preview-modal :deep(.ant-modal-body) { overflow: hidden; }
+.email-preview-modal { overflow: auto !important; }
+.email-preview-modal :deep(.ant-modal-body) { overflow: visible !important; }
 .email-preview-stage { height: calc(100dvh - 190px); min-height: 480px; }
 
 /* The editor owns source scrolling; the preview iframe grows to its document. */
-.html-editor :deep(textarea) { overflow: auto !important; resize: vertical; }
-.template-editor-spin { overflow: visible; }
+.html-editor,
+.html-editor :deep(textarea),
+.html-editor :deep(.ant-input) {
+  overflow-y: auto !important;
+  resize: vertical;
+}
+.template-editor-spin { overflow: hidden; }
 .template-editor { min-height: 0; }
 .email-preview-modal :deep(.ant-modal) { max-width: calc(100vw - 24px); }
-.email-preview-modal :deep(.ant-modal-content) { max-height: none; }
+.email-preview-modal :deep(.ant-modal-content) { max-height: none; overflow: visible; }
 .email-preview-modal :deep(.ant-modal-body) { max-height: none; }
 .email-preview-stage { height: auto; min-height: 560px; overflow: visible; }
 .email-preview { height: auto; min-height: 560px; overflow: hidden; }
