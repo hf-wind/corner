@@ -119,10 +119,10 @@
         </div>
       </div>
     </a-modal>
-    <a-modal v-model:open="preview.open" :title="preview.subject || '邮件预览'" width="760px" :footer="null" wrap-class-name="email-preview-modal">
+    <a-modal v-model:open="preview.open" :title="preview.subject || '邮件预览'" width="900px" :footer="null" wrap-class-name="email-preview-modal">
       <div class="email-preview-stage">
         <div v-if="preview.loading" class="email-preview-loading"><Icon name="ph:circle-notch-bold" class="spinning" />正在生成预览…</div>
-        <iframe v-else class="email-preview" sandbox="allow-same-origin" :srcdoc="preview.html" title="邮件模板预览" />
+        <iframe v-else ref="previewFrame" class="email-preview" sandbox="allow-same-origin" :srcdoc="preview.html" :style="{ height: `${previewHeight}px` }" @load="syncPreviewHeight" title="邮件模板预览" />
       </div>
     </a-modal>
   </div>
@@ -146,6 +146,8 @@ const templates = ref<any[]>([])
 const selected = ref<any>(null)
 const editor = reactive({ custom: false, subject: '', html: '', htmlExpanded: false })
 const preview = reactive({ open: false, subject: '', html: '', loading: false })
+const previewFrame = ref<HTMLIFrameElement | null>(null)
+const previewHeight = ref(680)
 
 const pagination = reactive({
   current: 1,
@@ -255,6 +257,12 @@ async function previewTemplate() {
   } finally {
     preview.loading = false
   }
+}
+
+function syncPreviewHeight() {
+  const body = previewFrame.value?.contentDocument?.body
+  if (!body) return
+  previewHeight.value = Math.max(560, Math.ceil(body.scrollHeight + 16))
 }
 
 function templateIcon(key: string) {
@@ -481,7 +489,18 @@ function stripHtml(html: string) {
 .email-preview-modal :deep(.ant-modal-body) { overflow: hidden; }
 .email-preview-stage { height: calc(100dvh - 190px); min-height: 480px; }
 
+/* The editor owns source scrolling; the preview iframe grows to its document. */
+.html-editor :deep(textarea) { overflow: auto !important; resize: vertical; }
+.template-editor-spin { overflow: visible; }
+.template-editor { min-height: 0; }
+.email-preview-modal :deep(.ant-modal) { max-width: calc(100vw - 24px); }
+.email-preview-modal :deep(.ant-modal-content) { max-height: none; }
+.email-preview-modal :deep(.ant-modal-body) { max-height: none; }
+.email-preview-stage { height: auto; min-height: 560px; overflow: visible; }
+.email-preview { height: auto; min-height: 560px; overflow: hidden; }
+
 @media (max-width: 700px) {
-  .email-preview-stage { height: calc(100dvh - 170px); min-height: 360px; }
+  .email-preview-stage,
+  .email-preview { min-height: 420px; }
 }
 </style>
