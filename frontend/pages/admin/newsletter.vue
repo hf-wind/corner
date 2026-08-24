@@ -9,9 +9,6 @@
       <AdminRefreshButton :loading="loading" @click="loadAll()" />
     </div>
     <section class="newsletter-config admin-table-shell">
-      <div class="section-heading">
-        <div><p>设置周报发送时间与当前运行状态。</p></div>
-      </div>
       <div class="panel-body">
         <div class="config-form">
           <div class="config-item switch-item">
@@ -253,7 +250,6 @@ onMounted(loadAll)
   gap: 16px;
 }
 
-.section-heading,
 .newsletter-toolbar {
   display: flex;
   justify-content: space-between;
@@ -261,19 +257,12 @@ onMounted(loadAll)
   gap: 16px;
 }
 
-.section-heading {
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.section-heading h2,
 .newsletter-toolbar strong {
   margin: 0;
   color: var(--c-text);
   font-size: 0.86rem;
 }
 
-.section-heading p,
 .newsletter-toolbar .toolbar-description {
   margin: 4px 0 0;
   color: var(--c-text-3);
@@ -286,7 +275,7 @@ onMounted(loadAll)
 }
 
 .panel-body {
-  padding: 18px;
+  padding: 16px;
 }
 
 .config-form {
@@ -300,7 +289,6 @@ onMounted(loadAll)
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 32px;
   color: var(--c-text-2);
   font-size: 0.85rem;
 }
@@ -349,7 +337,6 @@ onMounted(loadAll)
 }
 
 @media (max-width: 720px) {
-  .section-heading,
   .newsletter-toolbar { align-items: stretch; flex-direction: column; }
   .newsletter-toolbar .filter-bar { width: 100%; justify-content: stretch; }
   .newsletter-toolbar .filter-bar > * { flex: 1 1 140px; }
