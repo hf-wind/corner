@@ -51,6 +51,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import("./pages/library/[slug].vue"),
   },
   {
+    path: "/newsletter/confirm",
+    component: () => import("./pages/newsletter/confirm.vue"),
+    meta: { layout: false },
+  },
+  {
+    path: "/newsletter/unsubscribe",
+    component: () => import("./pages/newsletter/unsubscribe.vue"),
+    meta: { layout: false },
+  },
+  {
     path: "/login",
     component: () => import("./pages/login.vue"),
     meta: { layout: false },
@@ -164,6 +174,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/admin/messages",
     component: () => import("./pages/admin/messages.vue"),
+    meta: adminMeta,
+  },
+  {
+    path: "/admin/newsletter",
+    component: () => import("./pages/admin/newsletter.vue"),
     meta: adminMeta,
   },
   {

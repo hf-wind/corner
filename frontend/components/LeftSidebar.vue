@@ -194,6 +194,7 @@ const adminFullNav = [
   { to: "/admin/visitor", icon: "ph:footprints-bold", label: "访客时光" },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件通知" },
+{ to: "/admin/newsletter", icon: "ph:newspaper-bold", label: "订阅周报" },
   { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情资源" },
   { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
   { to: "/admin/settings", icon: "ph:gear-bold", label: "站点设置" },
@@ -284,7 +285,7 @@ const navGroups = computed<NavGroup[]>(() => {
       {
         key: "system",
         label: "系统与通知",
-        items: select(["/admin/email", "/admin/settings", "/admin/backups", "/admin/info", "/admin/about"]),
+        items: select(["/admin/email", "/admin/newsletter", "/admin/settings", "/admin/backups", "/admin/info", "/admin/about"]),
       },
       {
         key: "account",

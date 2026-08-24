@@ -17,6 +17,8 @@ type EmailTemplateKey =
   | 'reply_notification'
   | 'comment_moderation_notification'
   | 'like_notification'
+  | 'newsletter_confirm'
+  | 'newsletter_weekly'
   | 'test';
 
 type StoredEmailTemplate = {
@@ -407,6 +409,7 @@ export class EmailService {
         contentHtml: this.renderEmailContent(data.content, config.siteUrl),
         approved: data.approved ? '通过' : '未通过',
         reason: data.reason || '',
+        reasonText: data.reason?.trim() ? `，说明：${data.reason.trim()}` : '',
         detailUrl: `${config.siteUrl}${data.link}`,
       },
       `【风隅随笔】评论审核${data.approved ? '通过' : '未通过'}：${data.sourceTitle}`,
@@ -486,6 +489,84 @@ export class EmailService {
     }
   }
 
+  async sendNewsletterConfirm(to: string, token: string): Promise<void> {
+    const config = await this.getEmailConfig();
+    if (!config.enabled) {
+      throw new ServiceUnavailableException('邮件服务未启用');
+    }
+    const template = await this.resolveTemplate(
+      'newsletter_confirm',
+      {
+        siteName: '风隅随笔',
+        siteUrl: config.siteUrl,
+        confirmUrl: `${config.siteUrl}/newsletter/confirm?token=${encodeURIComponent(token)}`,
+        unsubscribeUrl: `${config.siteUrl}/newsletter/unsubscribe?token=${encodeURIComponent(token)}`,
+      },
+      '【风隅随笔】确认你的订阅',
+      '',
+    );
+
+    await this.notificationQueue.add(
+      'send-notification',
+      {
+        to,
+        subject: template.subject,
+        html: template.html,
+        type: 'newsletter_confirm',
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+        timeout: 15000,
+        removeOnComplete: 100,
+        removeOnFail: 200,
+      },
+    );
+    this.logger.log(`订阅确认邮件已加入队列: ${to}`);
+  }
+
+  async sendNewsletterWeekly(
+    to: string,
+    data: {
+      periodLabel: string;
+      totalCount: string;
+      itemsHtml: string;
+      unsubscribeToken: string;
+    },
+  ): Promise<void> {
+    const config = await this.getEmailConfig();
+    const template = await this.resolveTemplate(
+      'newsletter_weekly',
+      {
+        siteName: '风隅随笔',
+        siteUrl: config.siteUrl,
+        periodLabel: data.periodLabel,
+        totalCount: data.totalCount,
+        itemsHtml: data.itemsHtml,
+        unsubscribeUrl: `${config.siteUrl}/newsletter/unsubscribe?token=${encodeURIComponent(data.unsubscribeToken)}`,
+      },
+      `【风隅随笔】本周更新 · ${data.periodLabel}`,
+      '',
+    );
+
+    await this.notificationQueue.add(
+      'send-notification',
+      {
+        to,
+        subject: template.subject,
+        html: template.html,
+        type: 'newsletter_weekly',
+      },
+      {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 3000 },
+        timeout: 15000,
+        removeOnComplete: 200,
+        removeOnFail: 500,
+      },
+    );
+  }
+
   async getEmailLogs(query: {
     page?: number;
     limit?: number;
@@ -563,16 +644,50 @@ export class EmailService {
   }
 
   private templateDefinitions(siteUrl: string) {
+    // 邮件安全色板：由站点主题 --hue-theme:220deg 映射而来
+    const palette = {
+      page: '#f2f4f8',
+      card: '#ffffff',
+      primary: '#1a66ff',
+      primarySoft: '#eef3ff',
+      text1: '#171a21',
+      text2: '#40485a',
+      text3: '#8a92a6',
+      border: '#e4e8f0',
+      footerBg: '#f7f9fc',
+    };
     const sampleBase = { siteName: '风隅随笔', siteUrl };
     const logoUrl = `${siteUrl.replace(/\/$/, '')}/logo.png`;
+    const fontStack =
+      "-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+    const button = (url: string, label: string) =>
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px auto 6px"><tr><td style="border-radius:999px;background:${palette.primary}"><a href="${url}" target="_blank" style="display:inline-block;padding:11px 32px;font-family:${fontStack};font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:.4px">${label}</a></td></tr></table>`;
+    const quote = (contentHtml: string) =>
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0;background:${palette.primarySoft};border-radius:10px"><tr><td style="border-left:3px solid ${palette.primary};padding:14px 18px;font-family:${fontStack};font-size:14px;line-height:1.9;color:${palette.text2}">${contentHtml}</td></tr></table>`;
     const layout = (title: string, body: string) => `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:32px 16px;background:#f4f5f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;color:#30343b">
-<main style="max-width:580px;margin:0 auto;padding:0 0 28px;background:#fff;border:1px solid #e1e4e8;border-radius:12px;overflow:hidden;box-shadow:0 14px 38px rgba(34,39,46,.08)">
-<header style="padding:24px 32px 22px;background:#2b2f36;color:#fff"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:middle"><img src="${logoUrl}" width="42" height="42" alt="{{siteName}}" style="display:block;border-radius:9px"></td><td style="padding-left:12px;vertical-align:middle"><strong style="display:block;font-size:18px;line-height:1.2">{{siteName}}</strong><span style="display:block;margin-top:4px;color:#d58a45;font-size:11px;letter-spacing:1.4px">听风于隅，漫写人间</span></td></tr></table></header>
-<section style="padding:30px 32px"><p style="margin:0 0 7px;color:#d58a45;font-size:11px;letter-spacing:1.6px">WIND · CORNER NOTES</p><h1 style="margin:0 0 22px;font-size:24px;line-height:1.35;color:#2b2f36">${title}</h1>${body}</section>
-<footer style="margin:0 32px;padding-top:18px;border-top:1px solid #e5e7ea;color:#7b828c;font-size:12px;line-height:1.7">此邮件由 {{siteName}} 自动发送，请勿直接回复。<br><a href="{{siteUrl}}" style="color:#b36f32;text-decoration:none">访问 {{siteName}}</a></footer>
-</main></body></html>`;
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
+<body style="margin:0;padding:28px 16px 36px;background:${palette.page};font-family:${fontStack};color:${palette.text2}">
+<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
+<tr><td style="background:${palette.card};border:1px solid ${palette.border};border-radius:16px;overflow:hidden;box-shadow:0 10px 32px rgba(23,26,33,.06)">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="padding:22px 30px;border-bottom:1px solid ${palette.border}">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="vertical-align:middle"><img src="${logoUrl}" width="34" height="34" alt="{{siteName}}" style="display:block;border-radius:9px"></td>
+        <td style="padding-left:11px;vertical-align:middle"><strong style="display:block;font-size:15px;line-height:1.3;color:${palette.text1}">{{siteName}}</strong><span style="display:block;margin-top:2px;font-size:11px;letter-spacing:1.2px;color:${palette.text3}">听风于隅 · 漫写人间</span></td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="padding:30px 30px 10px">
+      <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:2px;color:${palette.primary}">WIND · CORNER NOTES</p>
+      <h1 style="margin:0 0 20px;font-size:21px;line-height:1.4;color:${palette.text1}">${title}</h1>
+      <div style="font-size:14px;line-height:1.9;color:${palette.text2}">${body}</div>
+    </td></tr>
+    <tr><td style="padding:16px 30px 20px;border-top:1px solid ${palette.border};background:${palette.footerBg}">
+      <p style="margin:0;font-size:12px;line-height:1.8;color:${palette.text3}">此邮件由 {{siteName}} 自动发送，请勿直接回复。<br><a href="{{siteUrl}}" target="_blank" style="color:${palette.primary};text-decoration:none">访问 {{siteName}}</a></p>
+    </td></tr>
+  </table>
+</td></tr></table>
+</body></html>`;
     return [
       {
         key: 'verification' as const,
@@ -583,7 +698,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】{{type}}验证码',
         defaultHtml: layout(
           '{{type}}验证码',
-          '<p style="color:#5f6670">您的验证码是：</p><div style="margin:22px 0;padding:18px;border-radius:8px;background:#fff5e9;color:#a86227;font:700 32px/1 monospace;text-align:center;letter-spacing:6px">{{code}}</div><p style="color:#8a9098;font-size:13px">验证码 5 分钟内有效，请勿向他人泄露。</p>',
+          `<p style="margin:0 0 16px">你好，你的<strong style="color:${palette.text1}">{{type}}</strong>验证码是：</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;background:${palette.primarySoft};border-radius:12px"><tr><td style="padding:20px;font-family:${fontStack};font-size:30px;font-weight:700;letter-spacing:8px;color:${palette.primary};text-align:center">{{code}}</td></tr></table><p style="margin:0;color:${palette.text3};font-size:13px">验证码 5 分钟内有效，请勿向他人泄露。</p>`,
         ),
       },
       {
@@ -615,7 +730,7 @@ export class EmailService {
           '【{{siteName}}】{{senderName}} 评论了你的{{sourceType}}',
         defaultHtml: layout(
           '收到一条新评论',
-          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 评论了你的{{sourceType}}《{{sourceTitle}}》。 </p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #d58a45;background:#faf7f2">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#b36f32">查看详情</a>',
+          `<p style="margin:0">你好，<strong style="color:${palette.text1}">{{senderName}}</strong> 评论了你的{{sourceType}}《{{sourceTitle}}》。</p>${quote('{{{contentHtml}}}')}<p style="margin:14px 0 0">${button('{{detailUrl}}', '查看详情')}</p>`,
         ),
       },
       {
@@ -644,7 +759,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】{{senderName}} 回复了你的评论',
         defaultHtml: layout(
           '你的评论收到回复',
-          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 回复了你在《{{sourceTitle}}》的评论。</p><blockquote style="margin:20px 0;padding:14px;border-left:3px solid #d58a45;background:#faf7f2">{{{contentHtml}}}</blockquote><a href="{{detailUrl}}" style="color:#b36f32">查看详情</a>',
+          `<p style="margin:0">你好，<strong style="color:${palette.text1}">{{senderName}}</strong> 回复了你在《{{sourceTitle}}》的评论。</p>${quote('{{{contentHtml}}}')}<p style="margin:14px 0 0">${button('{{detailUrl}}', '查看详情')}</p>`,
         ),
       },
       {
@@ -662,6 +777,7 @@ export class EmailService {
           'contentHtml',
           'approved',
           'reason',
+          'reasonText',
           'detailUrl',
         ],
         sample: {
@@ -674,12 +790,13 @@ export class EmailService {
           contentHtml: '期待更新。',
           approved: '通过',
           reason: '',
+          reasonText: '',
           detailUrl: `${siteUrl}/article/sample`,
         },
         defaultSubject: '【{{siteName}}】评论审核{{approved}}：{{sourceTitle}}',
         defaultHtml: layout(
           '评论审核结果：{{approved}}',
-          '<p>Hi <strong>{{recipientName}}</strong>，你在{{sourceType}}《{{sourceTitle}}》下的评论已完成审核。</p><blockquote style="margin:20px 0;padding:14px;background:#faf7f2">{{{contentHtml}}}</blockquote><p>审核结果：<strong>{{approved}}</strong></p><p>说明：{{reason}}</p><a href="{{detailUrl}}" style="color:#b36f32">查看内容</a>',
+          `<p style="margin:0">你好，你在{{sourceType}}《{{sourceTitle}}》下的评论已完成审核，结果：<strong style="color:${palette.text1}">{{approved}}</strong>{{reasonText}}</p>${quote('{{{contentHtml}}}')}<p style="margin:14px 0 0">${button('{{detailUrl}}', '查看内容')}</p>`,
         ),
       },
       {
@@ -704,7 +821,53 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】{{senderName}} 赞了你的评论',
         defaultHtml: layout(
           '你的评论收到点赞',
-          '<p>Hi <strong>{{recipientName}}</strong>，{{senderName}} 赞了你在《{{sourceTitle}}》下的评论。</p><a href="{{detailUrl}}" style="color:#b36f32">查看详情</a>',
+          `<p style="margin:0">你好，<strong style="color:${palette.text1}">{{senderName}}</strong> 赞了你在《{{sourceTitle}}》下的评论。</p><p style="margin:14px 0 0">${button('{{detailUrl}}', '查看详情')}</p>`,
+        ),
+      },
+      {
+        key: 'newsletter_confirm' as const,
+        name: '订阅确认',
+        description: '访客订阅周报后发送的确认邮件，点击链接完成 double opt-in。',
+        variables: [
+          'siteName',
+          'siteUrl',
+          'confirmUrl',
+          'unsubscribeUrl',
+        ],
+        sample: {
+          ...sampleBase,
+          confirmUrl: `${siteUrl}/newsletter/confirm?token=sample`,
+          unsubscribeUrl: `${siteUrl}/newsletter/unsubscribe?token=sample`,
+        },
+        defaultSubject: '【{{siteName}}】确认你的订阅',
+        defaultHtml: layout(
+          '确认订阅风隅周报',
+          `<p style="margin:0">你好，有人用这个邮箱订阅了「{{siteName}}」的更新周报。如果这是你本人的操作，点击下方按钮完成确认：</p><p style="margin:18px 0 0">${button('{{confirmUrl}}', '确认订阅')}</p><p style="margin:16px 0 0;color:${palette.text3};font-size:13px">不是你操作的？忽略这封邮件即可，不会添加任何订阅。</p>`,
+        ),
+      },
+      {
+        key: 'newsletter_weekly' as const,
+        name: '订阅周报',
+        description: '按设定周期汇总新发布的内容，发送给邮件订阅者。',
+        variables: [
+          'siteName',
+          'siteUrl',
+          'periodLabel',
+          'totalCount',
+          'itemsHtml',
+          'unsubscribeUrl',
+        ],
+        sample: {
+          ...sampleBase,
+          periodLabel: '8 月 17 日 – 8 月 23 日',
+          totalCount: '3',
+          itemsHtml: `<p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:1.6px;color:${palette.primary}">文章 · 1</p>${quote('示例文章摘要')}<p style="margin:18px 0 10px;font-size:12px;font-weight:700;letter-spacing:1.6px;color:${palette.primary}">瞬间 · 2</p>${quote('示例瞬间内容')}`,
+          unsubscribeUrl: `${siteUrl}/newsletter/unsubscribe?token=sample`,
+        },
+        defaultSubject: '【{{siteName}}】本周更新 · {{periodLabel}}',
+        defaultHtml: layout(
+          '本周的角落，有了新内容',
+          `<p style="margin:0 0 20px">这一周共发布了 <strong style="color:${palette.primary};font-size:17px">{{totalCount}}</strong> 条内容，欢迎回来看看。</p>{{{itemsHtml}}}<p style="margin:14px 0 0">${button('{{siteUrl}}', '访问站点')}</p><p style="margin:26px 0 0;padding-top:16px;border-top:1px solid ${palette.border};font-size:12px;color:${palette.text3}">不想再收到周报？<a href="{{unsubscribeUrl}}" target="_blank" style="color:${palette.text3}">一键退订</a></p>`,
         ),
       },
       {
@@ -716,7 +879,7 @@ export class EmailService {
         defaultSubject: '【{{siteName}}】邮件测试',
         defaultHtml: layout(
           '邮件服务测试成功',
-          '<p>如果你看到这封邮件，说明 SMTP 发信配置可用。</p><a href="{{siteUrl}}" style="color:#b36f32">访问站点</a>',
+          `<p style="margin:0">如果你看到这封邮件，说明 SMTP 发信配置可用。</p><p style="margin:14px 0 0">${button('{{siteUrl}}', '访问站点')}</p>`,
         ),
       },
     ];

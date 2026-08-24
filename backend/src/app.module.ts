@@ -21,6 +21,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { MusicModule } from './modules/music/music.module';
 import { EmojiModule } from './modules/emoji/emoji.module';
 import { EmailModule } from './modules/email/email.module';
+import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { FriendLinkModule } from './modules/friend-link/friend-link.module';
 import { LibraryModule } from './modules/library/library.module';
@@ -73,6 +74,7 @@ import { BackupModule } from './modules/backup/backup.module';
     MusicModule,
     EmojiModule,
     EmailModule,
+    NewsletterModule,
     NotificationModule,
     FriendLinkModule,
     LibraryModule,

@@ -144,6 +144,8 @@
           </section>
         </div>
 
+        <NewsletterBar v-if="adjacentLoaded" class="article-anim" />
+
         <div v-if="adjacentLoaded" class="surround-post article-anim">
           <AppLink
             v-if="prevArticle"

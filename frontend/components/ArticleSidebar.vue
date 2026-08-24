@@ -484,7 +484,7 @@ onUnmounted(() => {
 .sidebar-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-evenly;
   gap: 8px;
   flex-shrink: 0;
   padding: 4px 0 0;

@@ -524,6 +524,21 @@ model EmailLog {
   @@map("email_logs")
 }
 
+model NewsletterSubscriber {
+  id          String    @id @default(uuid()) @db.Uuid
+  email       String    @unique @db.VarChar(255)
+  status      String    @default("pending") @db.VarChar(20)
+  token       String    @unique @db.VarChar(64)
+  source      String    @default("article") @db.VarChar(30)
+  confirmedAt DateTime? @map("confirmed_at")
+  lastSentAt  DateTime? @map("last_sent_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, confirmedAt])
+  @@map("newsletter_subscribers")
+}
+
 model Notification {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
