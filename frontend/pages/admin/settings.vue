@@ -1,6 +1,6 @@
 <template>
   <div class="settings-page admin-page-shell">
-    <header class="admin-page-head"><div><h1>站点设置</h1><p>集中管理站点信息、邮件、上传策略与音乐资源。</p></div><a-button :loading="healthLoading" @click="loadConfigHealth"><Icon name="ph:heartbeat-bold" /> 配置体检</a-button></header>
+    <header class="admin-page-head"><div><span>SYSTEM SETTINGS</span><h1>站点设置</h1><p>集中管理站点信息、邮件、上传策略与音乐资源。</p></div><a-button :loading="healthLoading" @click="loadConfigHealth"><Icon name="ph:heartbeat-bold" /> 配置体检</a-button></header>
     <section class="config-health" :class="{ attention: configHealth.requiredMissing }">
       <header><div><Icon :name="configHealth.requiredMissing ? 'ph:warning-circle-bold' : 'ph:check-circle-bold'" /><span><strong>{{ configHealth.requiredMissing ? `${configHealth.requiredMissing} 项必要配置缺失` : '必要配置已齐全' }}</strong><small>{{ configHealth.configuredCount }} / {{ configHealth.checks.length }} 项已配置</small></span></div><time v-if="configHealth.checkedAt">{{ String(configHealth.checkedAt).slice(0, 16).replace('T', ' ') }}</time></header>
       <div class="health-grid"><article v-for="item in configHealth.checks" :key="item.key"><i :class="{ ok: item.configured }"><Icon :name="item.configured ? 'ph:check-bold' : 'ph:x-bold'" /></i><span><strong>{{ item.label }}</strong><small>{{ item.source }}</small></span><a-tag :color="item.configured ? 'green' : item.required ? 'red' : 'default'">{{ item.configured ? '已配置' : item.required ? '必需' : '可选' }}</a-tag></article></div>

@@ -5,105 +5,110 @@ import {
 } from "vue-router";
 import { setCompatRouter } from "./compat/runtime";
 import { useFeatureFlags } from "./composables/useFeatureFlags";
+import { importWithRetry } from "./utils/lazyImport";
+
+function lazyRoute<T>(loader: () => Promise<T>) {
+  return () => importWithRetry(loader);
+}
 
 const adminMeta = { layout: "admin", requiresAuth: true } as const;
 
 const routes: RouteRecordRaw[] = [
   {
     path: "/",
-    component: () => import("./pages/index.vue"),
+    component: lazyRoute(() => import("./pages/index.vue")),
     meta: { layout: "welcome" },
   },
-  { path: "/home", component: () => import("./pages/home.vue") },
+  { path: "/home", component: lazyRoute(() => import("./pages/home.vue")) },
   {
     path: "/article/:slug",
-    component: () => import("./pages/article/[slug].vue"),
+    component: lazyRoute(() => import("./pages/article/[slug].vue")),
   },
-  { path: "/archive", component: () => import("./pages/archive.vue") },
-  { path: "/category", component: () => import("./pages/category.vue") },
-  { path: "/tags", component: () => import("./pages/tags.vue") },
-  { path: "/friends", component: () => import("./pages/friends.vue") },
-  { path: "/guestbook", component: () => import("./pages/guestbook.vue") },
-  { path: "/about", component: () => import("./pages/about.vue") },
-  { path: "/moments", component: () => import("./pages/moments/index.vue") },
+  { path: "/archive", component: lazyRoute(() => import("./pages/archive.vue")) },
+  { path: "/category", component: lazyRoute(() => import("./pages/category.vue")) },
+  { path: "/tags", component: lazyRoute(() => import("./pages/tags.vue")) },
+  { path: "/friends", component: lazyRoute(() => import("./pages/friends.vue")) },
+  { path: "/guestbook", component: lazyRoute(() => import("./pages/guestbook.vue")) },
+  { path: "/about", component: lazyRoute(() => import("./pages/about.vue")) },
+  { path: "/moments", component: lazyRoute(() => import("./pages/moments/index.vue")) },
   {
     path: "/moments/:slug",
-    component: () => import("./pages/moments/[slug].vue"),
+    component: lazyRoute(() => import("./pages/moments/[slug].vue")),
   },
   {
     path: "/places/:slug",
-    component: () => import("./pages/places/[slug].vue"),
+    component: lazyRoute(() => import("./pages/places/[slug].vue")),
   },
-  { path: "/time/map", component: () => import("./pages/time/map.vue") },
+  { path: "/time/map", component: lazyRoute(() => import("./pages/time/map.vue")) },
   {
     path: "/time/constellation",
-    component: () => import("./pages/time/constellation.vue"),
+    component: lazyRoute(() => import("./pages/time/constellation.vue")),
     meta: { layout: "welcome" },
   },
-  { path: "/albums", component: () => import("./pages/albums/index.vue") },
+  { path: "/albums", component: lazyRoute(() => import("./pages/albums/index.vue")) },
   {
     path: "/albums/:slug",
-    component: () => import("./pages/albums/[slug].vue"),
+    component: lazyRoute(() => import("./pages/albums/[slug].vue")),
   },
-  { path: "/library", component: () => import("./pages/library/index.vue") },
+  { path: "/library", component: lazyRoute(() => import("./pages/library/index.vue")) },
   {
     path: "/library/:slug",
-    component: () => import("./pages/library/[slug].vue"),
+    component: lazyRoute(() => import("./pages/library/[slug].vue")),
   },
   {
     path: "/newsletter/confirm",
-    component: () => import("./pages/newsletter/confirm.vue"),
+    component: lazyRoute(() => import("./pages/newsletter/confirm.vue")),
     meta: { layout: false },
   },
   {
     path: "/newsletter/unsubscribe",
-    component: () => import("./pages/newsletter/unsubscribe.vue"),
+    component: lazyRoute(() => import("./pages/newsletter/unsubscribe.vue")),
     meta: { layout: false },
   },
   {
     path: "/login",
-    component: () => import("./pages/login.vue"),
+    component: lazyRoute(() => import("./pages/login.vue")),
     meta: { layout: false },
   },
   {
     path: "/register",
-    component: () => import("./pages/register.vue"),
+    component: lazyRoute(() => import("./pages/register.vue")),
     meta: { layout: false },
   },
 
   {
     path: "/admin",
-    component: () => import("./pages/admin/index.vue"),
+    component: lazyRoute(() => import("./pages/admin/index.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/about",
-    component: () => import("./pages/admin/about.vue"),
+    component: lazyRoute(() => import("./pages/admin/about.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/backups",
-    component: () => import("./pages/admin/backups.vue"),
+    component: lazyRoute(() => import("./pages/admin/backups.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/albums",
-    component: () => import("./pages/admin/albums/index.vue"),
+    component: lazyRoute(() => import("./pages/admin/albums/index.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/albums/create",
-    component: () => import("./pages/admin/albums/create.vue"),
+    component: lazyRoute(() => import("./pages/admin/albums/create.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/albums/:id",
-    component: () => import("./pages/admin/albums/[id].vue"),
+    component: lazyRoute(() => import("./pages/admin/albums/[id].vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/ai",
-    component: () => import("./pages/admin/ai/index.vue"),
+    component: lazyRoute(() => import("./pages/admin/ai/index.vue")),
     meta: adminMeta,
   },
   {
@@ -113,22 +118,22 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/categories",
-    component: () => import("./pages/admin/categories.vue"),
+    component: lazyRoute(() => import("./pages/admin/categories.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/comments",
-    component: () => import("./pages/admin/comments.vue"),
+    component: lazyRoute(() => import("./pages/admin/comments.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/email",
-    component: () => import("./pages/admin/email.vue"),
+    component: lazyRoute(() => import("./pages/admin/email.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/emoji",
-    component: () => import("./pages/admin/emoji.vue"),
+    component: lazyRoute(() => import("./pages/admin/emoji.vue")),
     meta: adminMeta,
   },
   {
@@ -138,27 +143,27 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/friends",
-    component: () => import("./pages/admin/friends.vue"),
+    component: lazyRoute(() => import("./pages/admin/friends.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/info",
-    component: () => import("./pages/admin/info.vue"),
+    component: lazyRoute(() => import("./pages/admin/info.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/library",
-    component: () => import("./pages/admin/library/index.vue"),
+    component: lazyRoute(() => import("./pages/admin/library/index.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/library/create",
-    component: () => import("./pages/admin/library/create.vue"),
+    component: lazyRoute(() => import("./pages/admin/library/create.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/library/:id",
-    component: () => import("./pages/admin/library/[id].vue"),
+    component: lazyRoute(() => import("./pages/admin/library/[id].vue")),
     meta: adminMeta,
   },
   {
@@ -168,92 +173,92 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/media",
-    component: () => import("./pages/admin/media.vue"),
+    component: lazyRoute(() => import("./pages/admin/media.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/messages",
-    component: () => import("./pages/admin/messages.vue"),
+    component: lazyRoute(() => import("./pages/admin/messages.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/newsletter",
-    component: () => import("./pages/admin/newsletter.vue"),
+    component: lazyRoute(() => import("./pages/admin/newsletter.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/visitor",
-    component: () => import("./pages/admin/visitor.vue"),
+    component: lazyRoute(() => import("./pages/admin/visitor.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/memory-graph",
-    component: () => import("./pages/admin/memory-graph.vue"),
+    component: lazyRoute(() => import("./pages/admin/memory-graph.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/moments",
-    component: () => import("./pages/admin/moments/index.vue"),
+    component: lazyRoute(() => import("./pages/admin/moments/index.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/moments/create",
-    component: () => import("./pages/admin/moments/create.vue"),
+    component: lazyRoute(() => import("./pages/admin/moments/create.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/moments/preview",
-    component: () => import("./pages/admin/moments/preview.vue"),
+    component: lazyRoute(() => import("./pages/admin/moments/preview.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/moments/:slug",
-    component: () => import("./pages/admin/moments/[slug].vue"),
+    component: lazyRoute(() => import("./pages/admin/moments/[slug].vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/posts",
-    component: () => import("./pages/admin/posts/index.vue"),
+    component: lazyRoute(() => import("./pages/admin/posts/index.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/posts/create",
-    component: () => import("./pages/admin/posts/create.vue"),
+    component: lazyRoute(() => import("./pages/admin/posts/create.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/posts/preview",
-    component: () => import("./pages/admin/posts/preview.vue"),
+    component: lazyRoute(() => import("./pages/admin/posts/preview.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/posts/:slug",
-    component: () => import("./pages/admin/posts/[slug].vue"),
+    component: lazyRoute(() => import("./pages/admin/posts/[slug].vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/profile",
-    component: () => import("./pages/admin/profile.vue"),
+    component: lazyRoute(() => import("./pages/admin/profile.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/settings",
-    component: () => import("./pages/admin/settings.vue"),
+    component: lazyRoute(() => import("./pages/admin/settings.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/tags",
-    component: () => import("./pages/admin/tags.vue"),
+    component: lazyRoute(() => import("./pages/admin/tags.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/analytics",
-    component: () => import("./pages/admin/analytics.vue"),
+    component: lazyRoute(() => import("./pages/admin/analytics.vue")),
     meta: adminMeta,
   },
   {
     path: "/admin/users",
-    component: () => import("./pages/admin/users.vue"),
+    component: lazyRoute(() => import("./pages/admin/users.vue")),
     meta: adminMeta,
   },
   { path: "/:pathMatch(.*)*", redirect: "/" },
@@ -331,9 +336,23 @@ router.afterEach((to) => {
   );
 });
 
-router.onError(() => {
+router.onError((error, to) => {
   if (typeof document !== "undefined")
     document.documentElement.classList.remove("space-pending");
+
+  const message = String(error instanceof Error ? error.message : error);
+  const isModuleLoadError = /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror/i.test(message);
+  if (!isModuleLoadError || typeof window === "undefined") return;
+
+  // A stale dev-server graph or an old deployed chunk can recover after one reload.
+  // Keep a per-route marker so a genuinely broken module cannot reload forever.
+  const marker = `corner:module-reload:${to.fullPath}`;
+  if (sessionStorage.getItem(marker) === "1") {
+    sessionStorage.removeItem(marker);
+    return;
+  }
+  sessionStorage.setItem(marker, "1");
+  window.location.reload();
 });
 
 export default router;

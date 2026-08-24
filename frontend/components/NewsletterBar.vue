@@ -1,29 +1,33 @@
 <template>
   <section class="newsletter-bar" aria-label="邮件订阅">
-    <div class="nl-icon" aria-hidden="true">
+    <div class="nl-mark" aria-hidden="true">
       <Icon name="ph:paper-plane-tilt-bold" />
+      <span>NEWSLETTER</span>
     </div>
     <div class="nl-copy">
-      <strong>订阅风隅周报</strong>
+      <strong>把下一篇寄给你</strong>
       <span>每周精选新文章与瞬间，安静地送进你的邮箱。</span>
     </div>
     <form class="nl-form" @submit.prevent="onSubscribe">
+      <label class="sr-only" for="newsletter-email">邮箱地址</label>
       <input
+        id="newsletter-email"
         v-model.trim="email"
         type="email"
         name="email"
         class="nl-input"
-        placeholder="you@example.com"
+        placeholder="输入邮箱地址"
         aria-label="邮箱地址"
         :disabled="submitting"
         required
       />
       <button type="submit" class="nl-btn" :disabled="submitting">
+        <span>{{ submitLabel }}</span>
         <Icon
           :name="submitting ? 'ph:circle-notch-bold' : 'ph:arrow-right-bold'"
           :class="{ spinning: submitting }"
+          aria-hidden="true"
         />
-        {{ submitLabel }}
       </button>
     </form>
   </section>
@@ -71,24 +75,31 @@ async function onSubscribe() {
 .newsletter-bar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 28px;
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 14px);
-  background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
+  gap: 18px;
+  margin-top: 24px;
+  padding: 20px 2px 22px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 56%, transparent);
+  background: color-mix(in srgb, var(--c-primary-soft) 18%, transparent);
 }
 
-.nl-icon {
+.nl-mark {
   flex: 0 0 auto;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--c-primary) 10%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 7px;
   color: var(--c-primary);
-  font-size: 1.25rem;
+  font-size: 1.05rem;
+}
+
+.nl-mark span {
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
 }
 
 .nl-copy {
@@ -101,29 +112,34 @@ async function onSubscribe() {
 
 .nl-copy strong {
   color: var(--c-text);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .nl-copy span {
   color: var(--c-text-3);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   line-height: 1.5;
 }
 
 .nl-form {
   display: flex;
   flex: 0 0 auto;
-  gap: 8px;
+  width: min(100%, 310px);
+  gap: 6px;
+  margin-left: auto;
 }
 
 .nl-input {
-  width: 210px;
-  padding: 9px 13px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 11px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--c-bg, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ld-bg-card) 74%, transparent);
   color: var(--c-text);
-  font-size: 0.82rem;
+  font: inherit;
+  font-size: 0.72rem;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -141,24 +157,29 @@ async function onSubscribe() {
 
 .nl-btn {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
-  padding: 9px 16px;
-  border: none;
-  border-radius: 999px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 70%, transparent);
+  border-radius: 8px;
   background: var(--c-primary);
   color: #fff;
-  font-size: 0.82rem;
+  font: inherit;
+  font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
   transition:
     filter 0.2s ease,
-    transform 0.2s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .nl-btn:hover:not(:disabled) {
   filter: brightness(1.08);
   transform: translateY(-1px);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--c-primary) 24%, transparent);
 }
 
 .nl-btn:disabled {
@@ -170,6 +191,18 @@ async function onSubscribe() {
   animation: nl-spin 0.9s linear infinite;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @keyframes nl-spin {
   to {
     transform: rotate(360deg);
@@ -178,23 +211,54 @@ async function onSubscribe() {
 
 @media (max-width: 720px) {
   .newsletter-bar {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 5px 11px;
+    padding: 17px 0 18px;
   }
 
-  .nl-icon {
-    margin: 0 auto;
+  .nl-mark {
+    grid-row: span 2;
+    align-self: start;
+    padding-top: 2px;
+  }
+
+  .nl-mark span {
+    display: none;
+  }
+
+  .nl-copy {
+    align-self: center;
   }
 
   .nl-form {
-    flex-direction: column;
+    grid-column: 2;
+    width: 100%;
+    margin: 5px 0 0;
   }
 
-  .nl-input,
+  .nl-input {
+    min-width: 0;
+  }
+
   .nl-btn {
-    width: 100%;
     justify-content: center;
+    padding-right: 11px;
+    padding-left: 11px;
+  }
+}
+
+@media (max-width: 390px) {
+  .newsletter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .nl-mark {
+    grid-row: auto;
+  }
+
+  .nl-form {
+    grid-column: 1;
   }
 }
 </style>

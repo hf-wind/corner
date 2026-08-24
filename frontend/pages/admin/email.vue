@@ -1,6 +1,6 @@
 <template>
   <div class="email-logs-page admin-page-shell">
-    <header class="admin-page-head"><div><h1>邮件通知</h1><p>管理通知模板、发送预览和完整投递日志。</p></div><AdminRefreshButton :loading="tab === 'templates' ? templatesLoading : loading" @click="tab === 'templates' ? loadTemplates() : loadLogs()" /></header>
+    <header class="admin-page-head"><div><span>COMMUNICATION</span><h1>邮件通知</h1><p>管理通知模板、发送预览和完整投递日志。</p></div><AdminRefreshButton :loading="tab === 'templates' ? templatesLoading : loading" @click="tab === 'templates' ? loadTemplates() : loadLogs()" /></header>
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="templates" tab="邮件模板" />
       <a-tab-pane key="logs" tab="发送记录" />
@@ -396,11 +396,26 @@ function stripHtml(html: string) {
   display: block;
   box-sizing: border-box;
   width: 100%;
-  min-height: 460px;
-  max-height: 520px;
-  overflow-y: auto !important;
-  resize: vertical;
   font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.html-editor {
+  height: min(520px, calc(100dvh - 360px));
+  min-height: 260px;
+  max-height: none;
+  overflow-y: auto !important;
+  padding-bottom: 28px;
+  resize: none;
+  scroll-padding-bottom: 28px;
+}
+.html-editor :deep(textarea),
+.html-editor :deep(.ant-input) {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto !important;
+  padding-bottom: 28px;
+  resize: none;
+  scroll-padding-bottom: 28px;
 }
 
 .section-card {
@@ -517,7 +532,6 @@ function stripHtml(html: string) {
 .html-editor :deep(textarea),
 .html-editor :deep(.ant-input) {
   overflow-y: auto !important;
-  resize: vertical;
 }
 .template-editor-spin { overflow: hidden; }
 .template-editor { min-height: 0; }

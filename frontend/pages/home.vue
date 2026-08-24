@@ -93,12 +93,13 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
 import { useBottomDockState } from "~/composables/useBottomDockState";
+import { importWithRetry } from "~/utils/lazyImport";
 
 const FeaturedSwiper = defineAsyncComponent(
-  () => import("~/components/FeaturedSwiper.vue"),
+  () => importWithRetry(() => import("~/components/FeaturedSwiper.vue"), 2, 180, "featured-swiper"),
 );
 const HomeSidebar = defineAsyncComponent(
-  () => import("~/components/HomeSidebar.vue"),
+  () => importWithRetry(() => import("~/components/HomeSidebar.vue"), 2, 180, "home-sidebar"),
 );
 import SectionHead from "~/components/SectionHead.vue";
 const api = useApi();

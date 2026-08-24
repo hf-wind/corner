@@ -105,6 +105,17 @@ export class HttpCacheInterceptor implements NestInterceptor {
   private isCacheable(request: Request): boolean {
     if (request.headers.authorization || request.headers.cookie) return false;
     const path = request.path;
+    // Visitor and AI guest headers identify per-user state. The public cache
+    // key intentionally does not include them, so never share these responses.
+    if (request.headers['x-visitor-id'] || request.headers['x-ai-guest-id'])
+      return false;
+    if (
+      path === '/visitor/new-id' ||
+      path === '/music/proxy' ||
+      path === '/emoji-packs/asset' ||
+      /\/stories\/[^/]+\/share-cover\.png$/.test(path)
+    )
+      return false;
     if (path === '/rss.xml') return false;
     if (/\/(?:health|auth|notifications)(?:\/|$)/.test(path)) return false;
     // Weather has provider-specific stale caching and must still work while Redis reconnects.

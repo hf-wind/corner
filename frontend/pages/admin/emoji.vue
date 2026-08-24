@@ -1,6 +1,6 @@
 <template>
   <div class="emoji-admin admin-page-shell">
-    <header class="admin-page-head"><div><h1>表情资源</h1><p>管理表情包、Unicode 字符和动态图片资源。</p></div><a-button type="primary" @click="openAddPack"><PlusOutlined /> 添加表情包</a-button></header>
+<header class="admin-page-head"><div><span>CONTENT RESOURCES</span><h1>表情资源</h1><p>管理表情包、Unicode 字符和动态图片资源。</p></div><a-button type="primary" @click="openAddPack"><PlusOutlined /> 添加表情包</a-button></header>
     <div class="table-toolbar">
       <a-input v-model:value="packKeywordInput" allow-clear placeholder="搜索表情包" class="pack-search" @press-enter="applyPackSearch">
         <template #prefix><Icon name="ph:magnifying-glass" /></template>
