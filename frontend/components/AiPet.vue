@@ -14,10 +14,7 @@
           <header class="pet-chat-head">
             <div class="pet-chat-title">
               <span class="pet-chat-avatar" aria-hidden="true">
-                <span
-                  class="dora-avatar-image"
-                  :style="{ backgroundImage: `url(${spriteUrl})` }"
-                />
+                <img class="dora-avatar-image" :src="dramAvatarImg" alt="" />
               </span>
               <div>
                 <div class="pet-name-row">
@@ -231,6 +228,7 @@
 <script setup lang="ts">
 import MarkdownIt from "markdown-it";
 import petMeta from "~/assets/dram/pet.json";
+import dramAvatarImg from "~/assets/images/dram-avatar.processed.png";
 import { aiCardImage, cleanAiExcerpt, cleanAiTitle } from "~/utils/aiContent";
 const spriteUrl = "/dram/spritesheet.webp";
 
@@ -1324,14 +1322,17 @@ onUnmounted(() => {
 }
 
 .pet-chat-avatar {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--c-primary-soft);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--c-primary) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 20%, var(--border));
+  background: color-mix(in srgb, var(--c-primary-soft) 62%, var(--ld-bg-card));
+  box-shadow:
+    0 7px 18px color-mix(in srgb, var(--c-primary) 18%, transparent),
+    0 1px 0 color-mix(in srgb, #fff 65%, transparent) inset;
   flex-shrink: 0;
 }
 
@@ -1339,11 +1340,8 @@ onUnmounted(() => {
   display: block;
   width: 100%;
   height: 100%;
-  background-repeat: no-repeat;
-  background-size: 288px 312px;
-  background-position: 0 0;
-  transform: scale(1.18);
-  transform-origin: center;
+  padding: 3px;
+  object-fit: contain;
 }
 
 .pet-chat-avatar :deep(.icon) {

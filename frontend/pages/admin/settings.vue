@@ -1,12 +1,64 @@
 <template>
   <div class="settings-page admin-page-shell">
-    <header class="admin-page-head"><div><span>SYSTEM SETTINGS</span><h1>站点设置</h1><p>集中管理站点信息、邮件、上传策略与音乐资源。</p></div><a-button :loading="healthLoading" @click="loadConfigHealth"><Icon name="ph:heartbeat-bold" /> 配置体检</a-button></header>
-    <section class="config-health" :class="{ attention: configHealth.requiredMissing }">
-      <header><div><Icon :name="configHealth.requiredMissing ? 'ph:warning-circle-bold' : 'ph:check-circle-bold'" /><span><strong>{{ configHealth.requiredMissing ? `${configHealth.requiredMissing} 项必要配置缺失` : '必要配置已齐全' }}</strong><small>{{ configHealth.configuredCount }} / {{ configHealth.checks.length }} 项已配置</small></span></div><time v-if="configHealth.checkedAt">{{ String(configHealth.checkedAt).slice(0, 16).replace('T', ' ') }}</time></header>
-      <div class="health-grid"><article v-for="item in configHealth.checks" :key="item.key"><i :class="{ ok: item.configured }"><Icon :name="item.configured ? 'ph:check-bold' : 'ph:x-bold'" /></i><span><strong>{{ item.label }}</strong><small>{{ item.source }}</small></span><a-tag :color="item.configured ? 'green' : item.required ? 'red' : 'default'">{{ item.configured ? '已配置' : item.required ? '必需' : '可选' }}</a-tag></article></div>
+    <header class="admin-page-head">
+      <div>
+        <span>SYSTEM SETTINGS</span>
+        <h1>站点设置</h1>
+        <p>集中管理站点信息、邮件、上传策略与音乐资源。</p>
+      </div>
+      <a-button :loading="healthLoading" @click="loadConfigHealth"
+        ><Icon name="ph:heartbeat-bold" /> 配置体检</a-button
+      >
+    </header>
+    <section
+      class="config-health"
+      :class="{ attention: configHealth.requiredMissing }"
+    >
+      <header>
+        <div>
+          <Icon
+            :name="
+              configHealth.requiredMissing
+                ? 'ph:warning-circle-bold'
+                : 'ph:check-circle-bold'
+            "
+          /><span
+            ><strong>{{
+              configHealth.requiredMissing
+                ? `${configHealth.requiredMissing} 项必要配置缺失`
+                : "必要配置已齐全"
+            }}</strong
+            ><small
+              >{{ configHealth.configuredCount }} /
+              {{ configHealth.checks.length }} 项已配置</small
+            ></span
+          >
+        </div>
+        <time v-if="configHealth.checkedAt">{{
+          String(configHealth.checkedAt).slice(0, 16).replace("T", " ")
+        }}</time>
+      </header>
+      <div class="health-grid">
+        <article v-for="item in configHealth.checks" :key="item.key">
+          <i :class="{ ok: item.configured }"
+            ><Icon :name="item.configured ? 'ph:check-bold' : 'ph:x-bold'" /></i
+          ><span
+            ><strong>{{ item.label }}</strong
+            ><small>{{ item.source }}</small></span
+          ><a-tag
+            :color="
+              item.configured ? 'green' : item.required ? 'red' : 'default'
+            "
+            >{{
+              item.configured ? "已配置" : item.required ? "必需" : "可选"
+            }}</a-tag
+          >
+        </article>
+      </div>
     </section>
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="website" tab="网站信息" />
+      <a-tab-pane key="circle" tab="朋友圈" />
       <a-tab-pane key="basic" tab="基本设置" />
       <a-tab-pane key="email" tab="邮件配置" />
       <a-tab-pane key="music" tab="音乐播放器" />
@@ -14,25 +66,160 @@
 
     <div v-show="tab === 'website'" class="tab-body">
       <a-space direction="vertical" :size="16" style="width: 100%">
-        <AdminCard icon="ph:house-bold" title="默认站点信息" desc="前台标题、搜索描述与系统默认站点资料">
-          <a-form labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
-            <a-form-item label="标题"><a-input v-model:value="settings.site_title" /></a-form-item>
-            <a-form-item label="公开地址"><a-input v-model:value="settings.site_url" placeholder="https://corner.ink" /></a-form-item>
-            <a-form-item label="描述"><a-textarea v-model:value="settings.site_description" :rows="3" /></a-form-item>
-            <a-form-item label="关键词"><a-input v-model:value="keywordText" placeholder="逗号分隔" /></a-form-item>
-            <a-form-item :wrapper-col="{ style: { marginLeft: '88px' } }"><a-button type="primary" :loading="websiteSaving" @click="saveWebsiteSettings"><Icon name="ph:floppy-disk-bold" /> 保存网站信息</a-button></a-form-item>
+        <AdminCard
+          icon="ph:house-bold"
+          title="默认站点信息"
+          desc="前台标题、搜索描述与系统默认站点资料"
+        >
+          <a-form
+            labelAlign="left"
+            size="middle"
+            :label-col="{ style: { width: '88px' } }"
+          >
+            <a-form-item label="标题"
+              ><a-input v-model:value="settings.site_title"
+            /></a-form-item>
+            <a-form-item label="公开地址"
+              ><a-input
+                v-model:value="settings.site_url"
+                placeholder="https://corner.ink"
+            /></a-form-item>
+            <a-form-item label="描述"
+              ><a-textarea v-model:value="settings.site_description" :rows="3"
+            /></a-form-item>
+            <a-form-item label="关键词"
+              ><a-input v-model:value="keywordText" placeholder="逗号分隔"
+            /></a-form-item>
+            <a-form-item :wrapper-col="{ style: { marginLeft: '88px' } }"
+              ><a-button
+                type="primary"
+                :loading="websiteSaving"
+                @click="saveWebsiteSettings"
+                ><Icon name="ph:floppy-disk-bold" /> 保存网站信息</a-button
+              ></a-form-item
+            >
           </a-form>
         </AdminCard>
-        <AdminCard icon="ph:handshake-bold" title="友链展示资料" desc="用于友链页展示、互链申请和本站默认对外资料">
-          <a-alert type="info" show-icon message="站点名称、地址和描述直接共用上方默认站点信息；这里只补充友链展示需要的头像、RSS 和联系邮箱。" />
-          <a-form class="site-profile-form" labelAlign="left" size="middle" :label-col="{ style: { width: '88px' } }">
-            <a-form-item label="站点 Logo"><a-input v-model:value="siteForm.avatar" placeholder="/logo.png" /><div class="site-logo-preview" :class="{ failed: siteLogoFailed }"><img v-if="!siteLogoFailed" :src="siteForm.avatar || '/logo.png'" alt="友链 Logo 预览" @error="siteLogoFailed = true"><Icon v-else name="ph:image-broken-bold" /><span>{{ siteLogoFailed ? 'Logo 加载失败，请检查地址' : '实时预览' }}</span></div></a-form-item>
-            <a-form-item label="RSS 地址"><a-input v-model:value="siteForm.rssUrl" placeholder="https://corner.ink/api/rss.xml" /></a-form-item>
-            <a-form-item label="联系邮箱"><a-input v-model:value="siteForm.contactEmail" type="email" /></a-form-item>
-            <a-form-item :wrapper-col="{ style: { marginLeft: '88px' } }"><a-button type="primary" :loading="siteSaving" @click="saveSiteInfo"><Icon name="ph:floppy-disk-bold" /> 保存展示资料</a-button></a-form-item>
+        <AdminCard
+          icon="ph:handshake-bold"
+          title="友链展示资料"
+          desc="用于友链页展示、互链申请和本站默认对外资料"
+        >
+          <a-alert
+            type="info"
+            show-icon
+            message="站点名称、地址和描述直接共用上方默认站点信息；这里只补充友链展示需要的头像、RSS 和联系邮箱。"
+          />
+          <a-form
+            class="site-profile-form"
+            labelAlign="left"
+            size="middle"
+            :label-col="{ style: { width: '88px' } }"
+          >
+            <a-form-item label="站点 Logo"
+              ><a-input
+                v-model:value="siteForm.avatar"
+                placeholder="/logo.png"
+              />
+              <div
+                class="site-logo-preview"
+                :class="{ failed: siteLogoFailed }"
+              >
+                <img
+                  v-if="!siteLogoFailed"
+                  :src="siteForm.avatar || '/logo.png'"
+                  alt="友链 Logo 预览"
+                  @error="siteLogoFailed = true"
+                /><Icon v-else name="ph:image-broken-bold" /><span>{{
+                  siteLogoFailed ? "Logo 加载失败，请检查地址" : "实时预览"
+                }}</span>
+              </div></a-form-item
+            >
+            <a-form-item label="RSS 地址"
+              ><a-input
+                v-model:value="siteForm.rssUrl"
+                placeholder="https://corner.ink/api/rss.xml"
+            /></a-form-item>
+            <a-form-item label="联系邮箱"
+              ><a-input v-model:value="siteForm.contactEmail" type="email"
+            /></a-form-item>
+            <a-form-item :wrapper-col="{ style: { marginLeft: '88px' } }"
+              ><a-button
+                type="primary"
+                :loading="siteSaving"
+                @click="saveSiteInfo"
+                ><Icon name="ph:floppy-disk-bold" /> 保存展示资料</a-button
+              ></a-form-item
+            >
           </a-form>
         </AdminCard>
       </a-space>
+    </div>
+
+    <div v-show="tab === 'circle'" class="tab-body">
+      <AdminCard
+        icon="ph:users-three-bold"
+        title="朋友圈聚合"
+        desc="抓取已启用友链的 RSS，整理成轻量的朋友圈动态流"
+      >
+        <a-form
+          labelAlign="left"
+          size="middle"
+          :label-col="{ style: { width: '92px' } }"
+        >
+          <a-form-item label="启用功能"
+            ><a-switch v-model:checked="circle.enabled"
+          /></a-form-item>
+          <a-form-item label="页面标题"
+            ><a-input v-model:value="circle.title" placeholder="朋友圈"
+          /></a-form-item>
+          <a-form-item label="页面副标题"
+            ><a-input
+              v-model:value="circle.subtitle"
+              placeholder="和朋友们分享新鲜事"
+          /></a-form-item>
+          <a-form-item label="封面策略"
+            ><a-radio-group v-model:value="circle.coverMode"
+              ><a-radio value="random">随机封面</a-radio
+              ><a-radio value="fixed">固定封面</a-radio></a-radio-group
+            ></a-form-item
+          >
+          <a-form-item label="固定 URL"
+            ><a-input
+              v-model:value="circle.coverUrl"
+              placeholder="固定模式使用，也可留空使用封面组第一张"
+          /></a-form-item>
+          <a-form-item label="封面组"
+            ><a-textarea
+              v-model:value="circle.coversText"
+              :rows="4"
+              placeholder="每行一个图片 URL；随机模式会从这里抽取"
+            />
+            <div class="cover-picker-row">
+              <a-button size="small" @click="pickCircleCovers"
+                ><Icon name="ph:image-square-bold" /> 从媒体库选择</a-button
+              ><span class="hint"
+                >也可以直接输入 URL，每行一个，最多 20 张。</span
+              >
+            </div></a-form-item
+          >
+          <a-form-item label="最多动态"
+            ><a-input-number v-model:value="circle.maxItems" :min="8" :max="80"
+          /></a-form-item>
+          <a-form-item label="缓存时间"
+            ><a-input-number
+              v-model:value="circle.cacheTtl"
+              :min="60"
+              :max="3600"
+            /><span class="unit-label">秒</span></a-form-item
+          >
+          <div class="settings-save-row">
+            <a-button type="primary" :loading="circleSaving" @click="saveCircle"
+              ><Icon name="ph:floppy-disk-bold" /> 保存朋友圈配置</a-button
+            >
+          </div>
+        </a-form>
+      </AdminCard>
     </div>
 
     <div v-show="tab === 'basic'" class="tab-body">
@@ -48,10 +235,7 @@
             :label-col="{ style: { width: '108px' } }"
           >
             <a-form-item label="文件命名">
-              <a-select
-                v-model:value="mediaNaming"
-                style="width: 200px"
-              >
+              <a-select v-model:value="mediaNaming" style="width: 200px">
                 <a-select-option value="timestamp"
                   >时间戳（默认）</a-select-option
                 >
@@ -94,7 +278,14 @@
               <div class="hint">打捞请求会计入额度，默认 5 次。</div>
             </a-form-item>
           </a-form>
-          <div class="settings-save-row"><a-button type="primary" :loading="basicSaving" @click="saveBasicSettings"><Icon name="ph:floppy-disk-bold" /> 保存基本设置</a-button></div>
+          <div class="settings-save-row">
+            <a-button
+              type="primary"
+              :loading="basicSaving"
+              @click="saveBasicSettings"
+              ><Icon name="ph:floppy-disk-bold" /> 保存基本设置</a-button
+            >
+          </div>
         </AdminCard>
       </a-space>
     </div>
@@ -111,9 +302,7 @@
           :label-col="{ style: { width: '108px' } }"
         >
           <a-form-item label="启用邮件">
-            <a-switch
-              v-model:checked="email.email_enabled"
-            />
+            <a-switch v-model:checked="email.email_enabled" />
           </a-form-item>
           <a-form-item label="SMTP服务器">
             <a-input
@@ -130,9 +319,7 @@
             />
           </a-form-item>
           <a-form-item label="SSL加密">
-            <a-switch
-              v-model:checked="email.email_smtp_secure"
-            />
+            <a-switch v-model:checked="email.email_smtp_secure" />
           </a-form-item>
           <a-form-item label="发信地址">
             <a-input
@@ -190,8 +377,15 @@
               ><Icon name="ph:paper-plane-tilt-bold" /> 发送测试</a-button
             >
           </a-form-item>
-          </a-form>
-          <div class="settings-save-row"><a-button type="primary" :loading="emailSaving" @click="saveEmailConfig"><Icon name="ph:floppy-disk-bold" /> 保存邮件配置</a-button></div>
+        </a-form>
+        <div class="settings-save-row">
+          <a-button
+            type="primary"
+            :loading="emailSaving"
+            @click="saveEmailConfig"
+            ><Icon name="ph:floppy-disk-bold" /> 保存邮件配置</a-button
+          >
+        </div>
       </AdminCard>
     </div>
 
@@ -405,35 +599,87 @@
                         :scroll="{ x: 820 }"
                         class="playlist-track-table"
                       >
-                        <template #bodyCell="{ column, record: track, index: trackIndex }">
+                        <template
+                          #bodyCell="{
+                            column,
+                            record: track,
+                            index: trackIndex,
+                          }"
+                        >
                           <template v-if="column.key === 'cover'">
                             <div class="track-cover-editor">
-                              <img v-if="track.pic" :src="track.pic" alt="" loading="lazy" />
-                              <span v-else><Icon name="ph:music-note-bold" /></span>
+                              <img
+                                v-if="track.pic"
+                                :src="track.pic"
+                                alt=""
+                                loading="lazy"
+                              />
+                              <span v-else
+                                ><Icon name="ph:music-note-bold"
+                              /></span>
                               <a-button
                                 type="text"
                                 size="small"
                                 :loading="coverResolvingKey === track.key"
                                 title="自动获取封面"
                                 @click="resolveTrackCover(track)"
-                              ><Icon name="ph:magnifying-glass-bold" /></a-button>
+                                ><Icon name="ph:magnifying-glass-bold"
+                              /></a-button>
                             </div>
                           </template>
                           <template v-else-if="column.key === 'name'">
-                            <a-input v-model:value="track.name" size="small" placeholder="歌曲名" />
+                            <a-input
+                              v-model:value="track.name"
+                              size="small"
+                              placeholder="歌曲名"
+                            />
                           </template>
                           <template v-else-if="column.key === 'artist'">
-                            <a-input v-model:value="track.artist" size="small" placeholder="歌手" />
+                            <a-input
+                              v-model:value="track.artist"
+                              size="small"
+                              placeholder="歌手"
+                            />
                           </template>
                           <template v-else-if="column.key === 'sort'">
-                            <a-input-number v-model:value="track.sort" size="small" :min="0" :step="10" />
+                            <a-input-number
+                              v-model:value="track.sort"
+                              size="small"
+                              :min="0"
+                              :step="10"
+                            />
                           </template>
                           <template v-else-if="column.key === 'actions'">
                             <div class="track-actions">
-                              <a-button type="text" size="small" :disabled="trackIndex === 0" title="上移" @click="moveTrack(p, trackIndex, -1)"><Icon name="ph:caret-up-bold" /></a-button>
-                              <a-button type="text" size="small" :disabled="trackIndex === p.tracks.length - 1" title="下移" @click="moveTrack(p, trackIndex, 1)"><Icon name="ph:caret-down-bold" /></a-button>
-                              <a-popconfirm title="确认从歌单移除这首歌？" ok-text="移除" cancel-text="取消" @confirm="p.tracks.splice(trackIndex, 1)">
-                                <a-button type="text" danger size="small" title="移除歌曲"><Icon name="ph:trash-bold" /></a-button>
+                              <a-button
+                                type="text"
+                                size="small"
+                                :disabled="trackIndex === 0"
+                                title="上移"
+                                @click="moveTrack(p, trackIndex, -1)"
+                                ><Icon name="ph:caret-up-bold"
+                              /></a-button>
+                              <a-button
+                                type="text"
+                                size="small"
+                                :disabled="trackIndex === p.tracks.length - 1"
+                                title="下移"
+                                @click="moveTrack(p, trackIndex, 1)"
+                                ><Icon name="ph:caret-down-bold"
+                              /></a-button>
+                              <a-popconfirm
+                                title="确认从歌单移除这首歌？"
+                                ok-text="移除"
+                                cancel-text="取消"
+                                @confirm="p.tracks.splice(trackIndex, 1)"
+                              >
+                                <a-button
+                                  type="text"
+                                  danger
+                                  size="small"
+                                  title="移除歌曲"
+                                  ><Icon name="ph:trash-bold"
+                                /></a-button>
                               </a-popconfirm>
                             </div>
                           </template>
@@ -574,7 +820,9 @@
           />
         </a-spin>
         <template #footer>
-          <a-button @click="sourcePicker.open = false"><Icon name="ph:x-bold" /> 取消</a-button>
+          <a-button @click="sourcePicker.open = false"
+            ><Icon name="ph:x-bold" /> 取消</a-button
+          >
           <a-button
             :disabled="!sourcePicker.tracks.length"
             @click="adoptWholeSource"
@@ -608,7 +856,12 @@ const healthLoading = ref(false);
 const websiteSaving = ref(false);
 const basicSaving = ref(false);
 const emailSaving = ref(false);
-const configHealth = reactive<any>({ checks: [], configuredCount: 0, requiredMissing: 0, checkedAt: "" });
+const configHealth = reactive<any>({
+  checks: [],
+  configuredCount: 0,
+  requiredMissing: 0,
+  checkedAt: "",
+});
 const settings = ref({
   site_title: "",
   site_url: "",
@@ -628,6 +881,17 @@ const siteForm = reactive({
   description: "",
   rssUrl: "",
   contactEmail: "1833079849@qq.com",
+});
+const circleSaving = ref(false);
+const circle = reactive({
+  enabled: true,
+  title: "朋友圈",
+  subtitle: "和朋友们分享新鲜事",
+  coverMode: "random",
+  coverUrl: "",
+  coversText: "",
+  maxItems: 36,
+  cacheTtl: 600,
 });
 
 const emailTesting = ref(false);
@@ -730,7 +994,13 @@ const volumePercent = computed({
 
 onMounted(async () => {
   loadConfigHealth();
-  await Promise.all([loadSettings(), loadSiteInfo(), loadMusic(), loadEmail()]);
+  await Promise.all([
+    loadSettings(),
+    loadSiteInfo(),
+    loadMusic(),
+    loadEmail(),
+    loadCircle(),
+  ]);
   settings.value.site_title ||= siteForm.name;
   settings.value.site_url ||= siteForm.url;
   settings.value.site_description ||= siteForm.description;
@@ -752,50 +1022,80 @@ async function loadSiteInfo() {
   }
 }
 
-watch(() => siteForm.avatar, () => { siteLogoFailed.value = false })
+watch(
+  () => siteForm.avatar,
+  () => {
+    siteLogoFailed.value = false;
+  },
+);
 
 async function saveWebsiteSettings() {
   websiteSaving.value = true;
   try {
     const keywords = keywordText.value.split(/[,，]\s*/).filter(Boolean);
     await Promise.all([
-      api.put('/settings', { key: 'site_title', value: settings.value.site_title }),
-      api.put('/settings', { key: 'site_url', value: settings.value.site_url }),
-      api.put('/settings', { key: 'site_description', value: settings.value.site_description }),
-      api.put('/settings', { key: 'site_keywords', value: keywords }),
+      api.put("/settings", {
+        key: "site_title",
+        value: settings.value.site_title,
+      }),
+      api.put("/settings", { key: "site_url", value: settings.value.site_url }),
+      api.put("/settings", {
+        key: "site_description",
+        value: settings.value.site_description,
+      }),
+      api.put("/settings", { key: "site_keywords", value: keywords }),
     ]);
     settings.value.site_keywords = keywords;
-    updateSiteSetting('site_title', settings.value.site_title);
-    updateSiteSetting('site_description', settings.value.site_description);
-    toast.success('网站信息已保存');
-  } catch { toast.error('网站信息保存失败'); }
-  finally { websiteSaving.value = false; }
+    updateSiteSetting("site_title", settings.value.site_title);
+    updateSiteSetting("site_description", settings.value.site_description);
+    toast.success("网站信息已保存");
+  } catch {
+    toast.error("网站信息保存失败");
+  } finally {
+    websiteSaving.value = false;
+  }
 }
 
 async function saveBasicSettings() {
   basicSaving.value = true;
   try {
     await Promise.all([
-      api.put('/settings', { key: 'media_naming', value: mediaNaming.value }),
-      api.put('/settings', { key: 'visitor_bottle_daily_limit', value: settings.value.visitor_bottle_daily_limit }),
-      api.put('/settings', { key: 'visitor_fish_daily_limit', value: settings.value.visitor_fish_daily_limit }),
+      api.put("/settings", { key: "media_naming", value: mediaNaming.value }),
+      api.put("/settings", {
+        key: "visitor_bottle_daily_limit",
+        value: settings.value.visitor_bottle_daily_limit,
+      }),
+      api.put("/settings", {
+        key: "visitor_fish_daily_limit",
+        value: settings.value.visitor_fish_daily_limit,
+      }),
     ]);
-    toast.success('基本设置已保存');
-  } catch { toast.error('基本设置保存失败'); }
-  finally { basicSaving.value = false; }
+    toast.success("基本设置已保存");
+  } catch {
+    toast.error("基本设置保存失败");
+  } finally {
+    basicSaving.value = false;
+  }
 }
 
 async function saveEmailConfig() {
   emailSaving.value = true;
   try {
     const payload: Record<string, unknown> = { ...email };
-    if (!emailPasswordDirty.value || !email.email_smtp_pass.trim()) delete payload.email_smtp_pass;
-    await api.put('/email/config', payload);
-    if (emailPasswordDirty.value) { email.email_smtp_pass = ''; emailPasswordDirty.value = false; }
-    toast.success('邮件配置已保存');
+    if (!emailPasswordDirty.value || !email.email_smtp_pass.trim())
+      delete payload.email_smtp_pass;
+    await api.put("/email/config", payload);
+    if (emailPasswordDirty.value) {
+      email.email_smtp_pass = "";
+      emailPasswordDirty.value = false;
+    }
+    toast.success("邮件配置已保存");
     void loadConfigHealth();
-  } catch { toast.error('邮件配置保存失败'); }
-  finally { emailSaving.value = false; }
+  } catch {
+    toast.error("邮件配置保存失败");
+  } finally {
+    emailSaving.value = false;
+  }
 }
 
 async function saveSiteInfo() {
@@ -854,6 +1154,61 @@ async function loadSettings() {
       );
     }
   } catch {}
+}
+
+async function loadCircle() {
+  try {
+    const result = await api.get<any>("/circle/admin/config");
+    Object.assign(circle, {
+      enabled: result?.enabled !== false,
+      title: result?.title || "朋友圈",
+      subtitle: result?.subtitle || "和朋友们分享新鲜事",
+      coverMode: result?.coverMode === "fixed" ? "fixed" : "random",
+      coverUrl: result?.coverUrl || "",
+      coversText: Array.isArray(result?.covers) ? result.covers.join("\n") : "",
+      maxItems: Number(result?.maxItems) || 36,
+      cacheTtl: Number(result?.cacheTtl) || 600,
+    });
+  } catch {}
+}
+
+async function saveCircle() {
+  circleSaving.value = true;
+  try {
+    await api.put("/circle/admin/config", {
+      enabled: circle.enabled,
+      title: circle.title,
+      subtitle: circle.subtitle,
+      coverMode: circle.coverMode,
+      coverUrl: circle.coverUrl,
+      covers: circle.coversText
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+      maxItems: circle.maxItems,
+      cacheTtl: circle.cacheTtl,
+    });
+    toast.success("朋友圈配置已保存");
+  } catch (error: any) {
+    toast.error(error?.message || "朋友圈配置保存失败");
+  } finally {
+    circleSaving.value = false;
+  }
+}
+
+async function pickCircleCovers() {
+  const items = await openItems({ multiple: true, folder: "cover" });
+  const urls = items
+    .map((item: any) => String(item.path || item.url || "").trim())
+    .filter(Boolean);
+  if (!urls.length) return;
+  const existing = circle.coversText
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  circle.coversText = Array.from(new Set([...existing, ...urls]))
+    .slice(0, 20)
+    .join("\n");
 }
 
 async function loadEmail() {
@@ -980,12 +1335,14 @@ async function loadMusic() {
               key: playlistKey(),
               visible: p.visible !== false,
               expanded: false,
-                  tracks: Array.isArray(p.tracks)
+              tracks: Array.isArray(p.tracks)
                 ? p.tracks.map((track: any, trackIndex: number) => ({
                     ...track,
                     key: trackKey(),
                     pic: track.pic || "",
-                    sort: Number.isFinite(Number(track.sort)) ? Number(track.sort) : (trackIndex + 1) * 10,
+                    sort: Number.isFinite(Number(track.sort))
+                      ? Number(track.sort)
+                      : (trackIndex + 1) * 10,
                   }))
                 : [],
               sort: Number.isFinite(Number(p.sort))
@@ -1212,7 +1569,9 @@ function moveTrack(playlist: PlaylistForm, index: number, offset: number) {
   if (target < 0 || target >= playlist.tracks.length) return;
   const [track] = playlist.tracks.splice(index, 1);
   playlist.tracks.splice(target, 0, track);
-  playlist.tracks.forEach((item, position) => (item.sort = (position + 1) * 10));
+  playlist.tracks.forEach(
+    (item, position) => (item.sort = (position + 1) * 10),
+  );
 }
 
 function beforePlaylistEnter(element: Element) {
@@ -1399,12 +1758,12 @@ async function refreshCache() {
   flex-direction: column;
 }
 .config-health header strong {
-  font-size: .72rem;
+  font-size: 0.72rem;
 }
 .config-health header small,
 .config-health time {
   color: var(--c-text-3);
-  font-size: .54rem;
+  font-size: 0.54rem;
 }
 .health-grid {
   display: grid;
@@ -1442,14 +1801,14 @@ async function refreshCache() {
 }
 .health-grid article strong {
   overflow: hidden;
-  font-size: .6rem;
+  font-size: 0.6rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .health-grid article small {
   overflow: hidden;
   color: var(--c-text-3);
-  font-size: .48rem;
+  font-size: 0.48rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1472,11 +1831,18 @@ async function refreshCache() {
   box-shadow: 0 14px 34px color-mix(in srgb, var(--ld-shadow) 16%, transparent);
 }
 @media (max-width: 900px) {
-  .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 520px) {
-  .health-grid { grid-template-columns: 1fr; }
-  .config-health > header { align-items: flex-start; flex-direction: column; }
+  .health-grid {
+    grid-template-columns: 1fr;
+  }
+  .config-health > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 .hint {
   font-size: 0.72rem;
@@ -2010,8 +2376,36 @@ async function refreshCache() {
     grid-template-columns: 1fr 1fr;
   }
 }
-.settings-save-row { display:flex; justify-content:flex-end; padding-top:12px; border-top:1px solid var(--border); }
-.site-logo-preview { display:flex; align-items:center; gap:10px; margin-top:10px; padding:9px 10px; border:1px solid var(--border); border-radius:8px; background:var(--c-bg-1); color:var(--c-text-3); font-size:.68rem; }
-.site-logo-preview img { width:48px; height:48px; border-radius:6px; background:var(--ld-bg-card); object-fit:contain; }
-.site-logo-preview.failed { color:#d65f5f; }.site-logo-preview.failed :deep(svg) { width:32px; height:32px; }
+.settings-save-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.site-logo-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--c-bg-1);
+  color: var(--c-text-3);
+  font-size: 0.68rem;
+}
+.site-logo-preview img {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: var(--ld-bg-card);
+  object-fit: contain;
+}
+.site-logo-preview.failed {
+  color: #d65f5f;
+}
+.site-logo-preview.failed :deep(svg) {
+  width: 32px;
+  height: 32px;
+}
 </style>

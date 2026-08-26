@@ -77,7 +77,7 @@ async function onSubscribe() {
   align-items: center;
   gap: 18px;
   margin-top: 24px;
-  padding: 20px 2px 22px;
+  padding: 20px 10px 22px;
   border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 56%, transparent);
   background: color-mix(in srgb, var(--c-primary-soft) 18%, transparent);
@@ -214,7 +214,7 @@ async function onSubscribe() {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 5px 11px;
-    padding: 17px 0 18px;
+    padding: 17px 10px 18px;
   }
 
   .nl-mark {

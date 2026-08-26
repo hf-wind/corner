@@ -1,5 +1,9 @@
 <template>
-  <aside id="z-aside" class="sidebar-right" :class="{ 'immersive-sidebar': immersive }">
+  <aside
+    id="z-aside"
+    class="sidebar-right"
+    :class="{ 'immersive-sidebar': immersive }"
+  >
     <header class="widget-head">
       <div class="head-title">
         <Icon name="ph:list-bullets-bold" class="head-icon" />
@@ -13,12 +17,33 @@
       </div>
     </header>
 
-    <div ref="catalogWrapRef" class="catalog-wrap">
-      <ClientOnly>
-        <MdCatalog v-if="resolvedScrollEl" :key="catalogKey" :editor-id="editorId" :scroll-element="resolvedScrollEl"
-          :theme="mdTheme" :offset-top="110" sync-with="preview" class="article-md-catalog" :on-active="onCatalogActive"
-          :on-click="onCatalogClick" />
-      </ClientOnly>
+    <div
+      ref="catalogWrapRef"
+      class="catalog-wrap"
+      :class="{ 'catalog-ready': catalogReady }"
+    >
+      <nav
+        v-if="catalogReady"
+        class="article-catalog-tree"
+        aria-label="文章目录"
+      >
+        <button
+          v-for="item in catalogItems"
+          :key="item.id"
+          type="button"
+          class="catalog-entry"
+          :class="{ active: item.index - 1 === activeCatalogIndex }"
+          :style="{
+            '--catalog-depth': Math.max(0, item.level - 1),
+            '--catalog-order': item.index,
+          }"
+          :title="item.text"
+          :data-catalog-index="item.index - 1"
+          @click="onCatalogClick($event, item)"
+        >
+          <span>{{ item.text }}</span>
+        </button>
+      </nav>
     </div>
 
     <div class="pet-dock" v-if="!immersive">
@@ -26,14 +51,32 @@
     </div>
 
     <div v-if="!immersive" class="sidebar-actions">
-      <button type="button" class="action-btn" title="评论区" @click="emit('scroll-comment')">
+      <button
+        type="button"
+        class="action-btn visible primary"
+        title="去评论区"
+        aria-label="去评论区"
+        @click="emit('scroll-comment')"
+      >
         <Icon name="ph:chat-circle-text-bold" />
       </button>
-      <button type="button" class="action-btn" :class="{ visible: showTop }" title="回到顶部" @click="emit('scroll-top')">
+      <button
+        type="button"
+        class="action-btn"
+        :class="{ visible: showTop }"
+        :disabled="!showTop"
+        title="回到顶部"
+        aria-label="回到顶部"
+        @click="emit('scroll-top')"
+      >
         <Icon name="ph:arrow-up-bold" />
       </button>
-      <button type="button" class="action-btn visible" :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
-        @click="emit('toggle-immersive')">
+      <button
+        type="button"
+        class="action-btn visible"
+        :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+        @click="emit('toggle-immersive')"
+      >
         <Icon name="ph:book-open-text-bold" />
       </button>
     </div>
@@ -41,17 +84,36 @@
 
   <Transition name="immersive-ui">
     <div v-if="immersive" class="immersive-ui">
-      <button type="button" class="immersive-catalog-bar" :class="{ open: immersiveCatalogOpen }" title="文章目录"
-        aria-label="文章目录" @click="immersiveCatalogOpen = !immersiveCatalogOpen">
-        <Icon name="ph:list-bullets-bold" />
-        <span class="bar-title">文章目录</span>
+      <button
+        type="button"
+        class="immersive-catalog-bar"
+        :class="{ open: immersiveCatalogOpen }"
+        title="阅读进度"
+        aria-label="阅读进度"
+        @click="toggleImmersiveCatalog"
+      >
+        <LiquidProgress
+          class="reading-liquid"
+          :progress="percent"
+        />
+        <Icon name="ph:book-open-text-bold" />
+        <span class="bar-title">阅读进度</span>
         <span class="bar-progress">{{ percent }}%</span>
-        <Icon :name="immersiveCatalogOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'
-          " class="bar-caret" />
+        <Icon
+          :name="
+            immersiveCatalogOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'
+          "
+          class="bar-caret"
+        />
       </button>
 
       <Transition name="immersive-catalog">
-        <section v-if="immersiveCatalogOpen" class="immersive-catalog-panel" role="dialog" aria-label="文章目录">
+        <section
+          v-if="immersiveCatalogOpen"
+          class="immersive-catalog-panel"
+          role="dialog"
+          aria-label="文章目录"
+        >
           <header class="immersive-catalog-head">
             <div>
               <Icon name="ph:list-bullets-bold" class="head-icon" />
@@ -59,46 +121,102 @@
             </div>
             <div class="head-right">
               <span class="head-progress">已阅读 {{ percent }}%</span>
-              <button type="button" class="head-close" aria-label="收起目录" title="收起目录"
-                @click="immersiveCatalogOpen = false">
+              <button
+                type="button"
+                class="head-close"
+                aria-label="收起目录"
+                title="收起目录"
+                @click="immersiveCatalogOpen = false"
+              >
                 <Icon name="ph:x-bold" />
               </button>
             </div>
           </header>
-          <div ref="immersiveCatalogWrapRef" class="immersive-catalog-content catalog-wrap">
-            <ClientOnly>
-              <MdCatalog v-if="resolvedScrollEl" :key="`${catalogKey}-immersive`" :editor-id="editorId"
-                :scroll-element="resolvedScrollEl" :theme="mdTheme" :offset-top="110" sync-with="preview"
-                class="article-md-catalog" :on-active="onCatalogActive" :on-click="onCatalogClick" />
-            </ClientOnly>
+          <div
+            ref="immersiveCatalogWrapRef"
+            class="immersive-catalog-content catalog-wrap"
+          >
+            <nav
+              v-if="catalogReady"
+              class="article-catalog-tree"
+              aria-label="沉浸模式文章目录"
+            >
+              <button
+                v-for="item in catalogItems"
+                :key="item.id"
+                type="button"
+                class="catalog-entry"
+                :class="{ active: item.index - 1 === activeCatalogIndex }"
+                :style="{
+                  '--catalog-depth': Math.max(0, item.level - 1),
+                  '--catalog-order': item.index,
+                }"
+                :title="item.text"
+                :data-catalog-index="item.index - 1"
+                @click="onCatalogClick($event, item)"
+              >
+                <span>{{ item.text }}</span>
+              </button>
+            </nav>
           </div>
         </section>
       </Transition>
 
       <div class="immersive-actions">
-        <button type="button" class="im-action" title="去评论区" aria-label="去评论区" @click="emit('scroll-comment')">
+        <button
+          type="button"
+          class="im-action"
+          title="去评论区"
+          aria-label="去评论区"
+          @click="emit('scroll-comment')"
+        >
           <Icon name="ph:chat-circle-text-bold" />
         </button>
-        <button v-if="showTop" type="button" class="im-action" title="回到顶部" aria-label="回到顶部"
-          @click="emit('scroll-top')">
+        <button
+          type="button"
+          class="im-action"
+          :disabled="!showTop"
+          title="回到顶部"
+          aria-label="回到顶部"
+          @click="emit('scroll-top')"
+        >
           <Icon name="ph:arrow-up-bold" />
         </button>
-        <button type="button" class="im-action im-exit" title="退出沉浸阅读" aria-label="退出沉浸阅读"
-          @click="emit('toggle-immersive')">
+        <button
+          type="button"
+          class="im-action im-exit"
+          title="退出沉浸阅读"
+          aria-label="退出沉浸阅读"
+          @click="emit('toggle-immersive')"
+        >
           <Icon name="ph:book-open-bold" />
         </button>
       </div>
     </div>
   </Transition>
 
-  <div class="mobile-article-tools" :class="{ expanded: mobileActionsOpen }" v-show="!immersive">
+  <div
+    class="mobile-article-tools"
+    :class="{ expanded: mobileActionsOpen }"
+    v-show="!immersive"
+  >
     <Transition name="catalog-backdrop">
-      <button v-if="mobileCatalogOpen" type="button" class="mobile-catalog-backdrop" aria-label="关闭文章目录"
-        @click="mobileCatalogOpen = false" />
+      <button
+        v-if="mobileCatalogOpen"
+        type="button"
+        class="mobile-catalog-backdrop"
+        aria-label="关闭文章目录"
+        @click="mobileCatalogOpen = false"
+      />
     </Transition>
 
     <Transition name="mobile-catalog">
-      <section v-if="mobileCatalogOpen" class="mobile-catalog-panel" role="dialog" aria-label="文章目录">
+      <section
+        v-if="mobileCatalogOpen"
+        class="mobile-catalog-panel"
+        role="dialog"
+        aria-label="文章目录"
+      >
         <header class="mobile-catalog-head">
           <div>
             <span class="mobile-catalog-icon">
@@ -109,43 +227,88 @@
               <span>已阅读 {{ percent }}%</span>
             </div>
           </div>
-          <button type="button" aria-label="关闭目录" @click="mobileCatalogOpen = false">
+          <button
+            type="button"
+            aria-label="关闭目录"
+            @click="mobileCatalogOpen = false"
+          >
             <Icon name="ph:x-bold" />
           </button>
         </header>
         <div class="mobile-catalog-progress" aria-hidden="true">
           <i :style="{ width: `${percent}%` }" />
         </div>
-        <div ref="mobileCatalogWrapRef" class="mobile-catalog-content" @click="handleMobileCatalogClick">
-          <ClientOnly>
-            <MdCatalog v-if="resolvedScrollEl" :key="`${catalogKey}-mobile`" :editor-id="editorId"
-              :scroll-element="resolvedScrollEl" :theme="mdTheme" :offset-top="88" sync-with="preview"
-              class="article-md-catalog" :on-active="onCatalogActive" :on-click="onCatalogClick" />
-          </ClientOnly>
+        <div
+          ref="mobileCatalogWrapRef"
+          class="mobile-catalog-content"
+        >
+          <nav
+            v-if="catalogReady"
+            class="article-catalog-tree"
+            aria-label="移动端文章目录"
+          >
+            <button
+              v-for="item in catalogItems"
+              :key="item.id"
+              type="button"
+              class="catalog-entry"
+              :class="{ active: item.index - 1 === activeCatalogIndex }"
+              :style="{
+                '--catalog-depth': Math.max(0, item.level - 1),
+                '--catalog-order': item.index,
+              }"
+              :title="item.text"
+              :data-catalog-index="item.index - 1"
+              @click="onCatalogClick($event, item)"
+            >
+              <span>{{ item.text }}</span>
+            </button>
+          </nav>
         </div>
       </section>
     </Transition>
 
     <Transition name="mobile-tool-menu">
       <div v-if="mobileActionsOpen" class="mobile-tool-menu">
-        <button type="button" aria-label="文章目录" title="文章目录" @click="openMobileCatalog">
+        <button
+          type="button"
+          aria-label="文章目录"
+          title="文章目录"
+          @click="openMobileCatalog"
+        >
           <i>
             <Icon name="ph:list-bullets-bold" />
           </i>
         </button>
-        <button type="button" :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'" :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
-          @click="runMobileAction('immersive')">
+        <button
+          type="button"
+          :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+          :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+          @click="runMobileAction('immersive')"
+        >
           <i>
-            <Icon :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'" />
+            <Icon
+              :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'"
+            />
           </i>
         </button>
-        <button type="button" aria-label="去评论区" title="去评论区" @click="runMobileAction('comment')">
+        <button
+          type="button"
+          aria-label="去评论区"
+          title="去评论区"
+          @click="runMobileAction('comment')"
+        >
           <i>
             <Icon name="ph:chat-circle-text-bold" />
           </i>
         </button>
-        <button type="button" aria-label="回到顶部" title="回到顶部" :class="{ muted: !showTop }"
-          @click="runMobileAction('top')">
+        <button
+          type="button"
+          aria-label="回到顶部"
+          title="回到顶部"
+          :class="{ muted: !showTop }"
+          @click="runMobileAction('top')"
+        >
           <i>
             <Icon name="ph:arrow-up-bold" />
           </i>
@@ -153,10 +316,20 @@
       </div>
     </Transition>
 
-    <button type="button" class="mobile-tool-trigger" :class="{ active: mobileActionsOpen }"
-      :style="{ '--reading-progress': `${percent * 3.6}deg` }" :aria-expanded="mobileActionsOpen"
-      :aria-label="mobileActionsOpen ? '收起文章快捷操作' : '展开文章快捷操作'" @click="mobileActionsOpen = !mobileActionsOpen">
-      <span>
+    <button
+      type="button"
+      class="mobile-tool-trigger"
+      :class="{ active: mobileActionsOpen }"
+      :style="{ '--reading-progress': `${percent}%` }"
+      :aria-expanded="mobileActionsOpen"
+      :aria-label="mobileActionsOpen ? '收起文章快捷操作' : '展开文章快捷操作'"
+      @click="mobileActionsOpen = !mobileActionsOpen"
+    >
+      <LiquidProgress
+        class="mobile-trigger-liquid"
+        :progress="percent"
+      />
+      <span class="mobile-trigger-face">
         <Icon :name="mobileActionsOpen ? 'ph:x-bold' : 'ph:compass-bold'" />
       </span>
     </button>
@@ -164,8 +337,12 @@
 </template>
 
 <script setup lang="ts">
-import { MdCatalog } from "md-editor-v3";
-import "md-editor-v3/lib/preview.css";
+type CatalogItem = {
+  id: string;
+  text: string;
+  level: number;
+  index: number;
+};
 
 const props = withDefaults(
   defineProps<{
@@ -174,6 +351,9 @@ const props = withDefaults(
     progress?: number;
     showTop?: boolean;
     immersive?: boolean;
+    catalogReady?: boolean;
+    catalogItems?: CatalogItem[];
+    activeCatalogIndex?: number;
   }>(),
   {
     editorId: "article-preview",
@@ -181,6 +361,9 @@ const props = withDefaults(
     progress: 0,
     showTop: false,
     immersive: false,
+    catalogReady: false,
+    catalogItems: () => [],
+    activeCatalogIndex: 0,
   },
 );
 
@@ -189,7 +372,7 @@ const emit = defineEmits<{
   "scroll-comment": [];
   "catalog-navigate": [
     event: MouseEvent,
-    item: { text: string; level: number; index: number },
+    item: CatalogItem,
   ];
   "toggle-immersive": [];
 }>();
@@ -198,41 +381,87 @@ const catalogWrapRef = ref<HTMLElement | null>(null);
 const mobileCatalogWrapRef = ref<HTMLElement | null>(null);
 const immersiveCatalogWrapRef = ref<HTMLElement | null>(null);
 const immersiveCatalogOpen = ref(false);
-const resolvedScrollEl = ref<string | HTMLElement | null>(null);
-const isDark = ref(false);
 const mobileActionsOpen = ref(false);
 const mobileCatalogOpen = ref(false);
-const mdTheme = computed(() => (isDark.value ? "dark" : "light"));
 const percent = computed(() =>
   Math.round(Math.min(1, Math.max(0, props.progress)) * 100),
 );
-const catalogKey = computed(() => `${props.editorId}-${mdTheme.value}`);
 
-let observer: MutationObserver | null = null;
-
-function onCatalogActive(_heading: unknown, activeElement?: HTMLElement) {
-  const wrap =
-    (activeElement?.closest(
-      ".catalog-wrap, .mobile-catalog-content",
-    ) as HTMLElement | null) ||
-    catalogWrapRef.value ||
-    immersiveCatalogWrapRef.value;
-  if (!activeElement || !wrap) return;
-  const wrapRect = wrap.getBoundingClientRect();
-  const elRect = activeElement.getBoundingClientRect();
-  if (elRect.top < wrapRect.top + 8) {
-    wrap.scrollBy({ top: elRect.top - wrapRect.top - 20, behavior: "smooth" });
-  } else if (elRect.bottom > wrapRect.bottom - 8) {
-    wrap.scrollBy({
-      top: elRect.bottom - wrapRect.bottom + 20,
-      behavior: "smooth",
-    });
-  }
+function articleScrollHost() {
+  return typeof props.scrollElement === "string"
+    ? (document.querySelector(props.scrollElement) as HTMLElement | null)
+    : null;
 }
 
-function openMobileCatalog() {
+function syncCatalogWrap(
+  wrap: HTMLElement | null,
+  behavior: ScrollBehavior = "auto",
+) {
+  if (!wrap || !wrap.offsetParent) return;
+  const active = wrap.querySelector<HTMLElement>(
+    `[data-catalog-index="${props.activeCatalogIndex}"]`,
+  );
+  if (!active) {
+    wrap.scrollTop = 0;
+    return;
+  }
+  if (props.activeCatalogIndex === 0) {
+    wrap.scrollTo({ top: 0, behavior });
+    return;
+  }
+  const wrapRect = wrap.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  const safeTop = wrapRect.top + Math.min(54, wrap.clientHeight * 0.24);
+  const safeBottom = wrapRect.bottom - Math.min(54, wrap.clientHeight * 0.24);
+  if (activeRect.top >= safeTop && activeRect.bottom <= safeBottom) return;
+  wrap.scrollTo({
+    top: Math.max(
+      0,
+      wrap.scrollTop +
+        activeRect.top -
+        wrapRect.top -
+        wrap.clientHeight * 0.3,
+    ),
+    behavior,
+  });
+}
+
+function syncOpenCatalogs(behavior: ScrollBehavior = "auto") {
+  syncCatalogWrap(catalogWrapRef.value, behavior);
+  syncCatalogWrap(immersiveCatalogWrapRef.value, behavior);
+  syncCatalogWrap(mobileCatalogWrapRef.value, behavior);
+}
+
+async function toggleImmersiveCatalog() {
+  const host = articleScrollHost();
+  const readingTop = host?.scrollTop ?? 0;
+  const opening = !immersiveCatalogOpen.value;
+  immersiveCatalogOpen.value = opening;
+  if (!opening) return;
+
+  await nextTick();
+  requestAnimationFrame(() => {
+    if (host) host.scrollTop = readingTop;
+    requestAnimationFrame(() => {
+      if (host) host.scrollTop = readingTop;
+      syncCatalogWrap(immersiveCatalogWrapRef.value);
+    });
+  });
+}
+
+async function openMobileCatalog() {
+  const host = articleScrollHost();
+  const readingTop = host?.scrollTop ?? 0;
   mobileActionsOpen.value = false;
   mobileCatalogOpen.value = true;
+  await nextTick();
+  requestAnimationFrame(() => {
+    if (host) host.scrollTop = readingTop;
+    requestAnimationFrame(() => {
+      if (host) host.scrollTop = readingTop;
+      syncCatalogWrap(mobileCatalogWrapRef.value);
+    });
+  });
 }
 
 function runMobileAction(action: "top" | "comment" | "immersive") {
@@ -244,68 +473,53 @@ function runMobileAction(action: "top" | "comment" | "immersive") {
 
 function onCatalogClick(
   event: MouseEvent,
-  item: { text: string; level: number; index: number },
+  item: CatalogItem,
 ) {
   event.preventDefault();
+  mobileCatalogOpen.value = false;
+  immersiveCatalogOpen.value = false;
   emit("catalog-navigate", event, item);
-  window.setTimeout(() => {
-    mobileCatalogOpen.value = false;
-  }, 180);
-}
-
-function handleMobileCatalogClick(event: MouseEvent) {
-  const target = event.target as HTMLElement;
-  if (target.closest(".md-editor-catalog-link")) {
-    window.setTimeout(() => {
-      mobileCatalogOpen.value = false;
-    }, 120);
-  }
 }
 
 function onKeydown(event: KeyboardEvent) {
   if (event.key !== "Escape") return;
+  immersiveCatalogOpen.value = false;
   mobileCatalogOpen.value = false;
   mobileActionsOpen.value = false;
 }
 
-function resolveScrollElement() {
-  if (typeof props.scrollElement === "string") {
-    const el = document.querySelector(
-      props.scrollElement,
-    ) as HTMLElement | null;
-    resolvedScrollEl.value = el || props.scrollElement;
-  } else {
-    resolvedScrollEl.value = props.scrollElement;
-  }
-}
-
 watch(
   () => props.immersive,
-  (v) => {
+  () => {
     immersiveCatalogOpen.value = false;
     mobileCatalogOpen.value = false;
     mobileActionsOpen.value = false;
   },
 );
 
-onMounted(async () => {
-  const sync = () => {
-    isDark.value = document.documentElement.classList.contains("dark");
-  };
-  sync();
-  observer = new MutationObserver(sync);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
+watch(
+  () => props.activeCatalogIndex,
+  async () => {
+    await nextTick();
+    requestAnimationFrame(() => syncOpenCatalogs("smooth"));
+  },
+);
 
+watch(
+  [() => props.catalogReady, () => props.catalogItems.length],
+  async () => {
+    await nextTick();
+    requestAnimationFrame(() => syncOpenCatalogs());
+  },
+  { flush: "post" },
+);
+
+onMounted(async () => {
   await nextTick();
-  resolveScrollElement();
   document.addEventListener("keydown", onKeydown);
 });
 
 onUnmounted(() => {
-  observer?.disconnect();
   document.removeEventListener("keydown", onKeydown);
 });
 </script>
@@ -326,6 +540,23 @@ onUnmounted(() => {
   gap: 10px;
   background: transparent;
   isolation: isolate;
+}
+
+.sidebar-right::before {
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--border) 78%, transparent) 10%,
+    color-mix(in srgb, var(--border) 78%, transparent) 86%,
+    transparent
+  );
+  content: "";
+  pointer-events: none;
 }
 
 @keyframes article-sidebar-arrive {
@@ -416,58 +647,83 @@ onUnmounted(() => {
   border-radius: 999px;
 }
 
-.catalog-wrap :deep(.article-md-catalog),
-.catalog-wrap :deep(.md-editor-catalog) {
-  --md-color: var(--c-text-2);
-  --md-hover-color: var(--c-primary);
-  --md-bk-color: transparent;
-  position: relative;
+.article-catalog-tree {
+  display: grid;
+  align-content: start;
+  gap: 2px;
   width: 100%;
 }
 
-.catalog-wrap :deep(.md-editor-catalog-dark) {
-  --md-color: var(--c-text-2);
-  --md-hover-color: var(--c-primary);
-  --md-bk-color: transparent;
+.catalog-wrap.catalog-ready .article-catalog-tree {
+  animation: catalog-reveal 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* override default green (#73d13d) with theme primary */
-.catalog-wrap :deep(.md-editor-catalog-indicator) {
-  background-color: var(--c-primary) !important;
-  width: 2px;
-  border-radius: 999px;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--c-primary) 45%, transparent);
+@keyframes catalog-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-.catalog-wrap :deep(.md-editor-catalog-link span) {
-  color: var(--c-text-2) !important;
+.catalog-entry {
+  --catalog-depth: 0;
+  --catalog-order: 0;
+  position: relative;
   display: flex;
+  width: 100%;
   min-height: 28px;
   align-items: center;
-  overflow: hidden;
-  border-radius: 5px;
-  padding: 4px 7px;
+  padding: 5px 7px 5px calc(11px + var(--catalog-depth) * 8px);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
   font-family: var(--font-rounded);
   font-size: 11px;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  text-align: left;
   transition:
     color 0.2s ease,
-    background 0.2s ease,
+    background-color 0.2s ease,
     transform 0.2s ease;
 }
 
-.catalog-wrap :deep(.md-editor-catalog-link span:hover) {
-  color: var(--c-primary) !important;
+.catalog-entry span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.catalog-entry:hover {
+  color: var(--c-primary);
   background: color-mix(in srgb, var(--c-primary) 8%, transparent);
   transform: translateX(2px);
 }
 
-.catalog-wrap :deep(.md-editor-catalog-active > span) {
-  color: var(--c-primary) !important;
+.catalog-entry.active {
+  color: var(--c-primary);
   font-weight: 650;
-  background: var(--c-primary-soft);
+  background: color-mix(in srgb, var(--c-primary-soft) 54%, transparent);
+}
+
+.catalog-entry.active::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: calc(3px + var(--catalog-depth) * 8px);
+  width: 2px;
+  border-radius: 999px;
+  background: var(--c-primary);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--c-primary) 34%, transparent);
+  content: "";
 }
 
 .pet-dock {
@@ -484,27 +740,22 @@ onUnmounted(() => {
 .sidebar-actions {
   display: flex;
   align-items: center;
-  justify-content: space-evenly;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
   flex-shrink: 0;
-  padding: 4px 0 0;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--ld-shadow) 76%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  padding: 10px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
 }
 
 .action-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
   color: var(--c-text-3);
   font-size: 0.95rem;
   cursor: pointer;
@@ -513,12 +764,23 @@ onUnmounted(() => {
     background 0.18s ease,
     opacity 0.2s ease,
     transform 0.18s ease;
-  opacity: 0.65;
+  opacity: 0.42;
 }
 
 .action-btn.visible {
   opacity: 1;
   color: var(--c-text-2);
+}
+
+.action-btn.primary {
+  border-color: color-mix(in srgb, var(--c-primary) 24%, var(--border));
+  color: var(--c-primary);
+  background: color-mix(in srgb, var(--c-primary-soft) 46%, transparent);
+}
+
+.action-btn:disabled {
+  cursor: default;
+  transform: none;
 }
 
 .action-btn:hover {
@@ -539,37 +801,59 @@ onUnmounted(() => {
 }
 
 .immersive-catalog-bar {
+  --immersive-bar-bg: color-mix(
+    in srgb,
+    var(--ld-bg-card) 88%,
+    transparent
+  );
   position: fixed;
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1180;
   display: inline-flex;
+  overflow: hidden;
   align-items: center;
   gap: 8px;
   padding: 9px 16px;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
+  background: var(--immersive-bar-bg);
   color: var(--c-text-2);
   box-shadow: var(--ui-shadow-soft);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   font-family: inherit;
   font-size: 0.78rem;
+  isolation: isolate;
   cursor: pointer;
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     color 0.2s ease,
-    border-color 0.2s ease,
     box-shadow 0.2s ease;
 }
 
 .immersive-catalog-bar:hover {
   transform: translateX(-50%) translateY(-1px);
   color: var(--c-primary);
-  border-color: color-mix(in srgb, var(--c-primary) 32%, transparent);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--c-primary) 10%, var(--ld-shadow));
+  box-shadow: 0 10px 26px
+    color-mix(in srgb, var(--c-primary) 10%, var(--ld-shadow));
+}
+
+.immersive-catalog-bar > :not(.reading-liquid) {
+  position: relative;
+  z-index: 2;
+}
+
+.reading-liquid {
+  z-index: 0;
+  --liquid-fill-top: color-mix(in srgb, var(--c-primary) 10%, transparent);
+  --liquid-fill-bottom: color-mix(in srgb, var(--c-primary) 22%, transparent);
+  --liquid-wave-front: color-mix(in srgb, var(--c-primary) 17%, var(--immersive-bar-bg));
+  --liquid-wave-back: color-mix(in srgb, var(--c-primary) 9%, var(--immersive-bar-bg));
+  --liquid-wave-height: 12px;
+  --liquid-wave-front-duration: 8.6s;
+  --liquid-wave-back-duration: 11.8s;
 }
 
 .immersive-catalog-bar .bar-title {
@@ -603,17 +887,18 @@ onUnmounted(() => {
   transform: translateX(-50%);
   transform-origin: top center;
   z-index: 1175;
-  width: min(380px, calc(100vw - 48px));
-  max-height: min(56dvh, 480px);
+  width: min(420px, calc(100vw - 48px));
+  height: min(78dvh, 720px);
+  max-height: min(78dvh, 720px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
-  border-radius: 20px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-bg-1));
   box-shadow:
-    0 32px 80px rgb(0 0 0 / 30%),
-    0 0 44px color-mix(in srgb, var(--c-primary) 8%, transparent),
+    0 22px 56px rgb(0 0 0 / 24%),
+    0 0 32px color-mix(in srgb, var(--c-primary) 7%, transparent),
     0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset;
   backdrop-filter: blur(24px) saturate(1.25);
   -webkit-backdrop-filter: blur(24px) saturate(1.25);
@@ -627,10 +912,12 @@ onUnmounted(() => {
   right: 14px;
   height: 2px;
   border-radius: 999px;
-  background: linear-gradient(90deg,
-      transparent,
-      color-mix(in srgb, var(--c-primary) 55%, transparent),
-      transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--c-primary) 55%, transparent),
+    transparent
+  );
   opacity: 0.8;
   pointer-events: none;
 }
@@ -646,7 +933,7 @@ onUnmounted(() => {
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 
-.immersive-catalog-head>div:first-child {
+.immersive-catalog-head > div:first-child {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -666,7 +953,7 @@ onUnmounted(() => {
   font-size: 0.9rem;
 }
 
-.immersive-catalog-head>div:first-child span {
+.immersive-catalog-head > div:first-child span {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--c-text);
@@ -716,7 +1003,9 @@ onUnmounted(() => {
 }
 
 .immersive-catalog-content {
+  flex: 1;
   min-height: 120px;
+  overflow-y: auto;
   padding: 10px 14px 16px;
   overscroll-behavior: contain;
 }
@@ -724,49 +1013,68 @@ onUnmounted(() => {
 .immersive-actions {
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  top: 50%;
+  bottom: auto;
   z-index: 1180;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ld-bg-card) 92%, transparent);
+  box-shadow:
+    0 12px 34px color-mix(in srgb, #000 10%, var(--ld-shadow)),
+    0 1px 0 color-mix(in srgb, #fff 52%, transparent) inset;
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  transform: translateY(-50%);
 }
 
 .im-action {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border: 0;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
+  background: transparent;
   color: var(--c-text-2);
-  box-shadow: var(--ui-shadow-soft);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   font-size: 1rem;
   cursor: pointer;
   transition:
     transform 0.2s ease,
     color 0.2s ease,
-    box-shadow 0.2s ease;
+    background-color 0.2s ease;
 }
 
-.im-action:hover {
-  transform: translateY(-2px);
+.im-action:hover:not(:disabled) {
+  transform: translateY(-1px);
   color: var(--c-primary);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--c-primary) 14%, var(--ld-shadow));
+  background: color-mix(in srgb, var(--c-primary-soft) 78%, transparent);
+}
+
+.im-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--c-primary) 48%, transparent);
+  outline-offset: 1px;
+}
+
+.im-action:disabled {
+  opacity: 0.38;
+  cursor: default;
+  transform: none;
 }
 
 .im-action.im-exit {
   color: var(--c-primary);
-  border-color: color-mix(in srgb, var(--c-primary) 30%, transparent);
-  background: color-mix(in srgb, var(--c-primary-soft) 55%, var(--ld-bg-card));
+  background: color-mix(in srgb, var(--c-primary-soft) 68%, transparent);
 }
 
 .immersive-catalog-enter-active {
   transition:
-    opacity 0.28s ease,
-    transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+    opacity 0.2s ease,
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .immersive-catalog-leave-active {
@@ -785,52 +1093,9 @@ onUnmounted(() => {
   transform: translateX(-50%) translateY(-8px) scale(0.98);
 }
 
-.immersive-catalog-content :deep(.md-editor-catalog-link) {
+.immersive-catalog-content .catalog-entry {
   animation: cat-item-in 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(2)) {
-  animation-delay: 0.03s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(3)) {
-  animation-delay: 0.06s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(4)) {
-  animation-delay: 0.09s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(5)) {
-  animation-delay: 0.12s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(6)) {
-  animation-delay: 0.15s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(7)) {
-  animation-delay: 0.18s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(8)) {
-  animation-delay: 0.21s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(9)) {
-  animation-delay: 0.24s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(10)) {
-  animation-delay: 0.27s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(11)) {
-  animation-delay: 0.3s;
-}
-
-.immersive-catalog-content :deep(.md-editor-catalog-link:nth-child(12)) {
-  animation-delay: 0.33s;
+  animation-delay: min(calc(var(--catalog-order) * 18ms), 180ms);
 }
 
 @keyframes cat-item-in {
@@ -870,72 +1135,92 @@ onUnmounted(() => {
     left: max(12px, env(safe-area-inset-left));
     z-index: 12019;
     width: calc(100vw - 24px);
-    max-height: min(68dvh, 540px);
+    height: min(76dvh, 620px);
+    max-height: min(76dvh, 620px);
     transform: none;
   }
 
   .immersive-actions {
     right: max(10px, env(safe-area-inset-right));
-    bottom: max(10px, env(safe-area-inset-bottom));
-    gap: 8px;
+    top: 50%;
+    bottom: auto;
+    gap: 4px;
+    padding: 5px;
+    transform: translateY(-50%);
   }
 
   .im-action {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     font-size: 0.95rem;
   }
 
   .mobile-article-tools {
     position: fixed;
-    top: 50%;
+    top: calc(50% - 21px);
     right: max(10px, env(safe-area-inset-right));
     left: auto;
     z-index: 1170;
     display: block;
     width: 42px;
     height: 42px;
-    transform: translateY(-50%);
   }
 
   .mobile-tool-trigger {
-    --reading-progress: 0deg;
     position: relative;
     z-index: 3;
     width: 42px;
     height: 42px;
     display: grid;
     place-items: center;
-    padding: 2px;
-    border: 0;
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--c-primary) 28%, var(--border));
     border-radius: 50%;
     color: var(--c-primary);
-    background: conic-gradient(var(--c-primary) var(--reading-progress),
-        color-mix(in srgb, var(--border) 58%, transparent) 0);
-    box-shadow: 0 6px 18px color-mix(in srgb, #000 12%, var(--ld-shadow));
+    background: color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft));
+    box-shadow:
+      0 8px 22px color-mix(in srgb, #000 10%, var(--ld-shadow)),
+      0 1px 0 color-mix(in srgb, #fff 64%, transparent) inset;
+    isolation: isolate;
     cursor: pointer;
     transition:
       transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
       box-shadow 0.2s ease;
   }
 
-  .mobile-tool-trigger>span {
-    width: 38px;
-    height: 38px;
+  .mobile-trigger-face {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
     display: grid;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--border) 64%, transparent);
     border-radius: 50%;
-    background: color-mix(in srgb, var(--ld-bg-card) 82%, transparent);
-    box-shadow: 0 1px 0 color-mix(in srgb, #fff 52%, transparent) inset;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     font-size: 1.05rem;
+    transition: transform 0.56s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mobile-trigger-liquid {
+    z-index: 0;
+    --liquid-fill-top: color-mix(in srgb, var(--c-primary) 20%, transparent);
+    --liquid-fill-bottom: color-mix(in srgb, var(--c-primary) 44%, transparent);
+    --liquid-wave-front: color-mix(in srgb, var(--c-primary) 24%, var(--ld-bg-card));
+    --liquid-wave-back: color-mix(in srgb, var(--c-primary) 13%, var(--ld-bg-card));
+    --liquid-wave-height: 10px;
+    --liquid-wave-front-duration: 7.2s;
+    --liquid-wave-back-duration: 9.8s;
   }
 
   .mobile-tool-trigger.active {
-    transform: rotate(90deg) scale(0.94);
-    box-shadow: 0 5px 14px color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
+    transform: scale(0.94);
+    box-shadow: 0 5px 14px
+      color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
+  }
+
+  .mobile-tool-trigger.active .mobile-trigger-face {
+    transform: rotate(135deg);
   }
 
   .mobile-tool-menu {
@@ -948,6 +1233,7 @@ onUnmounted(() => {
   }
 
   .mobile-tool-menu button {
+    --tool-accent: var(--c-primary);
     --scatter-x: 0px;
     --scatter-y: 0px;
     position: absolute;
@@ -972,21 +1258,25 @@ onUnmounted(() => {
   }
 
   .mobile-tool-menu button:nth-child(1) {
+    --tool-accent: var(--c-primary);
     --scatter-x: -48px;
     --scatter-y: -51px;
   }
 
   .mobile-tool-menu button:nth-child(2) {
+    --tool-accent: #2b9373;
     --scatter-x: -72px;
     --scatter-y: -18px;
   }
 
   .mobile-tool-menu button:nth-child(3) {
+    --tool-accent: #d08635;
     --scatter-x: -72px;
     --scatter-y: 22px;
   }
 
   .mobile-tool-menu button:nth-child(4) {
+    --tool-accent: #d05768;
     --scatter-x: -48px;
     --scatter-y: 57px;
   }
@@ -996,11 +1286,13 @@ onUnmounted(() => {
     height: 36px;
     display: grid;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--c-primary) 22%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--tool-accent) 24%, var(--border));
     border-radius: 50%;
-    color: var(--c-primary);
-    background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
-    box-shadow: 0 5px 16px color-mix(in srgb, #000 11%, var(--ld-shadow));
+    color: var(--tool-accent);
+    background: color-mix(in srgb, var(--ld-bg-card) 88%, var(--tool-accent));
+    box-shadow:
+      0 6px 18px color-mix(in srgb, #000 10%, var(--ld-shadow)),
+      0 0 18px color-mix(in srgb, var(--tool-accent) 13%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     font-size: 0.9rem;
@@ -1021,30 +1313,29 @@ onUnmounted(() => {
     z-index: 1;
     padding: 0;
     border: 0;
-    background: rgb(8 15 30 / 46%);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: rgb(8 15 30 / 34%);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
 
   .mobile-catalog-panel {
     position: fixed;
-    right: max(12px, env(safe-area-inset-right));
-    top: 50%;
-    bottom: auto;
-    left: auto;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: max(10px, env(safe-area-inset-left));
     z-index: 2;
-    width: min(360px, calc(100vw - 20px));
-    max-height: min(74dvh, 580px);
+    width: auto;
+    height: min(72dvh, 620px);
+    max-height: min(72dvh, 620px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--c-primary) 12%, var(--border));
-    border-radius: 16px;
+    border-radius: 12px;
     background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-bg-1));
     box-shadow:
-      0 24px 64px rgb(0 0 0 / 28%),
+      0 18px 48px rgb(0 0 0 / 24%),
       0 1px 0 color-mix(in srgb, #fff 55%, transparent) inset;
-    transform: translateY(-50%);
   }
 
   .mobile-catalog-head {
@@ -1056,13 +1347,13 @@ onUnmounted(() => {
     background: color-mix(in srgb, var(--c-primary-soft) 42%, transparent);
   }
 
-  .mobile-catalog-head>div {
+  .mobile-catalog-head > div {
     display: flex;
     align-items: center;
     gap: 10px;
   }
 
-  .mobile-catalog-head>div>div {
+  .mobile-catalog-head > div > div {
     display: flex;
     flex-direction: column;
   }
@@ -1072,7 +1363,7 @@ onUnmounted(() => {
     font-size: 0.9rem;
   }
 
-  .mobile-catalog-head>div>div span {
+  .mobile-catalog-head > div > div span {
     margin-top: 2px;
     color: var(--c-text-3);
     font-size: 0.64rem;
@@ -1090,7 +1381,7 @@ onUnmounted(() => {
     box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 14%, transparent);
   }
 
-  .mobile-catalog-head>button {
+  .mobile-catalog-head > button {
     width: 32px;
     height: 32px;
     display: grid;
@@ -1117,52 +1408,25 @@ onUnmounted(() => {
   }
 
   .mobile-catalog-content {
+    flex: 1;
     min-height: 92px;
     overflow-y: auto;
     padding: 12px 12px 17px;
     overscroll-behavior: contain;
   }
 
-  .mobile-catalog-content :deep(.article-md-catalog),
-  .mobile-catalog-content :deep(.md-editor-catalog) {
-    --md-color: var(--c-text-2);
-    --md-hover-color: var(--c-primary);
-    --md-bk-color: transparent;
-    width: 100%;
-  }
-
-  .mobile-catalog-content :deep(.md-editor-catalog-link span) {
+  .mobile-catalog-content .catalog-entry {
     min-height: 34px;
-    display: flex;
-    align-items: center;
-    position: relative;
-    padding: 6px 9px;
+    padding-top: 7px;
+    padding-bottom: 7px;
     border-radius: 7px;
-    color: var(--c-text-2) !important;
     font-size: 0.76rem;
     line-height: 1.45;
   }
 
-  .mobile-catalog-content :deep(.md-editor-catalog-active > span) {
-    color: var(--c-primary) !important;
+  .mobile-catalog-content .catalog-entry.active {
     background: var(--c-primary-soft);
     font-weight: 700;
-  }
-
-  .mobile-catalog-content :deep(.md-editor-catalog-active > span::before) {
-    content: "";
-    position: absolute;
-    top: 6px;
-    bottom: 6px;
-    left: -1px;
-    width: 3px;
-    border-radius: 999px;
-    background: var(--c-primary);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--c-primary) 32%, transparent);
-  }
-
-  .mobile-catalog-content :deep(.md-editor-catalog-indicator) {
-    display: none;
   }
 
   .mobile-tool-menu-enter-active,
@@ -1185,6 +1449,10 @@ onUnmounted(() => {
     transition-delay: 0.07s;
   }
 
+  .mobile-tool-menu-enter-active button:nth-child(4) {
+    transition-delay: 0.105s;
+  }
+
   .mobile-tool-menu-enter-from button,
   .mobile-tool-menu-leave-to button {
     opacity: 0;
@@ -1201,7 +1469,7 @@ onUnmounted(() => {
   .mobile-catalog-enter-from,
   .mobile-catalog-leave-to {
     opacity: 0;
-    transform: translate3d(18px, -50%, 0) scale(0.98);
+    transform: translate3d(0, 18px, 0) scale(0.99);
   }
 
   .catalog-backdrop-enter-active,
@@ -1221,6 +1489,7 @@ onUnmounted(() => {
   .immersive-catalog-leave-to {
     transform: translateY(-7px) scale(0.98);
   }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1232,7 +1501,7 @@ onUnmounted(() => {
   .immersive-ui-leave-active,
   .immersive-catalog-enter-active,
   .immersive-catalog-leave-active,
-  .immersive-catalog-content :deep(.md-editor-catalog-link) {
+  .immersive-catalog-content .catalog-entry {
     transition: none;
     animation: none;
   }

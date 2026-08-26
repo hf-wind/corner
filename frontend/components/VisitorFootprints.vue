@@ -1,5 +1,10 @@
 <template>
-  <section class="footprints" aria-label="最近访客足迹">
+  <section
+    ref="footprintsRef"
+    class="footprints"
+    aria-label="最近访客足迹"
+    :style="footprintStyle"
+  >
     <header class="fp-head">
       <div>
         <span class="fp-kicker">RECENT ARRIVALS</span>
@@ -105,12 +110,44 @@ type RecentVisit = {
 };
 
 const { fetchRecent } = useVisitor();
-const items = ref<RecentVisit[]>([]);
+const footprintsRef = ref<HTMLElement | null>(null);
+const allItems = ref<RecentVisit[]>([]);
+const visibleCount = ref(4);
+const items = computed(() => allItems.value.slice(0, visibleCount.value));
+const footprintStyle = computed(() => ({
+  "--fp-visible-count": String(Math.max(3, items.value.length)),
+}));
 const loading = ref(false);
 const refreshing = ref(false);
 const listKey = ref(0);
 let loadSeq = 0;
 let idleHandle: number | null = null;
+let resizeObserver: ResizeObserver | null = null;
+
+function updateVisibleCount() {
+  const root = footprintsRef.value;
+  if (!root) return;
+  const parent = root.parentElement;
+  const head = root.querySelector<HTMLElement>(".fp-head");
+  const siblings = parent
+    ? Array.from(parent.children).filter((element) => element !== root)
+    : [];
+  const siblingsHeight = siblings.reduce(
+    (total, element) => total + (element as HTMLElement).offsetHeight,
+    0,
+  );
+  const gap = parent
+    ? Number.parseFloat(getComputedStyle(parent).rowGap || "0") *
+      Math.max(0, parent.children.length - 1)
+    : 0;
+  const available =
+    (parent?.clientHeight || root.clientHeight) -
+    siblingsHeight -
+    gap -
+    (head?.offsetHeight || 64) -
+    8;
+  visibleCount.value = Math.min(12, Math.max(3, Math.floor(available / 56)));
+}
 
 function visitorLabel(visit: RecentVisit) {
   const nickname = visit.nickname?.trim();
@@ -183,7 +220,7 @@ async function load(fresh = false) {
   try {
     const data = await fetchRecent(fresh);
     if (seq !== loadSeq) return;
-    items.value = (Array.isArray(data) ? data : []).slice(0, 4);
+    allItems.value = Array.isArray(data) ? data : [];
     listKey.value += 1;
   } catch {
     // Supplementary content keeps its last successful state on network failure.
@@ -196,6 +233,9 @@ async function load(fresh = false) {
 }
 
 onMounted(() => {
+  resizeObserver = new ResizeObserver(updateVisibleCount);
+  if (footprintsRef.value) resizeObserver.observe(footprintsRef.value);
+  updateVisibleCount();
   if ("requestIdleCallback" in window) {
     idleHandle = window.requestIdleCallback(() => void load(true), {
       timeout: 1400,
@@ -205,6 +245,7 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  resizeObserver?.disconnect();
   if (idleHandle !== null) {
     if ("cancelIdleCallback" in window) window.cancelIdleCallback(idleHandle);
     else window.clearTimeout(idleHandle);
@@ -300,8 +341,8 @@ onUnmounted(() => {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-auto-rows: minmax(54px, 1fr);
-  align-content: stretch;
+  grid-auto-rows: 56px;
+  align-content: start;
   gap: 0;
   margin: 0;
   padding: 5px 0 0;

@@ -205,18 +205,11 @@
       </button>
 
       <span class="water-progress" aria-hidden="true">
-        <span
+        <LiquidProgress
           class="water-level"
-          :class="{
-            active: playing,
-            'is-empty': progress <= 0.1,
-            'is-full': progress >= 99.5,
-          }"
-          :style="{ height: `${waterProgress}%` }"
-        >
-          <i class="water-wave water-wave-front" />
-          <i class="water-wave water-wave-back" />
-        </span>
+          :progress="waterProgress"
+          :active="playing"
+        />
       </span>
 
       <div
@@ -1324,26 +1317,24 @@ function clamp(value: number, minimum: number, maximum: number) {
 .devtools-glowing {
   position: absolute;
   z-index: -1;
-  top: 50%;
-  left: 50%;
-  width: 160px;
-  height: 160px;
-  border-radius: 9999px;
-  background-image: linear-gradient(
-    45deg,
-    var(--c-primary),
-    var(--c-primary),
-    var(--c-primary)
-  );
+  right: 8%;
+  bottom: -3px;
+  left: 8%;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-primary) 45%, transparent);
   opacity: 0;
-  filter: blur(60px);
+  filter: blur(10px);
   pointer-events: none;
-  transform: translate(-50%, -50%);
-  transition: all 1s;
+  transform: translateY(2px) scaleX(0.82);
+  transition:
+    opacity 0.42s ease,
+    transform 0.52s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .music-capsule:hover .devtools-glowing {
-  opacity: 0.22;
+  opacity: 0.28;
+  transform: none;
 }
 
 .music-capsule.is-devtools-collapsed .queue-panel {
@@ -1378,64 +1369,15 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 .water-level {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--c-primary) 12%, transparent),
-    color-mix(in srgb, var(--c-primary) 20%, transparent)
-  );
-  transition:
-    height 0.45s linear,
-    opacity 0.24s ease;
-}
-
-.water-level.is-empty {
-  opacity: 0;
-}
-
-.water-wave {
-  position: absolute;
-  top: -7px;
-  left: -24px;
-  width: calc(200% + 48px);
-  height: 12px;
-  background: radial-gradient(
-      ellipse at 50% 100%,
-      color-mix(in srgb, var(--c-primary) 28%, var(--devtools-widget-bg)) 0 54%,
-      transparent 56%
-    )
-    0 0 / 24px 11px repeat-x;
-  opacity: 0.76;
-  animation: water-wave-front 2.4s linear infinite;
-}
-
-.water-wave-back {
-  top: -5px;
-  left: -18px;
-  height: 10px;
-  background: radial-gradient(
-      ellipse at 50% 100%,
-      color-mix(in srgb, var(--c-primary) 20%, var(--devtools-widget-bg)) 0 52%,
-      transparent 55%
-    )
-    0 0 / 18px 9px repeat-x;
-  opacity: 0.5;
-  animation: water-wave-back 3.2s linear infinite;
-}
-
-.water-level.active .water-wave-front {
-  animation-duration: 1.65s;
-}
-
-.water-level.active .water-wave-back {
-  animation-duration: 2.2s;
-}
-
-.water-level.is-full .water-wave {
-  opacity: 0;
+  --liquid-fill-top: color-mix(in srgb, var(--c-primary) 9%, transparent);
+  --liquid-fill-bottom: color-mix(in srgb, var(--c-primary) 22%, transparent);
+  --liquid-wave-front: color-mix(in srgb, var(--c-primary) 15%, var(--devtools-widget-bg));
+  --liquid-wave-back: color-mix(in srgb, var(--c-primary) 8%, var(--devtools-widget-bg));
+  --liquid-wave-height: 12px;
+  --liquid-wave-front-duration: 8.8s;
+  --liquid-wave-back-duration: 12s;
+  --liquid-wave-front-active-duration: 6.4s;
+  --liquid-wave-back-active-duration: 9s;
 }
 
 .cover-button,
@@ -2007,18 +1949,6 @@ function clamp(value: number, minimum: number, maximum: number) {
   }
 }
 
-@keyframes water-wave-front {
-  to {
-    transform: translate3d(24px, 0, 0);
-  }
-}
-
-@keyframes water-wave-back {
-  to {
-    transform: translate3d(-18px, 0, 0);
-  }
-}
-
 @keyframes playing-pulse {
   50% {
     opacity: 0.55;
@@ -2124,7 +2054,6 @@ function clamp(value: number, minimum: number, maximum: number) {
   .water-progress,
   .queue-panel-enter-active,
   .queue-panel-leave-active,
-  .water-wave,
   .track-index > svg,
   .loading-disc,
   .loading-spinner {

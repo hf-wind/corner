@@ -10,7 +10,9 @@
           <span class="side-kicker">CORNER INDEX</span>
           <span id="home-overview-title">风隅坐标</span>
         </div>
-        <AppLink to="/archive" aria-label="查看归档" title="查看归档"><Icon name="ph:arrow-up-right-bold" /></AppLink>
+        <AppLink to="/archive" aria-label="查看归档" title="查看归档"
+          ><Icon name="ph:arrow-up-right-bold"
+        /></AppLink>
       </div>
       <div class="overview-grid">
         <div
@@ -174,9 +176,21 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
 }
-.side-card-head > div { flex-direction: column; align-items: flex-start; gap: 2px; }
-.side-kicker { color: var(--c-primary); font-family: var(--font-mono); font-size: .44rem; font-weight: 700; }
-#home-overview-title { color: var(--c-text); font-size: .72rem; }
+.side-card-head > div {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.side-kicker {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: 0.44rem;
+  font-weight: 700;
+}
+#home-overview-title {
+  color: var(--c-text);
+  font-size: 0.72rem;
+}
 
 .side-card-head a {
   display: grid;
@@ -227,7 +241,9 @@ onUnmounted(() => {
   color: var(--c-text-3);
   font-size: 0.48rem;
 }
-.overview-item > i { display: none; }
+.overview-item > i {
+  display: none;
+}
 
 .pet-dock {
   display: flex;
@@ -236,19 +252,26 @@ onUnmounted(() => {
   flex: 0 0 92px;
   align-items: flex-end;
   justify-content: flex-end;
+  margin-top: auto;
   border-top: 0;
 }
 
 .footprints {
   display: flex;
-  min-height: 190px;
-  flex: 1 1 190px;
+  height: calc(80px + var(--fp-visible-count, 3) * 56px);
+  min-height: 264px;
+  max-height: 100%;
+  flex: 0 1 auto;
   flex-direction: column;
 }
 
 @media (max-height: 680px) and (min-width: 901px) {
-  .overview-card { display: none; }
-  .footprints { min-height: 170px; }
+  .overview-card {
+    display: none;
+  }
+  .footprints {
+    min-height: 248px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -24,13 +24,28 @@ const routes: RouteRecordRaw[] = [
     path: "/article/:slug",
     component: lazyRoute(() => import("./pages/article/[slug].vue")),
   },
-  { path: "/archive", component: lazyRoute(() => import("./pages/archive.vue")) },
-  { path: "/category", component: lazyRoute(() => import("./pages/category.vue")) },
+  {
+    path: "/archive",
+    component: lazyRoute(() => import("./pages/archive.vue")),
+  },
+  {
+    path: "/category",
+    component: lazyRoute(() => import("./pages/category.vue")),
+  },
   { path: "/tags", component: lazyRoute(() => import("./pages/tags.vue")) },
-  { path: "/friends", component: lazyRoute(() => import("./pages/friends.vue")) },
-  { path: "/guestbook", component: lazyRoute(() => import("./pages/guestbook.vue")) },
+  {
+    path: "/friends",
+    component: lazyRoute(() => import("./pages/friends.vue")),
+  },
+  {
+    path: "/guestbook",
+    component: lazyRoute(() => import("./pages/guestbook.vue")),
+  },
   { path: "/about", component: lazyRoute(() => import("./pages/about.vue")) },
-  { path: "/moments", component: lazyRoute(() => import("./pages/moments/index.vue")) },
+  {
+    path: "/moments",
+    component: lazyRoute(() => import("./pages/moments/index.vue")),
+  },
   {
     path: "/moments/:slug",
     component: lazyRoute(() => import("./pages/moments/[slug].vue")),
@@ -39,18 +54,27 @@ const routes: RouteRecordRaw[] = [
     path: "/places/:slug",
     component: lazyRoute(() => import("./pages/places/[slug].vue")),
   },
-  { path: "/time/map", component: lazyRoute(() => import("./pages/time/map.vue")) },
+  {
+    path: "/time/map",
+    component: lazyRoute(() => import("./pages/time/map.vue")),
+  },
   {
     path: "/time/constellation",
     component: lazyRoute(() => import("./pages/time/constellation.vue")),
     meta: { layout: "welcome" },
   },
-  { path: "/albums", component: lazyRoute(() => import("./pages/albums/index.vue")) },
+  {
+    path: "/albums",
+    component: lazyRoute(() => import("./pages/albums/index.vue")),
+  },
   {
     path: "/albums/:slug",
     component: lazyRoute(() => import("./pages/albums/[slug].vue")),
   },
-  { path: "/library", component: lazyRoute(() => import("./pages/library/index.vue")) },
+  {
+    path: "/library",
+    component: lazyRoute(() => import("./pages/library/index.vue")),
+  },
   {
     path: "/library/:slug",
     component: lazyRoute(() => import("./pages/library/[slug].vue")),
@@ -324,10 +348,10 @@ router.beforeEach(async (to) => {
 router.afterEach((to) => {
   if (typeof document === "undefined") return;
   if (
-    !to.meta.requiresAuth
-    && !["/login", "/register"].includes(to.path)
-    && to.fullPath.startsWith("/")
-    && !to.fullPath.startsWith("//")
+    !to.meta.requiresAuth &&
+    !["/login", "/register"].includes(to.path) &&
+    to.fullPath.startsWith("/") &&
+    !to.fullPath.startsWith("//")
   ) {
     sessionStorage.setItem("corner:last-public-route", to.fullPath);
   }
@@ -341,7 +365,10 @@ router.onError((error, to) => {
     document.documentElement.classList.remove("space-pending");
 
   const message = String(error instanceof Error ? error.message : error);
-  const isModuleLoadError = /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror/i.test(message);
+  const isModuleLoadError =
+    /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror/i.test(
+      message,
+    );
   if (!isModuleLoadError || typeof window === "undefined") return;
 
   // A stale dev-server graph or an old deployed chunk can recover after one reload.

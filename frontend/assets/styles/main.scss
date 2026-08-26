@@ -259,8 +259,14 @@ mark.search-highlight.is-settled {
 }
 
 @keyframes page-content-enter {
-  from { opacity: 0; transform: translate3d(0, 8px, 0); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 html.theme-switching
@@ -366,7 +372,7 @@ select {
   .post-title,
   .login-title,
   .section-title
-  ) {
+) {
   font-family: var(--font-heading);
   font-weight: var(--font-heading-weight);
 }
@@ -419,9 +425,13 @@ select {
 }
 
 @media (min-width: 1920px) {
+  html {
+    font-size: clamp(15px, calc(9px + 0.3125vw), 20px);
+  }
+
   :root {
-    --left-w: 11.7188vw;
-    --right-w: 12.7083vw;
+    --left-w: 15rem;
+    --right-w: 16.2667rem;
   }
 
   .layout-page > .page-layout,
@@ -546,7 +556,9 @@ a {
 .reveal-block {
   opacity: 0;
   transform: translate3d(0, 16px, 0);
-  transition: opacity .56s var(--ui-ease-out), transform .56s var(--ui-ease-out);
+  transition:
+    opacity 0.56s var(--ui-ease-out),
+    transform 0.56s var(--ui-ease-out);
 }
 
 [data-reveal].is-visible,
@@ -701,7 +713,15 @@ a {
 }
 
 /* Keep page actions available while long admin forms and tables are scrolled. */
-.admin-main :where(.admin-page-head, .form-header, .editor-heading, .dashboard-head, .analytics-header, .page-header) {
+.admin-main
+  :where(
+    .admin-page-head,
+    .form-header,
+    .editor-heading,
+    .dashboard-head,
+    .analytics-header,
+    .page-header
+  ) {
   position: sticky;
   z-index: 40;
   top: -20px;
@@ -711,7 +731,8 @@ a {
   backdrop-filter: blur(14px);
 }
 
-.admin-main :where(.admin-page-head + .table-toolbar, .admin-page-head + .album-toolbar) {
+.admin-main
+  :where(.admin-page-head + .table-toolbar, .admin-page-head + .album-toolbar) {
   position: sticky;
   z-index: 39;
   top: 72px;
@@ -722,10 +743,24 @@ a {
 }
 
 /* Ant Design modals must stay inside the viewport; only their content may scroll. */
-.ant-modal-wrap { overflow: hidden !important; }
-.ant-modal { top: 0; max-height: calc(100dvh - 24px); margin: 12px auto; }
-.ant-modal-content { display: flex; max-height: calc(100dvh - 24px); flex-direction: column; overflow: hidden; }
-.ant-modal-body { min-height: 0; overflow: auto; }
+.ant-modal-wrap {
+  overflow: hidden !important;
+}
+.ant-modal {
+  top: 0;
+  max-height: calc(100dvh - 24px);
+  margin: 12px auto;
+}
+.ant-modal-content {
+  display: flex;
+  max-height: calc(100dvh - 24px);
+  flex-direction: column;
+  overflow: hidden;
+}
+.ant-modal-body {
+  min-height: 0;
+  overflow: auto;
+}
 
 .admin-main .admin-page-head > div > span {
   color: var(--c-primary);
@@ -789,7 +824,8 @@ a {
   padding-inline: 10px;
 }
 
-.admin-main :where(.ant-table-cell .ant-space, .ant-table-cell .ant-space-item) {
+.admin-main
+  :where(.ant-table-cell .ant-space, .ant-table-cell .ant-space-item) {
   align-items: center;
 }
 
@@ -802,19 +838,26 @@ a {
   margin-bottom: 12px;
 }
 
-.admin-main :where(.table-toolbar, .media-toolbar, .comment-filter) > .toolbar-spacer {
+.admin-main
+  :where(.table-toolbar, .media-toolbar, .comment-filter)
+  > .toolbar-spacer {
   flex: 1 1 auto;
 }
 
-.admin-main :where(.table-toolbar, .media-toolbar, .comment-filter, .post-toolbar) > * {
+.admin-main
+  :where(.table-toolbar, .media-toolbar, .comment-filter, .post-toolbar)
+  > * {
   align-self: center;
 }
 
-.admin-main :where(.table-toolbar, .media-toolbar, .comment-filter) :where(.ant-input-affix-wrapper, .ant-input-search) {
+.admin-main
+  :where(.table-toolbar, .media-toolbar, .comment-filter)
+  :where(.ant-input-affix-wrapper, .ant-input-search) {
   width: min(320px, 100%);
 }
 
-.admin-main :where(.admin-toolbar, .table-toolbar, .media-toolbar, .comment-filter) {
+.admin-main
+  :where(.admin-toolbar, .table-toolbar, .media-toolbar, .comment-filter) {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--admin-panel-radius);
@@ -829,14 +872,35 @@ a {
   background: var(--ld-bg-card);
 }
 
-.admin-main :where(.ant-input, .ant-input-affix-wrapper, .ant-select-selector, .ant-input-number) {
+.admin-main
+  :where(
+    .ant-input,
+    .ant-input-affix-wrapper,
+    .ant-select-selector,
+    .ant-input-number
+  ) {
   min-height: var(--admin-control-height);
   border-radius: var(--admin-radius) !important;
 }
 
-.admin-main :where(.ant-input, .ant-input-affix-wrapper, .ant-input-number, .ant-picker, .ant-input-number-input-wrap) { box-sizing: border-box; }
-.admin-main :where(.ant-input-number-input, .ant-picker-input > input) { height: calc(var(--admin-control-height) - 2px); line-height: calc(var(--admin-control-height) - 2px); }
-.admin-main :where(textarea.ant-input) { height: auto; min-height: 88px; }
+.admin-main
+  :where(
+    .ant-input,
+    .ant-input-affix-wrapper,
+    .ant-input-number,
+    .ant-picker,
+    .ant-input-number-input-wrap
+  ) {
+  box-sizing: border-box;
+}
+.admin-main :where(.ant-input-number-input, .ant-picker-input > input) {
+  height: calc(var(--admin-control-height) - 2px);
+  line-height: calc(var(--admin-control-height) - 2px);
+}
+.admin-main :where(textarea.ant-input) {
+  height: auto;
+  min-height: 88px;
+}
 
 .admin-main :where(.ant-select-single) {
   min-height: var(--admin-control-height);
@@ -893,7 +957,7 @@ a {
 
 .admin-pagination-total {
   color: var(--c-text-3);
-  font-size: .72rem;
+  font-size: 0.72rem;
   white-space: nowrap;
 }
 
@@ -910,7 +974,8 @@ a {
   justify-self: start;
 }
 
-.admin-main :where(.music-config-actions, .sticky-actions, .editor-sticky-actions) {
+.admin-main
+  :where(.music-config-actions, .sticky-actions, .editor-sticky-actions) {
   position: static !important;
   bottom: auto !important;
   background: transparent !important;
@@ -921,16 +986,33 @@ a {
 }
 
 @keyframes admin-content-in {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (max-width: 640px) {
-  .admin-main .admin-page-head { align-items: flex-start; flex-direction: column; }
-  .admin-pagination { align-items: flex-start; flex-direction: column; }
-  .admin-main :where(.detail-row) { grid-template-columns: 1fr; gap: var(--space-xs); }
+  .admin-main .admin-page-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .admin-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .admin-main :where(.detail-row) {
+    grid-template-columns: 1fr;
+    gap: var(--space-xs);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .admin-main > * { animation: none; }
+  .admin-main > * {
+    animation: none;
+  }
 }

@@ -29,18 +29,39 @@
 
     <div class="sidebar-scroll">
       <nav class="nav-menu">
-        <section v-for="group in navGroups" :key="group.key" class="nav-group"
-          :class="{ 'is-open': isGroupOpen(group) }">
-          <button v-if="!collapsed" type="button" class="nav-group-toggle" :aria-expanded="isGroupOpen(group)"
-            @click="toggleGroup(group.key)">
+        <section
+          v-for="group in navGroups"
+          :key="group.key"
+          class="nav-group"
+          :class="{ 'is-open': isGroupOpen(group) }"
+        >
+          <button
+            v-if="!collapsed"
+            type="button"
+            class="nav-group-toggle"
+            :aria-expanded="isGroupOpen(group)"
+            @click="toggleGroup(group.key)"
+          >
             <span>{{ group.label }}</span>
             <Icon name="ph:caret-down-bold" />
           </button>
-          <div class="nav-group-items" :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }">
+          <div
+            class="nav-group-items"
+            :class="{ 'is-collapsed-group': !isGroupOpen(group) && !collapsed }"
+          >
             <div class="nav-group-inner">
-              <AppLink v-for="item in group.items" :key="item.to" :to="item.to" class="nav-item"
-                :class="{ active: isNavActive(item.to) }" :title="collapsed ? item.label : undefined">
-                <Icon :name="item.icon" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
+              <AppLink
+                v-for="item in group.items"
+                :key="item.to"
+                :to="item.to"
+                class="nav-item"
+                :class="{ active: isNavActive(item.to) }"
+                :title="collapsed ? item.label : undefined"
+              >
+                <Icon :name="item.icon" class="nav-icon" /><span
+                  class="nav-label"
+                  >{{ item.label }}</span
+                >
               </AppLink>
             </div>
           </div>
@@ -58,41 +79,83 @@
           <div class="user-row">
             <button type="button" class="user-main" @click="goPanel">
               <div class="avatar-wrapper">
-                <img v-if="user?.avatar" :src="avatarSrc" alt="" class="avatar-img" />
+                <img
+                  v-if="user?.avatar"
+                  :src="avatarSrc"
+                  alt=""
+                  class="avatar-img"
+                />
                 <Icon v-else name="ph:user-circle-fill" class="avatar-icon" />
               </div>
               <span class="user-name">{{ user?.username ?? "用户" }}</span>
               <span v-if="isUserAdmin" class="user-badge">管</span>
             </button>
             <NotificationBell />
-            <button type="button" class="user-logout" title="退出登录" @click="handleLogout">
+            <button
+              type="button"
+              class="user-logout"
+              title="退出登录"
+              @click="handleLogout"
+            >
               <Icon name="ph:sign-out-bold" />
             </button>
           </div>
         </div>
         <div class="sidebar-tools" aria-label="侧栏快捷操作">
-          <AppLink v-if="isPanel" to="/home" class="sidebar-tool user-back" title="返回前台" aria-label="返回前台">
+          <AppLink
+            v-if="isPanel"
+            to="/home"
+            class="sidebar-tool user-back"
+            title="返回前台"
+            aria-label="返回前台"
+          >
             <Icon name="ph:arrow-u-up-left-bold" />
           </AppLink>
-          <div class="theme-pill" :class="`theme-${theme}`" role="group" aria-label="主题">
-            <button type="button" :class="{ active: theme === 'light' }" title="亮色" aria-label="亮色"
-              @click="setTheme('light')">
+          <div
+            class="theme-pill"
+            :class="`theme-${theme}`"
+            role="group"
+            aria-label="主题"
+          >
+            <button
+              type="button"
+              :class="{ active: theme === 'light' }"
+              title="亮色"
+              aria-label="亮色"
+              @click="setTheme('light')"
+            >
               <Icon name="ph:sun-bold" />
             </button>
-            <button type="button" :class="{ active: theme === 'dark' }" title="深色" aria-label="深色"
-              @click="setTheme('dark')">
+            <button
+              type="button"
+              :class="{ active: theme === 'dark' }"
+              title="深色"
+              aria-label="深色"
+              @click="setTheme('dark')"
+            >
               <Icon name="ph:moon-bold" />
             </button>
-            <button type="button" :class="{ active: theme === 'auto' }" title="跟随系统" aria-label="跟随系统"
-              @click="setTheme('auto')">
+            <button
+              type="button"
+              :class="{ active: theme === 'auto' }"
+              title="跟随系统"
+              aria-label="跟随系统"
+              @click="setTheme('auto')"
+            >
               <Icon name="ph:monitor-bold" />
             </button>
           </div>
-          <button v-if="isPanel && isUserAdmin && allowCollapse" type="button"
-            class="sidebar-tool admin-collapse-button" :title="collapsed ? '展开管理侧栏' : '收起管理侧栏'"
-            :aria-label="collapsed ? '展开管理侧栏' : '收起管理侧栏'" @click="emit('toggle-collapse')">
-            <Icon :name="collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-bold'
-              " />
+          <button
+            v-if="isPanel && isUserAdmin && allowCollapse"
+            type="button"
+            class="sidebar-tool admin-collapse-button"
+            :title="collapsed ? '展开管理侧栏' : '收起管理侧栏'"
+            :aria-label="collapsed ? '展开管理侧栏' : '收起管理侧栏'"
+            @click="emit('toggle-collapse')"
+          >
+            <Icon
+              :name="collapsed ? 'ph:sidebar-simple-bold' : 'ph:sidebar-bold'"
+            />
           </button>
         </div>
         <!-- 字体切换暂不展示，保留结构与样式便于后续恢复。
@@ -109,8 +172,7 @@
           {{ option.short }}
         </button>
       </div>
-      -->
-      </div>
+      --></div>
     </div>
   </aside>
 </template>
@@ -194,7 +256,7 @@ const adminFullNav = [
   { to: "/admin/visitor", icon: "ph:footprints-bold", label: "访客时光" },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件通知" },
-{ to: "/admin/newsletter", icon: "ph:newspaper-bold", label: "订阅周报" },
+  { to: "/admin/newsletter", icon: "ph:newspaper-bold", label: "订阅周报" },
   { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情资源" },
   { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
   { to: "/admin/settings", icon: "ph:gear-bold", label: "站点设置" },
@@ -266,16 +328,18 @@ const navGroups = computed<NavGroup[]>(() => {
       {
         key: "resources",
         label: "内容资源",
-        items: select(["/admin/categories", "/admin/tags", "/admin/friends", "/admin/media", "/admin/emoji"]),
+        items: select([
+          "/admin/categories",
+          "/admin/tags",
+          "/admin/friends",
+          "/admin/media",
+          "/admin/emoji",
+        ]),
       },
       {
         key: "engagement",
         label: "社区与用户",
-        items: select([
-          "/admin/comments",
-          "/admin/users",
-          "/admin/visitor",
-        ]),
+        items: select(["/admin/comments", "/admin/users", "/admin/visitor"]),
       },
       {
         key: "intelligence",
@@ -285,7 +349,14 @@ const navGroups = computed<NavGroup[]>(() => {
       {
         key: "system",
         label: "系统与通知",
-        items: select(["/admin/email", "/admin/newsletter", "/admin/settings", "/admin/backups", "/admin/info", "/admin/about"]),
+        items: select([
+          "/admin/email",
+          "/admin/newsletter",
+          "/admin/settings",
+          "/admin/backups",
+          "/admin/info",
+          "/admin/about",
+        ]),
       },
       {
         key: "account",
@@ -440,9 +511,11 @@ watch(
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
   border-radius: 16px;
-  background: linear-gradient(145deg,
-      color-mix(in srgb, var(--c-primary-soft) 64%, var(--ld-bg-card)),
-      var(--ld-bg-card) 70%);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--c-primary-soft) 64%, var(--ld-bg-card)),
+    var(--ld-bg-card) 70%
+  );
   box-shadow: 0 10px 28px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
   isolation: isolate;
 }
@@ -490,10 +563,12 @@ watch(
   z-index: -1;
   height: 1px;
   border-radius: 99px;
-  background: linear-gradient(90deg,
-      transparent,
-      color-mix(in srgb, var(--c-primary) 35%, transparent),
-      transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--c-primary) 35%, transparent),
+    transparent
+  );
   transform: rotate(-8deg);
 }
 
@@ -535,7 +610,8 @@ watch(
   padding: 7px;
   border-radius: 14px;
   background: color-mix(in srgb, var(--ld-bg-card) 80%, transparent);
-  box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--c-primary-soft) 38%, transparent);
+  box-shadow: inset 0 0 0 5px
+    color-mix(in srgb, var(--c-primary-soft) 38%, transparent);
   color: var(--c-primary);
   place-items: center;
 }
@@ -609,7 +685,6 @@ watch(
 }
 
 @keyframes wind-pass {
-
   0%,
   100% {
     opacity: 0.15;
@@ -691,7 +766,7 @@ watch(
   gap: 2px;
 }
 
-.nav-group+.nav-group {
+.nav-group + .nav-group {
   margin-top: 8px;
 }
 
@@ -1234,7 +1309,6 @@ watch(
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .hero::after,
   .hero-glow,
   .wind-stroke,

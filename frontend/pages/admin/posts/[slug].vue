@@ -35,11 +35,12 @@
             <client-only>
               <MdEditor
                 v-if="editorReady"
-                :key="editorKey"
                 v-model="form.content"
                 language="zh-CN"
                 :toolbars="toolbars"
                 :theme="editorTheme"
+                preview-theme="smart-blue"
+                code-theme="github"
                 @upload-img="onUploadImg"
                 @save="save"
                 class="md-editor"
@@ -76,7 +77,8 @@
                 :loading="saving"
                 style="margin-left: auto"
               >
-                <Icon name="ph:floppy-disk-bold" /> {{ saving ? "保存中…" : "保存" }}
+                <Icon name="ph:floppy-disk-bold" />
+                {{ saving ? "保存中…" : "保存" }}
               </a-button>
             </div>
           </a-card>
@@ -238,7 +240,11 @@
                 </a-tag>
               </header>
               <p>{{ item.excerpt || "该版本未填写摘要" }}</p>
-              <small>{{ formatVersionTime(item.createdAt) }} · {{ item.createdBy?.username || "系统" }} · 正文 {{ item.contentLength }} 字符</small>
+              <small
+                >{{ formatVersionTime(item.createdAt) }} ·
+                {{ item.createdBy?.username || "系统" }} · 正文
+                {{ item.contentLength }} 字符</small
+              >
             </div>
             <a-button size="small" @click="previewVersion(item)">
               <Icon name="ph:eye-bold" />预览
@@ -255,11 +261,28 @@
         <a-empty v-else-if="!versionsLoading" description="暂无版本记录" />
       </a-spin>
     </a-modal>
-    <a-modal v-model:open="versionPreview.open" :title="versionPreview.item ? `V${versionPreview.item.version} · ${versionPreview.item.title || '未命名版本'}` : '版本预览'" width="min(860px, calc(100vw - 24px))" :footer="null">
+    <a-modal
+      v-model:open="versionPreview.open"
+      :title="
+        versionPreview.item
+          ? `V${versionPreview.item.version} · ${versionPreview.item.title || '未命名版本'}`
+          : '版本预览'
+      "
+      width="min(860px, calc(100vw - 24px))"
+      :footer="null"
+    >
       <div v-if="versionPreview.item" class="version-preview">
-        <div class="version-preview-meta"><span>{{ versionSource(versionPreview.item.source) }}</span><small>{{ formatVersionTime(versionPreview.item.createdAt) }} · {{ versionPreview.item.createdBy?.username || '系统' }}</small></div>
-        <p v-if="versionPreview.item.excerpt" class="version-preview-excerpt">{{ versionPreview.item.excerpt }}</p>
-        <pre>{{ versionPreview.item.content || '该版本没有正文内容' }}</pre>
+        <div class="version-preview-meta">
+          <span>{{ versionSource(versionPreview.item.source) }}</span
+          ><small
+            >{{ formatVersionTime(versionPreview.item.createdAt) }} ·
+            {{ versionPreview.item.createdBy?.username || "系统" }}</small
+          >
+        </div>
+        <p v-if="versionPreview.item.excerpt" class="version-preview-excerpt">
+          {{ versionPreview.item.excerpt }}
+        </p>
+        <pre>{{ versionPreview.item.content || "该版本没有正文内容" }}</pre>
       </div>
     </a-modal>
   </div>
@@ -310,7 +333,7 @@ const form = ref({
   locationSource: "manual" as "manual" | "map" | "exif" | "imported",
 });
 const confirmedLocationKey = ref("");
-const editorKey = ref(0);
+const editorDark = ref(false);
 const coverOpen = ref(false);
 const coverUrlInput = ref("");
 const aiTransforming = ref(false);
@@ -413,12 +436,13 @@ const toolbars = [
 ];
 
 const editorTheme = computed(() => {
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  return editorDark.value ? "dark" : "light";
 });
 
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
 let hasUnsaved = false;
 let originalContent = "";
+let themeObserver: MutationObserver | null = null;
 
 function locationKey() {
   return `${form.value.place?.id || ""}|${form.value.locationVisibility}|${form.value.locationPrecision}`;
@@ -448,6 +472,7 @@ function postPayload(confirmExactLocation = false) {
 }
 
 onMounted(async () => {
+  editorDark.value = document.documentElement.classList.contains("dark");
   const slug = route.params.slug as string;
   const [post, catRes, tagRes] = await Promise.all([
     api.get<any>(`/posts/${slug}/preview`).catch(() => null),
@@ -484,10 +509,10 @@ onMounted(async () => {
   }
   loading.value = false;
 
-  const obs = new MutationObserver(() => {
-    editorKey.value++;
+  themeObserver = new MutationObserver(() => {
+    editorDark.value = document.documentElement.classList.contains("dark");
   });
-  obs.observe(document.documentElement, {
+  themeObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class"],
   });
@@ -497,6 +522,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  themeObserver?.disconnect();
   if (autoSaveTimer) clearInterval(autoSaveTimer);
   window.removeEventListener("beforeunload", handleBeforeUnload);
 });
@@ -691,7 +717,9 @@ async function openVersions() {
   versionsOpen.value = true;
   versionsLoading.value = true;
   try {
-    versions.value = await api.get<any[]>(`/posts/${route.params.slug}/versions`);
+    versions.value = await api.get<any[]>(
+      `/posts/${route.params.slug}/versions`,
+    );
   } catch (error: any) {
     versions.value = [];
     toast.error(error?.message || "版本记录加载失败");
@@ -701,7 +729,11 @@ async function openVersions() {
 }
 
 function versionSource(source: string) {
-  return source === "publish" ? "发布快照" : source === "draft-preserve" ? "恢复前草稿快照" : "历史版本";
+  return source === "publish"
+    ? "发布快照"
+    : source === "draft-preserve"
+      ? "恢复前草稿快照"
+      : "历史版本";
 }
 
 function previewVersion(item: any) {
@@ -716,17 +748,23 @@ function formatVersionTime(value: string) {
 function confirmRestoreVersion(item: any) {
   Modal.confirm({
     title: `恢复到 V${item.version}？`,
-    content: needsPublish.value ? "当前还有未发布内容。系统会先发布并保留当前草稿，再恢复所选历史版本；恢复结果会作为新的草稿，确认后可再次发布。" : "恢复会把所选历史版本载入为新的草稿，当前线上版本保持不变。",
+    content: needsPublish.value
+      ? "当前还有未发布内容。系统会先发布并保留当前草稿，再恢复所选历史版本；恢复结果会作为新的草稿，确认后可再次发布。"
+      : "恢复会把所选历史版本载入为新的草稿，当前线上版本保持不变。",
     okText: "确认恢复",
     cancelText: "取消",
     onOk: async () => {
       restoringVersion.value = item.id;
       try {
-        const restored = await api.post<any>(`/posts/${route.params.slug}/versions/${item.id}/restore`);
+        const restored = await api.post<any>(
+          `/posts/${route.params.slug}/versions/${item.id}/restore`,
+        );
         originalContent = "";
         hasUnsaved = false;
         toast.success("版本已恢复");
-        window.location.assign(`/admin/posts/${restored.slug || route.params.slug}`);
+        window.location.assign(
+          `/admin/posts/${restored.slug || route.params.slug}`,
+        );
       } catch (error: any) {
         toast.error(error?.message || "恢复失败");
       } finally {
@@ -1030,7 +1068,9 @@ function confirmRestoreVersion(item: any) {
   align-items: center;
   gap: 7px;
 }
-.version-list strong { font-size: 0.7rem; }
+.version-list strong {
+  font-size: 0.7rem;
+}
 .version-list p {
   overflow: hidden;
   margin: 5px 0;
@@ -1039,12 +1079,48 @@ function confirmRestoreVersion(item: any) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.version-list small { color: var(--c-text-4); font-size: 0.52rem; }
-.version-preview { display: grid; gap: 14px; }
-.version-preview-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--c-primary); font-size: .64rem; }
-.version-preview-meta small { color: var(--c-text-3); font-size: .56rem; }
-.version-preview-excerpt { margin: 0; padding: 11px 13px; border-left: 3px solid var(--c-primary); background: var(--c-bg-1); color: var(--c-text-2); font-size: .7rem; line-height: 1.7; }
-.version-preview pre { max-height: min(62vh, 620px); margin: 0; padding: 16px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--c-bg-1); color: var(--c-text-1); font: .72rem/1.85 var(--font-body); white-space: pre-wrap; word-break: break-word; }
+.version-list small {
+  color: var(--c-text-4);
+  font-size: 0.52rem;
+}
+.version-preview {
+  display: grid;
+  gap: 14px;
+}
+.version-preview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--c-primary);
+  font-size: 0.64rem;
+}
+.version-preview-meta small {
+  color: var(--c-text-3);
+  font-size: 0.56rem;
+}
+.version-preview-excerpt {
+  margin: 0;
+  padding: 11px 13px;
+  border-left: 3px solid var(--c-primary);
+  background: var(--c-bg-1);
+  color: var(--c-text-2);
+  font-size: 0.7rem;
+  line-height: 1.7;
+}
+.version-preview pre {
+  max-height: min(62vh, 620px);
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--c-bg-1);
+  color: var(--c-text-1);
+  font: 0.72rem/1.85 var(--font-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 @media (max-width: 700px) {
   .ai-diff {
     grid-template-columns: 1fr;
@@ -1052,33 +1128,31 @@ function confirmRestoreVersion(item: any) {
   .ai-selection-tools {
     flex-wrap: wrap;
   }
-  .version-list article { grid-template-columns: 40px minmax(0, 1fr); }
-  .version-list article > :deep(.ant-btn) { grid-column: 1 / -1; }
+  .version-list article {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .version-list article > :deep(.ant-btn) {
+    grid-column: 1 / -1;
+  }
 }
 </style>
 
 <style>
-:root .md-editor {
-  --md-bk-color: #fff;
-  --md-bk-color-outstand: #f6f8fa;
-  --md-bk-color-hover: #f0f2f5;
-  --md-bk-color-block: #fafbfc;
-  --md-bk-color-code: #f0f2f5;
-  --md-border-color: #e8eaed;
-  --md-color: #1f2328;
-  --md-color-secondary: #656d76;
-  --md-primary-color: #1677ff;
+:root .editor-page .md-editor {
+  --md-bk-color: var(--c-bg);
+  --md-bk-color-outstand: var(--c-bg-1);
+  --md-bk-color-hover: var(--c-bg-2);
+  --md-bk-color-block: color-mix(in srgb, var(--c-bg-1) 82%, var(--c-bg));
+  --md-bk-color-code: var(--code-bg);
+  --md-border-color: var(--border);
+  --md-color: var(--c-text);
+  --md-color-secondary: var(--c-text-2);
+  --md-primary-color: var(--c-primary);
 }
 
-:root.dark .md-editor {
-  --md-bk-color: hsl(220deg 0% 7%);
-  --md-bk-color-outstand: hsl(220deg 10% 10%);
-  --md-bk-color-hover: hsl(220deg 10% 14%);
-  --md-bk-color-block: hsl(220deg 10% 10%);
-  --md-bk-color-code: hsl(220deg 10% 16%);
-  --md-border-color: hsl(220deg 10% 20%);
-  --md-color: hsl(220deg 0% 100%);
-  --md-color-secondary: hsl(220deg 0% 70%);
-  --md-primary-color: hsl(220deg 100% 70%);
+:root .editor-page .md-editor-toolbar-wrapper {
+  background: color-mix(in srgb, var(--c-bg-1) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 </style>

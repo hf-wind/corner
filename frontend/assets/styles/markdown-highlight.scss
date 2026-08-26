@@ -1,0 +1,109 @@
+.md-editor {
+  --syntax-fg: #243044;
+  --syntax-keyword: #c24158;
+  --syntax-title: #7553b8;
+  --syntax-constant: #2569a8;
+  --syntax-string: #176b6a;
+  --syntax-built-in: #b65e1d;
+  --syntax-comment: #778293;
+  --syntax-tag: #2d7b4f;
+  --syntax-mark: #936b17;
+  --syntax-addition: #26734d;
+  --syntax-addition-bg: #eaf8ef;
+  --syntax-deletion: #b33a47;
+  --syntax-deletion-bg: #fff0f1;
+}
+
+.md-editor.md-editor-dark {
+  --syntax-fg: #c8d2df;
+  --syntax-keyword: #ff8b86;
+  --syntax-title: #d1b3ff;
+  --syntax-constant: #82c8ff;
+  --syntax-string: #9fd8d4;
+  --syntax-built-in: #f5ae6a;
+  --syntax-comment: #8490a0;
+  --syntax-tag: #82d6a5;
+  --syntax-mark: #e6ca72;
+  --syntax-addition: #9ce3af;
+  --syntax-addition-bg: #123b27;
+  --syntax-deletion: #ffc1bc;
+  --syntax-deletion-bg: #5a2026;
+}
+
+.md-editor .hljs {
+  color: var(--syntax-fg);
+  background: transparent;
+}
+.md-editor .hljs-doctag,
+.md-editor .hljs-keyword,
+.md-editor .hljs-meta .hljs-keyword,
+.md-editor .hljs-template-tag,
+.md-editor .hljs-template-variable,
+.md-editor .hljs-type,
+.md-editor .hljs-variable.language_ {
+  color: var(--syntax-keyword);
+}
+.md-editor .hljs-title,
+.md-editor .hljs-title.class_,
+.md-editor .hljs-title.class_.inherited__,
+.md-editor .hljs-title.function_ {
+  color: var(--syntax-title);
+}
+.md-editor .hljs-attr,
+.md-editor .hljs-attribute,
+.md-editor .hljs-literal,
+.md-editor .hljs-meta,
+.md-editor .hljs-number,
+.md-editor .hljs-operator,
+.md-editor .hljs-variable,
+.md-editor .hljs-selector-attr,
+.md-editor .hljs-selector-class,
+.md-editor .hljs-selector-id {
+  color: var(--syntax-constant);
+}
+.md-editor .hljs-regexp,
+.md-editor .hljs-string,
+.md-editor .hljs-meta .hljs-string {
+  color: var(--syntax-string);
+}
+.md-editor .hljs-built_in,
+.md-editor .hljs-symbol {
+  color: var(--syntax-built-in);
+}
+.md-editor .hljs-comment,
+.md-editor .hljs-code,
+.md-editor .hljs-formula {
+  color: var(--syntax-comment);
+}
+.md-editor .hljs-name,
+.md-editor .hljs-quote,
+.md-editor .hljs-selector-tag,
+.md-editor .hljs-selector-pseudo {
+  color: var(--syntax-tag);
+}
+.md-editor .hljs-subst,
+.md-editor .hljs-emphasis,
+.md-editor .hljs-strong {
+  color: var(--syntax-fg);
+}
+.md-editor .hljs-section {
+  color: var(--syntax-constant);
+  font-weight: 700;
+}
+.md-editor .hljs-bullet {
+  color: var(--syntax-mark);
+}
+.md-editor .hljs-emphasis {
+  font-style: italic;
+}
+.md-editor .hljs-strong {
+  font-weight: 700;
+}
+.md-editor .hljs-addition {
+  color: var(--syntax-addition);
+  background: var(--syntax-addition-bg);
+}
+.md-editor .hljs-deletion {
+  color: var(--syntax-deletion);
+  background: var(--syntax-deletion-bg);
+}

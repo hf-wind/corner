@@ -38,6 +38,7 @@ import { JourneyModule } from './modules/journey/journey.module';
 import { VisitorModule } from './modules/visitor/visitor.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { BackupModule } from './modules/backup/backup.module';
+import { CircleModule } from './modules/circle/circle.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { BackupModule } from './modules/backup/backup.module';
     VisitorModule,
     GeoModule,
     BackupModule,
+    CircleModule,
   ],
   controllers: [AppController],
   providers: [

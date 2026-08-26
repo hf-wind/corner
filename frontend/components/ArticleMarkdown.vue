@@ -1,74 +1,285 @@
 <template>
-  <div ref="wrapperRef" class="article-md-wrap" :class="{ dark: isDark }" @click.capture="onContentClick">
+  <div
+    ref="wrapperRef"
+    class="article-md-wrap"
+    :class="{ dark: isDark, 'theme-refreshing': themeRefreshing }"
+    @click.capture="onContentClick"
+  >
     <ClientOnly>
-      <MdPreview v-if="editorReady" :id="editorId" :model-value="content || ''" :theme="mdTheme" language="zh-CN" preview-theme="vuepress"
-        class="article-md-preview" />
+      <MdPreview
+        v-if="editorReady"
+        :id="editorId"
+        :model-value="content || ''"
+        :theme="mdTheme"
+        language="zh-CN"
+        preview-theme="smart-blue"
+        code-theme="github"
+        class="article-md-preview"
+      />
       <div v-else class="article-md-loading" aria-label="正文渲染中">
         <i /><i /><i />
       </div>
     </ClientOnly>
-    <ImageLightbox v-model="previewOpen" v-model:index="previewIndex" :images="previewImages" label="文章图片预览" />
+    <ImageLightbox
+      v-model="previewOpen"
+      v-model:index="previewIndex"
+      :images="previewImages"
+      label="文章图片预览"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/preview.css'
-import ImageLightbox from '~/components/ImageLightbox.vue'
-import { configureMarkdownEditor } from '~/utils/configureMarkdownEditor'
+import { MdPreview } from "md-editor-v3";
+import "md-editor-v3/lib/preview.css";
+import ImageLightbox from "~/components/ImageLightbox.vue";
+import { configureMarkdownEditor } from "~/utils/configureMarkdownEditor";
 
-withDefaults(defineProps<{
-  content?: string
-  editorId?: string
-}>(), {
-  content: '',
-  editorId: 'article-preview',
-})
+withDefaults(
+  defineProps<{
+    content?: string;
+    editorId?: string;
+  }>(),
+  {
+    content: "",
+    editorId: "article-preview",
+  },
+);
 
-const isDark = ref(false)
-const editorReady = ref(false)
-const mdTheme = computed(() => (isDark.value ? 'dark' : 'light'))
-const wrapperRef = ref<HTMLElement | null>(null)
-const previewOpen = ref(false)
-const previewIndex = ref(0)
-const previewImages = ref<Array<{ src: string; alt: string; caption?: string }>>([])
+const emit = defineEmits<{ rendered: [] }>();
 
-let observer: MutationObserver | null = null
+const isDark = ref(false);
+const themeRefreshing = ref(false);
+const editorReady = ref(false);
+const mdTheme = computed(() => (isDark.value ? "dark" : "light"));
+const wrapperRef = ref<HTMLElement | null>(null);
+const previewOpen = ref(false);
+const previewIndex = ref(0);
+const previewImages = ref<
+  Array<{ src: string; alt: string; caption?: string }>
+>([]);
+
+let observer: MutationObserver | null = null;
+let themeResizeObserver: ResizeObserver | null = null;
+let themePositionTimer: ReturnType<typeof setTimeout> | null = null;
+let themePositionFrame: number | null = null;
+let themeInputAbortController: AbortController | null = null;
+let diagramObserver: MutationObserver | null = null;
+let diagramInteractionObserver: MutationObserver | null = null;
+let diagramRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let diagramStableHeights: number[] = [];
+const DIAGRAM_THEME_MIN_DURATION = 900;
+
+type ReadingAnchor = {
+  host: HTMLElement;
+  blockIndex: number;
+  viewportOffset: number;
+};
+
+function previewBlocks() {
+  return Array.from(
+    wrapperRef.value?.querySelectorAll<HTMLElement>(
+      ".md-editor-preview > *",
+    ) || [],
+  );
+}
+
+function mermaidBoxes() {
+  return Array.from(
+    wrapperRef.value?.querySelectorAll<HTMLElement>(".md-editor-mermaid") || [],
+  );
+}
+
+function applyStableDiagramHeights() {
+  mermaidBoxes().forEach((box, index) => {
+    const height = diagramStableHeights[index];
+    if (height) box.style.setProperty("--mermaid-stable-height", `${height}px`);
+  });
+}
+
+function ensureDiagramLoaders() {
+  applyStableDiagramHeights();
+  for (const box of mermaidBoxes()) {
+    if (box.querySelector(":scope > .mermaid-theme-loader")) continue;
+    const loader = document.createElement("span");
+    const ring = document.createElement("span");
+    loader.className = "mermaid-theme-loader";
+    loader.setAttribute("role", "status");
+    loader.setAttribute("aria-label", "图表主题切换中");
+    ring.className = "mermaid-loader-ring";
+    ring.setAttribute("aria-hidden", "true");
+    loader.append(ring);
+    box.append(loader);
+  }
+}
+
+function clearDiagramThemeRefresh() {
+  diagramObserver?.disconnect();
+  diagramObserver = null;
+  if (diagramRefreshTimer) clearTimeout(diagramRefreshTimer);
+  diagramRefreshTimer = null;
+  themeRefreshing.value = false;
+  mermaidBoxes().forEach((box) => {
+    box.style.removeProperty("--mermaid-stable-height");
+    box.querySelector(":scope > .mermaid-theme-loader")?.remove();
+  });
+  diagramStableHeights = [];
+}
+
+function beginDiagramThemeRefresh() {
+  clearDiagramThemeRefresh();
+  diagramStableHeights = mermaidBoxes().map(
+    (box) => box.getBoundingClientRect().height,
+  );
+  if (!diagramStableHeights.length) return;
+  themeRefreshing.value = true;
+  ensureDiagramLoaders();
+  if (wrapperRef.value) {
+    diagramObserver = new MutationObserver(ensureDiagramLoaders);
+    diagramObserver.observe(wrapperRef.value, { childList: true, subtree: true });
+  }
+  diagramRefreshTimer = window.setTimeout(
+    clearDiagramThemeRefresh,
+    DIAGRAM_THEME_MIN_DURATION,
+  );
+}
+
+function captureReadingAnchor(): ReadingAnchor | null {
+  const host = wrapperRef.value?.closest<HTMLElement>(".article-main");
+  if (!host) return null;
+  const blocks = previewBlocks();
+  if (!blocks.length) return null;
+  const hostTop = host.getBoundingClientRect().top;
+  const threshold = hostTop + Math.min(32, host.clientHeight * 0.08);
+  let blockIndex = blocks.findIndex(
+    (block) => block.getBoundingClientRect().bottom > threshold,
+  );
+  if (blockIndex < 0) blockIndex = blocks.length - 1;
+  return {
+    host,
+    blockIndex,
+    viewportOffset: blocks[blockIndex].getBoundingClientRect().top - hostTop,
+  };
+}
+
+function clearThemePositionLock() {
+  themeResizeObserver?.disconnect();
+  themeResizeObserver = null;
+  themeInputAbortController?.abort();
+  themeInputAbortController = null;
+  if (themePositionTimer) clearTimeout(themePositionTimer);
+  themePositionTimer = null;
+  if (themePositionFrame !== null) cancelAnimationFrame(themePositionFrame);
+  themePositionFrame = null;
+}
+
+function lockThemeReadingPosition(anchor: ReadingAnchor) {
+  clearThemePositionLock();
+  const restore = () => {
+    themePositionFrame = null;
+    const block = previewBlocks()[anchor.blockIndex];
+    if (!block || !block.isConnected || !anchor.host.isConnected) return;
+    const currentOffset =
+      block.getBoundingClientRect().top -
+      anchor.host.getBoundingClientRect().top;
+    const delta = currentOffset - anchor.viewportOffset;
+    if (Math.abs(delta) > 0.5) anchor.host.scrollTop += delta;
+  };
+  const scheduleRestore = () => {
+    if (themePositionFrame !== null) cancelAnimationFrame(themePositionFrame);
+    themePositionFrame = requestAnimationFrame(restore);
+  };
+
+  if (wrapperRef.value) {
+    themeResizeObserver = new ResizeObserver(scheduleRestore);
+    themeResizeObserver.observe(wrapperRef.value);
+  }
+  themeInputAbortController = new AbortController();
+  for (const eventName of ["wheel", "touchstart", "pointerdown"] as const) {
+    anchor.host.addEventListener(eventName, clearThemePositionLock, {
+      passive: true,
+      signal: themeInputAbortController.signal,
+    });
+  }
+  scheduleRestore();
+  themePositionTimer = window.setTimeout(clearThemePositionLock, 1600);
+}
 
 function onContentClick(event: MouseEvent) {
-  if (event.button !== 0) return
-  const image = (event.target as HTMLElement).closest<HTMLImageElement>('.md-editor-preview img')
-  if (!image || !wrapperRef.value?.contains(image)) return
+  if (event.button !== 0) return;
+  const image = (event.target as HTMLElement).closest<HTMLImageElement>(
+    ".md-editor-preview img",
+  );
+  if (!image || !wrapperRef.value?.contains(image)) return;
 
-  const images = Array.from(wrapperRef.value.querySelectorAll<HTMLImageElement>('.md-editor-preview img'))
-    .filter(item => Boolean(item.currentSrc || item.src))
+  const images = Array.from(
+    wrapperRef.value.querySelectorAll<HTMLImageElement>(
+      ".md-editor-preview img",
+    ),
+  )
+    .filter((item) => Boolean(item.currentSrc || item.src))
     .map((item, index) => ({
       src: item.currentSrc || item.src,
       alt: item.alt || `文章图片 ${index + 1}`,
       caption: item.alt || undefined,
-    }))
-  const index = images.findIndex(item => item.src === (image.currentSrc || image.src))
-  if (index < 0) return
+    }));
+  const index = images.findIndex(
+    (item) => item.src === (image.currentSrc || image.src),
+  );
+  if (index < 0) return;
 
-  event.preventDefault()
-  event.stopPropagation()
-  previewImages.value = images
-  previewIndex.value = index
-  previewOpen.value = true
+  event.preventDefault();
+  event.stopPropagation();
+  previewImages.value = images;
+  previewIndex.value = index;
+  previewOpen.value = true;
 }
 
 onMounted(async () => {
-  const sync = () => {
-    isDark.value = document.documentElement.classList.contains('dark')
+  const sync = async () => {
+    const nextDark = document.documentElement.classList.contains("dark");
+    if (nextDark === isDark.value) return;
+    const readingAnchor = captureReadingAnchor();
+    beginDiagramThemeRefresh();
+    isDark.value = nextDark;
+    await nextTick();
+    if (readingAnchor) lockThemeReadingPosition(readingAnchor);
+    requestAnimationFrame(() => emit("rendered"));
+  };
+  isDark.value = document.documentElement.classList.contains("dark");
+  observer = new MutationObserver(sync);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  await configureMarkdownEditor();
+  editorReady.value = true;
+  await nextTick();
+  if (wrapperRef.value) {
+    diagramInteractionObserver = new MutationObserver((records) => {
+      for (const record of records) {
+        const box = record.target as HTMLElement;
+        if (box.hasAttribute("data-grab")) continue;
+        box.querySelector<SVGElement>(":scope > svg")?.style.removeProperty(
+          "transform",
+        );
+      }
+    });
+    diagramInteractionObserver.observe(wrapperRef.value, {
+      attributes: true,
+      attributeFilter: ["data-grab"],
+      subtree: true,
+    });
   }
-  sync()
-  observer = new MutationObserver(sync)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-  await configureMarkdownEditor()
-  editorReady.value = true
-})
+  requestAnimationFrame(() => emit("rendered"));
+});
 
-onUnmounted(() => observer?.disconnect())
+onUnmounted(() => {
+  observer?.disconnect();
+  diagramInteractionObserver?.disconnect();
+  clearThemePositionLock();
+  clearDiagramThemeRefresh();
+});
 </script>
 
 <style scoped>
@@ -92,8 +303,102 @@ onUnmounted(() => observer?.disconnect())
   background: color-mix(in srgb, var(--c-text) 8%, transparent);
 }
 
-.article-md-loading i:nth-child(2) { width: 88%; }
-.article-md-loading i:nth-child(3) { width: 72%; }
+.article-md-loading i:nth-child(2) {
+  width: 88%;
+}
+.article-md-loading i:nth-child(3) {
+  width: 72%;
+}
+
+.article-md-wrap :deep(.md-editor-mermaid) {
+  position: relative;
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
+  transition:
+    opacity 0.24s ease,
+    background-color 0.24s ease,
+    border-color 0.24s ease;
+}
+
+.article-md-wrap :deep(.mermaid-theme-loader) {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  overflow: hidden;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--ld-bg-card) 96%, var(--c-primary-soft));
+  opacity: 1;
+  pointer-events: none;
+  place-items: center;
+}
+
+.article-md-wrap :deep(.mermaid-theme-loader::before) {
+  position: absolute;
+  inset: 10px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 10%, transparent);
+  border-radius: 6px;
+  content: "";
+}
+
+.article-md-wrap :deep(.mermaid-loader-ring) {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border: 2px solid color-mix(in srgb, var(--c-primary) 16%, transparent);
+  border-top-color: var(--c-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c-primary) 12%, transparent);
+  animation: mermaid-loader-spin 0.82s linear infinite;
+}
+
+.article-md-wrap :deep(.mermaid-loader-ring::after) {
+  position: absolute;
+  inset: 7px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  content: "";
+}
+
+@keyframes mermaid-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.article-md-wrap :deep(.md-editor-mermaid > svg) {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100%;
+  max-height: min(76dvh, 720px);
+  margin: 0 auto;
+}
+
+.article-md-wrap :deep(.md-editor-mermaid[data-grab]) {
+  overflow: hidden;
+  cursor: grab;
+  isolation: isolate;
+  touch-action: none;
+  user-select: none;
+}
+
+.article-md-wrap :deep(.md-editor-mermaid[data-grab]:active) {
+  cursor: grabbing;
+}
+
+.article-md-wrap :deep(.md-editor-mermaid:not([data-grab]) > svg) {
+  transform: none !important;
+}
+
+.article-md-wrap.theme-refreshing :deep(.md-editor-mermaid) {
+  overflow: hidden;
+  min-height: min(var(--mermaid-stable-height, 320px), min(80dvh, 760px));
+  opacity: 1;
+}
 
 .article-md-wrap :deep(.article-md-preview) {
   --md-bk-color: transparent;
@@ -153,7 +458,8 @@ onUnmounted(() => observer?.disconnect())
   margin: 2.75rem 0 1.15rem;
   padding: 0 0 12px;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--c-primary) 22%, var(--border));
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--c-primary) 22%, var(--border));
   font-size: 26px;
 }
 
@@ -169,7 +475,7 @@ onUnmounted(() => observer?.disconnect())
   height: 2px;
   border-radius: 2px;
   background: var(--c-primary);
-  content: '';
+  content: "";
 }
 
 .article-md-wrap :deep(.md-editor-preview h2) {
@@ -192,7 +498,7 @@ onUnmounted(() => observer?.disconnect())
   border: 0;
   border-radius: 999px;
   background: var(--c-primary);
-  content: '';
+  content: "";
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 10%, transparent);
 }
 
@@ -211,7 +517,7 @@ onUnmounted(() => observer?.disconnect())
   flex: 0 0 7px;
   border-radius: 50%;
   background: var(--c-primary);
-  content: '';
+  content: "";
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 9%, transparent);
 }
 
@@ -229,9 +535,41 @@ onUnmounted(() => observer?.disconnect())
   height: 16px;
   flex: 0 0 16px;
   background: color-mix(in srgb, var(--c-primary) 82%, var(--c-text));
-  content: '';
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  content: "";
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.article-md-wrap :deep(.md-editor-preview h2:has(code:not(pre code))),
+.article-md-wrap :deep(.md-editor-preview h3:has(code:not(pre code))),
+.article-md-wrap :deep(.md-editor-preview h4:has(code:not(pre code))) {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.article-md-wrap :deep(.md-editor-preview h2:has(code:not(pre code))) {
+  padding-left: 15px;
+}
+
+.article-md-wrap :deep(.md-editor-preview h3:has(code:not(pre code))) {
+  padding-left: 16px;
+}
+
+.article-md-wrap :deep(.md-editor-preview h4:has(code:not(pre code))) {
+  padding-left: 23px;
+}
+
+.article-md-wrap :deep(.md-editor-preview h2:has(code:not(pre code))::before),
+.article-md-wrap :deep(.md-editor-preview h3:has(code:not(pre code))::before),
+.article-md-wrap :deep(.md-editor-preview h4:has(code:not(pre code))::before) {
+  position: absolute;
+  top: 0.71em;
+  left: 0;
+  display: block;
+  transform: translateY(-50%);
 }
 
 .article-md-wrap :deep(.md-editor-preview h5),
@@ -279,13 +617,18 @@ onUnmounted(() => observer?.disconnect())
 .article-md-wrap :deep(.md-editor-preview li a),
 .article-md-wrap :deep(.md-editor-preview blockquote a),
 .article-md-wrap :deep(.md-editor-preview td a) {
-  background-image: linear-gradient(color-mix(in srgb, var(--c-primary) 42%, transparent), color-mix(in srgb, var(--c-primary) 42%, transparent));
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--c-primary) 42%, transparent),
+    color-mix(in srgb, var(--c-primary) 42%, transparent)
+  );
   background-position: 0 100%;
   background-repeat: no-repeat;
   background-size: 100% 1px;
   font-weight: 600;
   text-decoration: none;
-  transition: background-size 0.18s ease, color 0.18s ease;
+  transition:
+    background-size 0.18s ease,
+    color 0.18s ease;
 }
 
 .article-md-wrap :deep(.md-editor-preview p a:hover),
@@ -313,10 +656,12 @@ onUnmounted(() => observer?.disconnect())
   width: 18px;
   height: 18px;
   background: var(--c-primary);
-  content: '';
+  content: "";
   opacity: 0.72;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 
 .article-md-wrap :deep(.md-editor-preview blockquote p:first-child) {
@@ -346,11 +691,13 @@ onUnmounted(() => observer?.disconnect())
   font-weight: 750;
 }
 
-.article-md-wrap :deep(.md-editor-preview input[type='checkbox']) {
+.article-md-wrap :deep(.md-editor-preview input[type="checkbox"]) {
   accent-color: var(--c-primary);
 }
 
 .article-md-wrap :deep(.md-editor-preview code:not(pre code)) {
+  min-width: 0;
+  max-width: 100%;
   margin: 0 0.12em;
   padding: 0.16em 0.42em;
   border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
@@ -359,6 +706,18 @@ onUnmounted(() => observer?.disconnect())
   color: color-mix(in srgb, var(--c-primary) 76%, var(--c-text));
   font-family: var(--font-mono);
   font-size: 0.88em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.article-md-wrap :deep(.md-editor-preview h1 code:not(pre code)),
+.article-md-wrap :deep(.md-editor-preview h2 code:not(pre code)),
+.article-md-wrap :deep(.md-editor-preview h3 code:not(pre code)),
+.article-md-wrap :deep(.md-editor-preview h4 code:not(pre code)) {
+  word-break: break-all;
 }
 
 .article-md-wrap :deep(.md-editor-preview mark) {
@@ -373,12 +732,15 @@ onUnmounted(() => observer?.disconnect())
   border-radius: 8px;
   box-shadow: 0 12px 30px color-mix(in srgb, var(--ld-shadow) 72%, transparent);
   cursor: zoom-in;
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
 }
 
 @media (hover: hover) {
   .article-md-wrap :deep(.md-editor-preview img:hover) {
-    box-shadow: 0 16px 36px color-mix(in srgb, var(--ld-shadow) 92%, transparent);
+    box-shadow: 0 16px 36px
+      color-mix(in srgb, var(--ld-shadow) 92%, transparent);
     transform: translateY(-2px);
   }
 }
@@ -400,6 +762,7 @@ onUnmounted(() => observer?.disconnect())
 }
 
 .article-md-wrap :deep(.md-editor-preview pre) {
+  margin: 0 !important;
   border-radius: 0;
   box-shadow: none;
   border: none;
@@ -436,7 +799,13 @@ onUnmounted(() => observer?.disconnect())
   height: 1px;
   margin: 2.7rem 0;
   border: 0;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c-primary) 38%, var(--border)) 18%, color-mix(in srgb, var(--c-primary) 38%, var(--border)) 82%, transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--c-primary) 38%, var(--border)) 18%,
+    color-mix(in srgb, var(--c-primary) 38%, var(--border)) 82%,
+    transparent
+  );
 }
 
 .article-md-wrap :deep(.md-editor-preview) {

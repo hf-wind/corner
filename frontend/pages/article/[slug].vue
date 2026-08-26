@@ -87,11 +87,20 @@
           aria-label="摘要"
         >
           <div v-if="article.excerpt" class="md-excerpt">
-            <span class="excerpt-mark"><Icon name="ph:quotes-bold" /></span>
+            <span class="excerpt-avatar" aria-hidden="true">
+              <img :src="dramExcerptImg" alt="" />
+              <i><Icon name="ph:quotes-bold" /></i>
+            </span>
             <span class="excerpt-content">
               <small><b>摘要</b><i>SUMMARY</i></small>
               <span class="excerpt-copy">
-                <span class="excerpt-typed">{{ typedExcerpt }}<span v-if="excerptTyping" class="excerpt-caret" aria-hidden="true" /></span>
+                <span class="excerpt-typed"
+                  >{{ typedExcerpt
+                  }}<span
+                    v-if="excerptTyping"
+                    class="excerpt-caret"
+                    aria-hidden="true"
+                /></span>
               </span>
             </span>
           </div>
@@ -111,7 +120,11 @@
         </div>
 
         <div ref="articleContentRef" class="article-shell article-anim">
-          <ArticleMarkdown :content="article.content" :editor-id="editorId" />
+          <ArticleMarkdown
+            :content="article.content"
+            :editor-id="editorId"
+            @rendered="scheduleCatalog"
+          />
         </div>
 
         <div class="post-footer article-anim">
@@ -193,7 +206,11 @@
           :highlight-query="highlightQuery"
         />
       </template>
-      <section v-else-if="!articleLoading" class="article-state" aria-live="polite">
+      <section
+        v-else-if="!articleLoading"
+        class="article-state"
+        aria-live="polite"
+      >
         <Icon name="ph:file-x-bold" />
         <h1>文章暂时无法打开</h1>
         <p>它可能已经下线，或网络暂时不可用，请稍后再试。</p>
@@ -211,6 +228,9 @@
       :progress="readingProgress"
       :show-top="showBackTop"
       :immersive="immersiveMode"
+      :catalog-ready="catalogReady"
+      :catalog-items="catalogItems"
+      :active-catalog-index="activeCatalogIndex"
       @scroll-top="scrollToTop"
       @scroll-comment="scrollToComment"
       @catalog-navigate="navigateCatalog"
@@ -230,6 +250,7 @@
 
 <script setup lang="ts">
 import avatarImg from "~/assets/images/avatar.jpg";
+import dramExcerptImg from "~/assets/images/dram-excerpt.processed.png";
 import { getDisplayImageUrl } from "~/utils/imagePerformance";
 import { gsap } from "gsap";
 import { focusSearchHighlight } from "~/composables/useSearchHighlight";
@@ -242,6 +263,8 @@ const api = useApi();
 const route = useRoute();
 const slug = route.params.slug as string;
 const editorId = "article-preview";
+const CATALOG_VIEW_OFFSET = 32;
+const CATALOG_ACTIVE_TOLERANCE = 1;
 
 const article = ref<any>({});
 const prevArticle = ref<any>(null);
@@ -260,9 +283,24 @@ const adjacentLoaded = ref(false);
 const readingProgress = ref(0);
 const showBackTop = ref(false);
 const immersiveMode = ref(false);
+const catalogReady = ref(false);
+type CatalogItem = {
+  id: string;
+  text: string;
+  level: number;
+  index: number;
+};
+const catalogItems = ref<CatalogItem[]>([]);
+const activeCatalogIndex = ref(0);
+let catalogHeadings: HTMLElement[] = [];
+let catalogOffsets: number[] = [];
 const excerptVisibleCount = ref(0);
 const excerptCharacters = computed(() =>
-  Array.from(String(article.value?.excerpt || "").replace(/\s+/g, " ").trim()),
+  Array.from(
+    String(article.value?.excerpt || "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  ),
 );
 const typedExcerpt = computed(() =>
   excerptCharacters.value.slice(0, excerptVisibleCount.value).join(""),
@@ -270,9 +308,15 @@ const typedExcerpt = computed(() =>
 const excerptTyping = computed(
   () => excerptVisibleCount.value < excerptCharacters.value.length,
 );
-const highlightQuery = computed(() => String(route.query.highlight || '').trim().slice(0, 80));
-const focusCommentId = computed(() => String(route.query.commentId || '').trim());
-const focusParentId = computed(() => String(route.query.parentId || '').trim());
+const highlightQuery = computed(() =>
+  String(route.query.highlight || "")
+    .trim()
+    .slice(0, 80),
+);
+const focusCommentId = computed(() =>
+  String(route.query.commentId || "").trim(),
+);
+const focusParentId = computed(() => String(route.query.parentId || "").trim());
 const articleContext = computed(() => ({
   title: article.value?.title || "",
   content: article.value?.content || "",
@@ -331,8 +375,26 @@ async function loadAdjacent() {
   }
 }
 
+function scrollArticleTo(destination: number) {
+  const container = articleMainRef.value;
+  if (!container) return;
+  const next = Math.max(0, destination);
+  const distance = Math.abs(next - container.scrollTop);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    container.scrollTop = next;
+    return;
+  }
+  gsap.killTweensOf(container);
+  gsap.to(container, {
+    scrollTop: next,
+    duration: Math.min(0.58, Math.max(0.24, distance / 6000)),
+    ease: "power3.out",
+    overwrite: true,
+  });
+}
+
 function scrollToTop() {
-  articleMainRef.value?.scrollTo({ top: 0, behavior: "smooth" });
+  scrollArticleTo(0);
 }
 
 function scrollToComment() {
@@ -341,16 +403,45 @@ function scrollToComment() {
   if (!container || !target) return;
   const cRect = container.getBoundingClientRect();
   const tRect = target.getBoundingClientRect();
-  container.scrollBy({ top: tRect.top - cRect.top - 16, behavior: "smooth" });
+  scrollArticleTo(container.scrollTop + tRect.top - cRect.top - 16);
 }
 
 function catalogHeading(item: { text: string; index: number }) {
+  const catalogItem = item as CatalogItem;
+  if (catalogItem.id) {
+    const byId = document.getElementById(catalogItem.id);
+    if (byId) return byId;
+  }
   const direct = document.getElementById(item.text);
   if (direct) return direct;
   const headings = document.querySelectorAll<HTMLElement>(
     `#${editorId} h1, #${editorId} h2, #${editorId} h3, #${editorId} h4, #${editorId} h5, #${editorId} h6`,
   );
   return headings[item.index - 1] || null;
+}
+
+function headingLayoutTop(heading: HTMLElement, container: HTMLElement) {
+  const headingRect = heading.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const style = getComputedStyle(heading);
+  let transformShift = 0;
+  if (style.transform !== "none") {
+    const values = style.transform
+      .slice(style.transform.indexOf("(") + 1, -1)
+      .split(",")
+      .map(Number);
+    const is3d = style.transform.startsWith("matrix3d(");
+    const scaleY = values[is3d ? 5 : 3] ?? 1;
+    const translateY = values[is3d ? 13 : 5] ?? 0;
+    const originY = Number.parseFloat(style.transformOrigin.split(/\s+/)[1]) || 0;
+    transformShift = translateY + (1 - scaleY) * originY;
+  }
+  return (
+    container.scrollTop +
+    headingRect.top -
+    containerRect.top -
+    transformShift
+  );
 }
 
 function navigateCatalog(
@@ -362,25 +453,11 @@ function navigateCatalog(
   const target = catalogHeading(item);
   if (!container || !target) return;
 
-  const containerRect = container.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
   const destination = Math.max(
     0,
-    container.scrollTop + targetRect.top - containerRect.top - 28,
+    headingLayoutTop(target, container) - CATALOG_VIEW_OFFSET,
   );
-  const distance = Math.abs(destination - container.scrollTop);
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    container.scrollTop = destination;
-    return;
-  }
-
-  gsap.killTweensOf(container);
-  gsap.to(container, {
-    scrollTop: destination,
-    duration: Math.min(1.02, Math.max(0.48, distance / 3000)),
-    ease: "power4.inOut",
-    overwrite: true,
-  });
+  scrollArticleTo(destination);
 }
 
 function setImmersive(active: boolean) {
@@ -394,10 +471,7 @@ function toggleImmersive() {
 }
 
 function onPageKeydown(event: KeyboardEvent) {
-  if (
-    event.key === "Escape" &&
-    immersiveMode.value
-  ) {
+  if (event.key === "Escape" && immersiveMode.value) {
     setImmersive(false);
   }
 }
@@ -405,6 +479,82 @@ function onPageKeydown(event: KeyboardEvent) {
 let scrollFrame: number | null = null;
 let articleResizeObserver: ResizeObserver | null = null;
 let excerptFrame: number | null = null;
+let catalogIdleHandle: number | null = null;
+let catalogFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+function refreshCatalogOffsets() {
+  const container = articleMainRef.value;
+  if (!container) return;
+  const root = articleContentRef.value;
+  const currentHeadings = root
+    ? Array.from(
+        root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"),
+      )
+    : [];
+  const headingsChanged =
+    currentHeadings.length !== catalogHeadings.length ||
+    currentHeadings.some((heading, index) => heading !== catalogHeadings[index]);
+  if (headingsChanged) {
+    catalogHeadings = currentHeadings;
+    catalogItems.value = catalogHeadings.map((heading, index) => {
+      if (!heading.id) heading.id = `${editorId}-heading-${index + 1}`;
+      return {
+        id: heading.id,
+        text: heading.textContent?.trim() || `章节 ${index + 1}`,
+        level: Number(heading.tagName.slice(1)) || 1,
+        index: index + 1,
+      };
+    });
+  }
+  catalogOffsets = catalogHeadings.map((heading) =>
+    Math.max(
+      0,
+      headingLayoutTop(heading, container) - CATALOG_VIEW_OFFSET,
+    ),
+  );
+}
+
+function buildCatalog() {
+  refreshCatalogOffsets();
+  catalogReady.value = true;
+  updateActiveCatalog();
+}
+
+function scheduleCatalog() {
+  if (catalogIdleHandle !== null || catalogFallbackTimer) return;
+  const reveal = () => {
+    catalogIdleHandle = null;
+    catalogFallbackTimer = null;
+    requestAnimationFrame(buildCatalog);
+  };
+  if ("requestIdleCallback" in window) {
+    catalogIdleHandle = window.requestIdleCallback(reveal, { timeout: 700 });
+  } else {
+    catalogFallbackTimer = window.setTimeout(reveal, 80);
+  }
+}
+
+function updateActiveCatalog() {
+  const container = articleMainRef.value;
+  if (!container || !catalogOffsets.length) {
+    activeCatalogIndex.value = 0;
+    return;
+  }
+  const position = container.scrollTop;
+  let low = 0;
+  let high = catalogOffsets.length - 1;
+  let active = 0;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    if (catalogOffsets[middle] <= position + CATALOG_ACTIVE_TOLERANCE) {
+      active = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  activeCatalogIndex.value = active;
+}
 
 function updateArticleScrollState() {
   const container = articleMainRef.value;
@@ -428,6 +578,7 @@ function updateArticleScrollState() {
     1,
     Math.max(0, contentScroll / readingDistance),
   );
+  updateActiveCatalog();
 }
 
 function handleArticleScroll() {
@@ -483,7 +634,8 @@ function checkOutdated() {
 }
 
 function focusSearchResult() {
-  if (highlightQuery.value) focusSearchHighlight(highlightQuery.value, articleMainRef.value);
+  if (highlightQuery.value)
+    focusSearchHighlight(highlightQuery.value, articleMainRef.value);
 }
 
 onMounted(async () => {
@@ -499,7 +651,10 @@ onMounted(async () => {
   updateArticleScrollState();
 
   if (articleContentRef.value) {
-    articleResizeObserver = new ResizeObserver(updateArticleScrollState);
+    articleResizeObserver = new ResizeObserver(() => {
+      refreshCatalogOffsets();
+      updateArticleScrollState();
+    });
     articleResizeObserver.observe(articleContentRef.value);
   }
   void loadAdjacent();
@@ -512,6 +667,9 @@ onUnmounted(() => {
   articleResizeObserver?.disconnect();
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
   if (excerptFrame !== null) cancelAnimationFrame(excerptFrame);
+  if (catalogIdleHandle !== null && "cancelIdleCallback" in window)
+    window.cancelIdleCallback(catalogIdleHandle);
+  if (catalogFallbackTimer) clearTimeout(catalogFallbackTimer);
 });
 </script>
 
@@ -540,7 +698,7 @@ onUnmounted(() => {
 }
 
 .article-main > * {
-  width: min(100%, 800px);
+  width: min(100%, 53.333rem);
   margin-right: auto;
   margin-left: auto;
   transition: width 0.32s var(--ui-ease-out);
@@ -559,7 +717,7 @@ onUnmounted(() => {
   position: relative;
   z-index: 3;
   min-width: var(--article-aside-w, 236px);
-  background: var(--c-bg);
+  background: transparent;
   isolation: isolate;
 }
 
@@ -577,7 +735,7 @@ onUnmounted(() => {
 }
 
 .article-page.is-immersive .article-main > * {
-  width: min(100%, 760px);
+  width: min(100%, 50.667rem);
 }
 
 .article-page.is-immersive :deep(.sidebar-right) {
@@ -595,7 +753,9 @@ onUnmounted(() => {
 .article-page.is-immersive .post-title,
 .article-page.is-immersive .article-shell,
 .article-page.is-immersive .article-lead {
-  transition: max-width .36s var(--ui-ease-out), width .36s var(--ui-ease-out);
+  transition:
+    max-width 0.36s var(--ui-ease-out),
+    width 0.36s var(--ui-ease-out);
 }
 
 .article-shell {
@@ -826,7 +986,7 @@ onUnmounted(() => {
   background: transparent;
 }
 
-.excerpt-mark,
+.excerpt-avatar,
 .excerpt-content,
 .excerpt-copy,
 .excerpt-caret {
@@ -834,16 +994,39 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-.excerpt-mark {
+.excerpt-avatar {
+  position: relative;
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 54px;
+  height: 54px;
   flex-shrink: 0;
   border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--c-primary-soft) 72%, transparent);
-  color: color-mix(in srgb, var(--c-primary) 84%, var(--c-text));
-  font-size: 1rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-primary-soft) 62%, var(--ld-bg-card));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--c-primary) 13%, transparent);
+  place-items: center;
+}
+
+.excerpt-avatar img {
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  object-fit: contain;
+}
+
+.excerpt-avatar i {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  border: 2px solid var(--ld-bg-card);
+  border-radius: 50%;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 0.65rem;
+  font-style: normal;
   place-items: center;
 }
 
@@ -896,7 +1079,10 @@ onUnmounted(() => {
   white-space: normal;
 }
 
-.excerpt-typed { display: block; min-height: 0; }
+.excerpt-typed {
+  display: block;
+  min-height: 0;
+}
 
 .excerpt-caret {
   display: inline-block;
@@ -921,13 +1107,15 @@ onUnmounted(() => {
 }
 
 :deep(.search-highlight) {
-  padding: 0 .12em;
+  padding: 0 0.12em;
   border-radius: 3px;
   background: color-mix(in srgb, var(--c-primary) 24%, transparent);
   color: inherit;
-  transition: background-color .45s ease;
+  transition: background-color 0.45s ease;
 }
-:deep(.search-highlight.is-settled) { background: color-mix(in srgb, var(--c-primary) 12%, transparent); }
+:deep(.search-highlight.is-settled) {
+  background: color-mix(in srgb, var(--c-primary) 12%, transparent);
+}
 
 @keyframes article-fade-up {
   from {
@@ -1209,10 +1397,9 @@ onUnmounted(() => {
     margin-bottom: 18px;
   }
 
-  .excerpt-mark {
-    width: 28px;
-    height: 28px;
-    font-size: 0.86rem;
+  .excerpt-avatar {
+    width: 46px;
+    height: 46px;
   }
 
   .excerpt-content {
@@ -1262,6 +1449,7 @@ onUnmounted(() => {
   .article-shell {
     transition: none;
   }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
