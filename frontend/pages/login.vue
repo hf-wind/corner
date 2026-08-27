@@ -104,7 +104,7 @@
         </Transition>
       </div>
       <TurnstileWidget ref="turnstileWidget" v-model="turnstileToken" />
-      <template v-if="isProduction">
+      <template v-if="supabaseEnabled">
         <div class="auth-divider">
           <span>或</span>
         </div>
@@ -130,12 +130,11 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: false });
-const isProduction = import.meta.env.PROD;
 const api = useApi();
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
-const { signInWithGitHub } = useSupabase();
+const { signInWithGitHub, enabled: supabaseEnabled } = useSupabase();
 const loginType = ref<"password" | "code">("password");
 const email = ref("");
 const password = ref("");

@@ -3,14 +3,19 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 let supabaseInstance: SupabaseClient | null = null
 
 export const useSupabase = () => {
-  if (!supabaseInstance) {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase环境变量未配置')
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return {
+      signInWithGitHub: async () => { throw new Error('Supabase环境变量未配置') },
+      getUser: async () => null,
+      signOut: async () => {},
+      enabled: false
     }
-    
+  }
+
+  if (!supabaseInstance) {
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey)
   }
 
@@ -39,6 +44,7 @@ export const useSupabase = () => {
   return {
     signInWithGitHub,
     getUser,
-    signOut
+    signOut,
+    enabled: true
   }
 }
