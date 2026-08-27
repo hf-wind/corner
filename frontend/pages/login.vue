@@ -104,13 +104,15 @@
         </Transition>
       </div>
       <TurnstileWidget ref="turnstileWidget" v-model="turnstileToken" />
-      <div class="auth-divider">
-        <span>或</span>
-      </div>
-      <GitHubLoginButton 
-        :loading="githubLoading" 
-        @login="handleGitHubLogin" 
-      />
+      <template v-if="isProduction">
+        <div class="auth-divider">
+          <span>或</span>
+        </div>
+        <GitHubLoginButton 
+          :loading="githubLoading" 
+          @login="handleGitHubLogin" 
+        />
+      </template>
       <button class="submit-button" type="submit" :disabled="submitting">
         <Icon
           :name="submitting ? 'ph:circle-notch-bold' : 'ph:arrow-right-bold'"
@@ -128,6 +130,7 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: false });
+const isProduction = import.meta.env.PROD;
 const api = useApi();
 const router = useRouter();
 const route = useRoute();
