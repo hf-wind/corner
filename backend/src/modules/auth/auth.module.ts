@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { EmailModule } from '../email/email.module';
+import { UserModule } from '../user/user.module';
 import { TurnstileService } from './turnstile.service';
 
 @Module({
@@ -15,6 +16,7 @@ import { TurnstileService } from './turnstile.service';
       signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any },
     }),
     EmailModule,
+    UserModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, TurnstileService],
