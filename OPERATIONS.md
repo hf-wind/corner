@@ -44,15 +44,13 @@ GitHub OAuth 应用中的 **Homepage URL** 只用于展示，生产环境可填�
 `https://corner.ink/home`；**Authorization callback URL** 必须填写 Supabase 项目的回调地址：
 `https://<project-ref>.supabase.co/auth/v1/callback`。
 
-在 Supabase Auth 的 URL Configuration 中，将 Site URL 设为 `https://corner.ink`，并把以下地址加入
-Redirect URLs：
+在 Supabase Auth 的 Redirect URLs allow list 中加入以下地址（控制台版本不同，Site URL 可能不显示；本流程不依赖它）：
 
 - `https://corner.ink/auth/github-callback`
 - `http://localhost:3000/auth/github-callback`
 
-生产镜像通过 `VITE_PUBLIC_APP_ORIGIN=https://corner.ink` 固定回调主机；本地 Vite 开发服务未设置该变量时，
-才会使用当前 origin（通常是 `http://localhost:3000`）。两者共用 Supabase 项目时，必须同时登记上面的两条
-Redirect URL。
+callback 使用浏览器当前 origin 动态生成。生产从 `https://corner.ink` 发起就返回生产站点，本地从
+`http://localhost:3000` 发起就返回本地。两者共用 Supabase 项目时，必须同时登记上面的两条 Redirect URL。
 
 应用完成 GitHub 登录后始终跳转到 `/home`（或登录前经过校验的站内路径），不会把 OAuth token 留在地址栏。
 

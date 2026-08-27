@@ -508,7 +508,7 @@ watch(panelOpen, (v) => {
   .notif-panel {
     top: auto !important;
     right: max(12px, env(safe-area-inset-right));
-    bottom: max(12px, env(safe-area-inset-bottom));
+    bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px));
     left: max(12px, env(safe-area-inset-left)) !important;
     width: auto;
     max-height: min(72dvh, 560px);

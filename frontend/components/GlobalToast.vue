@@ -1,6 +1,7 @@
 <template>
   <Teleport to="body">
-    <div class="toast-container">
+    <div class="toast-signal" :class="{ active: signalActive }" aria-hidden="true" />
+    <div class="toast-container" aria-live="polite" aria-atomic="true">
       <TransitionGroup name="toast" tag="div" class="toast-stack">
         <div
           v-for="t in toasts"
@@ -30,6 +31,8 @@
 const { toasts, dismiss } = useToast()
 
 const timers = new Map<number, ReturnType<typeof setTimeout>>()
+const signalActive = ref(false)
+let signalTimer: ReturnType<typeof setTimeout> | null = null
 
 function pauseAuto(id: number) {
   const timer = timers.get(id)
@@ -43,23 +46,49 @@ function resumeAuto(id: number) {
   }
 }
 
-watch(() => toasts.value.length, () => {
+watch(() => toasts.value.map(t => t.id).join(','), () => {
+  signalActive.value = false
+  requestAnimationFrame(() => {
+    signalActive.value = true
+    if (signalTimer) clearTimeout(signalTimer)
+    signalTimer = setTimeout(() => { signalActive.value = false }, 900)
+  })
   toasts.value.forEach(t => {
     if (!timers.has(t.id) && t.visible) {
       timers.set(t.id, setTimeout(() => dismiss(t.id), 3000))
     }
   })
 })
+
+onUnmounted(() => {
+  if (signalTimer) clearTimeout(signalTimer)
+  timers.forEach(timer => clearTimeout(timer))
+})
 </script>
 
 <style scoped>
 .toast-container {
   position: fixed;
-  bottom: 20px;
+  bottom: max(78px, calc(env(safe-area-inset-bottom) + 72px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
   pointer-events: none;
+}
+
+.toast-signal {
+  position: fixed;
+  inset: 8px;
+  z-index: 9998;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 0%, transparent);
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--c-primary) 0%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toast-signal.active {
+  animation: toast-edge-signal 0.9s ease-out both;
 }
 
 .toast-stack {
@@ -125,9 +154,15 @@ watch(() => toasts.value.length, () => {
   color: var(--c-text-1);
   word-break: break-word;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+@keyframes toast-edge-signal {
+  0% { opacity: 0; border-color: color-mix(in srgb, var(--c-primary) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--c-primary) 0%, transparent); }
+  22% { opacity: 1; border-color: color-mix(in srgb, var(--c-primary) 38%, transparent); box-shadow: inset 0 0 28px color-mix(in srgb, var(--c-primary) 5%, transparent); }
+  100% { opacity: 0; border-color: color-mix(in srgb, var(--c-primary) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--c-primary) 0%, transparent); }
 }
 
 .toast-close {

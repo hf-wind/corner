@@ -206,52 +206,55 @@ export class UserService {
   }
 
   async findOrCreateGitHubUser(githubUser: GitHubUser) {
-    // 尝试通过GitHub ID查找用户
-    let user = await this.prisma.user.findFirst({
-      where: { githubId: githubUser.id }
-    });
-    
-    if (!user && githubUser.email) {
-      // 尝试通过email查找用户
-      user = await this.prisma.user.findUnique({
-        where: { email: githubUser.email }
-      });
-      
-      if (user) {
-        // 关联GitHub账号
-        user = await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            githubId: githubUser.id,
-            githubUsername: githubUser.username,
-            githubAvatar: githubUser.avatar
-          }
-        });
-      }
+    const providerId = String(githubUser.id || '').trim();
+    const email = String(githubUser.email || '').trim().toLowerCase();
+    if (!providerId || !email) {
+      throw new BadRequestException('GitHub 未提供有效的账号标识或邮箱');
     }
-    
-    if (!user) {
-      // 创建新用户
-      const baseUsername = githubUser.username || githubUser.email.split('@')[0];
+
+    const linkedUser = await this.prisma.user.findUnique({
+      where: { githubId: providerId },
+    });
+    if (linkedUser) return { user: linkedUser, action: 'existing_github' as const };
+
+    const emailUser = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
+    if (emailUser) {
+      if (emailUser.githubId && emailUser.githubId !== providerId) {
+        throw new BadRequestException('该系统账号已绑定其他 GitHub 账号');
+      }
+      const user = await this.prisma.user.update({
+        where: { id: emailUser.id },
+        data: {
+          githubId: providerId,
+          githubUsername: githubUser.username?.trim() || null,
+          githubAvatar: githubUser.avatar?.trim() || null,
+        },
+      });
+      return { user, action: 'linked_existing' as const };
+    }
+
+    // 没有同邮箱账号时创建新用户。
+    const baseUsername = githubUser.username?.trim() || email.split('@')[0];
+    {
       const username = await this.generateUsername(baseUsername);
-      // 为GitHub用户生成一个随机密码哈希（用户不会使用这个密码）
       const randomPassword = Math.random().toString(36).substring(2);
       const passwordHash = await bcrypt.hash(randomPassword, 12);
-      user = await this.prisma.user.create({
+      const user = await this.prisma.user.create({
         data: {
-          email: githubUser.email,
+          email,
           username,
-          githubId: githubUser.id,
-          githubUsername: githubUser.username,
-          githubAvatar: githubUser.avatar,
+          githubId: providerId,
+          githubUsername: githubUser.username?.trim() || null,
+          githubAvatar: githubUser.avatar?.trim() || null,
           passwordHash,
           avatar: githubUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
           role: 'user'
         }
       });
+      return { user, action: 'created' as const };
     }
-    
-    return user;
   }
 
   private async generateUsername(base: string): Promise<string> {

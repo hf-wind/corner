@@ -27,9 +27,10 @@ export const useSupabase = () => {
     const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//')
       ? redirect
       : '/home'
-    const configuredOrigin = String(import.meta.env.VITE_PUBLIC_APP_ORIGIN || '').trim()
-    const appOrigin = configuredOrigin || window.location.origin
-    const callback = new URL('/auth/github-callback', appOrigin)
+    // OAuth must return to the origin that actually launched the flow. Using a
+    // build-time origin can leak a local development host into production when
+    // an old or shared environment file is bundled.
+    const callback = new URL('/auth/github-callback', window.location.origin)
     callback.searchParams.set('redirect', safeRedirect)
     const { data, error } = await supabaseInstance!.auth.signInWithOAuth({
       provider: 'github',

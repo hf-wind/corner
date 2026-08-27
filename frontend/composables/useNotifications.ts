@@ -15,6 +15,23 @@ type NotificationEventPayload =
 let eventSource: EventSource | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let connectedToken: string | null = null
+let pendingFeedback: AppNotification[] = []
+let feedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+function queueNotificationFeedback(item: AppNotification) {
+  pendingFeedback.push(item)
+  if (feedbackTimer) return
+  feedbackTimer = setTimeout(() => {
+    const batch = pendingFeedback.splice(0)
+    feedbackTimer = null
+    const toast = useToast()
+    if (batch.length === 1) {
+      toast.info(batch[0].title || '收到一条新消息')
+    } else if (batch.length > 1) {
+      toast.info(`收到 ${batch.length} 条新消息`)
+    }
+  }, 120)
+}
 
 export function useNotifications() {
   const api = useApi()
@@ -35,7 +52,10 @@ export function useNotifications() {
       if (existing >= 0) latestItems.value.splice(existing, 1)
       latestItems.value.unshift(payload.data)
       latestItems.value = latestItems.value.slice(0, 8)
-      if (!payload.data.read && existing < 0) unreadCount.value += 1
+      if (!payload.data.read && existing < 0) {
+        unreadCount.value += 1
+        queueNotificationFeedback(payload.data)
+      }
     }
   }
 

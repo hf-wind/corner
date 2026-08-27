@@ -104,7 +104,7 @@ const handleCallback = async () => {
     })
     
     await setSession(response.access_token, response.user)
-    
+
     sessionStorage.removeItem('corner:github-turnstile-token')
     const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'

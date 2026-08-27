@@ -440,7 +440,7 @@ function openSearch() {
 }
 
 function goPanel() {
-  router.push(panelHome());
+  router.push(isUserAdmin.value ? '/admin' : '/admin/profile');
 }
 
 async function handleLogout() {
