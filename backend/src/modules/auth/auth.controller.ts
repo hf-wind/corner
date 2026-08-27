@@ -3,7 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { GitHubLoginDto } from './dto/github-login.dto';
+import { GitHubLoginRequestDto } from './dto/github-login.dto';
 import {
   IsEmail,
   IsString,
@@ -80,7 +80,7 @@ export class AuthController {
   }
 
   @Post('github')
-  async githubLogin(@Body() body: { githubUser: GitHubLoginDto }) {
+  async githubLogin(@Body() body: GitHubLoginRequestDto) {
     return this.auth.githubLogin(body.githubUser);
   }
 }

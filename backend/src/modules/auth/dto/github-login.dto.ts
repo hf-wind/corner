@@ -1,4 +1,5 @@
-import { IsString, IsEmail, IsOptional } from 'class-validator'
+import { IsString, IsEmail, IsOptional, ValidateNested } from 'class-validator'
+import { Type } from 'class-transformer'
 
 export class GitHubLoginDto {
   @IsString()
@@ -14,4 +15,10 @@ export class GitHubLoginDto {
   @IsString()
   @IsOptional()
   avatar?: string
+}
+
+export class GitHubLoginRequestDto {
+  @ValidateNested()
+  @Type(() => GitHubLoginDto)
+  githubUser: GitHubLoginDto
 }
