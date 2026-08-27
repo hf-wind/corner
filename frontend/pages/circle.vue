@@ -21,7 +21,7 @@
       <section ref="streamRef" class="circle-stream" aria-labelledby="circle-stream-title" aria-live="polite">
         <div v-if="loading && !items.length" class="stream-state stream-loading"><div class="loading-mark"><span /><span /><span /></div><strong>正在收集朋友们的新消息</strong><span>RSS 订阅源正在抵达。</span></div>
         <div v-else-if="!filteredItems.length" class="stream-state stream-empty"><div class="empty-mark"><Icon name="ph:wind-bold" /></div><strong>{{ items.length ? '没有符合筛选条件的动态' : '此刻很安静' }}</strong><span>{{ items.length ? '试试切换另一个动态视图。' : '为友链配置 RSS 后，新消息会自动出现在这里。' }}</span><button v-if="items.length" type="button" @click="setActiveFilter('all')">查看全部动态 <Icon name="ph:arrow-right-bold" /></button></div>
-        <div v-else class="stream-list"><template v-for="(item, index) in visibleFilteredItems" :key="item.id"><div v-if="showNewDivider(index)" class="new-divider"><span><Icon name="ph:sparkle-bold" /> 新动态</span></div><div v-if="showDateMarker(index)" class="date-marker"><span>{{ dateLabel(item.publishedAt) }}</span><i /></div><article class="stream-entry" :class="{ 'has-image': item.image && !brokenImages.has(item.id), 'is-featured': index === 0 }" :style="entryStyle(item, index)"><div class="entry-spine"><a class="source-avatar" :href="item.source.url" target="_blank" rel="noopener noreferrer" :title="item.source.name"><img :src="avatarFor(item.source)" :alt="item.source.name" loading="lazy" @error="onAvatarError" /></a><span class="entry-node" /></div><div class="entry-content"><header class="entry-head"><div class="entry-source"><a :href="item.source.url" target="_blank" rel="noopener noreferrer">{{ item.source.name }}</a><span class="source-badge">RSS</span><time :datetime="item.publishedAt" :title="formatDate(item.publishedAt)">{{ relativeDate(item.publishedAt) }}</time></div><a class="entry-open" :href="item.url" target="_blank" rel="noopener noreferrer" title="打开原文" aria-label="打开原文"><Icon name="ph:arrow-up-right-bold" /></a></header><a class="entry-body" :href="item.url" target="_blank" rel="noopener noreferrer"><div class="entry-label"><span v-if="index === 0" class="featured-label"><Icon name="ph:star-four-fill" /> LATEST</span><span class="entry-index">{{ String(index + 1).padStart(2, '0') }}</span></div><h3>{{ item.title }}</h3><p v-if="item.summary">{{ item.summary }}</p><figure v-if="item.image && !brokenImages.has(item.id)"><img :src="item.image" :alt="item.title" loading="lazy" decoding="async" @error="onEntryImageError(item.id)" /><figcaption><Icon name="ph:image-square-bold" /> 文章配图</figcaption></figure></a><footer class="entry-foot"><div class="entry-details"><span v-if="item.author"><Icon name="ph:user-circle-bold" /> {{ item.author }}</span><a v-if="item.comments" :href="item.comments" target="_blank" rel="noopener noreferrer"><Icon name="ph:chat-circle-text-bold" /> 评论</a><a v-if="item.enclosure" :href="item.enclosure" target="_blank" rel="noopener noreferrer"><Icon name="ph:paperclip-bold" /> 附件</a></div><div class="category-row"><span v-for="tag in (item.categories || []).slice(0, 4)" :key="tag">#{{ tag }}</span><span v-if="!item.categories?.length" class="quiet-tag">来自订阅源</span></div><a class="entry-read" :href="item.url" target="_blank" rel="noopener noreferrer">阅读原文 <Icon name="ph:arrow-up-right-bold" /></a></footer></div></article></template></div>
+        <div v-else class="stream-list"><template v-for="(item, index) in visibleFilteredItems" :key="item.id"><div v-if="showNewDivider(index)" class="new-divider"><span><Icon name="ph:sparkle-bold" /> 新动态</span></div><div v-if="showDateMarker(index)" class="date-marker"><span>{{ dateLabel(item.publishedAt) }}</span><i /></div><article class="stream-entry" :class="{ 'has-image': item.image && !brokenImages.has(item.id), 'is-featured': index === 0 }" :style="entryStyle(item, index)"><div class="entry-spine"><a class="source-avatar" :href="item.source.url" target="_blank" rel="noopener noreferrer" :title="item.source.name"><img :src="avatarFor(item.source)" :alt="item.source.name" loading="lazy" @error="onAvatarError" /></a><span class="entry-node" /></div><div class="entry-content"><header class="entry-head"><div class="entry-source"><a :href="item.source.url" target="_blank" rel="noopener noreferrer">{{ item.source.name }}</a><span class="source-badge">RSS</span><time :datetime="item.publishedAt" :title="formatDate(item.publishedAt)">{{ relativeDate(item.publishedAt) }}</time></div><a class="entry-open" :href="item.url" target="_blank" rel="noopener noreferrer" title="打开原文" aria-label="打开原文"><Icon name="ph:arrow-up-right-bold" /></a></header><a class="entry-body" :href="item.url" target="_blank" rel="noopener noreferrer"><div class="entry-label"><span v-if="index === 0" class="featured-label"><Icon name="ph:star-four-fill" /> LATEST</span><span class="entry-index">{{ String(index + 1).padStart(2, '0') }}</span></div><h3>{{ item.title }}</h3><p v-if="item.content || item.summary" class="entry-excerpt">{{ item.content || item.summary }}</p><figure v-if="item.image && !brokenImages.has(item.id)"><img :src="item.image" :alt="item.title" loading="lazy" decoding="async" @error="onEntryImageError(item.id)" /><figcaption><Icon name="ph:image-square-bold" /> 文章配图</figcaption></figure></a><footer class="entry-foot"><div class="entry-details"><span v-if="item.author"><Icon name="ph:user-circle-bold" /> {{ item.author }}</span><a v-if="item.comments" :href="item.comments" target="_blank" rel="noopener noreferrer"><Icon name="ph:chat-circle-text-bold" /> 评论</a><a v-if="item.enclosure" :href="item.enclosure" target="_blank" rel="noopener noreferrer"><Icon name="ph:paperclip-bold" /> 附件</a></div><div class="category-row"><span v-for="tag in (item.categories || []).slice(0, 4)" :key="tag">#{{ tag }}</span><span v-if="!item.categories?.length" class="quiet-tag">来自订阅源</span></div><a class="entry-read" :href="item.url" target="_blank" rel="noopener noreferrer">阅读原文 <Icon name="ph:arrow-up-right-bold" /></a></footer></div></article></template></div>
         <div ref="loadMoreRef" class="load-more" aria-live="polite"><template v-if="visibleCount < filteredItems.length"><span class="load-pulse"><i /><i /><i /></span> 继续向下探索</template><span v-else-if="filteredItems.length" class="end-mark"><Icon name="ph:check-circle-bold" /> 已抵达最早的动态</span></div>
       </section>
 
@@ -545,7 +545,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   font-size: 0.72rem;
   line-height: 1.82;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 20;
 }
 .entry-body figure {
   margin: 14px 0 0;
@@ -939,7 +939,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   }
   .entry-body p {
     font-size: 0.68rem;
-    -webkit-line-clamp: 4;
+    -webkit-line-clamp: 20;
   }
   .entry-body figure {
     aspect-ratio: 4/3;
@@ -1133,7 +1133,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 }
 
 .stream-entry.has-image .entry-body p {
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 20;
 }
 
 .stream-entry:not(.has-image) .entry-body figure {
@@ -1730,6 +1730,123 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
   .entry-body figure {
     border-color: #bbb;
+  }
+}
+
+/* stage-orbit is a live signal marker rather than a static illustration. */
+.stage-orbit {
+  animation: orbit-entrance 0.72s cubic-bezier(0.16, 1, 0.3, 1) both, orbit-float 8s ease-in-out 0.72s infinite;
+  transform-origin: 50% 50%;
+}
+
+.stage-orbit .ring-one {
+  animation: orbit-spin 18s linear infinite;
+}
+
+.stage-orbit .ring-two {
+  animation: orbit-spin-reverse 12s linear infinite;
+}
+
+.stage-orbit .orbit-core {
+  animation: orbit-core-pulse 3.2s ease-in-out infinite;
+}
+
+.stage-orbit .dot-one {
+  animation: orbit-dot-one 7s ease-in-out infinite;
+}
+
+.stage-orbit .dot-two {
+  animation: orbit-dot-two 9s ease-in-out -2s infinite;
+}
+
+@keyframes orbit-entrance {
+  from {
+    opacity: 0;
+    transform: scale(0.72) rotate(-14deg);
+  }
+  to {
+    opacity: 0.92;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes orbit-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(-24deg) scaleY(0.74);
+  }
+  to {
+    transform: rotate(336deg) scaleY(0.74);
+  }
+}
+
+@keyframes orbit-spin-reverse {
+  from {
+    transform: rotate(36deg) scaleY(0.62);
+  }
+  to {
+    transform: rotate(-324deg) scaleY(0.62);
+  }
+}
+
+@keyframes orbit-core-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--circle-accent) 8%, transparent), 0 16px 40px rgb(0 0 0 / 12%);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 17px color-mix(in srgb, var(--circle-accent) 4%, transparent), 0 20px 48px rgb(0 0 0 / 16%);
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+
+@keyframes orbit-dot-one {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  25% {
+    transform: translate3d(-8px, 8px, 0) scale(0.82);
+  }
+  50% {
+    transform: translate3d(-16px, 0, 0) scale(1.16);
+  }
+  75% {
+    transform: translate3d(-5px, -9px, 0) scale(0.88);
+  }
+}
+
+@keyframes orbit-dot-two {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.9);
+  }
+  33% {
+    transform: translate3d(10px, -6px, 0) scale(1.18);
+  }
+  66% {
+    transform: translate3d(17px, 5px, 0) scale(0.76);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-orbit,
+  .stage-orbit .ring-one,
+  .stage-orbit .ring-two,
+  .stage-orbit .orbit-core,
+  .stage-orbit .dot-one,
+  .stage-orbit .dot-two {
+    animation: none;
   }
 }
 
@@ -2361,8 +2478,10 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
 .entry-head {
   display: flex;
-  min-height: 42px;
-  align-items: flex-start;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
@@ -2416,9 +2535,9 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
 .entry-open {
   display: grid;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
   border: 1px solid transparent;
   border-radius: 8px;
   color: var(--circle-faint);
@@ -2435,18 +2554,21 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
 .entry-body {
   display: block;
-  margin-top: 12px;
+  margin-top: 6px;
   color: inherit;
   text-decoration: none;
 }
 
 .entry-label {
   display: flex;
-  min-height: 18px;
+  min-height: 0;
+  max-height: 20px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
+  overflow: hidden;
+  line-height: 1;
 }
 
 .featured-label {
@@ -2492,7 +2614,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   font-size: 0.72rem;
   line-height: 1.8;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 20;
 }
 
 .entry-body figure {
@@ -3119,7 +3241,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
   .entry-body p {
     font-size: 0.68rem;
-    -webkit-line-clamp: 4;
+    -webkit-line-clamp: 20;
   }
 
   .entry-body figure {
