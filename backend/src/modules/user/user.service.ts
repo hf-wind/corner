@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { GitHubUser } from '../auth/types/github-user.type';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UserService {
@@ -231,7 +232,11 @@ export class UserService {
     
     if (!user) {
       // 创建新用户
-      const username = githubUser.username || githubUser.email.split('@')[0];
+      const baseUsername = githubUser.username || githubUser.email.split('@')[0];
+      const username = await this.generateUsername(baseUsername);
+      // 为GitHub用户生成一个随机密码哈希（用户不会使用这个密码）
+      const randomPassword = Math.random().toString(36).substring(2);
+      const passwordHash = await bcrypt.hash(randomPassword, 12);
       user = await this.prisma.user.create({
         data: {
           email: githubUser.email,
@@ -239,7 +244,7 @@ export class UserService {
           githubId: githubUser.id,
           githubUsername: githubUser.username,
           githubAvatar: githubUser.avatar,
-          passwordHash: '', // GitHub用户不需要密码
+          passwordHash,
           avatar: githubUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
           role: 'user'
         }
@@ -247,5 +252,26 @@ export class UserService {
     }
     
     return user;
+  }
+
+  private async generateUsername(base: string): Promise<string> {
+    let candidate = base.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
+    if (!candidate) candidate = 'user';
+
+    const exists = await this.prisma.user.findUnique({
+      where: { username: candidate },
+    });
+    if (!exists) return candidate;
+
+    for (let i = 0; i < 10; i++) {
+      const suffix = Math.random().toString(36).substring(2, 5);
+      const testUsername = `${candidate}_${suffix}`;
+      const taken = await this.prisma.user.findUnique({
+        where: { username: testUsername },
+      });
+      if (!taken) return testUsername;
+    }
+
+    return `${candidate}_${Date.now().toString(36)}`;
   }
 }

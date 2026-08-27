@@ -30,6 +30,7 @@ const route = useRoute()
 const router = useRouter()
 const { getUser } = useSupabase()
 const { setSession } = useAuth()
+const api = useApi()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -45,19 +46,16 @@ const handleCallback = async () => {
       throw new Error('获取用户信息失败')
     }
     
-    const response = await $fetch('/api/auth/github', {
-      method: 'POST',
-      body: {
-        githubUser: {
-          id: user.id,
-          email: user.email,
-          username: user.user_metadata?.user_name || user.user_metadata?.preferred_username,
-          avatar: user.user_metadata?.avatar_url
-        }
+    const response = await api.post('/auth/github', {
+      githubUser: {
+        id: user.id,
+        email: user.email,
+        username: user.user_metadata?.user_name || user.user_metadata?.preferred_username,
+        avatar: user.user_metadata?.avatar_url
       }
     })
     
-    await setSession(response.token, response.user)
+    await setSession(response.access_token, response.user)
     
     const redirect = route.query.redirect as string || '/'
     router.push(redirect)
