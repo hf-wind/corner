@@ -203,6 +203,7 @@ async function sendCode() {
 async function handleGitHubLogin() {
   if (githubLoading.value) return;
   githubLoading.value = true;
+  let navigationStarted = false;
   try {
     const token = await resolveTurnstile();
     if (!token) return;
@@ -213,11 +214,13 @@ async function handleGitHubLogin() {
       requestAnimationFrame(() => window.setTimeout(resolve, 120));
     });
     await signInWithGitHub({ redirect: safeRedirect() || "/home" });
+    // Supabase starts a full-page navigation; keep the state until this page unloads.
+    navigationStarted = true;
   } catch (err: any) {
     sessionStorage.removeItem("corner:github-turnstile-token");
     toast.error(err.message || "GitHub登录失败");
   } finally {
-    githubLoading.value = false;
+    if (!navigationStarted) githubLoading.value = false;
   }
 }
 async function handleLogin() {

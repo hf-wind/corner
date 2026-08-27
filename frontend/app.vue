@@ -1,5 +1,5 @@
 <template>
-  <ClientOnly>
+  <ClientOnly v-if="route.meta.layout !== false">
     <GlobalBottomDock />
   </ClientOnly>
   <component :is="activeLayout">
