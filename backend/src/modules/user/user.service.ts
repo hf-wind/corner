@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { GitHubUser } from '../auth/types/github-user.type';
 
 @Injectable()
 export class UserService {
@@ -201,5 +202,50 @@ export class UserService {
         role: true,
       },
     });
+  }
+
+  async findOrCreateGitHubUser(githubUser: GitHubUser) {
+    // 尝试通过GitHub ID查找用户
+    let user = await this.prisma.user.findFirst({
+      where: { githubId: githubUser.id }
+    });
+    
+    if (!user && githubUser.email) {
+      // 尝试通过email查找用户
+      user = await this.prisma.user.findUnique({
+        where: { email: githubUser.email }
+      });
+      
+      if (user) {
+        // 关联GitHub账号
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            githubId: githubUser.id,
+            githubUsername: githubUser.username,
+            githubAvatar: githubUser.avatar
+          }
+        });
+      }
+    }
+    
+    if (!user) {
+      // 创建新用户
+      const username = githubUser.username || githubUser.email.split('@')[0];
+      user = await this.prisma.user.create({
+        data: {
+          email: githubUser.email,
+          username,
+          githubId: githubUser.id,
+          githubUsername: githubUser.username,
+          githubAvatar: githubUser.avatar,
+          passwordHash: '', // GitHub用户不需要密码
+          avatar: githubUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+          role: 'user'
+        }
+      });
+    }
+    
+    return user;
   }
 }

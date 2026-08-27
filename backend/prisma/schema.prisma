@@ -17,6 +17,12 @@ model User {
   isActive           Boolean             @default(true) @map("is_active")
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
+  
+  // GitHub相关字段
+  githubId           String?             @unique @map("github_id") @db.VarChar(100)
+  githubUsername     String?             @map("github_username") @db.VarChar(100)
+  githubAvatar       String?             @map("github_avatar") @db.Text
+  
   posts              Post[]
   postVersions       PostVersion[]
   media              Media[]
@@ -33,9 +39,25 @@ model User {
   storyRoutes        StoryRoute[]
   musicFavorites     MusicFavorite[]
   visitorMessages    VisitorMessage[]
+  authProviders      AuthProvider[]
 
   @@index([isActive, role])
+  @@index([githubId])
   @@map("users")
+}
+
+model AuthProvider {
+  id         String   @id @default(uuid()) @db.Uuid
+  provider   String   @db.VarChar(50)
+  providerId String   @map("provider_id") @db.VarChar(100)
+  userId     String   @map("user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("auth_providers")
 }
 
 model MusicFavorite {

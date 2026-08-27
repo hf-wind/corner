@@ -575,6 +575,23 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: translateY(-5px);
 }
+.auth-panel :deep(.auth-divider) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+  color: var(--c-text-3);
+  font-size: 0.6rem;
+}
+
+.auth-panel :deep(.auth-divider::before),
+.auth-panel :deep(.auth-divider::after) {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .auth-panel :deep(.auth-switch) {
   margin: 20px 0 0;
   padding-top: 18px;

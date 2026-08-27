@@ -9,6 +9,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GitHubUser } from './types/github-user.type';
+import { UserService } from '../user/user.service';
 import * as bcrypt from 'bcryptjs';
 
 type AuthUser = {
@@ -25,6 +27,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private emailService: EmailService,
+    private userService: UserService,
   ) {}
 
   async sendVerificationCode(
@@ -140,6 +143,27 @@ export class AuthService {
     });
 
     return { success: true, message: '密码修改成功' };
+  }
+
+  async githubLogin(githubUser: GitHubUser) {
+    const user = await this.userService.findOrCreateGitHubUser(githubUser);
+    
+    const token = this.jwt.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role
+    });
+    
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        avatar: user.avatar
+      }
+    };
   }
 
   private async generateUsername(email: string): Promise<string> {

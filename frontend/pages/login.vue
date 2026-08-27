@@ -104,6 +104,13 @@
         </Transition>
       </div>
       <TurnstileWidget ref="turnstileWidget" v-model="turnstileToken" />
+      <div class="auth-divider">
+        <span>或</span>
+      </div>
+      <GitHubLoginButton 
+        :loading="githubLoading" 
+        @login="handleGitHubLogin" 
+      />
       <button class="submit-button" type="submit" :disabled="submitting">
         <Icon
           :name="submitting ? 'ph:circle-notch-bold' : 'ph:arrow-right-bold'"
@@ -125,6 +132,7 @@ const api = useApi();
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const { signInWithGitHub } = useSupabase();
 const loginType = ref<"password" | "code">("password");
 const email = ref("");
 const password = ref("");
@@ -133,6 +141,7 @@ const submitting = ref(false);
 const sendingCode = ref(false);
 const cooldown = ref(0);
 const turnstileToken = ref("");
+const githubLoading = ref(false);
 const turnstileWidget = ref<{
   reset: () => void;
   waitForToken: (timeoutMs?: number) => Promise<string>;
@@ -187,6 +196,16 @@ async function sendCode() {
   } finally {
     sendingCode.value = false;
     turnstileWidget.value?.reset();
+  }
+}
+async function handleGitHubLogin() {
+  if (githubLoading.value) return;
+  githubLoading.value = true;
+  try {
+    await signInWithGitHub();
+  } catch (err: any) {
+    toast.error(err.message || "GitHub登录失败");
+    githubLoading.value = false;
   }
 }
 async function handleLogin() {

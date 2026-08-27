@@ -4,11 +4,14 @@ let supabaseInstance: SupabaseClient | null = null
 
 export const useSupabase = () => {
   if (!supabaseInstance) {
-    const config = useRuntimeConfig()
-    supabaseInstance = createClient(
-      config.public.supabaseUrl,
-      config.public.supabaseAnonKey
-    )
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase环境变量未配置')
+    }
+    
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey)
   }
 
   const signInWithGitHub = async () => {
