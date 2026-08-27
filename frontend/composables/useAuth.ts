@@ -101,7 +101,7 @@ export function useAuth() {
   }
 
   function panelHome() {
-    return isAdmin.value ? '/admin' : '/admin/profile'
+    return isAdmin.value ? '/admin' : '/home'
   }
 
   function lastPublicPath() {

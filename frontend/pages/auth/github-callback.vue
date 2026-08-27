@@ -57,7 +57,7 @@ const handleCallback = async () => {
     
     await setSession(response.access_token, response.user)
     
-    const redirect = route.query.redirect as string || '/'
+    const redirect = route.query.redirect as string || '/home'
     router.push(redirect)
   } catch (err: any) {
     error.value = err.message || '登录失败，请重试'
