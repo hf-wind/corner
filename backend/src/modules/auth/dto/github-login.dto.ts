@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, ValidateNested } from 'class-validator'
+import { IsString, IsEmail, IsOptional, ValidateNested, MaxLength } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class GitHubLoginDto {
@@ -21,4 +21,9 @@ export class GitHubLoginRequestDto {
   @ValidateNested()
   @Type(() => GitHubLoginDto)
   githubUser: GitHubLoginDto
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(2048)
+  turnstileToken?: string
 }

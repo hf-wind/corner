@@ -45,20 +45,28 @@ const handleCallback = async () => {
     if (!user) {
       throw new Error('获取用户信息失败')
     }
+
+    // Never leave OAuth access/refresh tokens visible in the address bar,
+    // including when the local account request fails and the user retries.
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`)
     
+    const turnstileToken = sessionStorage.getItem('corner:github-turnstile-token') || ''
     const response = await api.post('/auth/github', {
       githubUser: {
         id: user.id,
         email: user.email,
         username: user.user_metadata?.user_name || user.user_metadata?.preferred_username,
         avatar: user.user_metadata?.avatar_url
-      }
+      },
+      turnstileToken
     })
     
     await setSession(response.access_token, response.user)
     
-    const redirect = route.query.redirect as string || '/home'
-    router.push(redirect)
+    sessionStorage.removeItem('corner:github-turnstile-token')
+    const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+    const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
+    await router.replace(redirect)
   } catch (err: any) {
     error.value = err.message || '登录失败，请重试'
   } finally {

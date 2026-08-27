@@ -38,6 +38,20 @@ BACKUP_ENCRYPTION_KEY=至少32位的独立随机密钥
 BACKUP_RECOVERY_TOKEN=至少32位的独立恢复口令
 ```
 
+## GitHub OAuth 回调地址
+
+GitHub OAuth 应用中的 **Homepage URL** 只用于展示，生产环境可填写
+`https://corner.ink/home`；**Authorization callback URL** 必须填写 Supabase 项目的回调地址：
+`https://<project-ref>.supabase.co/auth/v1/callback`。
+
+在 Supabase Auth 的 URL Configuration 中，将 Site URL 设为 `https://corner.ink`，并把以下地址加入
+Redirect URLs：
+
+- `https://corner.ink/auth/github-callback`
+- `http://localhost:3000/auth/github-callback`
+
+应用完成 GitHub 登录后始终跳转到 `/home`（或登录前经过校验的站内路径），不会把 OAuth token 留在地址栏。
+
 修改后执行：
 
 ```bash

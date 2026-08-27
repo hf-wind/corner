@@ -204,9 +204,14 @@ async function handleGitHubLogin() {
   if (githubLoading.value) return;
   githubLoading.value = true;
   try {
-    await signInWithGitHub();
+    const token = await resolveTurnstile();
+    if (!token) return;
+    sessionStorage.setItem("corner:github-turnstile-token", token);
+    await signInWithGitHub({ redirect: safeRedirect() || "/home" });
   } catch (err: any) {
+    sessionStorage.removeItem("corner:github-turnstile-token");
     toast.error(err.message || "GitHub登录失败");
+  } finally {
     githubLoading.value = false;
   }
 }

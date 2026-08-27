@@ -80,7 +80,8 @@ export class AuthController {
   }
 
   @Post('github')
-  async githubLogin(@Body() body: GitHubLoginRequestDto) {
+  async githubLogin(@Body() body: GitHubLoginRequestDto, @Req() req: any) {
+    await this.turnstile.verify(body.turnstileToken, req.ip)
     return this.auth.githubLogin(body.githubUser);
   }
 }

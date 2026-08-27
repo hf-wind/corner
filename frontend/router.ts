@@ -99,6 +99,11 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: false },
   },
   {
+    path: "/auth/github-callback",
+    component: lazyRoute(() => import("./pages/auth/github-callback.vue")),
+    meta: { layout: false },
+  },
+  {
     path: "/register",
     component: lazyRoute(() => import("./pages/register.vue")),
     meta: { layout: false },
