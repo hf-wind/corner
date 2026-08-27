@@ -207,6 +207,11 @@ async function handleGitHubLogin() {
     const token = await resolveTurnstile();
     if (!token) return;
     sessionStorage.setItem("corner:github-turnstile-token", token);
+    // Let Vue paint the loading state before Supabase starts a full-page
+    // navigation, otherwise a resolved Turnstile token makes it invisible.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => window.setTimeout(resolve, 120));
+    });
     await signInWithGitHub({ redirect: safeRedirect() || "/home" });
   } catch (err: any) {
     sessionStorage.removeItem("corner:github-turnstile-token");

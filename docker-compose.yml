@@ -135,6 +135,7 @@ services:
         VITE_FEATURE_STORIES_ENABLED: ${VITE_FEATURE_STORIES_ENABLED:-false}
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_PUBLIC_APP_ORIGIN: ${VITE_PUBLIC_APP_ORIGIN:-https://corner.ink}
     restart: unless-stopped
     depends_on:
       backend:

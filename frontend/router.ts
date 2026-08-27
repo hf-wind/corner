@@ -310,6 +310,20 @@ const router = createRouter({
 setCompatRouter(router);
 
 router.beforeEach(async (to) => {
+  // Supabase may fall back to its Site URL when a redirect URL is not yet
+  // allow-listed. Capture the OAuth hash at any route and send it through the
+  // same callback handler instead of rendering the welcome page at "/".
+  if (
+    typeof window !== "undefined" &&
+    to.path !== "/auth/github-callback" &&
+    /(?:^#|&)access_token=|(?:^#|&)error=/.test(window.location.hash)
+  ) {
+    return {
+      path: "/auth/github-callback",
+      query: { redirect: "/home" },
+      hash: window.location.hash,
+    };
+  }
   if (typeof document !== "undefined") {
     document.documentElement.classList.toggle(
       "space-pending",

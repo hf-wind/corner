@@ -50,6 +50,10 @@ Redirect URLs：
 - `https://corner.ink/auth/github-callback`
 - `http://localhost:3000/auth/github-callback`
 
+生产镜像通过 `VITE_PUBLIC_APP_ORIGIN=https://corner.ink` 固定回调主机；本地 Vite 开发服务未设置该变量时，
+才会使用当前 origin（通常是 `http://localhost:3000`）。两者共用 Supabase 项目时，必须同时登记上面的两条
+Redirect URL。
+
 应用完成 GitHub 登录后始终跳转到 `/home`（或登录前经过校验的站内路径），不会把 OAuth token 留在地址栏。
 
 修改后执行：

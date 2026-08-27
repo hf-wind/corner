@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_API_PROXY_TARGET?: string
   readonly VITE_SUPABASE_URL?: string
   readonly VITE_SUPABASE_ANON_KEY?: string
+  readonly VITE_PUBLIC_APP_ORIGIN?: string
   readonly VITE_TURNSTILE_SITE_KEY?: string
   readonly VITE_TURNSTILE_ENABLED?: string
   readonly VITE_AMAP_WEB_KEY?: string
