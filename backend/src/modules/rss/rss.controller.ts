@@ -7,9 +7,10 @@ export class RssController {
   constructor(private readonly rss: RssService) {}
 
   @Get('rss.xml')
-  @Header('Content-Type', 'application/rss+xml; charset=utf-8')
-  @Header('Content-Disposition', 'inline; filename="rss.xml"')
-  @Header('Cache-Control', 'public, max-age=300')
+  // Browsers use the XML viewer for application/xml. RSS clients still detect
+  // the feed from the <rss> document root, so no presentation stylesheet is needed.
+  @Header('Content-Type', 'application/xml')
+  @Header('Cache-Control', 'no-store, must-revalidate, no-cache, max-age=0')
   @Header('X-Robots-Tag', 'all')
   async feed(@Res() response: Response) {
     response.send(await this.rss.render());

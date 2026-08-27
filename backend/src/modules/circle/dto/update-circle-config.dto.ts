@@ -2,14 +2,39 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
-  IsIn,
   IsInt,
   IsOptional,
   IsString,
   Max,
   MaxLength,
+  ValidateNested,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CircleSubscriptionDto {
+  @IsString()
+  @MaxLength(120)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  url?: string;
+
+  @IsString()
+  @MaxLength(2048)
+  rssUrl: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  avatar?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+}
 
 export class UpdateCircleConfigDto {
   @IsOptional()
@@ -27,15 +52,6 @@ export class UpdateCircleConfigDto {
   subtitle?: string;
 
   @IsOptional()
-  @IsIn(['random', 'fixed'])
-  coverMode?: 'random' | 'fixed';
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(2048)
-  coverUrl?: string;
-
-  @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
   @IsString({ each: true })
@@ -43,10 +59,11 @@ export class UpdateCircleConfigDto {
   covers?: string[];
 
   @IsOptional()
-  @IsInt()
-  @Min(8)
-  @Max(80)
-  maxItems?: number;
+  @IsArray()
+  @ArrayMaxSize(40)
+  @ValidateNested({ each: true })
+  @Type(() => CircleSubscriptionDto)
+  subscriptions?: CircleSubscriptionDto[];
 
   @IsOptional()
   @IsInt()

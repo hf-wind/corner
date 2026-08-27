@@ -231,6 +231,7 @@ const siteNav = [
   { to: "/tags", icon: "ph:tag-bold", label: "标签" },
   { to: "/library", icon: "ph:books-bold", label: "书影" },
   { to: "/moments", icon: "ph:sparkle-bold", label: "瞬间" },
+  { to: "/circle", icon: "ph:users-three-bold", label: "朋友圈" },
   { to: "/time/map", icon: "ph:map-trifold-bold", label: "地图" },
   { to: "/time/constellation", icon: "ph:graph-bold", label: "星图" },
   { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
@@ -244,6 +245,7 @@ const adminFullNav = [
   { to: "/admin/analytics", icon: "ph:chart-line-up-bold", label: "访问统计" },
   { to: "/admin/posts", icon: "ph:article-bold", label: "文章" },
   { to: "/admin/moments", icon: "ph:sparkle-bold", label: "瞬间" },
+  { to: "/admin/circle", icon: "ph:users-three-bold", label: "朋友圈" },
   { to: "/admin/library", icon: "ph:books-bold", label: "书影" },
   { to: "/admin/albums", icon: "ph:images-square-bold", label: "相册" },
   { to: "/admin/memory-graph", icon: "ph:planet-bold", label: "时光星图" },
@@ -331,6 +333,7 @@ const navGroups = computed<NavGroup[]>(() => {
         items: select([
           "/admin/categories",
           "/admin/tags",
+          "/admin/circle",
           "/admin/friends",
           "/admin/media",
           "/admin/emoji",
@@ -379,6 +382,7 @@ const navGroups = computed<NavGroup[]>(() => {
       label: "时光收藏",
       items: select([
         "/moments",
+        "/circle",
         "/library",
         "/albums",
         "/time/map",

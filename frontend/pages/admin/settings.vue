@@ -58,7 +58,6 @@
     </section>
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="website" tab="网站信息" />
-      <a-tab-pane key="circle" tab="朋友圈" />
       <a-tab-pane key="basic" tab="基本设置" />
       <a-tab-pane key="email" tab="邮件配置" />
       <a-tab-pane key="music" tab="音乐播放器" />
@@ -154,72 +153,6 @@
           </a-form>
         </AdminCard>
       </a-space>
-    </div>
-
-    <div v-show="tab === 'circle'" class="tab-body">
-      <AdminCard
-        icon="ph:users-three-bold"
-        title="朋友圈聚合"
-        desc="抓取已启用友链的 RSS，整理成轻量的朋友圈动态流"
-      >
-        <a-form
-          labelAlign="left"
-          size="middle"
-          :label-col="{ style: { width: '92px' } }"
-        >
-          <a-form-item label="启用功能"
-            ><a-switch v-model:checked="circle.enabled"
-          /></a-form-item>
-          <a-form-item label="页面标题"
-            ><a-input v-model:value="circle.title" placeholder="朋友圈"
-          /></a-form-item>
-          <a-form-item label="页面副标题"
-            ><a-input
-              v-model:value="circle.subtitle"
-              placeholder="和朋友们分享新鲜事"
-          /></a-form-item>
-          <a-form-item label="封面策略"
-            ><a-radio-group v-model:value="circle.coverMode"
-              ><a-radio value="random">随机封面</a-radio
-              ><a-radio value="fixed">固定封面</a-radio></a-radio-group
-            ></a-form-item
-          >
-          <a-form-item label="固定 URL"
-            ><a-input
-              v-model:value="circle.coverUrl"
-              placeholder="固定模式使用，也可留空使用封面组第一张"
-          /></a-form-item>
-          <a-form-item label="封面组"
-            ><a-textarea
-              v-model:value="circle.coversText"
-              :rows="4"
-              placeholder="每行一个图片 URL；随机模式会从这里抽取"
-            />
-            <div class="cover-picker-row">
-              <a-button size="small" @click="pickCircleCovers"
-                ><Icon name="ph:image-square-bold" /> 从媒体库选择</a-button
-              ><span class="hint"
-                >也可以直接输入 URL，每行一个，最多 20 张。</span
-              >
-            </div></a-form-item
-          >
-          <a-form-item label="最多动态"
-            ><a-input-number v-model:value="circle.maxItems" :min="8" :max="80"
-          /></a-form-item>
-          <a-form-item label="缓存时间"
-            ><a-input-number
-              v-model:value="circle.cacheTtl"
-              :min="60"
-              :max="3600"
-            /><span class="unit-label">秒</span></a-form-item
-          >
-          <div class="settings-save-row">
-            <a-button type="primary" :loading="circleSaving" @click="saveCircle"
-              ><Icon name="ph:floppy-disk-bold" /> 保存朋友圈配置</a-button
-            >
-          </div>
-        </a-form>
-      </AdminCard>
     </div>
 
     <div v-show="tab === 'basic'" class="tab-body">
@@ -882,17 +815,6 @@ const siteForm = reactive({
   rssUrl: "",
   contactEmail: "1833079849@qq.com",
 });
-const circleSaving = ref(false);
-const circle = reactive({
-  enabled: true,
-  title: "朋友圈",
-  subtitle: "和朋友们分享新鲜事",
-  coverMode: "random",
-  coverUrl: "",
-  coversText: "",
-  maxItems: 36,
-  cacheTtl: 600,
-});
 
 const emailTesting = ref(false);
 const emailTestTo = ref("");
@@ -999,7 +921,6 @@ onMounted(async () => {
     loadSiteInfo(),
     loadMusic(),
     loadEmail(),
-    loadCircle(),
   ]);
   settings.value.site_title ||= siteForm.name;
   settings.value.site_url ||= siteForm.url;
@@ -1154,61 +1075,6 @@ async function loadSettings() {
       );
     }
   } catch {}
-}
-
-async function loadCircle() {
-  try {
-    const result = await api.get<any>("/circle/admin/config");
-    Object.assign(circle, {
-      enabled: result?.enabled !== false,
-      title: result?.title || "朋友圈",
-      subtitle: result?.subtitle || "和朋友们分享新鲜事",
-      coverMode: result?.coverMode === "fixed" ? "fixed" : "random",
-      coverUrl: result?.coverUrl || "",
-      coversText: Array.isArray(result?.covers) ? result.covers.join("\n") : "",
-      maxItems: Number(result?.maxItems) || 36,
-      cacheTtl: Number(result?.cacheTtl) || 600,
-    });
-  } catch {}
-}
-
-async function saveCircle() {
-  circleSaving.value = true;
-  try {
-    await api.put("/circle/admin/config", {
-      enabled: circle.enabled,
-      title: circle.title,
-      subtitle: circle.subtitle,
-      coverMode: circle.coverMode,
-      coverUrl: circle.coverUrl,
-      covers: circle.coversText
-        .split(/\r?\n|,/)
-        .map((item) => item.trim())
-        .filter(Boolean),
-      maxItems: circle.maxItems,
-      cacheTtl: circle.cacheTtl,
-    });
-    toast.success("朋友圈配置已保存");
-  } catch (error: any) {
-    toast.error(error?.message || "朋友圈配置保存失败");
-  } finally {
-    circleSaving.value = false;
-  }
-}
-
-async function pickCircleCovers() {
-  const items = await openItems({ multiple: true, folder: "cover" });
-  const urls = items
-    .map((item: any) => String(item.path || item.url || "").trim())
-    .filter(Boolean);
-  if (!urls.length) return;
-  const existing = circle.coversText
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-  circle.coversText = Array.from(new Set([...existing, ...urls]))
-    .slice(0, 20)
-    .join("\n");
 }
 
 async function loadEmail() {

@@ -29,8 +29,8 @@
         <p>{{ sectionDescription }}</p>
       </div>
 
-      <Transition name="content-switch">
-        <div v-if="items.length" :key="`items-${contentVersion}`" class="card-grid content-reveal" :class="{ 'is-updating': switching }"><LibraryCard v-for="item in items" :key="item.id" :item="item" /></div>
+      <Transition name="content-switch" mode="out-in">
+        <div v-if="items.length" :key="`items-${contentVersion}`" class="card-grid content-reveal"><LibraryCard v-for="item in items" :key="item.id" :item="item" /></div>
         <div v-else-if="!loading" :key="`empty-${contentVersion}`" class="empty-state content-reveal"><span><Icon name="ph:books" /></span><h3>这一格还空着</h3><p>或许下一本书、下一部电影就会出现在这里。</p></div>
       </Transition>
 
@@ -120,7 +120,6 @@ useHead({ title: '书影', meta: [{ name: 'description', content: '风隅随笔�
 .library-search { display:flex; width:min(270px,100%); height:38px; align-items:center; gap:8px; padding:0 11px; border-bottom:1px solid var(--border); color:var(--c-text-3); transition:border-color .2s; }.library-search:focus-within { border-color:var(--library-accent); }.library-search input { min-width:0; flex:1; border:0; outline:0; background:transparent; color:var(--c-text); font:inherit; font-size:.68rem; }.library-search button { display:grid; border:0; background:transparent; color:var(--c-text-3); cursor:pointer; place-items:center; }
 .section-intro { display:flex; align-items:flex-end; justify-content:space-between; gap:30px; margin:30px 0 16px; }.section-intro span { color:var(--library-accent); font-size:.48rem; font-weight:700; letter-spacing:.2em; }.section-intro h2 { margin:5px 0 0; font-family:var(--font-heading); font-size:1.3rem; }.section-intro p { max-width:465px; color:var(--c-text-3); font-size:.65rem; line-height:1.8; text-align:right; }
 .card-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
-.card-grid.is-updating { opacity:.58; transition:opacity .18s ease; }
 .empty-state { display:flex; min-height:300px; flex-direction:column; align-items:center; justify-content:center; color:var(--c-text-3); }.empty-state>span { display:grid; width:72px; height:72px; margin-bottom:15px; border-radius:50%; background:var(--c-bg-2); color:var(--library-accent); font-size:2rem; place-items:center; }.empty-state h3 { margin:0 0 6px; color:var(--c-text); font-size:1rem; }.empty-state p { font-size:.68rem; }
 .library-pagination { display:flex; align-items:center; justify-content:center; gap:24px; margin-top:36px; }.library-pagination button { display:grid; width:38px; height:38px; border:1px solid var(--border); border-radius:50%; background:var(--ld-bg-card); color:var(--c-text-2); cursor:pointer; place-items:center; }.library-pagination button:disabled { cursor:not-allowed; opacity:.35; }.library-pagination span { display:flex; align-items:center; gap:9px; color:var(--c-text-3); font-size:.62rem; font-variant-numeric:tabular-nums; }.library-pagination span i { width:28px; height:1px; background:var(--border); }
 .library-footer { display:flex; width:100%; align-items:center; gap:14px; margin:0 auto; padding:20px 0 max(20px,env(safe-area-inset-bottom)); border-top:1px solid var(--border); color:var(--c-text-3); font-size:.49rem; letter-spacing:.13em; }.library-footer i { flex:1; height:1px; background:linear-gradient(90deg,var(--border),transparent); }

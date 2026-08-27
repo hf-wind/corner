@@ -60,7 +60,7 @@
                 </div>
               </Transition>
             </a-form-item>
-            <a-form-item label="站点头像"><a-input v-model:value="applyForm.siteAvatar" placeholder="头像 URL（可选）" /></a-form-item>
+            <a-form-item label="站点 Logo"><a-input v-model:value="applyForm.siteAvatar" placeholder="Logo URL（可选）" /></a-form-item>
             <a-form-item label="RSS 地址"><a-input v-model:value="applyForm.siteRssUrl" placeholder="RSS / Atom URL（可选）" /></a-form-item>
             <a-form-item class="span-two" label="站点描述"><a-textarea v-model:value="applyForm.siteDescription" :rows="3" placeholder="用一两句话介绍你的站点" /></a-form-item>
             <a-form-item label="联系邮箱" required><a-input v-model:value="applyForm.contactEmail" type="email" placeholder="用于接收审核结果" /></a-form-item>

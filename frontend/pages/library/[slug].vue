@@ -193,7 +193,6 @@ const loading = ref(true);
 const item = ref<LibraryItem | null>(null);
 const related = ref<LibraryItem[]>([]);
 const detailPageRef = ref<HTMLElement | null>(null);
-useScrollReveal(detailPageRef, '.reveal-block');
 const progressLabels: Record<string, string> = {
   "want-to-read": "想读",
   reading: "在读",
@@ -926,6 +925,43 @@ useHead({
 
   .content-section+.content-section {
     margin-top: 50px;
+  }
+}
+
+@keyframes doc-block-reveal {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .reveal-block {
+    animation: doc-block-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 128px;
+    will-change: opacity, filter, transform;
+  }
+}
+
+@supports not (animation-timeline: view()) {
+  .reveal-block {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-block {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 </style>

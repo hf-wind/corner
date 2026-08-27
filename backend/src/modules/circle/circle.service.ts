@@ -11,11 +11,23 @@ export type CircleConfig = {
   enabled: boolean;
   title: string;
   subtitle: string;
-  coverMode: 'random' | 'fixed';
-  coverUrl: string;
   covers: string[];
-  maxItems: number;
+  subscriptions: CircleSubscription[];
+  subscriptionsConfigured: boolean;
+  subscriptionExclusions: string[];
   cacheTtl: number;
+};
+
+export type CircleSubscription = {
+  name: string;
+  url: string;
+  rssUrl: string;
+  avatar: string;
+  enabled: boolean;
+};
+
+type CircleConfigInput = Partial<Omit<CircleConfig, 'subscriptions' | 'subscriptionExclusions'>> & {
+  subscriptions?: Array<Partial<CircleSubscription>>;
 };
 
 type CircleItem = {
@@ -24,61 +36,113 @@ type CircleItem = {
   summary: string;
   url: string;
   publishedAt: string;
-  source: { name: string; url: string; avatar: string };
+  source: { name: string; url: string; avatar: string; rssUrl: string };
   image?: string;
   categories: string[];
+  author?: string;
+  content?: string;
+  enclosure?: string;
+  comments?: string;
 };
 
 @Injectable()
 export class CircleService {
   private readonly logger = new Logger(CircleService.name);
-  private cache: { expires: number; items: CircleItem[] } | null = null;
+  private cache: { expires: number; fingerprint: string; items: CircleItem[] } | null = null;
 
   constructor(private readonly settings: SettingsService) {}
 
   async getConfig(): Promise<CircleConfig> {
-    const raw = await this.settings.get('circle_config');
+    const [raw, rawFriends] = await Promise.all([
+      this.settings.get('circle_config'),
+      this.settings.get('friends'),
+    ]);
     const value = this.objectValue(raw);
     const covers = Array.isArray(value.covers)
       ? value.covers.map((cover) => this.stringValue(cover)).filter(Boolean)
       : [];
+    const subscriptionsConfigured = Array.isArray(value.subscriptions);
+    const subscriptionExclusions = Array.isArray(value.subscriptionExclusions)
+      ? value.subscriptionExclusions
+          .map((item: unknown) => this.subscriptionKey(this.stringValue(item)))
+          .filter(Boolean)
+      : [];
+    const configuredSubscriptions = subscriptionsConfigured
+      ? value.subscriptions
+          .map((item: unknown) => this.subscriptionValue(item))
+          .filter(
+            (item: CircleSubscription | null): item is CircleSubscription =>
+              Boolean(item),
+          )
+      : [];
+    const friendSubscriptions = Array.isArray(rawFriends)
+      ? rawFriends
+          .map((item: unknown) => this.subscriptionValue(item))
+          .filter(
+            (item: CircleSubscription | null): item is CircleSubscription =>
+              Boolean(item),
+          )
+      : [];
+    // Keep explicit edits as the source of truth for matching RSS URLs, while
+    // continuously bringing newly-added RSS links into the list.
+    const subscriptions = this.mergeSubscriptions(
+      configuredSubscriptions,
+      friendSubscriptions,
+      subscriptionExclusions,
+    ).slice(0, 40);
     return {
       enabled: value.enabled !== false,
       title: this.stringValue(value.title) || '朋友圈',
       subtitle: this.stringValue(value.subtitle) || '和朋友们分享新鲜事',
-      coverMode: value.coverMode === 'fixed' ? 'fixed' : 'random',
-      coverUrl: this.stringValue(value.coverUrl),
       covers,
-      maxItems: Math.min(80, Math.max(8, Number(value.maxItems) || 36)),
+      subscriptions,
+      subscriptionsConfigured,
+      subscriptionExclusions,
       cacheTtl: Math.min(3600, Math.max(60, Number(value.cacheTtl) || 600)),
     };
   }
 
-  async updateConfig(input: Partial<CircleConfig>) {
+  async updateConfig(input: CircleConfigInput) {
     const current = await this.getConfig();
+    const rawFriends = await this.settings.get('friends');
     const covers = Array.isArray(input.covers)
       ? input.covers.map((cover) => this.stringValue(cover)).filter(Boolean)
       : this.stringValue(input.covers)
           .split(/\r?\n|,/)
           .map((cover) => cover.trim())
           .filter(Boolean);
+    const subscriptions = input.subscriptions === undefined
+      ? current.subscriptions
+      : input.subscriptions
+          .map((item) => this.subscriptionValue(item))
+          .filter((item): item is CircleSubscription => Boolean(item))
+          .slice(0, 40);
+    const exclusions = new Set(current.subscriptionExclusions);
+    if (input.subscriptions !== undefined && Array.isArray(rawFriends)) {
+      const friendKeys = rawFriends
+        .map((item: unknown) => this.subscriptionValue(item))
+        .filter((item): item is CircleSubscription => Boolean(item))
+        .map((item) => this.subscriptionKey(item.rssUrl));
+      const currentKeys = new Set(
+        current.subscriptions.map((item) => this.subscriptionKey(item.rssUrl)),
+      );
+      const nextKeys = new Set(
+        subscriptions.map((item) => this.subscriptionKey(item.rssUrl)),
+      );
+      for (const key of friendKeys) {
+        if (currentKeys.has(key) && !nextKeys.has(key)) exclusions.add(key);
+      }
+      for (const key of nextKeys) exclusions.delete(key);
+    }
     const next: CircleConfig = {
       enabled:
         input.enabled === undefined ? current.enabled : Boolean(input.enabled),
       title: this.stringValue(input.title) || current.title,
       subtitle: this.stringValue(input.subtitle) || current.subtitle,
-      coverMode:
-        input.coverMode === 'fixed'
-          ? 'fixed'
-          : input.coverMode === 'random'
-            ? 'random'
-            : current.coverMode,
-      coverUrl: this.stringValue(input.coverUrl),
       covers: Array.from(new Set(covers)).slice(0, 20),
-      maxItems: Math.min(
-        80,
-        Math.max(8, Number(input.maxItems) || current.maxItems),
-      ),
+      subscriptionsConfigured: true,
+      subscriptions,
+      subscriptionExclusions: Array.from(exclusions),
       cacheTtl: Math.min(
         3600,
         Math.max(60, Number(input.cacheTtl) || current.cacheTtl),
@@ -92,23 +156,23 @@ export class CircleService {
   async getFeed() {
     const config = await this.getConfig();
     if (!config.enabled) return { enabled: false, config, items: [] };
-    if (this.cache && this.cache.expires > Date.now()) {
+    const fingerprint = this.subscriptionFingerprint(config.subscriptions);
+    if (this.cache && this.cache.expires > Date.now() && this.cache.fingerprint === fingerprint) {
       return {
         enabled: true,
         config,
         items: this.withCover(this.cache.items, config),
       };
     }
-    const rawFriends = await this.settings.get('friends');
-    const friends = Array.isArray(rawFriends)
-      ? rawFriends
+    const friends = Array.isArray(config.subscriptions)
+      ? config.subscriptions
           .map((friend) => this.objectValue(friend))
           .filter(
             (friend) =>
               friend.enabled !== false &&
               this.stringValue(friend.rssUrl || friend.siteRssUrl),
           )
-          .slice(0, 24)
+          .slice(0, 40)
       : [];
     const results: CircleItem[][] = [];
     for (let index = 0; index < friends.length; index += FEED_CONCURRENCY) {
@@ -126,8 +190,8 @@ export class CircleService {
         (left, right) =>
           Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
       )
-      .slice(0, config.maxItems);
-    this.cache = { expires: Date.now() + config.cacheTtl * 1000, items };
+      .slice(0, 500);
+    this.cache = { expires: Date.now() + config.cacheTtl * 1000, fingerprint, items };
     return { enabled: true, config, items: this.withCover(items, config) };
   }
 
@@ -148,6 +212,7 @@ export class CircleService {
             siteUrl,
           )
         : '',
+      rssUrl,
     };
     try {
       const xml = await this.fetchXml(rssUrl);
@@ -155,7 +220,7 @@ export class CircleService {
       const entries = [
         ...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/(?:item|entry)>/gi),
       ];
-      return entries.slice(0, 12).map((match, index) => {
+      return entries.slice(0, 30).map((match, index) => {
         const block = match[0];
         const title = this.xmlText(block, 'title') || '未命名文章';
         const url =
@@ -168,6 +233,10 @@ export class CircleService {
           this.xmlText(block, 'content:encoded') ||
           this.xmlText(block, 'content');
         const image = this.extractImage(block, description, url);
+        const content = this.xmlText(block, 'content:encoded') || this.xmlText(block, 'content');
+        const enclosure = this.xmlAttr(block, 'enclosure', 'url') || this.xmlAttr(block, 'media:content', 'url');
+        const comments = this.xmlText(block, 'comments');
+        const author = this.xmlText(block, 'dc:creator') || this.xmlText(block, 'author') || this.xmlText(block, 'name');
         const published =
           this.xmlText(block, 'pubDate') ||
           this.xmlText(block, 'published') ||
@@ -186,6 +255,10 @@ export class CircleService {
             .map((item) => this.cleanText(item))
             .filter(Boolean)
             .slice(0, 4),
+          author: this.cleanText(author).slice(0, 120),
+          content: this.cleanText(content).slice(0, 800),
+          enclosure: this.absoluteUrl(enclosure, siteUrl) || '',
+          comments: this.absoluteUrl(comments, siteUrl) || '',
         };
       });
     } catch (error) {
@@ -313,11 +386,10 @@ export class CircleService {
   }
 
   private withCover(items: CircleItem[], config: CircleConfig) {
-    const cover =
-      config.coverMode === 'fixed'
-        ? config.coverUrl || config.covers[0]
-        : config.covers[Math.floor(Math.random() * config.covers.length)];
-    return items.map((item) => ({ ...item, cover: cover || undefined }));
+    if (config.covers.length === 0) return items.map((item) => ({ ...item, cover: undefined }));
+    if (config.covers.length === 1) return items.map((item) => ({ ...item, cover: config.covers[0] }));
+    const start = Math.floor(Math.random() * config.covers.length);
+    return items.map((item, index) => ({ ...item, cover: config.covers[(start + index) % config.covers.length] }));
   }
   private xmlText(block: string, tag: string) {
     const match = block.match(
@@ -394,5 +466,47 @@ export class CircleService {
     return value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, any>)
       : {};
+  }
+
+  private subscriptionValue(value: unknown): CircleSubscription | null {
+    const item = this.objectValue(value);
+    const rssUrl = this.stringValue(item.rssUrl || item.siteRssUrl);
+    if (!rssUrl) return null;
+    return {
+      name: this.stringValue(item.name || item.siteName) || this.hostName(rssUrl),
+      url: this.stringValue(item.url || item.siteUrl) || rssUrl,
+      rssUrl,
+      avatar: this.stringValue(item.avatar || item.siteAvatar),
+      enabled: item.enabled !== false,
+    };
+  }
+
+  private mergeSubscriptions(
+    configured: CircleSubscription[],
+    fromFriends: CircleSubscription[],
+    exclusions: string[] = [],
+  ) {
+    const result = [...configured];
+    const known = new Set(configured.map((item) => this.subscriptionKey(item.rssUrl)));
+    const excluded = new Set(exclusions);
+    for (const friend of fromFriends) {
+      const key = this.subscriptionKey(friend.rssUrl);
+      if (known.has(key) || excluded.has(key)) continue;
+      known.add(key);
+      result.push(friend);
+    }
+    return result;
+  }
+
+  private subscriptionFingerprint(subscriptions: CircleSubscription[]) {
+    return subscriptions
+      .filter((item) => item.enabled !== false)
+      .map((item) => `${this.subscriptionKey(item.rssUrl)}:${item.url}:${item.name}:${item.avatar}`)
+      .sort()
+      .join('|');
+  }
+
+  private subscriptionKey(value: string) {
+    return value.trim().replace(/\/+$/, '').toLowerCase();
   }
 }

@@ -60,6 +60,96 @@ describe('CircleService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('refreshes RSS after a friend with a new feed is added', async () => {
+    const friends = [
+      { name: '旧来源', url: 'https://old.example', rssUrl: 'https://93.184.216.34/old.xml' },
+    ];
+    const settings = settingsWithFriends(friends);
+    const fetchMock = jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(new Response('<rss><channel><item><title>旧文章</title><link>https://old.example/1</link></item></channel></rss>', { status: 200 }))
+      .mockResolvedValueOnce(new Response('<rss><channel><item><title>旧文章</title><link>https://old.example/1</link></item></channel></rss>', { status: 200 }))
+      .mockResolvedValueOnce(new Response('<rss><channel><item><title>新文章</title><link>https://new.example/1</link></item></channel></rss>', { status: 200 }));
+    const service = new CircleService(settings);
+
+    await service.getFeed();
+    friends.push({ name: '新来源', url: 'https://new.example', rssUrl: 'https://93.184.216.35/new.xml' });
+    const refreshed = await service.getFeed();
+
+    expect(refreshed.items.map((item) => item.title).sort()).toEqual(['新文章', '旧文章']);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('prefers explicit circle subscriptions over the legacy friends setting', async () => {
+    const settings = settingsWithFriends([]);
+    settings.get.mockImplementation((key: string) => {
+      if (key === 'circle_config') {
+        return Promise.resolve({
+          maxItems: 36,
+          cacheTtl: 600,
+          subscriptions: [{ name: '阮一峰', url: 'https://www.ruanyifeng.com/blog', rssUrl: 'https://93.184.216.34/atom.xml', enabled: true }],
+        });
+      }
+      return Promise.resolve(null);
+    });
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('<feed><entry><title>科技爱好者周刊</title><link href="https://www.ruanyifeng.com/blog/1"/><updated>Tue, 25 Aug 2026 08:00:00 GMT</updated></entry></feed>', { status: 200 }),
+    );
+    const service = new CircleService(settings);
+    const result = await service.getFeed();
+    expect(result.items[0]).toMatchObject({ title: '科技爱好者周刊', source: { name: '阮一峰' } });
+    expect(settings.get).toHaveBeenCalledWith('circle_config');
+    expect(settings.get).toHaveBeenCalledWith('friends');
+  });
+
+  it('adds newly linked RSS sources without overriding explicit subscriptions', async () => {
+    const settings = settingsWithFriends([
+      {
+        name: '新友链',
+        url: 'https://new.example',
+        rssUrl: 'https://new.example/rss.xml',
+      },
+      {
+        name: '手工订阅的友链',
+        url: 'https://friend.example',
+        rssUrl: 'https://friend.example/rss.xml',
+      },
+    ]);
+    settings.get.mockImplementation((key: string) => {
+      if (key === 'friends') return Promise.resolve([
+        {
+          name: '新友链',
+          url: 'https://new.example',
+          rssUrl: 'https://new.example/rss.xml',
+        },
+        {
+          name: '手工订阅的友链',
+          url: 'https://friend.example',
+          rssUrl: 'https://friend.example/rss.xml',
+        },
+      ]);
+      if (key === 'circle_config') {
+        return Promise.resolve({
+          subscriptions: [
+            {
+              name: '自定义名称',
+              url: 'https://friend.example',
+              rssUrl: 'https://friend.example/rss.xml',
+            },
+          ],
+        });
+      }
+      return Promise.resolve(null);
+    });
+    const service = new CircleService(settings);
+    const config = await service.getConfig();
+
+    expect(config.subscriptions).toHaveLength(2);
+    expect(config.subscriptions.map((item) => item.name)).toEqual([
+      '自定义名称',
+      '新友链',
+    ]);
+  });
+
   it('blocks private RSS targets before making a request', async () => {
     const settings = settingsWithFriends([
       {

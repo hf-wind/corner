@@ -173,6 +173,7 @@ function prefetchArticle() {
   display: flex;
   align-items: center;
   gap: 9px;
+  margin: 5px 0;
 }
 .card-tag {
   display: inline-flex;

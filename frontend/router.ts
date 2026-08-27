@@ -47,6 +47,10 @@ const routes: RouteRecordRaw[] = [
     component: lazyRoute(() => import("./pages/moments/index.vue")),
   },
   {
+    path: "/circle",
+    component: lazyRoute(() => import("./pages/circle.vue")),
+  },
+  {
     path: "/moments/:slug",
     component: lazyRoute(() => import("./pages/moments/[slug].vue")),
   },
@@ -223,6 +227,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/admin/moments",
     component: lazyRoute(() => import("./pages/admin/moments/index.vue")),
+    meta: adminMeta,
+  },
+  {
+    path: "/admin/circle",
+    component: lazyRoute(() => import("./pages/admin/circle.vue")),
     meta: adminMeta,
   },
   {

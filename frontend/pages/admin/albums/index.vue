@@ -66,7 +66,7 @@ const statusOptions = [
 const columns = [
   { title: '相册', key: 'album', minWidth: 320 }, { title: '状态', key: 'status', width: 100 },
   { title: '照片', dataIndex: ['_count', 'items'], key: 'count', width: 80, align: 'center' as const },
-  { title: '日期', key: 'date', width: 120 }, { title: '操作', key: 'actions', width: 280, fixed: 'right' as const },
+  { title: '日期', key: 'date', width: 120 }, { title: '操作', key: 'actions', width: 290, fixed: 'right' as const },
 ]
 
 function formatDate(value?: string) { return value ? value.slice(0, 10) : '未设时间' }

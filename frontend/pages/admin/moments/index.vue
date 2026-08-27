@@ -92,7 +92,7 @@ const columns = [
   { title: '点赞', dataIndex: 'likes', key: 'likes', width: 90, align: 'center' as const },
   { title: '评论', dataIndex: 'comments', key: 'comments', width: 90, align: 'center' as const },
   { title: '日期', dataIndex: 'date', key: 'date', width: 110 },
-  { title: '操作', key: 'actions', width: 260, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 290, fixed: 'right' as const },
 ]
 function statusText(status: string) { return status === 'published' ? '已发布' : status === 'private' ? '私密' : '草稿' }
 function statusColor(status: string) { return status === 'published' ? 'green' : status === 'private' ? 'purple' : 'default' }
