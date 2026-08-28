@@ -4,7 +4,7 @@
       <div class="stage-backdrop" :style="coverImage ? { backgroundImage: `url(${coverImage})` } : undefined" />
       <div class="stage-glass" />
       <div class="stage-inner">
-        <div class="stage-topline"><span class="eyebrow"><Icon name="ph:users-three-bold" /> FRIENDS / MOMENTS</span><button class="stage-refresh" type="button" :disabled="loading" :title="loading ? '正在刷新' : '刷新动态'" @click="loadFeed"><Icon :name="loading ? 'ph:spinner-gap-bold' : 'ph:arrows-clockwise-bold'" :class="{ spin: loading }" /><span>{{ loading ? '同步中' : '刷新动态' }}</span></button></div>
+        <div class="stage-topline"><span class="eyebrow"><Icon name="ph:users-three-bold" /> FRIENDS / MOMENTS</span><button class="stage-refresh" type="button" :disabled="loading" :title="loading ? '正在刷新' : '刷新动态'" @click="loadFeed(true)"><Icon :name="loading ? 'ph:spinner-gap-bold' : 'ph:arrows-clockwise-bold'" :class="{ spin: loading }" /><span>{{ loading ? '同步中' : '刷新动态' }}</span></button></div>
         <div class="stage-main">
           <div class="stage-copy"><h1>{{ config.title || '朋友圈' }}</h1><p>{{ config.subtitle || '和朋友们分享新鲜事' }}</p><div class="stage-tags"><span><Icon name="ph:rss-bold" /> {{ sourceCount }} 个来源</span><span><Icon name="ph:waveform-bold" /> {{ items.length }} 条动态</span><span v-if="latestPublishedAt"><Icon name="ph:clock-bold" /> {{ relativeDate(latestPublishedAt) }}更新</span></div></div>
           <div class="stage-orbit" aria-hidden="true"><span class="orbit-ring ring-one" /><span class="orbit-ring ring-two" /><span class="orbit-dot dot-one" /><span class="orbit-dot dot-two" /><span class="orbit-core"><Icon name="ph:heart-half-bold" /></span></div>
@@ -15,14 +15,14 @@
 
     <div v-if="newItemsCount" class="reading-notice"><span><Icon name="ph:sparkle-bold" /> 距离上次阅读新增 <strong>{{ newItemsCount }}</strong> 条动态</span><button type="button" @click="dismissNewItems">标记为已读 <Icon name="ph:check-bold" /></button></div>
 
-    <section class="circle-toolbar" aria-label="动态筛选"><div class="toolbar-inner"><div class="toolbar-heading"><span class="eyebrow">LIVE STREAM</span><h2 id="circle-stream-title">朋友动态</h2></div><div class="filter-pills" role="tablist" aria-label="动态筛选"><button v-for="filter in filters" :key="filter.key" type="button" role="tab" :aria-selected="activeFilter === filter.key" :class="{ active: activeFilter === filter.key }" @click="setActiveFilter(filter.key)"><Icon :name="filter.icon" /> {{ filter.label }}<small>{{ filterCount(filter.key) }}</small></button></div></div></section>
+    <section class="circle-toolbar" aria-label="动态筛选"><div class="toolbar-inner"><div class="toolbar-heading"><span class="eyebrow">LIVE STREAM</span><h2 id="circle-stream-title">朋友动态</h2><p class="stream-overview">共 {{ totalCount }} 条 · 已加载 {{ items.length }} 条<span v-if="fetchedAt"> · 更新于 {{ relativeDate(fetchedAt) }}</span></p></div><div class="filter-pills" role="tablist" aria-label="动态筛选"><button v-for="filter in filters" :key="filter.key" type="button" role="tab" :aria-selected="activeFilter === filter.key" :class="{ active: activeFilter === filter.key }" @click="setActiveFilter(filter.key)"><Icon :name="filter.icon" /> {{ filter.label }}<small>{{ filterCount(filter.key) }}</small></button></div></div></section>
 
     <div class="circle-layout">
-      <section ref="streamRef" class="circle-stream" aria-labelledby="circle-stream-title" aria-live="polite">
+      <section class="circle-stream" aria-labelledby="circle-stream-title" aria-live="polite">
         <div v-if="loading && !items.length" class="stream-state stream-loading"><div class="loading-mark"><span /><span /><span /></div><strong>正在收集朋友们的新消息</strong><span>RSS 订阅源正在抵达。</span></div>
         <div v-else-if="!filteredItems.length" class="stream-state stream-empty"><div class="empty-mark"><Icon name="ph:wind-bold" /></div><strong>{{ items.length ? '没有符合筛选条件的动态' : '此刻很安静' }}</strong><span>{{ items.length ? '试试切换另一个动态视图。' : '为友链配置 RSS 后，新消息会自动出现在这里。' }}</span><button v-if="items.length" type="button" @click="setActiveFilter('all')">查看全部动态 <Icon name="ph:arrow-right-bold" /></button></div>
-        <div v-else class="stream-list"><template v-for="(item, index) in visibleFilteredItems" :key="item.id"><div v-if="showNewDivider(index)" class="new-divider"><span><Icon name="ph:sparkle-bold" /> 新动态</span></div><div v-if="showDateMarker(index)" class="date-marker"><span>{{ dateLabel(item.publishedAt) }}</span><i /></div><article class="stream-entry" :class="{ 'has-image': item.image && !brokenImages.has(item.id), 'is-featured': index === 0 }" :style="entryStyle(item, index)"><div class="entry-spine"><a class="source-avatar" :href="item.source.url" target="_blank" rel="noopener noreferrer" :title="item.source.name"><img :src="avatarFor(item.source)" :alt="item.source.name" loading="lazy" @error="onAvatarError" /></a><span class="entry-node" /></div><div class="entry-content"><header class="entry-head"><div class="entry-source"><a :href="item.source.url" target="_blank" rel="noopener noreferrer">{{ item.source.name }}</a><span class="source-badge">RSS</span><time :datetime="item.publishedAt" :title="formatDate(item.publishedAt)">{{ relativeDate(item.publishedAt) }}</time></div><a class="entry-open" :href="item.url" target="_blank" rel="noopener noreferrer" title="打开原文" aria-label="打开原文"><Icon name="ph:arrow-up-right-bold" /></a></header><a class="entry-body" :href="item.url" target="_blank" rel="noopener noreferrer"><div class="entry-label"><span v-if="index === 0" class="featured-label"><Icon name="ph:star-four-fill" /> LATEST</span><span class="entry-index">{{ String(index + 1).padStart(2, '0') }}</span></div><h3>{{ item.title }}</h3><p v-if="item.content || item.summary" class="entry-excerpt">{{ item.content || item.summary }}</p><figure v-if="item.image && !brokenImages.has(item.id)"><img :src="item.image" :alt="item.title" loading="lazy" decoding="async" @error="onEntryImageError(item.id)" /><figcaption><Icon name="ph:image-square-bold" /> 文章配图</figcaption></figure></a><footer class="entry-foot"><div class="entry-details"><span v-if="item.author"><Icon name="ph:user-circle-bold" /> {{ item.author }}</span><a v-if="item.comments" :href="item.comments" target="_blank" rel="noopener noreferrer"><Icon name="ph:chat-circle-text-bold" /> 评论</a><a v-if="item.enclosure" :href="item.enclosure" target="_blank" rel="noopener noreferrer"><Icon name="ph:paperclip-bold" /> 附件</a></div><div class="category-row"><span v-for="tag in (item.categories || []).slice(0, 4)" :key="tag">#{{ tag }}</span><span v-if="!item.categories?.length" class="quiet-tag">来自订阅源</span></div><a class="entry-read" :href="item.url" target="_blank" rel="noopener noreferrer">阅读原文 <Icon name="ph:arrow-up-right-bold" /></a></footer></div></article></template></div>
-        <div ref="loadMoreRef" class="load-more" aria-live="polite"><template v-if="visibleCount < filteredItems.length"><span class="load-pulse"><i /><i /><i /></span> 继续向下探索</template><span v-else-if="filteredItems.length" class="end-mark"><Icon name="ph:check-circle-bold" /> 已抵达最早的动态</span></div>
+        <div v-else class="stream-list"><template v-for="(item, index) in visibleFilteredItems" :key="item.id"><div v-if="showNewDivider(index)" class="new-divider"><span><Icon name="ph:sparkle-bold" /> 上次阅读 · {{ readingLabel }}</span></div><div v-if="showDateMarker(index)" class="date-marker"><span>{{ dateLabel(item.publishedAt) }}</span><i /></div><article class="stream-entry" :class="{ 'has-image': item.image && !brokenImages.has(item.id), 'is-featured': index === 0 }" :style="entryStyle(item, index)"><div class="entry-spine"><a class="source-avatar" :href="item.source.url" target="_blank" rel="noopener noreferrer" :title="item.source.name"><img :src="avatarFor(item.source)" :alt="item.source.name" loading="lazy" @error="onAvatarError" /></a><span class="entry-node" /></div><div class="entry-content"><header class="entry-head"><div class="entry-source"><a :href="item.source.url" target="_blank" rel="noopener noreferrer">{{ item.source.name }}</a><span class="source-badge">RSS</span><time :datetime="item.publishedAt" :title="formatDate(item.publishedAt)">{{ relativeDate(item.publishedAt) }}</time></div><a class="entry-open" :href="item.url" target="_blank" rel="noopener noreferrer" title="打开原文" aria-label="打开原文"><Icon name="ph:arrow-up-right-bold" /></a></header><a class="entry-body" :href="item.url" target="_blank" rel="noopener noreferrer"><div class="entry-label"><span v-if="index === 0" class="featured-label"><Icon name="ph:star-four-fill" /> LATEST</span><span class="entry-index">{{ String(index + 1).padStart(2, '0') }}</span></div><h3>{{ item.title }}</h3><p v-if="item.content || item.summary" class="entry-excerpt">{{ item.content || item.summary }}</p><figure v-if="item.image && !brokenImages.has(item.id)"><img :src="item.image" :alt="item.title" loading="lazy" decoding="async" @error="onEntryImageError(item.id)" /><figcaption><Icon name="ph:image-square-bold" /> 文章配图</figcaption></figure></a></div></article></template></div>
+        <div ref="loadMoreRef" class="load-more" aria-live="polite"><template v-if="hasMore"><span class="load-pulse"><i /><i /><i /></span> {{ loadingMore ? '正在加载更多' : '继续向下探索' }}</template><span v-else-if="filteredItems.length" class="end-mark"><Icon name="ph:check-circle-bold" /> 已抵达最早的动态</span></div>
       </section>
 
       <aside class="circle-rail" aria-label="朋友圈信息"><section class="rail-panel rail-signal"><div class="rail-panel-head"><span class="eyebrow">SIGNAL</span><Icon name="ph:pulse-bold" /></div><div class="signal-value"><strong>{{ todayCount }}</strong><span>今日更新</span></div><div class="signal-bars"><i v-for="bar in signalBars" :key="bar" :style="{ height: `${bar}%` }" /></div><p>保持关注，朋友们的灵感正在流动。</p></section><section class="rail-panel"><div class="rail-panel-head"><span class="eyebrow">SOURCES</span><span class="rail-count">{{ sourceCount }}</span></div><h3>最近活跃</h3><div class="source-list"><a v-for="source in activeSources" :key="source.url" :href="source.url" target="_blank" rel="noopener noreferrer"><span class="source-mini-avatar"><img :src="avatarFor(source)" :alt="source.name" loading="lazy" @error="onAvatarError" /></span><span class="source-copy"><strong>{{ source.name }}</strong><small>{{ source.count }} 条动态</small></span><Icon name="ph:arrow-up-right-bold" /></a></div></section><section class="rail-panel rail-note"><Icon name="ph:quotes-bold" /><p>“让不同角落的声音，在这里相遇。”</p><span>WIND · CORNER</span></section></aside>
@@ -47,25 +47,30 @@ type CircleItem = {
   comments?: string;
   source: CircleSource;
 };
-type CircleFilterKey = "all" | "image" | "today";
+type CircleFilterKey = "all" | "today";
 type CircleFilter = { key: CircleFilterKey; label: string; icon: string };
 const api = useApi();
+const toast = useToast();
 const circlePageRef = ref<HTMLElement | null>(null);
-const streamRef = ref<HTMLElement | null>(null);
 const loadMoreRef = ref<HTMLElement | null>(null);
 const loading = ref(true);
+const loadingMore = ref(false);
 const items = ref<CircleItem[]>([]);
-const visibleCount = ref(10);
 const activeFilter = ref<CircleFilterKey>("all");
 const filters: CircleFilter[] = [
   { key: "all", label: "全部", icon: "ph:squares-four-bold" },
-  { key: "image", label: "带图片", icon: "ph:image-square-bold" },
   { key: "today", label: "今日", icon: "ph:sun-horizon-bold" },
 ];
+const page = ref(1);
+const totalPages = ref(1);
+const totalCount = ref(0);
+const feedSourceCount = ref(0);
+const feedTodayCount = ref(0);
+const fetchedAt = ref("");
 const clock = ref(Date.now());
 const brokenImages = reactive(new Set<string>());
 const readingKey = "corner:circle:reading";
-const reading = reactive({ lastSeenAt: "", scrollTop: 0 });
+const reading = reactive({ lastSeenAt: "" });
 const restoredPosition = ref(false);
 const config = reactive({
   title: "朋友圈",
@@ -80,26 +85,25 @@ const coverGallery = computed(() => {
   return Array.from(new Set(covers.map((cover) => cover.trim()).filter(Boolean))).slice(0, 8);
 });
 const sourceCount = computed(
-  () => new Set(items.value.map((item) => item.source.url)).size,
+  () => feedSourceCount.value || new Set(items.value.map((item) => item.source.url)).size,
 );
 const latestPublishedAt = computed(() => items.value[0]?.publishedAt || "");
 const filteredItems = computed(() => {
-  if (activeFilter.value === "image") return items.value.filter((item) => Boolean(item.image));
   if (activeFilter.value === "today") {
     const today = new Date().toDateString();
     return items.value.filter((item) => new Date(item.publishedAt).toDateString() === today);
   }
   return items.value;
 });
-const visibleFilteredItems = computed(() => filteredItems.value.slice(0, visibleCount.value));
-const visibleItems = computed(() => visibleFilteredItems.value);
+const visibleFilteredItems = computed(() => filteredItems.value);
+const hasMore = computed(() => page.value < totalPages.value);
+const readingLabel = computed(() => reading.lastSeenAt ? dateLabel(reading.lastSeenAt) : "此前");
 const filterCount = (key: CircleFilterKey) => {
-  if (key === "image") return items.value.filter((item) => Boolean(item.image)).length;
   if (key === "today") {
     const today = new Date().toDateString();
     return items.value.filter((item) => new Date(item.publishedAt).toDateString() === today).length;
   }
-  return items.value.length;
+  return totalCount.value;
 };
 const signalBars = computed(() => {
   const buckets = Array.from({ length: 7 }, () => 0);
@@ -119,7 +123,7 @@ const newItemsCount = computed(() => {
 });
 const todayCount = computed(() => {
   const today = new Date().toDateString();
-  return items.value.filter(
+  return feedTodayCount.value || items.value.filter(
     (item) => new Date(item.publishedAt).toDateString() === today,
   ).length;
 });
@@ -132,20 +136,34 @@ const activeSources = computed(() => {
   }
   return Array.from(sources.values()).slice(0, 7);
 });
-async function loadFeed() {
-  if (loading.value && items.value.length) return;
-  loading.value = true;
+async function loadFeed(refresh = false, notify = refresh) {
+  if (refresh && items.value.length && (loading.value || loadingMore.value)) return;
+  if (!refresh && loadingMore.value) return;
+  if (refresh) loading.value = true;
+  else if (items.value.length) loadingMore.value = true;
   try {
-    const result = await api.get<any>("/circle/feed");
+    const targetPage = refresh ? 1 : page.value + 1;
+    const result = await api.get<any>("/circle/feed", { page: targetPage, limit: 20, refresh: refresh ? 1 : undefined });
     Object.assign(config, result?.config || {});
-    items.value = Array.isArray(result?.items) ? result.items : [];
-    visibleCount.value = Math.min(10, filteredItems.value.length || 10);
-    brokenImages.clear();
+    const nextItems = Array.isArray(result?.items) ? result.items : [];
+    items.value = refresh ? nextItems : [...items.value, ...nextItems];
+    page.value = Number(result?.page) || targetPage;
+    totalPages.value = Number(result?.totalPages) || 1;
+    totalCount.value = Number(result?.total) || items.value.length;
+    feedSourceCount.value = Number(result?.sourceCount) || feedSourceCount.value;
+    feedTodayCount.value = Number(result?.todayCount) || feedTodayCount.value;
+    fetchedAt.value = typeof result?.fetchedAt === "string" ? result.fetchedAt : new Date().toISOString();
+    if (refresh && notify) {
+      brokenImages.clear();
+      toast.success("朋友圈已更新");
+    }
     await restoreReadingPosition();
   } catch {
     if (!items.value.length) items.value = [];
+    if (refresh && notify) toast.error("朋友圈更新失败，请稍后重试");
   } finally {
     loading.value = false;
+    loadingMore.value = false;
   }
 }
 function isNew(item: CircleItem) { return Boolean(reading.lastSeenAt) && Date.parse(item.publishedAt) > Date.parse(reading.lastSeenAt); }
@@ -175,14 +193,10 @@ function dateLabel(value: string) {
   return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(date);
 }
 function dismissNewItems() { reading.lastSeenAt = items.value[0]?.publishedAt || new Date().toISOString(); persistReading(); }
-function persistReading() { if (typeof window === "undefined") return; localStorage.setItem(readingKey, JSON.stringify({ lastSeenAt: reading.lastSeenAt, scrollTop: circlePageRef.value?.scrollTop || reading.scrollTop })); }
-async function restoreReadingPosition() { if (restoredPosition.value || typeof window === "undefined") return; restoredPosition.value = true; try { const stored = JSON.parse(localStorage.getItem(readingKey) || "{}"); reading.lastSeenAt = typeof stored.lastSeenAt === "string" ? stored.lastSeenAt : ""; reading.scrollTop = Number(stored.scrollTop) || 0; } catch { /* ignore invalid local state */ } await nextTick(); if (circlePageRef.value && reading.scrollTop > 0) circlePageRef.value.scrollTo({ top: reading.scrollTop, behavior: "auto" }); }
+function persistReading() { if (typeof window === "undefined") return; localStorage.setItem(readingKey, JSON.stringify({ lastSeenAt: reading.lastSeenAt })); }
+async function restoreReadingPosition() { if (restoredPosition.value || typeof window === "undefined") return; restoredPosition.value = true; try { const stored = JSON.parse(localStorage.getItem(readingKey) || "{}"); reading.lastSeenAt = typeof stored.lastSeenAt === "string" ? stored.lastSeenAt : ""; } catch { /* ignore invalid local state */ } await nextTick(); }
 function onCircleScroll() {
-  if (circlePageRef.value) reading.scrollTop = circlePageRef.value.scrollTop;
   persistReading();
-  if (circlePageRef.value && circlePageRef.value.scrollTop + circlePageRef.value.clientHeight >= circlePageRef.value.scrollHeight - 480) {
-    visibleCount.value = Math.min(filteredItems.value.length, visibleCount.value + 10);
-  }
 }
 function entryStyle(item: CircleItem, index: number) {
   const accents = ["var(--c-primary)", "#2b8b71", "#c47b34", "#c65468", "#397bb8"];
@@ -233,26 +247,21 @@ let clockTimer = 0;
 let circleObserver: IntersectionObserver | null = null;
 function setActiveFilter(key: CircleFilterKey) {
   activeFilter.value = key;
-  visibleCount.value = Math.min(10, filteredItems.value.length || 10);
   void nextTick(() => circlePageRef.value?.scrollTo({ top: 0, behavior: "smooth" }));
 }
 function observeLoadMore() {
   circleObserver?.disconnect();
   if (!loadMoreRef.value || typeof IntersectionObserver === "undefined") return;
   circleObserver = new IntersectionObserver(() => {
-    if (visibleCount.value < filteredItems.value.length) {
-      visibleCount.value = Math.min(filteredItems.value.length, visibleCount.value + 10);
-    }
+    if (hasMore.value && !loadingMore.value) void loadFeed();
   }, { root: circlePageRef.value, rootMargin: "420px" });
   circleObserver.observe(loadMoreRef.value);
 }
 watch(activeFilter, () => {
-  visibleCount.value = Math.min(10, filteredItems.value.length || 10);
   void nextTick(observeLoadMore);
 });
-watch(visibleCount, () => void nextTick(observeLoadMore));
 onMounted(() => {
-  void loadFeed();
+  void loadFeed(true, false);
   circlePageRef.value?.addEventListener("scroll", onCircleScroll, { passive: true });
   void nextTick(observeLoadMore);
   clockTimer = window.setInterval(() => {
@@ -263,7 +272,6 @@ onUnmounted(() => {
   window.clearInterval(clockTimer);
   circleObserver?.disconnect();
   circlePageRef.value?.removeEventListener("scroll", onCircleScroll);
-  reading.lastSeenAt = items.value[0]?.publishedAt || reading.lastSeenAt;
   persistReading();
 });
 useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`) });
@@ -1387,11 +1395,11 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
 @media (min-width: 1280px) {
   .circle-stage {
-    min-height: 520px;
+    min-height: 360px;
   }
 
   .stage-copy h1 {
-    font-size: 5.8rem;
+    font-size: 4.8rem;
   }
 
   .stage-orbit {
@@ -1400,7 +1408,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   }
 
   .circle-layout {
-    grid-template-columns: minmax(0, 760px) 300px;
+    grid-template-columns: minmax(0, 1fr) 228px;
   }
 
   .entry-body p {
@@ -1900,7 +1908,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
 .circle-stage {
   position: relative;
-  min-height: clamp(360px, 42vw, 500px);
+  min-height: clamp(280px, 30vw, 360px);
   overflow: hidden;
   border-bottom: 1px solid var(--circle-line);
   background:
@@ -2024,7 +2032,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   align-items: center;
   justify-content: space-between;
   gap: 40px;
-  padding: clamp(48px, 7vw, 92px) 0 clamp(32px, 6vw, 72px);
+  padding: clamp(30px, 4vw, 54px) 0 clamp(24px, 4vw, 42px);
 }
 
 .stage-copy {
@@ -2277,6 +2285,13 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   letter-spacing: 0;
 }
 
+.stream-overview {
+  margin: 8px 0 0;
+  color: var(--circle-faint);
+  font-size: 0.58rem;
+  line-height: 1.5;
+}
+
 .filter-pills {
   display: flex;
   max-width: 100%;
@@ -2339,8 +2354,8 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
 .circle-layout {
   width: min(var(--circle-max), calc(100% - var(--circle-gutter) * 2));
-  grid-template-columns: minmax(0, 1fr) minmax(248px, 300px);
-  gap: clamp(34px, 6vw, 76px);
+  grid-template-columns: minmax(0, 1fr) minmax(196px, 228px);
+  gap: clamp(24px, 4vw, 52px);
   padding: 0 0 100px;
 }
 
@@ -2666,7 +2681,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 }
 
 .entry-foot {
-  display: flex;
+  display: none;
   min-height: 28px;
   align-items: center;
   justify-content: space-between;
@@ -3054,7 +3069,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   }
 
   .circle-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+    grid-template-columns: minmax(0, 1fr) minmax(196px, 220px);
     gap: 34px;
   }
 
@@ -3120,7 +3135,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
   }
 
   .circle-stage {
-    min-height: 430px;
+    min-height: 300px;
   }
 
   .stage-inner {
@@ -3142,7 +3157,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
   .stage-main {
     display: block;
-    padding: 76px 0 50px;
+    padding: 42px 0 30px;
   }
 
   .stage-copy h1 {
@@ -3156,7 +3171,7 @@ useHead({ title: computed(() => `${config.title || "朋友圈"} · 风隅随笔`
 
   .stage-orbit {
     position: absolute;
-    top: 142px;
+    top: 98px;
     right: -20px;
     width: 152px;
     height: 152px;

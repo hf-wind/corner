@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="toast-signal" :class="{ active: signalActive }" aria-hidden="true" />
+    <div class="toast-signal" :class="[`toast-signal-${signalType}`, { active: signalActive }]" aria-hidden="true" />
     <div class="toast-container" aria-live="polite" aria-atomic="true">
       <TransitionGroup name="toast" tag="div" class="toast-stack">
         <div
@@ -32,7 +32,28 @@ const { toasts, dismiss } = useToast()
 
 const timers = new Map<number, ReturnType<typeof setTimeout>>()
 const signalActive = ref(false)
+const signalType = ref<ToastItem['type']>('info')
 let signalTimer: ReturnType<typeof setTimeout> | null = null
+let feedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearPageFeedback() {
+  if (typeof document === 'undefined') return
+  document.documentElement.classList.remove(
+    'toast-feedback-success',
+    'toast-feedback-error',
+    'toast-feedback-warning',
+    'toast-feedback-info',
+  )
+}
+
+function pulsePageFeedback(type: ToastItem['type']) {
+  if (typeof document === 'undefined') return
+  clearPageFeedback()
+  signalType.value = type
+  document.documentElement.classList.add(`toast-feedback-${type}`)
+  if (feedbackTimer) clearTimeout(feedbackTimer)
+  feedbackTimer = setTimeout(clearPageFeedback, 900)
+}
 
 function pauseAuto(id: number) {
   const timer = timers.get(id)
@@ -47,6 +68,8 @@ function resumeAuto(id: number) {
 }
 
 watch(() => toasts.value.map(t => t.id).join(','), () => {
+  const latest = toasts.value[toasts.value.length - 1]
+  if (latest) pulsePageFeedback(latest.type)
   signalActive.value = false
   requestAnimationFrame(() => {
     signalActive.value = true
@@ -62,6 +85,8 @@ watch(() => toasts.value.map(t => t.id).join(','), () => {
 
 onUnmounted(() => {
   if (signalTimer) clearTimeout(signalTimer)
+  if (feedbackTimer) clearTimeout(feedbackTimer)
+  clearPageFeedback()
   timers.forEach(timer => clearTimeout(timer))
 })
 </script>
@@ -91,6 +116,22 @@ onUnmounted(() => {
   animation: toast-edge-signal 0.9s ease-out both;
 }
 
+.toast-signal.toast-signal-success {
+  --toast-signal-color: #22c55e;
+}
+
+.toast-signal.toast-signal-error {
+  --toast-signal-color: #ef4444;
+}
+
+.toast-signal.toast-signal-warning {
+  --toast-signal-color: #f59e0b;
+}
+
+.toast-signal.toast-signal-info {
+  --toast-signal-color: var(--c-primary);
+}
+
 .toast-stack {
   display: flex;
   flex-direction: column-reverse;
@@ -102,11 +143,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
+  padding: 9px 12px;
   min-width: 180px;
   max-width: 360px;
-  background: var(--c-bg);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--c-bg) 92%, var(--c-primary-soft));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
   border-radius: 10px;
   box-shadow:
     0 4px 20px var(--ld-shadow),
@@ -121,6 +162,18 @@ onUnmounted(() => {
   transition:
     opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
     transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toast-item::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: color-mix(in srgb, var(--toast-accent) 72%, transparent);
+  content: "";
+  transform-origin: left;
+  animation: toast-progress 3s linear both;
 }
 
 .toast-item.toast-visible {
@@ -146,6 +199,10 @@ onUnmounted(() => {
 .toast-error .toast-icon { color: #ef4444; }
 .toast-warning .toast-icon { color: #f59e0b; }
 .toast-info .toast-icon { color: var(--c-primary); }
+.toast-success { --toast-accent: #22c55e; }
+.toast-error { --toast-accent: #ef4444; }
+.toast-warning { --toast-accent: #f59e0b; }
+.toast-info { --toast-accent: var(--c-primary); }
 
 .toast-message {
   flex: 1;
@@ -160,9 +217,14 @@ onUnmounted(() => {
 }
 
 @keyframes toast-edge-signal {
-  0% { opacity: 0; border-color: color-mix(in srgb, var(--c-primary) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--c-primary) 0%, transparent); }
-  22% { opacity: 1; border-color: color-mix(in srgb, var(--c-primary) 38%, transparent); box-shadow: inset 0 0 28px color-mix(in srgb, var(--c-primary) 5%, transparent); }
-  100% { opacity: 0; border-color: color-mix(in srgb, var(--c-primary) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--c-primary) 0%, transparent); }
+  0% { opacity: 0; border-color: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); }
+  22% { opacity: 1; border-color: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 38%, transparent); box-shadow: inset 0 0 28px color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 5%, transparent); }
+  100% { opacity: 0; border-color: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); }
+}
+
+@keyframes toast-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 .toast-close {
@@ -190,4 +252,15 @@ onUnmounted(() => {
   background: var(--c-bg-soft);
   color: var(--c-text-1);
 }
+</style>
+
+<style>
+html.toast-feedback-success body { background-color: color-mix(in srgb, #22c55e 3%, var(--c-bg)); }
+html.toast-feedback-error body { background-color: color-mix(in srgb, #ef4444 3%, var(--c-bg)); }
+html.toast-feedback-warning body { background-color: color-mix(in srgb, #f59e0b 3%, var(--c-bg)); }
+html.toast-feedback-info body { background-color: color-mix(in srgb, var(--c-primary) 3%, var(--c-bg)); }
+html.toast-feedback-success body,
+html.toast-feedback-error body,
+html.toast-feedback-warning body,
+html.toast-feedback-info body { transition: background-color 0.45s ease; }
 </style>

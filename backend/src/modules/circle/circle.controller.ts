@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -10,8 +10,16 @@ export class CircleController {
   constructor(private readonly circle: CircleService) {}
 
   @Get('feed')
-  feed() {
-    return this.circle.getFeed();
+  feed(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('refresh') refresh?: string,
+  ) {
+    return this.circle.getFeed({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      refresh: refresh === '1' || refresh === 'true',
+    });
   }
 
   @Get('admin/config')

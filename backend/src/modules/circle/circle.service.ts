@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Optional } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { SettingsService } from '../settings/settings.service';
+import { RedisService } from '../../common/redis/redis.service';
 
 const MAX_FEED_BYTES = 2_000_000;
 const MAX_REDIRECTS = 3;
@@ -45,12 +48,19 @@ type CircleItem = {
   comments?: string;
 };
 
+type FeedQuery = { page?: number; limit?: number; refresh?: boolean };
+type FeedCache = { items: CircleItem[]; fetchedAt: string };
+type FeedSourceCache = { xml: string; etag?: string; lastModified?: string };
+
 @Injectable()
 export class CircleService {
   private readonly logger = new Logger(CircleService.name);
   private cache: { expires: number; fingerprint: string; items: CircleItem[] } | null = null;
 
-  constructor(private readonly settings: SettingsService) {}
+  constructor(
+    private readonly settings: SettingsService,
+    @Optional() private readonly redis?: RedisService,
+  ) {}
 
   async getConfig(): Promise<CircleConfig> {
     const [raw, rawFriends] = await Promise.all([
@@ -153,16 +163,20 @@ export class CircleService {
     return next;
   }
 
-  async getFeed() {
+  async getFeed(query: FeedQuery = {}) {
     const config = await this.getConfig();
     if (!config.enabled) return { enabled: false, config, items: [] };
     const fingerprint = this.subscriptionFingerprint(config.subscriptions);
-    if (this.cache && this.cache.expires > Date.now() && this.cache.fingerprint === fingerprint) {
-      return {
-        enabled: true,
-        config,
-        items: this.withCover(this.cache.items, config),
-      };
+    const page = Math.max(1, Math.floor(Number(query.page) || 1));
+    const limit = Math.min(50, Math.max(1, Math.floor(Number(query.limit) || 20)));
+    const cacheKey = `corner:circle:feed:${createHash('sha1').update(fingerprint).digest('hex')}`;
+    let cached: FeedCache | null = null;
+    if (!query.refresh && this.redis) cached = await this.redis.getJson<FeedCache>(cacheKey).catch(() => null);
+    if (!query.refresh && cached) {
+      return this.pageResult(cached.items, config, page, limit, cached.fetchedAt);
+    }
+    if (!query.refresh && this.cache && this.cache.expires > Date.now() && this.cache.fingerprint === fingerprint) {
+      return this.pageResult(this.cache.items, config, page, limit, new Date().toISOString());
     }
     const friends = Array.isArray(config.subscriptions)
       ? config.subscriptions
@@ -191,8 +205,29 @@ export class CircleService {
           Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
       )
       .slice(0, 500);
+    const fetchedAt = new Date().toISOString();
     this.cache = { expires: Date.now() + config.cacheTtl * 1000, fingerprint, items };
-    return { enabled: true, config, items: this.withCover(items, config) };
+    if (this.redis) await this.redis.setJson(cacheKey, { items, fetchedAt }, config.cacheTtl).catch(() => undefined);
+    return this.pageResult(items, config, page, limit, fetchedAt);
+  }
+
+  private pageResult(items: CircleItem[], config: CircleConfig, page: number, limit: number, fetchedAt: string) {
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const today = new Date().toDateString();
+    return {
+      enabled: true,
+      config,
+      items: this.withCover(items.slice((safePage - 1) * limit, safePage * limit), config),
+      total,
+      page: safePage,
+      limit,
+      totalPages,
+      fetchedAt,
+      sourceCount: new Set(items.map((item) => item.source.url)).size,
+      todayCount: items.filter((item) => new Date(item.publishedAt).toDateString() === today).length,
+    };
   }
 
   private async fetchFriendFeed(
@@ -271,16 +306,21 @@ export class CircleService {
 
   private async fetchXml(value: string) {
     let current = await this.safeFeedUrl(value);
+    const cacheKey = `corner:circle:rss:${createHash('sha1').update(value).digest('hex')}`;
+    const sourceCache = this.redis ? await this.redis.getJson<FeedSourceCache>(cacheKey).catch(() => null) : null;
     for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
+      const headers: Record<string, string> = {
+        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+        'User-Agent': 'CornerCircle/1.0',
+      };
+      if (sourceCache?.etag) headers['If-None-Match'] = sourceCache.etag;
+      if (sourceCache?.lastModified) headers['If-Modified-Since'] = sourceCache.lastModified;
       const response = await fetch(current, {
         redirect: 'manual',
         signal: AbortSignal.timeout(7000),
-        headers: {
-          Accept:
-            'application/rss+xml, application/atom+xml, application/xml, text/xml',
-          'User-Agent': 'CornerCircle/1.0',
-        },
+        headers,
       });
+      if (response.status === 304 && sourceCache?.xml) return sourceCache.xml;
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
         if (!location || redirect === MAX_REDIRECTS) return '';
@@ -290,7 +330,15 @@ export class CircleService {
       if (!response.ok) return '';
       const declaredSize = Number(response.headers.get('content-length') || 0);
       if (declaredSize > MAX_FEED_BYTES) return '';
-      return this.readLimitedText(response, MAX_FEED_BYTES);
+      const xml = await this.readLimitedText(response, MAX_FEED_BYTES);
+      if (this.redis && xml) {
+        await this.redis.setJson(cacheKey, {
+          xml,
+          etag: response.headers.get('etag') || undefined,
+          lastModified: response.headers.get('last-modified') || undefined,
+        }, 86400).catch(() => undefined);
+      }
+      return xml;
     }
     return '';
   }
