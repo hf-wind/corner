@@ -7,8 +7,16 @@ import { SettingsService } from '../settings/settings.service';
 import { RedisService } from '../../common/redis/redis.service';
 
 const MAX_FEED_BYTES = 2_000_000;
+const MAX_ITEM_CONTENT_CHARS = 20_000;
 const MAX_REDIRECTS = 3;
 const FEED_CONCURRENCY = 6;
+const DEFAULT_SUBSCRIPTIONS: CircleSubscription[] = [
+  { name: 'mrxwlb', url: 'https://mrxwlb.com/', rssUrl: 'https://mrxwlb.com/feed/', avatar: '', section: 'thought', enabled: true },
+  { name: 'onojyun', url: 'https://onojyun.com/', rssUrl: 'https://onojyun.com/feed/', avatar: '', section: 'thought', enabled: true },
+  { name: 'Mobius Blog', url: 'https://mobius.blog/', rssUrl: 'https://mobius.blog/feed/', avatar: '', section: 'thought', enabled: true },
+  { name: '知乎热榜', url: 'https://www.zhihu.com/hot', rssUrl: 'https://rsshub.app/zhihu/hot', avatar: '', section: 'news', enabled: true },
+  { name: '少数派', url: 'https://sspai.com/', rssUrl: 'https://sspai.com/feed', avatar: '', section: 'tech', enabled: true },
+];
 
 export type CircleConfig = {
   enabled: boolean;
@@ -26,6 +34,7 @@ export type CircleSubscription = {
   url: string;
   rssUrl: string;
   avatar: string;
+  section?: string;
   enabled: boolean;
 };
 
@@ -39,7 +48,7 @@ type CircleItem = {
   summary: string;
   url: string;
   publishedAt: string;
-  source: { name: string; url: string; avatar: string; rssUrl: string };
+  source: { name: string; url: string; avatar: string; rssUrl: string; section?: string };
   image?: string;
   categories: string[];
   author?: string;
@@ -95,15 +104,18 @@ export class CircleService {
       : [];
     // Keep explicit edits as the source of truth for matching RSS URLs, while
     // continuously bringing newly-added RSS links into the list.
+    const defaultSubscriptions = process.env.NODE_ENV === 'test' ? [] : DEFAULT_SUBSCRIPTIONS;
     const subscriptions = this.mergeSubscriptions(
       configuredSubscriptions,
-      friendSubscriptions,
+      [...defaultSubscriptions, ...friendSubscriptions],
       subscriptionExclusions,
     ).slice(0, 40);
     return {
       enabled: value.enabled !== false,
-      title: this.stringValue(value.title) || '朋友圈',
-      subtitle: this.stringValue(value.subtitle) || '和朋友们分享新鲜事',
+      title: this.stringValue(value.title) && this.stringValue(value.title) !== '朋友圈'
+        ? this.stringValue(value.title)
+        : '见闻',
+      subtitle: this.stringValue(value.subtitle) || '从不同的角落，收拢值得读完的文字。',
       covers,
       subscriptions,
       subscriptionsConfigured,
@@ -211,6 +223,26 @@ export class CircleService {
     return this.pageResult(items, config, page, limit, fetchedAt);
   }
 
+  async getItem(id: string) {
+    const target = this.stringValue(id);
+    if (!target) return null;
+    const first = (await this.getFeed({ page: 1, limit: 50 })) as {
+      totalPages?: number;
+      items?: CircleItem[];
+    };
+    const pages = Math.min(Number(first.totalPages) || 1, 10);
+    const found = (first.items || []).find((item) => item.id === target);
+    if (found) return found;
+    for (let page = 2; page <= pages; page += 1) {
+      const result = (await this.getFeed({ page, limit: 50 })) as {
+        items?: CircleItem[];
+      };
+      const item = (result.items || []).find((entry) => entry.id === target);
+      if (item) return item;
+    }
+    return null;
+  }
+
   private pageResult(items: CircleItem[], config: CircleConfig, page: number, limit: number, fetchedAt: string) {
     const total = items.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -247,6 +279,7 @@ export class CircleService {
             siteUrl,
           )
         : '',
+      section: this.stringValue(friend.section),
       rssUrl,
     };
     try {
@@ -291,14 +324,14 @@ export class CircleService {
             .filter(Boolean)
             .slice(0, 4),
           author: this.cleanText(author).slice(0, 120),
-          content: this.cleanText(content).slice(0, 800),
+          content: this.cleanText(content).slice(0, MAX_ITEM_CONTENT_CHARS),
           enclosure: this.absoluteUrl(enclosure, siteUrl) || '',
           comments: this.absoluteUrl(comments, siteUrl) || '',
         };
       });
     } catch (error) {
       this.logger.warn(
-        `朋友圈 RSS 读取失败 ${rssUrl}: ${error instanceof Error ? error.message : String(error)}`,
+        `见闻 RSS 读取失败 ${rssUrl}: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
     }
@@ -488,9 +521,12 @@ export class CircleService {
   }
   private cleanText(value: string) {
     return this.decode(value)
+      .replace(/<(br|\/p|\/div|\/li|\/h[1-6])\s*\/?>/gi, '\n')
       .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;/gi, ' ')
-      .replace(/\s+/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n[ \t]+/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
   }
   private decode(value: string) {
@@ -525,6 +561,7 @@ export class CircleService {
       url: this.stringValue(item.url || item.siteUrl) || rssUrl,
       rssUrl,
       avatar: this.stringValue(item.avatar || item.siteAvatar),
+      section: this.stringValue(item.section),
       enabled: item.enabled !== false,
     };
   }
@@ -549,7 +586,7 @@ export class CircleService {
   private subscriptionFingerprint(subscriptions: CircleSubscription[]) {
     return subscriptions
       .filter((item) => item.enabled !== false)
-      .map((item) => `${this.subscriptionKey(item.rssUrl)}:${item.url}:${item.name}:${item.avatar}`)
+      .map((item) => `${this.subscriptionKey(item.rssUrl)}:${item.url}:${item.name}:${item.avatar}:${item.section || ''}`)
       .sort()
       .join('|');
   }

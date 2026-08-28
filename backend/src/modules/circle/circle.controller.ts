@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -20,6 +20,11 @@ export class CircleController {
       limit: limit ? Number(limit) : undefined,
       refresh: refresh === '1' || refresh === 'true',
     });
+  }
+
+  @Get('item/:id')
+  item(@Param('id') id: string) {
+    return this.circle.getItem(id);
   }
 
   @Get('admin/config')

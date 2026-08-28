@@ -51,6 +51,14 @@ const routes: RouteRecordRaw[] = [
     component: lazyRoute(() => import("./pages/circle.vue")),
   },
   {
+    path: "/circle/read",
+    component: lazyRoute(() => import("./pages/circle/read/[id].vue")),
+  },
+  {
+    path: "/circle/read/:id",
+    component: lazyRoute(() => import("./pages/circle/read/[id].vue")),
+  },
+  {
     path: "/moments/:slug",
     component: lazyRoute(() => import("./pages/moments/[slug].vue")),
   },

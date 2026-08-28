@@ -32,6 +32,11 @@ export class CircleSubscriptionDto {
   avatar?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  section?: string;
+
+  @IsOptional()
   @IsBoolean()
   enabled?: boolean;
 }
