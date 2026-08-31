@@ -2,7 +2,11 @@
   <aside
     id="z-aside"
     class="sidebar-right"
-    :class="{ 'immersive-sidebar': immersive }"
+    :class="{
+      'immersive-sidebar': immersive,
+      'has-catalog': hasCatalog,
+      'without-catalog': !hasCatalog,
+    }"
   >
     <header v-if="hasCatalog" class="widget-head">
       <div class="head-title">
@@ -94,10 +98,7 @@
         aria-label="阅读进度"
         @click="toggleImmersiveCatalog"
       >
-        <LiquidProgress
-          class="reading-liquid"
-          :progress="percent"
-        />
+        <LiquidProgress class="reading-liquid" :progress="percent" />
         <Icon name="ph:book-open-text-bold" />
         <span class="bar-title">阅读进度</span>
         <span class="bar-progress">{{ percent }}%</span>
@@ -197,146 +198,144 @@
     </div>
   </Transition>
 
-  <div
-    class="mobile-article-tools"
-    :class="{ expanded: mobileActionsOpen }"
-    v-show="!immersive"
-  >
-    <Transition name="catalog-backdrop">
-      <button
-        v-if="hasCatalog && mobileCatalogOpen"
-        type="button"
-        class="mobile-catalog-backdrop"
-        aria-label="关闭文章目录"
-        @click="mobileCatalogOpen = false"
-      />
-    </Transition>
+  <Teleport to="body">
+    <div
+      v-show="!immersive"
+      class="mobile-article-tools"
+      :class="{ expanded: mobileActionsOpen }"
+    >
+      <Transition name="catalog-backdrop">
+        <button
+          v-if="hasCatalog && mobileCatalogOpen"
+          type="button"
+          class="mobile-catalog-backdrop"
+          aria-label="关闭文章目录"
+          @click="mobileCatalogOpen = false"
+        />
+      </Transition>
 
-    <Transition name="mobile-catalog">
-      <section
-        v-if="hasCatalog && mobileCatalogOpen"
-        class="mobile-catalog-panel"
-        role="dialog"
-        aria-label="文章目录"
-      >
-        <header class="mobile-catalog-head">
-          <div>
-            <span class="mobile-catalog-icon">
-              <Icon name="ph:list-bullets-bold" />
-            </span>
+      <Transition name="mobile-catalog">
+        <section
+          v-if="hasCatalog && mobileCatalogOpen"
+          class="mobile-catalog-panel"
+          role="dialog"
+          aria-label="文章目录"
+        >
+          <header class="mobile-catalog-head">
             <div>
-              <strong>文章目录</strong>
-              <span>已阅读 {{ percent }}%</span>
+              <span class="mobile-catalog-icon">
+                <Icon name="ph:list-bullets-bold" />
+              </span>
+              <div>
+                <strong>文章目录</strong>
+                <span>已阅读 {{ percent }}%</span>
+              </div>
             </div>
+            <button
+              type="button"
+              aria-label="关闭目录"
+              @click="mobileCatalogOpen = false"
+            >
+              <Icon name="ph:x-bold" />
+            </button>
+          </header>
+          <div class="mobile-catalog-progress" aria-hidden="true">
+            <i :style="{ width: `${percent}%` }" />
           </div>
+          <div ref="mobileCatalogWrapRef" class="mobile-catalog-content">
+            <nav
+              v-if="catalogReady"
+              class="article-catalog-tree"
+              aria-label="移动端文章目录"
+            >
+              <button
+                v-for="item in catalogItems"
+                :key="item.id"
+                type="button"
+                class="catalog-entry"
+                :class="{ active: item.index - 1 === activeCatalogIndex }"
+                :style="{
+                  '--catalog-depth': Math.max(0, item.level - 1),
+                  '--catalog-order': item.index,
+                }"
+                :title="item.text"
+                :data-catalog-index="item.index - 1"
+                @click="onCatalogClick($event, item)"
+              >
+                <span>{{ item.text }}</span>
+              </button>
+            </nav>
+          </div>
+        </section>
+      </Transition>
+
+      <Transition name="mobile-tool-menu">
+        <div v-if="mobileActionsOpen" class="mobile-tool-menu">
+          <button
+            v-show="hasCatalog"
+            type="button"
+            aria-label="文章目录"
+            title="文章目录"
+            @click="openMobileCatalog"
+          >
+            <i>
+              <Icon name="ph:list-bullets-bold" />
+            </i>
+          </button>
           <button
             type="button"
-            aria-label="关闭目录"
-            @click="mobileCatalogOpen = false"
+            :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+            :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
+            @click="runMobileAction('immersive')"
           >
-            <Icon name="ph:x-bold" />
+            <i>
+              <Icon
+                :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'"
+              />
+            </i>
           </button>
-        </header>
-        <div class="mobile-catalog-progress" aria-hidden="true">
-          <i :style="{ width: `${percent}%` }" />
-        </div>
-        <div
-          ref="mobileCatalogWrapRef"
-          class="mobile-catalog-content"
-        >
-          <nav
-            v-if="catalogReady"
-            class="article-catalog-tree"
-            aria-label="移动端文章目录"
+          <button
+            type="button"
+            aria-label="去评论区"
+            title="去评论区"
+            @click="runMobileAction('comment')"
           >
-            <button
-              v-for="item in catalogItems"
-              :key="item.id"
-              type="button"
-              class="catalog-entry"
-              :class="{ active: item.index - 1 === activeCatalogIndex }"
-              :style="{
-                '--catalog-depth': Math.max(0, item.level - 1),
-                '--catalog-order': item.index,
-              }"
-              :title="item.text"
-              :data-catalog-index="item.index - 1"
-              @click="onCatalogClick($event, item)"
-            >
-              <span>{{ item.text }}</span>
-            </button>
-          </nav>
+            <i>
+              <Icon name="ph:chat-circle-text-bold" />
+            </i>
+          </button>
+          <button
+            type="button"
+            aria-label="回到顶部"
+            title="回到顶部"
+            :class="{ muted: !showTop }"
+            @click="runMobileAction('top')"
+          >
+            <i>
+              <Icon name="ph:arrow-up-bold" />
+            </i>
+          </button>
         </div>
-      </section>
-    </Transition>
+      </Transition>
 
-    <Transition name="mobile-tool-menu">
-      <div v-if="mobileActionsOpen" class="mobile-tool-menu">
-        <button
-          v-show="hasCatalog"
-          type="button"
-          aria-label="文章目录"
-          title="文章目录"
-          @click="openMobileCatalog"
-        >
-          <i>
-            <Icon name="ph:list-bullets-bold" />
-          </i>
-        </button>
-        <button
-          type="button"
-          :aria-label="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
-          :title="immersive ? '退出沉浸阅读' : '进入沉浸阅读'"
-          @click="runMobileAction('immersive')"
-        >
-          <i>
-            <Icon
-              :name="immersive ? 'ph:corners-in-bold' : 'ph:corners-out-bold'"
-            />
-          </i>
-        </button>
-        <button
-          type="button"
-          aria-label="去评论区"
-          title="去评论区"
-          @click="runMobileAction('comment')"
-        >
-          <i>
-            <Icon name="ph:chat-circle-text-bold" />
-          </i>
-        </button>
-        <button
-          type="button"
-          aria-label="回到顶部"
-          title="回到顶部"
-          :class="{ muted: !showTop }"
-          @click="runMobileAction('top')"
-        >
-          <i>
-            <Icon name="ph:arrow-up-bold" />
-          </i>
-        </button>
-      </div>
-    </Transition>
-
-    <button
-      type="button"
-      class="mobile-tool-trigger"
-      :class="{ active: mobileActionsOpen }"
-      :style="{ '--reading-progress': `${percent}%` }"
-      :aria-expanded="mobileActionsOpen"
-      :aria-label="mobileActionsOpen ? '收起文章快捷操作' : '展开文章快捷操作'"
-      @click="mobileActionsOpen = !mobileActionsOpen"
-    >
-      <LiquidProgress
-        class="mobile-trigger-liquid"
-        :progress="percent"
-      />
-      <span class="mobile-trigger-face">
-        <Icon :name="mobileActionsOpen ? 'ph:x-bold' : 'ph:compass-bold'" />
-      </span>
-    </button>
-  </div>
+      <button
+        type="button"
+        class="mobile-tool-trigger"
+        :class="{ active: mobileActionsOpen }"
+        :style="{ '--reading-progress': `${percent}%` }"
+        :aria-expanded="mobileActionsOpen"
+        :aria-label="
+          mobileActionsOpen ? '收起文章快捷操作' : '展开文章快捷操作'
+        "
+        @click="mobileActionsOpen = !mobileActionsOpen"
+      >
+        <LiquidProgress class="mobile-trigger-liquid" :progress="percent" />
+        <span class="mobile-trigger-face">
+          <Icon :name="mobileActionsOpen ? 'ph:x-bold' : 'ph:dots-nine-bold'" />
+        </span>
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -373,10 +372,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   "scroll-top": [];
   "scroll-comment": [];
-  "catalog-navigate": [
-    event: MouseEvent,
-    item: CatalogItem,
-  ];
+  "catalog-navigate": [event: MouseEvent, item: CatalogItem];
   "toggle-immersive": [];
 }>();
 
@@ -423,10 +419,7 @@ function syncCatalogWrap(
   wrap.scrollTo({
     top: Math.max(
       0,
-      wrap.scrollTop +
-        activeRect.top -
-        wrapRect.top -
-        wrap.clientHeight * 0.3,
+      wrap.scrollTop + activeRect.top - wrapRect.top - wrap.clientHeight * 0.3,
     ),
     behavior,
   });
@@ -477,10 +470,7 @@ function runMobileAction(action: "top" | "comment" | "immersive") {
   else emit("toggle-immersive");
 }
 
-function onCatalogClick(
-  event: MouseEvent,
-  item: CatalogItem,
-) {
+function onCatalogClick(event: MouseEvent, item: CatalogItem) {
   event.preventDefault();
   mobileCatalogOpen.value = false;
   immersiveCatalogOpen.value = false;
@@ -583,8 +573,9 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 10px;
   flex-shrink: 0;
-  padding: 0 3px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-primary-soft) 38%, transparent);
 }
 
 .head-title {
@@ -640,7 +631,7 @@ onUnmounted(() => {
   max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 5px 3px 4px 0;
+  padding: 7px 3px 4px 0;
   overscroll-behavior: contain;
 }
 
@@ -656,7 +647,7 @@ onUnmounted(() => {
 .article-catalog-tree {
   display: grid;
   align-content: start;
-  gap: 2px;
+  gap: 3px;
   width: 100%;
 }
 
@@ -680,13 +671,15 @@ onUnmounted(() => {
   --catalog-depth: 0;
   --catalog-order: 0;
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr);
   width: 100%;
   min-height: 28px;
   align-items: center;
-  padding: 5px 7px 5px calc(11px + var(--catalog-depth) * 8px);
+  gap: 8px;
+  padding: 6px 8px 6px calc(7px + var(--catalog-depth) * 9px);
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--c-text-2);
   cursor: pointer;
@@ -708,28 +701,41 @@ onUnmounted(() => {
   white-space: normal;
 }
 
+.catalog-entry::before {
+  display: block;
+  width: 2px;
+  height: 8px;
+  justify-self: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-text-3) 54%, transparent);
+  content: "";
+  transition:
+    height 0.24s var(--ui-ease-out),
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
 .catalog-entry:hover {
   color: var(--c-primary);
   background: color-mix(in srgb, var(--c-primary) 8%, transparent);
-  transform: translateX(2px);
+  transform: translateX(3px);
+}
+
+.catalog-entry:hover::before {
+  height: 13px;
+  background: color-mix(in srgb, var(--c-primary) 58%, transparent);
+}
+
+.catalog-entry.active::before {
+  height: 18px;
+  background: var(--c-primary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--c-primary) 30%, transparent);
 }
 
 .catalog-entry.active {
   color: var(--c-primary);
   font-weight: 650;
   background: color-mix(in srgb, var(--c-primary-soft) 54%, transparent);
-}
-
-.catalog-entry.active::before {
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: calc(3px + var(--catalog-depth) * 8px);
-  width: 2px;
-  border-radius: 999px;
-  background: var(--c-primary);
-  box-shadow: 0 0 7px color-mix(in srgb, var(--c-primary) 34%, transparent);
-  content: "";
 }
 
 .pet-dock {
@@ -762,6 +768,15 @@ onUnmounted(() => {
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
   transform: translateY(-50%);
+}
+
+.sidebar-right.has-catalog .sidebar-actions {
+  position: static;
+  align-self: center;
+  flex-direction: row;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transform: none;
 }
 
 .action-btn {
@@ -817,11 +832,7 @@ onUnmounted(() => {
 }
 
 .immersive-catalog-bar {
-  --immersive-bar-bg: color-mix(
-    in srgb,
-    var(--ld-bg-card) 88%,
-    transparent
-  );
+  --immersive-bar-bg: color-mix(in srgb, var(--ld-bg-card) 88%, transparent);
   position: fixed;
   top: 18px;
   left: 50%;
@@ -865,8 +876,16 @@ onUnmounted(() => {
   z-index: 0;
   --liquid-fill-top: color-mix(in srgb, var(--c-primary) 10%, transparent);
   --liquid-fill-bottom: color-mix(in srgb, var(--c-primary) 22%, transparent);
-  --liquid-wave-front: color-mix(in srgb, var(--c-primary) 17%, var(--immersive-bar-bg));
-  --liquid-wave-back: color-mix(in srgb, var(--c-primary) 9%, var(--immersive-bar-bg));
+  --liquid-wave-front: color-mix(
+    in srgb,
+    var(--c-primary) 17%,
+    var(--immersive-bar-bg)
+  );
+  --liquid-wave-back: color-mix(
+    in srgb,
+    var(--c-primary) 9%,
+    var(--immersive-bar-bg)
+  );
   --liquid-wave-height: 12px;
   --liquid-wave-front-duration: 8.6s;
   --liquid-wave-back-duration: 11.8s;
@@ -946,7 +965,8 @@ onUnmounted(() => {
   flex-shrink: 0;
   padding: 13px 14px 11px 16px;
   background: color-mix(in srgb, var(--c-primary-soft) 32%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-bottom: 0;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ld-shadow) 32%, transparent);
 }
 
 .immersive-catalog-head > div:first-child {
@@ -1178,25 +1198,29 @@ onUnmounted(() => {
     left: auto;
     z-index: 1170;
     display: block;
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
   }
 
   .mobile-tool-trigger {
     position: relative;
     z-index: 3;
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     display: grid;
     place-items: center;
     overflow: hidden;
     padding: 0;
-    border: 1px solid color-mix(in srgb, var(--c-primary) 28%, var(--border));
-    border-radius: 50%;
+    border: 0;
+    border-radius: 12px;
     color: var(--c-primary);
-    background: color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft));
+    background: color-mix(
+      in srgb,
+      var(--ld-bg-card) 92%,
+      var(--c-primary-soft)
+    );
     box-shadow:
-      0 8px 22px color-mix(in srgb, #000 10%, var(--ld-shadow)),
+      0 9px 24px color-mix(in srgb, #000 11%, var(--ld-shadow)),
       0 1px 0 color-mix(in srgb, #fff 64%, transparent) inset;
     isolation: isolate;
     cursor: pointer;
@@ -1211,10 +1235,10 @@ onUnmounted(() => {
     z-index: 2;
     display: grid;
     place-items: center;
-    border-radius: 50%;
+    border-radius: 12px;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    font-size: 1.05rem;
+    font-size: 1.08rem;
     transition: transform 0.56s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
@@ -1222,15 +1246,23 @@ onUnmounted(() => {
     z-index: 0;
     --liquid-fill-top: color-mix(in srgb, var(--c-primary) 20%, transparent);
     --liquid-fill-bottom: color-mix(in srgb, var(--c-primary) 44%, transparent);
-    --liquid-wave-front: color-mix(in srgb, var(--c-primary) 24%, var(--ld-bg-card));
-    --liquid-wave-back: color-mix(in srgb, var(--c-primary) 13%, var(--ld-bg-card));
+    --liquid-wave-front: color-mix(
+      in srgb,
+      var(--c-primary) 24%,
+      var(--ld-bg-card)
+    );
+    --liquid-wave-back: color-mix(
+      in srgb,
+      var(--c-primary) 13%,
+      var(--ld-bg-card)
+    );
     --liquid-wave-height: 10px;
     --liquid-wave-front-duration: 7.2s;
     --liquid-wave-back-duration: 9.8s;
   }
 
   .mobile-tool-trigger.active {
-    transform: scale(0.94);
+    transform: scale(0.92);
     box-shadow: 0 5px 14px
       color-mix(in srgb, var(--c-primary) 16%, var(--ld-shadow));
   }
@@ -1243,18 +1275,17 @@ onUnmounted(() => {
     position: absolute;
     inset: 0;
     z-index: 3;
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     pointer-events: none;
   }
 
   .mobile-tool-menu button {
     --tool-accent: var(--c-primary);
-    --scatter-x: 0px;
-    --scatter-y: 0px;
+    --scatter-y: -44px;
     position: absolute;
-    top: 2px;
-    right: 2px;
+    top: 1px;
+    right: 1px;
     left: auto;
     display: grid;
     align-items: center;
@@ -1263,38 +1294,30 @@ onUnmounted(() => {
     height: 38px;
     padding: 0;
     border: 0;
-    border-radius: 50%;
+    border-radius: 11px;
     color: var(--c-primary);
     background: transparent;
     font-family: inherit;
     cursor: pointer;
     pointer-events: auto;
-    transform: translate(var(--scatter-x), var(--scatter-y));
+    transform: translateY(var(--scatter-y));
     transition: filter 0.16s ease;
   }
 
   .mobile-tool-menu button:nth-child(1) {
-    --tool-accent: var(--c-primary);
-    --scatter-x: -48px;
-    --scatter-y: -51px;
+    --scatter-y: -176px;
   }
 
   .mobile-tool-menu button:nth-child(2) {
-    --tool-accent: #2b9373;
-    --scatter-x: -72px;
-    --scatter-y: -18px;
+    --scatter-y: -132px;
   }
 
   .mobile-tool-menu button:nth-child(3) {
-    --tool-accent: #d08635;
-    --scatter-x: -72px;
-    --scatter-y: 22px;
+    --scatter-y: -88px;
   }
 
   .mobile-tool-menu button:nth-child(4) {
-    --tool-accent: #d05768;
-    --scatter-x: -48px;
-    --scatter-y: 57px;
+    --scatter-y: -44px;
   }
 
   .mobile-tool-menu button i {
@@ -1302,16 +1325,16 @@ onUnmounted(() => {
     height: 36px;
     display: grid;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--tool-accent) 24%, var(--border));
-    border-radius: 50%;
+    border: 0;
+    border-radius: 11px;
     color: var(--tool-accent);
     background: color-mix(in srgb, var(--ld-bg-card) 88%, var(--tool-accent));
     box-shadow:
-      0 6px 18px color-mix(in srgb, #000 10%, var(--ld-shadow)),
-      0 0 18px color-mix(in srgb, var(--tool-accent) 13%, transparent);
+      0 7px 20px color-mix(in srgb, #000 10%, var(--ld-shadow)),
+      0 1px 0 color-mix(in srgb, #fff 58%, transparent) inset;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    font-size: 0.9rem;
+    font-size: 0.94rem;
     font-style: normal;
   }
 
@@ -1447,14 +1470,14 @@ onUnmounted(() => {
 
   .mobile-tool-menu-enter-active,
   .mobile-tool-menu-leave-active {
-    transition: opacity 0.2s ease;
+    transition: opacity 0.24s ease;
   }
 
   .mobile-tool-menu-enter-active button,
   .mobile-tool-menu-leave-active button {
     transition:
       opacity 0.22s ease,
-      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+      transform 0.46s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .mobile-tool-menu-enter-active button:nth-child(2) {
@@ -1472,7 +1495,7 @@ onUnmounted(() => {
   .mobile-tool-menu-enter-from button,
   .mobile-tool-menu-leave-to button {
     opacity: 0;
-    transform: translate(0, 0) scale(0.55);
+    transform: translateY(0) scale(0.72);
   }
 
   .mobile-catalog-enter-active,
@@ -1505,7 +1528,6 @@ onUnmounted(() => {
   .immersive-catalog-leave-to {
     transform: translateY(-7px) scale(0.98);
   }
-
 }
 
 @media (prefers-reduced-motion: reduce) {

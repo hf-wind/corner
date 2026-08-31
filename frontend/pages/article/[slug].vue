@@ -129,6 +129,7 @@
           <AsyncArticleMarkdown
             :content="article.content"
             :editor-id="editorId"
+            :article-title="article.title"
             @rendered="handleMarkdownRendered"
           />
         </div>
@@ -476,7 +477,7 @@ function catalogHeading(item: { text: string; index: number }) {
   const direct = document.getElementById(item.text);
   if (direct) return direct;
   const headings = document.querySelectorAll<HTMLElement>(
-    `#${editorId} h1, #${editorId} h2, #${editorId} h3, #${editorId} h4, #${editorId} h5, #${editorId} h6`,
+    `#${editorId} h1:not([hidden]), #${editorId} h2:not([hidden]), #${editorId} h3:not([hidden]), #${editorId} h4:not([hidden]), #${editorId} h5:not([hidden]), #${editorId} h6:not([hidden])`,
   );
   return headings[item.index - 1] || null;
 }
@@ -524,9 +525,19 @@ function setImmersive(active: boolean) {
   document.documentElement.classList.toggle("article-immersive", active);
 }
 
-function toggleImmersive() {
+async function toggleImmersive() {
+  const container = articleMainRef.value;
+  const readingTop = container?.scrollTop ?? 0;
   const next = !immersiveMode.value;
-  requestAnimationFrame(() => setImmersive(next));
+  setImmersive(next);
+  await nextTick();
+  requestAnimationFrame(() => {
+    if (container) container.scrollTop = readingTop;
+    requestAnimationFrame(() => {
+      if (container) container.scrollTop = readingTop;
+      scheduleArticleMetrics();
+    });
+  });
 }
 
 function onPageKeydown(event: KeyboardEvent) {
@@ -551,7 +562,11 @@ function refreshCatalogOffsets() {
   if (!container) return;
   const root = articleContentRef.value;
   const currentHeadings = root
-    ? Array.from(root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"))
+    ? Array.from(
+        root.querySelectorAll<HTMLElement>(
+          "h1:not([hidden]), h2:not([hidden]), h3:not([hidden]), h4:not([hidden]), h5:not([hidden]), h6:not([hidden])",
+        ),
+      )
     : [];
   const headingsChanged =
     currentHeadings.length !== catalogHeadings.length ||
@@ -827,13 +842,8 @@ onUnmounted(() => {
   transition: width 0.32s var(--ui-ease-out);
 }
 
-.article-page :deep(.sidebar-right),
 .article-main {
-  transition:
-    width 0.32s var(--ui-ease-out),
-    flex-basis 0.32s var(--ui-ease-out),
-    opacity 0.24s ease,
-    padding 0.32s var(--ui-ease-out);
+  transition: padding 0.32s var(--ui-ease-out);
 }
 
 .article-aside-stage {
@@ -852,6 +862,7 @@ onUnmounted(() => {
   width: 100%;
   min-width: 100%;
   flex-basis: 100%;
+  transition: opacity 0.18s ease;
 }
 
 .article-page :deep(.sidebar-right) {
@@ -871,22 +882,16 @@ onUnmounted(() => {
   min-width: 0;
   margin-right: auto;
   margin-left: auto;
-  padding-right: clamp(24px, 4vw, 88px);
-  padding-left: clamp(24px, 4vw, 88px);
+  padding-right: var(--article-inline-pad);
+  padding-left: var(--article-inline-pad);
 }
 
 .article-page.is-immersive .article-main > * {
-  width: min(100%, 50.667rem);
+  width: min(100%, 53.333rem);
 }
 
 .article-page.is-immersive :deep(.sidebar-right) {
-  width: 0;
-  flex-basis: 0;
-  min-width: 0;
   opacity: 0;
-  padding-right: 0;
-  padding-left: 0;
-  overflow: hidden;
   pointer-events: none;
   visibility: hidden;
 }
@@ -897,16 +902,8 @@ onUnmounted(() => {
   flex-basis: 0;
 }
 
-.article-page.is-immersive .post-title,
-.article-page.is-immersive .article-shell,
-.article-page.is-immersive .article-lead {
-  transition:
-    max-width 0.36s var(--ui-ease-out),
-    width 0.36s var(--ui-ease-out);
-}
-
 .article-shell {
-  transition: width 0.32s var(--ui-ease-out);
+  min-width: 0;
 }
 
 .article-main::-webkit-scrollbar {
@@ -1111,26 +1108,19 @@ onUnmounted(() => {
   margin-bottom: 22px;
   overflow: hidden;
   overflow-anchor: none;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 16%, var(--border));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--c-primary-soft) 28%, var(--ld-bg-card));
-}
-
-.article-lead::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 3px;
-  background: var(--c-primary);
-  content: "";
+  border: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--c-primary-soft) 36%, var(--ld-bg-card));
+  box-shadow:
+    0 12px 30px color-mix(in srgb, var(--c-primary) 7%, transparent),
+    0 1px 0 color-mix(in srgb, #fff 42%, transparent) inset;
 }
 
 .md-excerpt {
   display: flex;
-  align-items: stretch;
-  gap: 15px;
-  padding: 18px 20px 19px 18px;
+  align-items: center;
+  gap: 18px;
+  padding: 19px 22px;
   font-family: var(--font-rounded);
   font-size: 13px;
   line-height: 1.95;
@@ -1150,27 +1140,29 @@ onUnmounted(() => {
 .excerpt-avatar {
   position: relative;
   display: grid;
-  width: 54px;
-  height: 54px;
+  width: 68px;
+  height: 68px;
   flex-shrink: 0;
-  border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--border));
+  border: 0;
   border-radius: 50%;
   background: color-mix(in srgb, var(--c-primary-soft) 62%, var(--ld-bg-card));
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--c-primary) 13%, transparent);
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--c-primary) 15%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--ld-bg-card) 58%, transparent);
   place-items: center;
 }
 
 .excerpt-avatar img {
   width: 100%;
   height: 100%;
-  padding: 4px;
+  padding: 3px;
   object-fit: contain;
 }
 
 .excerpt-avatar i {
   position: absolute;
-  right: -3px;
-  bottom: -2px;
+  right: -2px;
+  bottom: 0;
   display: grid;
   width: 19px;
   height: 19px;
@@ -1547,9 +1539,9 @@ onUnmounted(() => {
   }
 
   .md-excerpt {
-    align-items: flex-start;
-    gap: 11px;
-    padding: 15px 14px 16px 13px;
+    align-items: center;
+    gap: 13px;
+    padding: 16px 15px;
   }
 
   .article-lead {
@@ -1557,8 +1549,8 @@ onUnmounted(() => {
   }
 
   .excerpt-avatar {
-    width: 46px;
-    height: 46px;
+    width: 58px;
+    height: 58px;
   }
 
   .excerpt-content {
@@ -1607,10 +1599,9 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .article-page :deep(.sidebar-right),
   .article-aside-stage,
   .article-main,
-  .article-shell {
+  .article-page :deep(.sidebar-right) {
     transition: none;
   }
 }

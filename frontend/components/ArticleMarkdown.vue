@@ -47,10 +47,12 @@ const props = withDefaults(
   defineProps<{
     content?: string;
     editorId?: string;
+    articleTitle?: string;
   }>(),
   {
     content: "",
     editorId: "article-preview",
+    articleTitle: "",
   },
 );
 
@@ -84,6 +86,8 @@ let themePositionFrame: number | null = null;
 let themeInputAbortController: AbortController | null = null;
 let diagramObserver: MutationObserver | null = null;
 let diagramInteractionObserver: MutationObserver | null = null;
+let headingObserver: MutationObserver | null = null;
+let headingSyncFrame: number | null = null;
 let diagramRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 let diagramStableHeights: number[] = [];
 const DIAGRAM_THEME_MIN_DURATION = 900;
@@ -99,6 +103,32 @@ function previewBlocks() {
     wrapperRef.value?.querySelectorAll<HTMLElement>(".md-editor-preview > *") ||
       [],
   );
+}
+
+function normalizedHeading(value: string) {
+  return value.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase();
+}
+
+function syncArticleHeadingVisibility() {
+  headingSyncFrame = null;
+  const title = normalizedHeading(props.articleTitle || "");
+  const headings = wrapperRef.value?.querySelectorAll<HTMLElement>(
+    ".md-editor-preview h1",
+  );
+  headings?.forEach((heading) => {
+    const duplicate = Boolean(
+      title &&
+      normalizedHeading(heading.innerText || heading.textContent || "") ===
+        title,
+    );
+    heading.hidden = duplicate;
+    heading.classList.toggle("article-title-duplicate", duplicate);
+  });
+}
+
+function scheduleHeadingSync() {
+  if (headingSyncFrame !== null) cancelAnimationFrame(headingSyncFrame);
+  headingSyncFrame = requestAnimationFrame(syncArticleHeadingVisibility);
 }
 
 function mermaidBoxes() {
@@ -281,6 +311,13 @@ onMounted(async () => {
   editorReady.value = true;
   await nextTick();
   if (wrapperRef.value) {
+    syncArticleHeadingVisibility();
+    headingObserver = new MutationObserver(scheduleHeadingSync);
+    headingObserver.observe(wrapperRef.value, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
     diagramInteractionObserver = new MutationObserver((records) => {
       for (const record of records) {
         const box = record.target as HTMLElement;
@@ -296,12 +333,22 @@ onMounted(async () => {
       subtree: true,
     });
   }
-  requestAnimationFrame(() => emit("rendered"));
+  requestAnimationFrame(() => {
+    syncArticleHeadingVisibility();
+    emit("rendered");
+  });
 });
+
+watch(
+  () => props.articleTitle,
+  () => scheduleHeadingSync(),
+);
 
 onUnmounted(() => {
   observer?.disconnect();
   diagramInteractionObserver?.disconnect();
+  headingObserver?.disconnect();
+  if (headingSyncFrame !== null) cancelAnimationFrame(headingSyncFrame);
   clearThemePositionLock();
   clearDiagramThemeRefresh();
 });
@@ -473,15 +520,31 @@ onUnmounted(() => {
   counter-reset: article-h2 article-h3;
   position: relative;
   margin: 2.75rem 0 1.15rem;
-  padding: 0 0 12px;
+  min-height: 36px;
+  padding: 2px 0 2px 46px;
   border: 0;
-  border-bottom: 1px solid
-    color-mix(in srgb, var(--c-primary) 22%, var(--border));
-  font-size: 26px;
+  font-size: 25px;
 }
 
 .article-md-wrap :deep(.md-editor-preview h1::before) {
-  display: none;
+  position: absolute;
+  top: 0.18em;
+  left: 0;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-primary-soft) 72%, var(--c-bg-2));
+  color: var(--c-primary);
+  content: counter(article-h1, decimal-leading-zero);
+  font: 720 9px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--c-primary) 10%, transparent);
+  place-items: center;
+}
+
+.article-md-wrap :deep(.md-editor-preview h1[hidden]) {
+  display: none !important;
 }
 
 .article-md-wrap :deep(.md-editor-preview h2) {
@@ -820,12 +883,14 @@ onUnmounted(() => {
 @keyframes article-block-reveal {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    filter: blur(10px);
+    transform: translateY(20px) scale(0.92);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    filter: blur(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -836,7 +901,9 @@ onUnmounted(() => {
     animation-fill-mode: both;
     animation-timing-function: linear;
     animation-timeline: view();
-    animation-range: entry 0% entry 96px;
+    animation-range: entry 0% entry 128px;
+    transform-origin: 50% center;
+    will-change: opacity, filter, transform;
   }
 }
 
@@ -849,7 +916,14 @@ onUnmounted(() => {
 
   .article-md-wrap :deep(.md-editor-preview h1) {
     margin-top: 2.35rem;
+    min-height: 32px;
+    padding-left: 41px;
     font-size: 1.42rem;
+  }
+
+  .article-md-wrap :deep(.md-editor-preview h1::before) {
+    width: 29px;
+    height: 29px;
   }
 
   .article-md-wrap :deep(.md-editor-preview h2) {
