@@ -67,7 +67,8 @@ git clone git@github.com:hf-wind/corner.git /srv/corner/app
 cd /srv/corner/app
 cp .env.example .env
 chmod 600 .env
-# 编辑 .env 后启动
+# 编辑 .env 后生成提交记录并启动
+bash ./scripts/export-git-log.sh
 docker compose config --quiet
 docker compose up -d --build --wait
 docker compose exec -T backend npm run prisma:seed
@@ -146,6 +147,7 @@ docker compose ps
 docker compose logs --tail=200 backend
 docker compose logs --tail=200 caddy
 docker compose pull
+bash ./scripts/export-git-log.sh
 docker compose up -d --build --wait
 ./scripts/backup.sh
 ```

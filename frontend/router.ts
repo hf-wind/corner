@@ -162,7 +162,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/ai-native",
-    redirect: { path: "/admin/ai", query: { tab: "chats" } },
+    redirect: "/admin/ai",
     meta: adminMeta,
   },
   {
@@ -198,6 +198,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/admin/info",
     component: lazyRoute(() => import("./pages/admin/info.vue")),
+    meta: adminMeta,
+  },
+  {
+    path: "/admin/journeys",
+    component: lazyRoute(() => import("./pages/admin/journeys.vue")),
     meta: adminMeta,
   },
   {
@@ -243,6 +248,16 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/admin/visitor-content",
     component: lazyRoute(() => import("./pages/admin/visitor.vue")),
+    meta: adminMeta,
+  },
+  {
+    path: "/admin/visitor-messages",
+    redirect: "/admin/visitor-content",
+    meta: adminMeta,
+  },
+  {
+    path: "/admin/visitor-bottles",
+    redirect: "/admin/visitor-content",
     meta: adminMeta,
   },
   {

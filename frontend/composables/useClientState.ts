@@ -13,9 +13,8 @@ const legacy = {
   nickname: 'corner:visitor:nickname',
   aiGuestId: 'corner:ai:guest-id',
   theme: 'theme',
+  fontPreset: 'font-preset',
   sidebar: 'corner-admin-sidebar-collapsed',
-  lastRoute: 'corner:last-public-route',
-  lastGreeting: 'corner:pet:last-greeting',
   token: 'token',
   user: 'user',
 } as const
@@ -54,8 +53,7 @@ function migrate() {
   const aiGuestId = localStorage.getItem(legacy.aiGuestId)
   const theme = localStorage.getItem(legacy.theme)
   const sidebar = localStorage.getItem(legacy.sidebar)
-  const lastRoute = sessionStorage.getItem(legacy.lastRoute)
-  const lastGreeting = sessionStorage.getItem(legacy.lastGreeting)
+  const fontPreset = localStorage.getItem(legacy.fontPreset)
   const token = localStorage.getItem(legacy.token)
   const storedUser = localStorage.getItem(legacy.user)
   if (!session.id) session.id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -64,8 +62,7 @@ function migrate() {
   if (aiGuestId && !ai.guestId) ai.guestId = aiGuestId
   if (theme && !site.theme) site.theme = theme
   if (sidebar !== null && site.adminSidebarCollapsed === undefined) site.adminSidebarCollapsed = sidebar === '1'
-  if (lastRoute && !session.lastPublicRoute) session.lastPublicRoute = lastRoute
-  if (lastGreeting && !session.petLastGreeting) session.petLastGreeting = lastGreeting
+  if (fontPreset && !site.fontPreset) site.fontPreset = fontPreset
   if (token && !auth.token) auth.token = token
   if (storedUser && !auth.user) { try { auth.user = JSON.parse(storedUser) } catch { /* ignore malformed legacy user */ } }
   write(KEYS.visitor, visitor)
@@ -73,8 +70,7 @@ function migrate() {
   write(KEYS.ai, ai)
   write(KEYS.auth, auth)
   write(KEYS.session, session)
-  ;[legacy.visitorId, legacy.nickname, legacy.aiGuestId, legacy.theme, legacy.sidebar, legacy.token, legacy.user, 'corner:circle:reading'].forEach((key) => localStorage.removeItem(key))
-  ;[legacy.lastRoute, legacy.lastGreeting].forEach((key) => sessionStorage.removeItem(key))
+  ;[legacy.visitorId, legacy.nickname, legacy.aiGuestId, legacy.theme, legacy.fontPreset, legacy.sidebar, legacy.token, legacy.user, 'corner:circle:reading'].forEach((key) => localStorage.removeItem(key))
 }
 
 let migrated = false

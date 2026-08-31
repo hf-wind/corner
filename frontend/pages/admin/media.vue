@@ -55,7 +55,7 @@
                   <a-checkbox :checked="selectedIds.has(item.id)" @change="toggleSelect(item.id, i)" />
                 </div>
                 <div v-if="isImage(item)" class="media-img-wrap" :class="{ failed: failedImages.has(item.id) }">
-                  <img v-if="!failedImages.has(item.id)" :src="mediaUrl(item.path)" :alt="item.originalName || item.filename" @error="failedImages.add(item.id)" />
+                  <img v-if="!failedImages.has(item.id)" :src="mediaUrl(item.path || item.originalPath || item.imageUrl || item.url)" :alt="item.originalName || item.filename || item.label || '表情资源'" @error="failedImages.add(item.id)" />
                   <span v-else><Icon name="ph:image-broken-bold" /><small>图片无法加载</small></span>
                 </div>
                 <div v-else-if="isAudio(item)" class="media-audio-wrap" @click.stop>
@@ -134,7 +134,7 @@ const moveDialog = reactive({
 })
 
 const isImage = (item: any) => {
-  const value = `${item.mimeType || ''} ${item.path || ''} ${item.filename || ''}`.toLowerCase()
+  const value = `${item.mimeType || ''} ${item.path || ''} ${item.originalPath || ''} ${item.imageUrl || ''} ${item.filename || ''}`.toLowerCase()
   return /image\//.test(value) || /\.(avif|gif|jpe?g|png|svg|webp)(?:\?|$)/.test(value) || item.folder === 'emoji'
 }
 const isAudio = (item: any) => item.mimeType?.startsWith('audio/')

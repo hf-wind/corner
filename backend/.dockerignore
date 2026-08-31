@@ -5,4 +5,5 @@ coverage
 .gitignore
 .env
 *.log
+!.runtime-git-log
 .cache

@@ -1179,6 +1179,23 @@ export class AiNativeService {
     };
   }
 
+  async feedback(page = 1, pageSize = 20) {
+    const take = Math.min(100, Math.max(1, Number(pageSize) || 20));
+    const current = Math.max(1, Number(page) || 1);
+    const where = { helpful: { not: null } };
+    const [items, total] = await Promise.all([
+      this.prisma.aiInteraction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (current - 1) * take,
+        take,
+        select: { id: true, actorType: true, userId: true, guestIdHash: true, scene: true, action: true, helpful: true, metadata: true, createdAt: true },
+      }),
+      this.prisma.aiInteraction.count({ where }),
+    ]);
+    return { items, total, page: current, pageSize: take };
+  }
+
   async usageAnalytics(requestedPage = 1, requestedPageSize = 15) {
     const page = Math.max(1, Math.floor(requestedPage) || 1);
     const pageSize = Math.min(

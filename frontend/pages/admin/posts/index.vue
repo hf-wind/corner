@@ -29,13 +29,13 @@
               <a-tag v-for="t in record.tags" :key="t" style="margin:0 2px 2px 0">{{ t }}</a-tag>
             </template>
             <template v-if="column.key === 'status'">
-              <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
+              <div class="status-switch"><a-switch :checked="record.status === 'published'" :loading="publishingSlug === record.slug" checked-children="公开" un-checked-children="下架" @change="(checked: boolean) => togglePublished(record, checked)" /><a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag></div>
             </template>
             <template v-if="column.key === 'actions'">
               <AdminRowActions
                 :record="record"
                 settings-menu
-                show-unpublish
+                :show-unpublish="false"
                 :publishing="publishingSlug === record.slug"
                 @edit="$router.push('/admin/posts/' + record.slug)"
                 @preview="preview(record.slug)"
@@ -318,6 +318,11 @@ async function unpublish(record: any) {
   })
 }
 
+async function togglePublished(record: any, checked: boolean) {
+  if (checked && record.status !== 'published') await publish(record)
+  else if (!checked && record.status === 'published') await unpublish(record)
+}
+
 async function remove(slug: string, title: string) {
   Modal.confirm({
     title: '删除确认',
@@ -341,6 +346,7 @@ onMounted(loadPosts)
 </script>
 
 <style scoped>
+.status-switch { display:flex; align-items:center; gap:6px; }
 .table-toolbar { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
 .post-search { width:260px; }
 .list-card { border-radius:8px; }

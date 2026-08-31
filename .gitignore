@@ -9,6 +9,7 @@ frontend/127.0.0.1/
 .env.local
 .env.production
 *.log
+backend/.runtime-git-log
 data/
 backups/
 .DS_Store

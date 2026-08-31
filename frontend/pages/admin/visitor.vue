@@ -25,20 +25,12 @@
         <span class="stat-icon"><Icon name="ph:footprints-bold" /></span>
         <div><strong>{{ stats.visits }}</strong><small>足迹记录</small></div>
       </div>
-      <div class="stat-card">
-        <span class="stat-icon"><Icon name="ph:note-pencil-bold" /></span>
-        <div><strong>{{ stats.messages }}</strong><small>留言总数</small><i v-if="stats.pendingMessages" class="pending-dot">{{ stats.pendingMessages }} 待审</i></div>
-      </div>
-      <div class="stat-card">
-        <span class="stat-icon"><Icon name="solar:bottle-outline" /></span>
-        <div><strong>{{ stats.bottles }}</strong><small>漂流瓶总数</small><i v-if="stats.pendingBottles" class="pending-dot">{{ stats.pendingBottles }} 待审</i></div>
-      </div>
     </div>
 
-    <a-tabs v-if="!contentOnly" v-model:active-key="activeTab" class="visitor-tabs">
-      <a-tab-pane key="messages" :tab="`留言${stats.pendingMessages ? `（${stats.pendingMessages} 待审）` : ''}`" />
-      <a-tab-pane key="bottles" :tab="`漂流瓶${stats.pendingBottles ? `（${stats.pendingBottles} 待审）` : ''}`" />
-      <a-tab-pane key="profiles" tab="身份档案" />
+    <a-tabs v-model:active-key="activeTab" class="visitor-tabs">
+      <a-tab-pane v-if="contentOnly" key="messages" :tab="`留言${stats.pendingMessages ? `（${stats.pendingMessages} 待审）` : ''}`" />
+      <a-tab-pane v-if="contentOnly" key="bottles" :tab="`漂流瓶${stats.pendingBottles ? `（${stats.pendingBottles} 待审）` : ''}`" />
+      <a-tab-pane v-if="!contentOnly" key="profiles" tab="身份档案" />
     </a-tabs>
 
     <div v-if="activeTab === 'messages' || activeTab === 'bottles'" class="message-review-pane">
@@ -141,6 +133,7 @@
                 <template v-else-if="column.key === 'region'">
                   <span class="region-cell">{{ record.region || '未定位' }}</span>
                 </template>
+                <template v-else-if="column.key === 'environment'"><span class="source-cell"><strong>{{ record.browser || '未知浏览器' }} · {{ record.os || '未知系统' }}</strong><small>{{ record.device || '未知设备' }} · 标识 {{ record.clientId || '-' }}</small></span></template>
                 <template v-else-if="column.key === 'counts'">
                   <div class="access-counts"><span>访问 {{ record.access?.visits ?? record.visitCount }}</span><span>文章阅读 {{ record.access?.articles || 0 }}</span><span>风讯角阅读 {{ record.access?.circle || 0 }}</span><span>站点操作 {{ record.access?.operations || 0 }}</span><span>AI 体验 {{ record.ai?.experiences || 0 }}</span><span>AI 会话 {{ record.ai?.sessions || 0 }}</span><span>反馈 {{ record.ai?.feedback || 0 }}（有帮助 {{ record.ai?.helpful || 0 }}）</span></div>
                 </template>
@@ -150,12 +143,27 @@
                 <template v-else-if="column.key === 'lastSeen'">
                   {{ formatTime(record.lastSeenAt) }}<span v-if="record.firstSeenAt" class="first-seen">初访 {{ formatTime(record.firstSeenAt) }}</span>
                 </template>
+                <template v-else-if="column.key === 'session'"><a-button type="link" size="small" :disabled="!record.conversationId" @click="openSession(record)"><Icon name="ph:chat-circle-text-bold" /> 查看</a-button></template>
+                <template v-else-if="column.key === 'profileDetail'"><a-button type="link" size="small" @click="openProfileDetail(record)" title="查看身份档案"><Icon name="ph:identification-card-bold" /></a-button></template>
               </template>
             </a-table>
             <AdminPagination v-model:current="profilePagination.current" :page-size="profilePagination.pageSize" :total="profilePagination.total" :show-size-changer="false" @change="loadProfiles" />
           </div>
         </a-spin>
     </div>
+
+    <a-modal v-model:open="profileDialog.open" title="访问身份档案" width="680px" :footer="null">
+      <div v-if="profileDialog.record" class="detail-body">
+        <div class="detail-row"><span class="detail-label">身份链路</span><a-tag :color="identityColor(profileDialog.record.identity)">{{ identityText(profileDialog.record.identity) }}</a-tag></div>
+        <div class="detail-row"><span class="detail-label">昵称 / 账号</span><span>{{ profileDialog.record.nickname || '未登记' }}<template v-if="profileDialog.record.account"> · {{ profileDialog.record.account.username }}（{{ profileDialog.record.account.email || '无邮箱' }}）</template></span></div>
+        <div class="detail-row"><span class="detail-label">客户端标识</span><span>{{ profileDialog.record.clientId || '-' }}</span></div>
+        <div class="detail-row"><span class="detail-label">IP 摘要</span><span>{{ profileDialog.record.ipHash || '-' }}</span></div>
+        <div class="detail-row"><span class="detail-label">位置与环境</span><span>{{ profileDialog.record.region || '未定位' }} · {{ profileDialog.record.browser || '未知浏览器' }} · {{ profileDialog.record.os || '未知系统' }} · {{ profileDialog.record.device || '未知设备' }}</span></div>
+        <div class="detail-row"><span class="detail-label">访问统计</span><span>访问 {{ profileDialog.record.access?.visits || 0 }} 次 · 文章 {{ profileDialog.record.access?.articles || 0 }} · 风讯角 {{ profileDialog.record.access?.circle || 0 }} · 站点操作 {{ profileDialog.record.access?.operations || 0 }}</span></div>
+        <div class="detail-row"><span class="detail-label">AI 统计</span><span>体验 {{ profileDialog.record.ai?.experiences || 0 }} · 会话 {{ profileDialog.record.ai?.sessions || 0 }} · 反馈 {{ profileDialog.record.ai?.feedback || 0 }}（有帮助 {{ profileDialog.record.ai?.helpful || 0 }}）</span></div>
+        <div v-if="profileDialog.record.ai?.feedbackItems?.length" class="detail-row detail-row-block"><span class="detail-label">AI 反馈记录</span><div class="event-list"><article v-for="item in profileDialog.record.ai.feedbackItems" :key="item.id"><span>{{ item.helpful ? '有帮助' : '没帮助' }} · {{ item.scene || '聊天' }}</span><small>{{ formatTime(item.createdAt) }}</small></article></div></div>
+      </div>
+    </a-modal>
 
     <a-modal
       v-model:open="detailDialog.open"
@@ -196,6 +204,10 @@
       </div>
     </a-modal>
 
+    <a-modal v-model:open="sessionDialog.open" :title="`${sessionDialog.record?.nickname || '访问者'} · AI 会话`" width="760px" :footer="null">
+      <a-spin :spinning="sessionDialog.loading"><div v-if="sessionDialog.detail?.messages?.length" class="session-messages"><article v-for="message in sessionDialog.detail.messages" :key="message.id" :class="message.role"><header><strong>{{ message.role === 'user' ? '用户' : 'AI' }}</strong><time>{{ formatTime(message.createdAt) }}</time></header><AdminMarkdown :content="message.content" /></article></div><a-empty v-else-if="!sessionDialog.loading" description="暂无 AI 会话记录" /></a-spin>
+    </a-modal>
+
     <a-modal v-model:open="rejectDialog.open" title="拒绝这条内容" width="420px" @ok="confirmReject" @cancel="rejectDialog.open = false">
       <a-textarea v-model:value="rejectDialog.reason" placeholder="请输入拒绝理由" :rows="4" />
     </a-modal>
@@ -208,7 +220,7 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 const api = useApi()
 const toast = useToast()
 const route = useRoute()
-const contentOnly = computed(() => route.path === '/admin/visitor-content' || String(route.query.section || '') === 'content')
+const contentOnly = computed(() => ['/admin/visitor-content', '/admin/visitor-messages', '/admin/visitor-bottles'].includes(route.path) || String(route.query.section || '') === 'content')
 const activeTab = ref(contentOnly.value ? 'messages' : 'profiles')
 const loadingStats = ref(false)
 const stats = reactive({ visitors: 0, todayVisitors: 0, visits: 0, messages: 0, bottles: 0, pendingMessages: 0, pendingBottles: 0, identity: {}, contentReads: {}, ai: {} } as any)
@@ -237,14 +249,19 @@ const profilePagination = reactive({ current: 1, pageSize: 10, total: 0, showSiz
 const profileColumns = [
   { title: '昵称', key: 'nickname', width: 160 },
   { title: '地区', key: 'region', width: 130 },
+  { title: '访问环境', key: 'environment', minWidth: 220 },
   { title: '访问与行为', key: 'counts', minWidth: 360 },
   { title: '成就', key: 'achievements', width: 90 },
   { title: '最近到访', key: 'lastSeen', width: 230 },
+  { title: 'AI 会话', key: 'session', width: 100, fixed: 'right' as const },
+  { title: '档案', key: 'profileDetail', width: 76, fixed: 'right' as const },
 ]
 function resetProfileFilters() { Object.assign(profileFilter, { keyword: '', type: '' }); void loadProfiles(1) }
 
 const rejectDialog = reactive({ open: false, record: null as any, reason: '' })
 const detailDialog = reactive({ open: false, record: null as any })
+const sessionDialog = reactive<any>({ open: false, loading: false, record: null, detail: null })
+const profileDialog = reactive<any>({ open: false, record: null })
 
 onMounted(() => {
   void loadStats()
@@ -278,6 +295,14 @@ function identityColor(identity?: string) {
 function openDetail(record: any) {
   detailDialog.record = record
   detailDialog.open = true
+}
+function openProfileDetail(record: any) { profileDialog.record = record; profileDialog.open = true }
+async function openSession(record: any) {
+  if (!record.conversationId) return
+  Object.assign(sessionDialog, { open: true, loading: true, record, detail: null })
+  try { sessionDialog.detail = await api.get(`/ai/admin/conversations/${encodeURIComponent(record.conversationId)}`, { page: 1, pageSize: 100 }) }
+  catch (error: any) { toast.error(error?.message || '会话加载失败') }
+  finally { sessionDialog.loading = false }
 }
 function formatTime(value?: string) {
   return value ? String(value).slice(0, 16).replace('T', ' ') : ''
@@ -444,6 +469,11 @@ function handleProfileChange(pag: any) {
 .chain-list strong { color: var(--c-text-2); font-size: .68rem; }
 .chain-list p { margin: 3px 0; color: var(--c-text); font-size: .76rem; line-height: 1.6; white-space: pre-wrap; }
 .chain-list small { color: var(--c-text-4); font-size: .58rem; }
+.session-messages { display:grid; gap:10px; max-height:58vh; overflow:auto; }
+.session-messages article { max-width:88%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--c-bg-1); }
+.session-messages article.user { margin-left:auto; background:var(--c-primary-soft); }
+.session-messages header { display:flex; justify-content:space-between; gap:12px; margin-bottom:6px; font-size:.65rem; }
+.session-messages time { color:var(--c-text-3); }
 
 @media (max-width: 900px) {
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

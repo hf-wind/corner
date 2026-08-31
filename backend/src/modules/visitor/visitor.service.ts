@@ -1476,13 +1476,10 @@ export class VisitorService {
         : [],
       hashes.length
         ? this.prisma.visitorVisit.findMany({
-            where: {
-              visitorIdHash: { in: hashes },
-              region: { not: null },
-            },
+            where: { visitorIdHash: { in: hashes } },
             orderBy: { createdAt: 'desc' },
             take: 100,
-            select: { visitorIdHash: true, region: true },
+            select: { visitorIdHash: true, region: true, browser: true, os: true, device: true },
           })
         : [],
       hashes.length && (this.prisma as any).visitorEvent?.findMany
@@ -1493,8 +1490,8 @@ export class VisitorService {
         : [],
       hashes.length && (this.prisma as any).aiInteraction?.findMany
         ? (this.prisma as any).aiInteraction.findMany({
-            where: { guestIdHash: { in: hashes } },
-            select: { guestIdHash: true, action: true, helpful: true },
+            where: { OR: [{ guestIdHash: { in: hashes } }, ...(userIds.length ? [{ userId: { in: userIds } }] : [])] },
+            select: { id: true, userId: true, guestIdHash: true, action: true, helpful: true, scene: true, createdAt: true },
           })
         : [],
     ]);
@@ -1507,8 +1504,11 @@ export class VisitorService {
     const caughtMap = countBy(caughtCounts, catchGroupKey);
     const achMap = countBy(achievementCounts, 'visitorIdHash');
     const accountMap = new Map(users.map((user) => [user.id, user]));
+    const hashByUserId = new Map(items.filter((item) => item.userId).map((item) => [item.userId as string, item.visitorIdHash]));
     const regionByHash = new Map<string, string>();
+    const latestVisitByHash = new Map<string, { browser?: string | null; os?: string | null; device?: string | null }>();
     for (const visit of visits) {
+      if (!latestVisitByHash.has(visit.visitorIdHash)) latestVisitByHash.set(visit.visitorIdHash, visit);
       if (visit.region && !regionByHash.has(visit.visitorIdHash)) {
         regionByHash.set(visit.visitorIdHash, visit.region);
       }
@@ -1523,17 +1523,25 @@ export class VisitorService {
       accessByHash.set(event.visitorIdHash, current);
     }
     const aiByHash = new Map<string, { experiences: number; sessions: number; feedback: number; helpful: number }>();
+    const feedbackByHash = new Map<string, Array<Record<string, unknown>>>();
     for (const interaction of aiInteractions) {
-      if (!interaction.guestIdHash) continue;
-      const current = aiByHash.get(interaction.guestIdHash) || { experiences: 0, sessions: 0, feedback: 0, helpful: 0 };
+      const hash = interaction.guestIdHash || (interaction.userId ? hashByUserId.get(interaction.userId) : null);
+      if (!hash) continue;
+      const current = aiByHash.get(hash) || { experiences: 0, sessions: 0, feedback: 0, helpful: 0 };
       current.experiences += 1;
       if (interaction.action === 'chat') current.sessions += 1;
       if (interaction.helpful !== null) { current.feedback += 1; if (interaction.helpful) current.helpful += 1; }
-      aiByHash.set(interaction.guestIdHash, current);
+      if (interaction.helpful !== null) {
+        const entries = feedbackByHash.get(hash) || [];
+        entries.push({ id: interaction.id, helpful: interaction.helpful, scene: interaction.scene, createdAt: interaction.createdAt });
+        feedbackByHash.set(hash, entries.slice(-20));
+      }
+      aiByHash.set(hash, current);
     }
     return {
       items: items.map((p) => ({
         id: p.id,
+        conversationId: p.userId ? p.userId : `guest:${p.visitorIdHash}`,
         nickname: p.nickname,
         userId: p.userId,
         account: p.userId ? (accountMap.get(p.userId) ?? null) : null,
@@ -1543,6 +1551,11 @@ export class VisitorService {
             ? 'anonymous'
             : 'registered',
         region: regionByHash.get(p.visitorIdHash) ?? null,
+        browser: latestVisitByHash.get(p.visitorIdHash)?.browser ?? null,
+        os: latestVisitByHash.get(p.visitorIdHash)?.os ?? null,
+        device: latestVisitByHash.get(p.visitorIdHash)?.device ?? null,
+        clientId: p.visitorIdHash.slice(0, 12),
+        ipHash: p.ipHash ? `${p.ipHash.slice(0, 12)}…` : null,
         isBanned: p.isBanned,
         visitCount: p.visitCount,
         messageCount: messageMap.get(p.visitorIdHash) ?? 0,
@@ -1550,7 +1563,7 @@ export class VisitorService {
         caughtCount: caughtMap.get(p.visitorIdHash) ?? 0,
         achievementCount: achMap.get(p.visitorIdHash) ?? 0,
         access: accessByHash.get(p.visitorIdHash) || { visits: 0, articles: 0, circle: 0, operations: 0 },
-        ai: aiByHash.get(p.visitorIdHash) || { experiences: 0, sessions: 0, feedback: 0, helpful: 0 },
+        ai: { ...(aiByHash.get(p.visitorIdHash) || { experiences: 0, sessions: 0, feedback: 0, helpful: 0 }), feedbackItems: feedbackByHash.get(p.visitorIdHash) || [] },
         firstSeenAt: p.firstSeenAt,
         lastSeenAt: p.lastSeenAt,
       })),

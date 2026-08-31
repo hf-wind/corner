@@ -16,7 +16,6 @@ export const fontPresetOptions: FontPresetOption[] = [
   { id: 'wenkai', label: '霞鹜文楷', short: '楷' },
 ]
 
-const FONT_STORAGE_KEY = 'font-preset'
 const WENKAI_STYLESHEET_ID = 'font-wenkai-stylesheet'
 
 export function useTypography() {
@@ -39,12 +38,12 @@ export function useTypography() {
 
   function setFontPreset(preset: FontPresetId) {
     fontPreset.value = preset
-    localStorage.setItem(FONT_STORAGE_KEY, preset)
+    useClientState().set('site', 'fontPreset', preset)
     applyFont(preset)
   }
 
   function init() {
-    const saved = localStorage.getItem(FONT_STORAGE_KEY)
+    const saved = String(useClientState().get('site', 'fontPreset', ''))
     fontPreset.value = isFontPreset(saved) ? saved : 'system-rounded'
     applyFont(fontPreset.value)
   }

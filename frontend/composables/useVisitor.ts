@@ -4,10 +4,16 @@ let activeVisit: Promise<any> | null = null;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingEvents: any[] = [];
 let flushing: Promise<any> | null = null;
+let pendingHydrated = false;
 
 export function useVisitor() {
   const api = useApi();
   const state = useClientState();
+  if (!pendingHydrated) {
+    const stored = state.getSession('pendingVisitorEvents', []);
+    if (Array.isArray(stored)) pendingEvents.push(...stored.slice(-100));
+    pendingHydrated = true;
+  }
 
   const nickname = ref(
     String(state.get('visitor', 'nickname', '')),
@@ -47,22 +53,16 @@ export function useVisitor() {
     const identity = authToken ? 'user' : (nickname.value.trim() ? 'registered' : 'anonymous');
     const trackedIdentity = String(state.getSession('visitTrackedIdentity', ''));
     if (trackedIdentity === identity) return { ok: true, deduped: true };
-    if (activeVisit) return activeVisit;
-    const visit = api.post<any>("/visitor/track").catch(() => null);
-    activeVisit = visit;
-    try {
-      const result = await visit;
-      if (result?.ok !== false) state.setSession('visitTrackedIdentity', identity);
-      return result;
-    } finally {
-      if (activeVisit === visit) activeVisit = null;
-    }
+    queueEvent({ action: 'session_start', path: location.pathname, contentType: 'page' });
+    state.setSession('visitTrackedIdentity', identity);
+    return flushEvents();
   };
 
   const queueEvent = (event: Record<string, unknown>) => {
     if (typeof window === 'undefined' || !visitorId()) return;
     const authToken = String(state.get('auth', 'token', ''));
     pendingEvents.push({ ...event, identity: event.identity || (authToken ? 'user' : nickname.value.trim() ? 'registered' : 'anonymous'), at: new Date().toISOString(), sessionId: state.getSession('id', '') });
+    state.setSession('pendingVisitorEvents', pendingEvents.slice(-100));
     if (pendingEvents.length >= 20) void flushEvents();
     else if (!flushTimer) flushTimer = setTimeout(() => void flushEvents(), 5 * 60 * 1000);
   };
@@ -71,7 +71,8 @@ export function useVisitor() {
     const batch = pendingEvents.splice(0);
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     flushing = api.post<any>('/visitor/track/batch', { events: batch }, keepalive ? { keepalive } as any : undefined)
-      .catch(() => { pendingEvents.unshift(...batch); return null; })
+      .catch(() => { pendingEvents.unshift(...batch); state.setSession('pendingVisitorEvents', pendingEvents.slice(-100)); return null; })
+      .then((result) => { state.setSession('pendingVisitorEvents', pendingEvents.slice(-100)); return result; })
       .finally(() => { flushing = null; });
     return flushing;
   };

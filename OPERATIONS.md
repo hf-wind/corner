@@ -58,6 +58,7 @@ callback 使用浏览器当前 origin 动态生成。生产从 `https://corner.i
 
 ```bash
 chmod 600 .env
+bash ./scripts/export-git-log.sh
 docker compose config --quiet
 docker compose up -d --build --wait
 ```

@@ -139,7 +139,7 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
-const tab = ref('templates')
+const tab = ref('logs')
 const loading = ref(false)
 const logs = ref<any[]>([])
 const filterType = ref<string | undefined>(undefined)

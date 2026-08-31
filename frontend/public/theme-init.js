@@ -2,11 +2,13 @@
   try {
     var root = document.documentElement;
     root.classList.add("no-transition");
-    root.dataset.font = localStorage.getItem("font-preset") || "ayuan";
+    var site = {};
+    try { site = JSON.parse(localStorage.getItem("corner:site") || "{}"); } catch (_) { site = {}; }
+    root.dataset.font = site.fontPreset || localStorage.getItem("font-preset") || "ayuan";
 
     var theme = "auto";
     try {
-      var site = JSON.parse(localStorage.getItem("corner:site") || "{}");
+      site = JSON.parse(localStorage.getItem("corner:site") || "{}");
       theme = site.theme || localStorage.getItem("theme") || "auto";
     } catch (_) { theme = localStorage.getItem("theme") || "auto"; }
     var dark =

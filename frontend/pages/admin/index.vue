@@ -139,8 +139,8 @@ const reviewRows = computed(() => [
   { label: '文章评论', value: data.pending.articleComments, icon: 'ph:article-bold', to: '/admin/comments' },
   { label: '瞬间评论', value: data.pending.momentComments, icon: 'ph:sparkle-bold', to: '/admin/comments?section=moment' },
   { label: '友链申请', value: data.pending.friendApplications, icon: 'ph:handshake-bold', to: '/admin/comments?section=applications' },
-  { label: '访客留言', value: data.pending.messages, icon: 'ph:note-pencil-bold', to: '/admin/visitor' },
-  { label: '漂流瓶', value: data.pending.bottles, icon: 'solar:bottle-outline', to: '/admin/visitor' },
+  { label: '访客留言', value: data.pending.messages, icon: 'ph:note-pencil-bold', to: '/admin/visitor-messages' },
+  { label: '漂流瓶', value: data.pending.bottles, icon: 'solar:bottle-outline', to: '/admin/visitor-bottles' },
 ])
 const quickActions = [{ to: '/admin/moments/create', icon: 'ph:sparkle-bold', label: '写瞬间', note: '记录此刻' }, { to: '/admin/media', icon: 'ph:image-square-bold', label: '媒体库', note: '整理素材' }, { to: '/admin/library/create', icon: 'ph:books-bold', label: '记书影', note: '添加收藏' }, { to: '/admin/settings', icon: 'ph:sliders-horizontal-bold', label: '站点设置', note: '检查配置' }]
 

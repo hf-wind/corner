@@ -14,6 +14,10 @@ project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 backup_dir="$(cd "$1" && pwd)"
 cd "$project_dir"
 
+# A restore may need to recreate the backend image. Keep the same Git-history
+# artifact contract as the normal deployment path.
+bash ./scripts/export-git-log.sh
+
 if [[ ! -f .env ]]; then
   echo "Missing $project_dir/.env" >&2
   exit 1

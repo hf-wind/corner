@@ -7,7 +7,6 @@
       <a-tab-pane key="style" tab="站点文风" />
       <a-tab-pane key="chat" tab="聊天助手" />
       <a-tab-pane key="moderation" tab="审核" />
-      <a-tab-pane key="chats" tab="会话管理" />
     </a-tabs>
 
     <div class="page-actions">
@@ -967,10 +966,6 @@
       </a-spin>
     </div>
 
-    <div v-show="tab === 'chats'" class="tab-body chats-tab">
-      <AdminAiUsage />
-    </div>
-
     <a-modal
       v-model:open="modelDialog.open"
       :title="modelDialog.id ? '编辑模型配置' : '新增模型配置'"
@@ -1062,7 +1057,7 @@ const router = useRouter();
 const api = useApi();
 const toast = useToast();
 
-const validTabs = new Set(["base", "content", "style", "chat", "moderation", "chats"]);
+const validTabs = new Set(["base", "content", "style", "chat", "moderation"]);
 const tab = ref(validTabs.has(String(route.query.tab)) ? String(route.query.tab) : "base");
 watch(tab, (value) => {
   const query = { ...route.query };

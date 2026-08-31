@@ -390,7 +390,7 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       return { groups, status: 'fallback', label: 'Git 提交流' };
     } catch (error) {
       this.logger.warn(`Git 提交流不可用: ${this.errorMessage(error)}`);
-      return { groups: [], status: 'unavailable', label: '暂未连接代码仓库' };
+      return { groups: [], status: 'unavailable', label: '无法获取 Git 提交记录' };
     }
   }
 
@@ -438,11 +438,30 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
 
   private async readRuntimeLog() {
     try {
-      const content = await readFile('/app/.runtime-git-log', 'utf8');
-      return content.split(/\r?\n/).map(line => {
-        const [sha = '', publishedAt = '', author = '', ...message] = line.split('\t');
-        return { sha, publishedAt, author, original: message.join('\t') };
-      }).filter(commit => commit.sha && commit.original);
+      const candidates = Array.from(
+        new Set(['/app/.runtime-git-log', `${process.cwd()}/.runtime-git-log`]),
+      );
+      let content = '';
+      for (const file of candidates) {
+        try {
+          content = await readFile(file, 'utf8');
+          if (content.trim()) break;
+        } catch {
+          // Try the next known runtime location.
+        }
+      }
+      if (!content.trim()) return [];
+      return content
+        .split(/\r?\n/)
+        .map((line) => {
+          const [sha = '', publishedAt = '', author = '', ...message] =
+            line.split('\t');
+          return { sha, publishedAt, author, original: message.join('\t') };
+        })
+        .filter(
+          (commit) =>
+            /^[0-9a-f]{40}$/i.test(commit.sha) && Boolean(commit.original),
+        );
     } catch {
       return [];
     }
