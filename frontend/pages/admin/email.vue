@@ -1,14 +1,14 @@
 <template>
   <div class="email-logs-page admin-page-shell">
-    <header class="admin-page-head"><div><span>COMMUNICATION</span><h1>邮件功能</h1><p>管理投递记录、订阅周报和邮件模板。</p></div><AdminRefreshButton :loading="tab === 'templates' ? templatesLoading : loading" @click="tab === 'templates' ? loadTemplates() : loadLogs()" /></header>
+    <header class="admin-page-head"><div><span>COMMUNICATION</span><h1>邮件功能</h1><p>管理投递记录、订阅周报和邮件模板。</p></div><AdminRefreshButton :loading="tab === 'templates' ? templatesLoading : loading" @click="tab === 'templates' ? loadTemplates() : tab === 'newsletter' ? newsletterRef?.loadAll() : loadLogs()" /></header>
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="logs" tab="发送记录" />
       <a-tab-pane key="newsletter" tab="订阅周报" />
       <a-tab-pane key="templates" tab="邮件模板" />
     </a-tabs>
 
-    <section v-show="tab === 'newsletter'" class="newsletter-link-panel">
-      <Icon name="ph:newspaper-bold" /><div><h2>订阅周报</h2><p>订阅名单与发送计划已集中到周报模块。</p></div><a-button type="primary" @click="navigateTo('/admin/newsletter')"><Icon name="ph:arrow-square-out-bold" /> 打开周报</a-button>
+    <section v-if="tab === 'newsletter'" class="newsletter-tab">
+      <NewsletterAdmin ref="newsletterRef" :embedded="true" />
     </section>
 
     <section v-show="tab === 'templates'" class="template-workspace">
@@ -135,11 +135,17 @@
 
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
+import { defineAsyncComponent } from 'vue'
 definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
-const tab = ref('logs')
+const route = useRoute()
+const NewsletterAdmin = defineAsyncComponent(() => import('./newsletter.vue'))
+const newsletterRef = ref<{ loadAll: () => void } | null>(null)
+const allowedTabs = ['logs', 'newsletter', 'templates']
+const requestedTab = String(route.query.tab || '')
+const tab = ref(allowedTabs.includes(requestedTab) ? requestedTab : 'logs')
 const loading = ref(false)
 const logs = ref<any[]>([])
 const filterType = ref<string | undefined>(undefined)
@@ -386,9 +392,7 @@ function stripHtml(html: string) {
 .email-logs-page {
   padding: 0;
 }
-.newsletter-link-panel{display:flex;min-height:112px;align-items:center;gap:14px;margin-bottom:14px;padding:20px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}
-.newsletter-link-panel>svg{flex:0 0 auto;width:34px;height:34px;padding:8px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary)}
-.newsletter-link-panel>div{min-width:0;flex:1}.newsletter-link-panel h2{margin:0;color:var(--c-text);font-size:.9rem}.newsletter-link-panel p{margin:5px 0 0;color:var(--c-text-3);font-size:.64rem}
+.newsletter-tab{min-width:0}
 .email-preview-modal :deep(.ant-modal-body) { overflow: hidden; padding: 0 20px 20px; }
 .email-preview-stage { height: calc(100dvh - 190px); min-height: 480px; }
 .template-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);height:min(680px,calc(100dvh - 170px));min-height:420px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.template-list{display:flex;min-height:0;flex-direction:column;gap:3px;overflow-y:auto;padding:8px;border-right:1px solid var(--border);background:var(--c-bg-1)}.template-list button{display:grid;grid-template-columns:32px minmax(0,1fr) 58px;align-items:center;gap:9px;padding:10px;border:0;border-radius:7px;background:transparent;color:var(--c-text);cursor:pointer;text-align:left;min-width:0}.template-list button:hover,.template-list button.active{background:var(--ld-bg-card)}.template-list button.active{box-shadow:0 1px 4px var(--ld-shadow)}.template-list button>span{display:grid;width:30px;height:30px;line-height:30px;border-radius:7px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.template-list button>div{min-width:0}.template-list strong,.template-list small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.template-list strong{font-size:.64rem}.template-list small{margin-top:3px;color:var(--c-text-3);font-size:.5rem;line-height:1.4}.template-list :deep(.ant-tag){display:block;max-width:58px;width:58px;margin:0;padding-inline:4px;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.template-editor-spin{min-width:0;min-height:0;overflow:hidden}.template-editor{display:flex;min-width:0;height:100%;flex-direction:column;gap:14px;overflow-y:auto;padding:18px}.editor-header{position:sticky;z-index:4;top:-18px;margin:-18px -18px 0;padding:18px;border-bottom:1px solid var(--border);background:var(--ld-bg-card)}.editor-header,.editor-header-actions{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.editor-header-actions{align-items:center;justify-content:flex-end;flex-wrap:wrap}.template-editor h2{margin:0;font-size:.86rem}.template-editor header p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem}.template-editor>label>span,.html-template-section>header>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.62rem}.html-template-section>header{display:flex;align-items:center;justify-content:space-between}.html-template-section>header .ant-btn{padding-inline:4px;color:var(--c-primary);font-size:.6rem}.html-template-collapsed{display:flex;min-height:52px;align-items:center;gap:8px;padding:12px;border:1px dashed var(--border);border-radius:7px;background:var(--c-bg-1);color:var(--c-text-3);font-size:.6rem}.html-template-collapsed :deep(svg){color:var(--c-primary)}.html-template-collapsed small{margin-left:auto;color:var(--c-text-3);font-family:var(--font-mono);font-size:.52rem}.html-editor :deep(textarea){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}.variables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:12px;border-radius:7px;background:var(--c-bg-1)}.variables>span,.variables>p,.variables>em{grid-column:1/-1}.variables>span{color:var(--c-text-2);font-size:.65rem;font-weight:700}.variables>p,.variables>em{margin:0;color:var(--c-text-3);font-size:.56rem;font-style:normal}.variables button{display:flex;min-width:0;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--ld-bg-card);color:var(--c-primary);cursor:pointer;text-align:left}.variables button:disabled{cursor:not-allowed;opacity:.55}.variables button code{flex:0 0 auto;font:10px/1.2 ui-monospace,monospace}.variables button small{min-width:0;color:var(--c-text-3);font-size:.52rem}.email-preview{display:block;width:100%;height:100%;border:1px solid var(--border);border-radius:8px;background:#fff}.email-preview-stage{display:flex;height:calc(84dvh - 120px);min-height:320px;flex-direction:column;overflow:hidden;border-radius:8px}.email-preview-loading{display:grid;min-height:280px;color:var(--c-text-3);font-size:.78rem;gap:10px;place-items:center}.email-preview-loading .spinning{animation:email-spin 1s linear infinite;font-size:1.4rem}@keyframes email-spin{to{transform:rotate(360deg)}}
@@ -443,7 +447,6 @@ function stripHtml(html: string) {
 .email-logs-page :deep(.ant-table-cell) { vertical-align: middle; }
 .email-logs-page :deep(.ant-table-cell .ant-tag) { display: inline-flex; max-width: 100%; margin-inline-end: 0; white-space: nowrap; }
 .subject-text { display: block; overflow: hidden; color: var(--c-text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-@media(max-width:640px){.newsletter-link-panel{align-items:flex-start;flex-wrap:wrap}.newsletter-link-panel>div{flex-basis:calc(100% - 50px)}.newsletter-link-panel>.ant-btn{width:100%;margin-left:48px}}
 
 .error-text {
   color: #ef4444;

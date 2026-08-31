@@ -197,5 +197,6 @@ useHead({ title: '时光星图' })
 @media(max-width:700px){.scene-settings-grid,.planet-settings-grid{grid-template-columns:1fr}.planet-settings-grid article{grid-template-columns:1fr}.planet-settings-grid article header,.planet-settings-grid label.wide{grid-column:auto}}
 @media(max-width:620px) { .page-header { align-items:flex-start; flex-direction:column; }.automation-card { grid-template-columns:48px 1fr; }.sync-time { grid-column:1/-1; }.metrics { grid-template-columns:1fr 1fr; }.recovery-panel>div { align-items:flex-start; flex-direction:column; } }
 @media(prefers-reduced-motion:reduce) { .automation-card::after { animation:none; } }
-.automation-card { min-height:128px; padding:20px; }
+.automation-card { min-height:132px; padding:20px; }
+@media(max-width:620px) { .automation-card { min-height:156px; grid-template-columns:48px minmax(0,1fr); align-items:start; } .automation-card p { max-width:none; } }
 </style>

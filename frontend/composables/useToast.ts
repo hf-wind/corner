@@ -8,6 +8,8 @@ export interface ToastItem {
 }
 
 let counter = 0
+const timers = new Map<number, ReturnType<typeof setTimeout>>()
+const removalTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
 export function useToast() {
   const toasts = useState<ToastItem[]>('global-toasts', () => [])
@@ -20,18 +22,23 @@ export function useToast() {
       const t = toasts.value.find(t => t.id === id)
       if (t) t.visible = true
     })
-    if (duration > 0) {
-      setTimeout(() => dismiss(id), duration)
-    }
+    if (duration > 0) timers.set(id, setTimeout(() => dismiss(id), duration))
     return id
   }
 
   function dismiss(id: number) {
+    const timer = timers.get(id)
+    if (timer) clearTimeout(timer)
+    timers.delete(id)
+    const previousRemoval = removalTimers.get(id)
+    if (previousRemoval) clearTimeout(previousRemoval)
     const t = toasts.value.find(t => t.id === id)
     if (t) t.visible = false
-    setTimeout(() => {
+    const removal = setTimeout(() => {
       toasts.value = toasts.value.filter(t => t.id !== id)
-    }, 250)
+      removalTimers.delete(id)
+    }, 260)
+    removalTimers.set(id, removal)
   }
 
   return {

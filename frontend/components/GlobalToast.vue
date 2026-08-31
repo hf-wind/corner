@@ -8,8 +8,6 @@
           :key="t.id"
           class="toast-item"
           :class="[`toast-${t.type}`, { 'toast-visible': t.visible }]"
-          @mouseenter="pauseAuto(t.id)"
-          @mouseleave="resumeAuto(t.id)"
         >
           <div class="toast-icon">
             <Icon v-if="t.type === 'success'" name="ph:check-circle" weight="fill" />
@@ -30,7 +28,6 @@
 <script setup lang="ts">
 const { toasts, dismiss } = useToast()
 
-const timers = new Map<number, ReturnType<typeof setTimeout>>()
 const signalActive = ref(false)
 const signalType = ref<ToastItem['type']>('info')
 let signalTimer: ReturnType<typeof setTimeout> | null = null
@@ -55,18 +52,6 @@ function pulsePageFeedback(type: ToastItem['type']) {
   feedbackTimer = setTimeout(clearPageFeedback, 900)
 }
 
-function pauseAuto(id: number) {
-  const timer = timers.get(id)
-  if (timer) clearTimeout(timer)
-}
-
-function resumeAuto(id: number) {
-  const t = toasts.value.find(t => t.id === id)
-  if (t && t.visible) {
-    timers.set(id, setTimeout(() => dismiss(id), 2000))
-  }
-}
-
 watch(() => toasts.value.map(t => t.id).join(','), () => {
   const latest = toasts.value[toasts.value.length - 1]
   if (latest) pulsePageFeedback(latest.type)
@@ -76,18 +61,12 @@ watch(() => toasts.value.map(t => t.id).join(','), () => {
     if (signalTimer) clearTimeout(signalTimer)
     signalTimer = setTimeout(() => { signalActive.value = false }, 900)
   })
-  toasts.value.forEach(t => {
-    if (!timers.has(t.id) && t.visible) {
-      timers.set(t.id, setTimeout(() => dismiss(t.id), 3000))
-    }
-  })
 })
 
 onUnmounted(() => {
   if (signalTimer) clearTimeout(signalTimer)
   if (feedbackTimer) clearTimeout(feedbackTimer)
   clearPageFeedback()
-  timers.forEach(timer => clearTimeout(timer))
 })
 </script>
 
@@ -110,10 +89,6 @@ onUnmounted(() => {
   box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--c-primary) 0%, transparent);
   opacity: 0;
   pointer-events: none;
-}
-
-.toast-signal.active {
-  animation: toast-edge-signal 0.9s ease-out both;
 }
 
 .toast-signal.toast-signal-success {
@@ -164,18 +139,6 @@ onUnmounted(() => {
     transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.toast-item::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  background: color-mix(in srgb, var(--toast-accent) 72%, transparent);
-  content: "";
-  transform-origin: left;
-  animation: toast-progress 3s linear both;
-}
-
 .toast-item.toast-visible {
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -216,17 +179,6 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
-@keyframes toast-edge-signal {
-  0% { opacity: 0; border-color: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); }
-  22% { opacity: 1; border-color: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 38%, transparent); box-shadow: inset 0 0 28px color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 5%, transparent); }
-  100% { opacity: 0; border-color: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 0%, transparent); }
-}
-
-@keyframes toast-progress {
-  from { transform: scaleX(1); }
-  to { transform: scaleX(0); }
-}
-
 .toast-close {
   flex-shrink: 0;
   display: flex;
@@ -263,4 +215,15 @@ html.toast-feedback-success body,
 html.toast-feedback-error body,
 html.toast-feedback-warning body,
 html.toast-feedback-info body { transition: background-color 0.45s ease; }
+</style>
+
+<style>
+.toast-container { z-index: 12000; }
+.toast-signal { z-index: 11999; inset: auto; top: max(14px, env(safe-area-inset-top)); left: 50%; width: min(360px, calc(100vw - 28px)); height: 72px; transform: translateX(-50%); border: 0; border-radius: 18px; opacity: 0; background: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 5%, transparent); filter: blur(8px); backdrop-filter: blur(12px) saturate(1.08); }
+.toast-signal.active { animation: toast-soft-focus .72s cubic-bezier(.22,1,.36,1) both; }
+.toast-item::after { display: none; }
+.toast-item::before { position: absolute; inset: -30% 18% auto; height: 75%; border-radius: 50%; background: color-mix(in srgb, var(--toast-accent) 9%, transparent); content: ''; filter: blur(14px); opacity: 0; pointer-events: none; transform: translate3d(0, 8px, 0); }
+.toast-item.toast-visible::before { animation: toast-sheen .78s cubic-bezier(.22,1,.36,1) both; }
+@keyframes toast-soft-focus { 0% { opacity: 0; transform: translateX(-50%) scale(.94); } 34% { opacity: .72; transform: translateX(-50%) scale(1.01); } 100% { opacity: 0; transform: translateX(-50%) scale(1.04); } }
+@keyframes toast-sheen { 0% { opacity: 0; transform: translate3d(0, 8px, 0) scale(.84); } 35% { opacity: .9; transform: translate3d(0, 0, 0) scale(1); } 100% { opacity: 0; transform: translate3d(0, -6px, 0) scale(1.06); } }
 </style>

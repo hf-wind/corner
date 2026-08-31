@@ -1,7 +1,7 @@
 <template>
   <div class="visitor-admin admin-page-shell">
     <header class="admin-page-head">
-      <div><span>{{ contentOnly ? 'CONTENT MANAGEMENT' : 'ACCESS MANAGEMENT' }}</span><h1>{{ contentOnly ? '留言与漂流瓶' : '访问管理' }}</h1><p>{{ contentOnly ? '独立管理留言和漂流瓶内容，不混入访问身份统计。' : '沿未登记访客、登记访客与登录用户链路查看访问和操作。' }}</p></div>
+      <div><span>{{ contentOnly ? 'CONTENT MANAGEMENT' : 'ACCESS MANAGEMENT' }}</span><h1>{{ contentOnly ? contentTitle : '访问管理' }}</h1><p>{{ contentOnly ? `${contentTitle}独立审核与追溯，不混入访问身份统计。` : '沿未登记访客、登记访客与登录用户链路查看访问和操作。' }}</p></div>
       <AdminRefreshButton :loading="loadingStats" @click="loadStats" />
     </header>
 
@@ -28,9 +28,9 @@
     </div>
 
     <a-tabs v-model:active-key="activeTab" class="visitor-tabs">
+      <a-tab-pane v-if="isAccessPage" key="profiles" tab="身份档案" />
       <a-tab-pane v-if="contentOnly" key="messages" :tab="`留言${stats.pendingMessages ? `（${stats.pendingMessages} 待审）` : ''}`" />
       <a-tab-pane v-if="contentOnly" key="bottles" :tab="`漂流瓶${stats.pendingBottles ? `（${stats.pendingBottles} 待审）` : ''}`" />
-      <a-tab-pane v-if="!contentOnly" key="profiles" tab="身份档案" />
     </a-tabs>
 
     <div v-if="activeTab === 'messages' || activeTab === 'bottles'" class="message-review-pane">
@@ -38,7 +38,7 @@
             <a-input v-model:value="msgFilter.keyword" allow-clear placeholder="搜索内容、署名或账号" class="message-search" @press-enter="loadMessages(1)">
               <template #prefix><Icon name="ph:magnifying-glass" /></template>
             </a-input>
-            <a-select v-model:value="msgFilter.type" style="width: 130px">
+            <a-select v-if="!contentOnly" v-model:value="msgFilter.type" style="width: 130px">
               <a-select-option value="">全部类型</a-select-option>
               <a-select-option value="message">留言</a-select-option>
               <a-select-option value="bottle">漂流瓶</a-select-option>
@@ -204,8 +204,9 @@
       </div>
     </a-modal>
 
-    <a-modal v-model:open="sessionDialog.open" :title="`${sessionDialog.record?.nickname || '访问者'} · AI 会话`" width="760px" :footer="null">
-      <a-spin :spinning="sessionDialog.loading"><div v-if="sessionDialog.detail?.messages?.length" class="session-messages"><article v-for="message in sessionDialog.detail.messages" :key="message.id" :class="message.role"><header><strong>{{ message.role === 'user' ? '用户' : 'AI' }}</strong><time>{{ formatTime(message.createdAt) }}</time></header><AdminMarkdown :content="message.content" /></article></div><a-empty v-else-if="!sessionDialog.loading" description="暂无 AI 会话记录" /></a-spin>
+    <a-modal v-model:open="sessionDialog.open" width="100vw" wrap-class-name="session-modal" :footer="null" centered>
+      <template #title><div class="session-title"><span class="session-title-icon"><Icon name="ph:chat-circle-text-bold" /></span><div><strong>{{ sessionDialog.record?.nickname || '未登记访客' }} · AI 会话</strong><small>{{ identityText(sessionDialog.record?.identity) }} · {{ sessionDialog.record?.region || '未定位' }} · {{ sessionDialog.record?.conversationId || '暂无会话标识' }}</small></div></div></template>
+      <a-spin :spinning="sessionDialog.loading"><div v-if="sessionDialog.detail?.messages?.length" class="session-viewer"><div class="session-summary"><span><Icon name="ph:clock-bold" /> {{ sessionDialog.detail.messages.length }} 条消息</span><span><Icon name="ph:calendar-blank-bold" /> 最近 {{ formatTime(sessionDialog.detail.messages.at(-1)?.createdAt) || '未知' }}</span></div><div class="session-messages"><article v-for="message in sessionDialog.detail.messages" :key="message.id" :class="message.role"><header><span class="message-role"><Icon :name="message.role === 'user' ? 'ph:user-bold' : 'ph:sparkle-bold'" />{{ message.role === 'user' ? '访问者' : 'AI 助手' }}</span><time>{{ formatTime(message.createdAt) }}</time></header><div class="message-content"><AdminMarkdown :content="message.content" /></div></article></div></div><a-empty v-else-if="!sessionDialog.loading" description="暂无 AI 会话记录" /></a-spin>
     </a-modal>
 
     <a-modal v-model:open="rejectDialog.open" title="拒绝这条内容" width="420px" @ok="confirmReject" @cancel="rejectDialog.open = false">
@@ -220,8 +221,12 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 const api = useApi()
 const toast = useToast()
 const route = useRoute()
-const contentOnly = computed(() => ['/admin/visitor-content', '/admin/visitor-messages', '/admin/visitor-bottles'].includes(route.path) || String(route.query.section || '') === 'content')
-const activeTab = ref(contentOnly.value ? 'messages' : 'profiles')
+const isAccessPage = computed(() => route.path === '/admin/visitor' && String(route.query.section || '') !== 'content')
+const contentType = computed<'message' | 'bottle'>(() => String(route.query.tab || '') === 'bottles' ? 'bottle' : 'message')
+const contentOnly = computed(() => !isAccessPage.value)
+const contentTitle = computed(() => contentType.value === 'bottle' ? '漂流瓶管理' : '留言管理')
+const initialTab = String(route.query.tab || '')
+const activeTab = ref(isAccessPage.value ? (['messages', 'bottles'].includes(initialTab) ? initialTab : 'profiles') : (contentType.value === 'bottle' ? 'bottles' : 'messages'))
 const loadingStats = ref(false)
 const stats = reactive({ visitors: 0, todayVisitors: 0, visits: 0, messages: 0, bottles: 0, pendingMessages: 0, pendingBottles: 0, identity: {}, contentReads: {}, ai: {} } as any)
 
@@ -229,7 +234,7 @@ const pendingTotal = computed(() => stats.pendingMessages + stats.pendingBottles
 
 const loadingMsgs = ref(false)
 const messages = ref<any[]>([])
-const msgFilter = reactive({ keyword: '', type: 'message', status: '' })
+const msgFilter = reactive({ keyword: '', type: contentType.value, status: '' })
 const msgPagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: false })
 const msgColumns = [
   { title: '内容', key: 'content', minWidth: 280 },
@@ -240,7 +245,7 @@ const msgColumns = [
   { title: '时间', key: 'createdAt', width: 150 },
   { title: '操作', key: 'actions', width: 170, fixed: 'right' as const },
 ]
-function resetMessageFilters() { Object.assign(msgFilter, { keyword: '', type: activeTab.value === 'bottles' ? 'bottle' : 'message', status: '' }); void loadMessages(1) }
+function resetMessageFilters() { Object.assign(msgFilter, { keyword: '', type: contentType.value, status: '' }); void loadMessages(1) }
 
 const loadingProfiles = ref(false)
 const profiles = ref<any[]>([])
@@ -265,19 +270,24 @@ const profileDialog = reactive<any>({ open: false, record: null })
 
 onMounted(() => {
   void loadStats()
-  if (contentOnly.value) void loadMessages(1)
-  else void loadProfiles(1)
+  if (activeTab.value === 'profiles') void loadProfiles(1)
+  else void loadMessages(1)
 })
 watch(contentOnly, (onlyContent) => {
-  activeTab.value = onlyContent ? 'messages' : 'profiles'
-  if (onlyContent) void loadMessages(1)
-  else void loadProfiles(1)
+  activeTab.value = onlyContent ? (contentType.value === 'bottle' ? 'bottles' : 'messages') : (['messages', 'bottles'].includes(String(route.query.tab || '')) ? String(route.query.tab) : 'profiles')
+  if (activeTab.value === 'profiles') void loadProfiles(1)
+  else void loadMessages(1)
 })
 watch(activeTab, (key) => {
   if (key === 'messages' || key === 'bottles') {
     msgFilter.type = key === 'bottles' ? 'bottle' : 'message'
     void loadMessages(1)
   }
+})
+watch(() => route.query.tab, (value) => {
+  if (!contentOnly.value) return
+  const next = String(value || '') === 'bottles' ? 'bottles' : 'messages'
+  if (activeTab.value !== next) activeTab.value = next
 })
 
 function statusColor(status: string) {
@@ -474,6 +484,7 @@ function handleProfileChange(pag: any) {
 .session-messages article.user { margin-left:auto; background:var(--c-primary-soft); }
 .session-messages header { display:flex; justify-content:space-between; gap:12px; margin-bottom:6px; font-size:.65rem; }
 .session-messages time { color:var(--c-text-3); }
+.session-title { display:flex; align-items:center; gap:10px; min-width:0; }.session-title-icon { display:grid; width:34px; height:34px; border-radius:9px; background:var(--c-primary-soft); color:var(--c-primary); place-items:center; }.session-title div { display:flex; min-width:0; flex-direction:column; gap:3px; }.session-title strong { overflow:hidden; font-size:.82rem; text-overflow:ellipsis; white-space:nowrap; }.session-title small { overflow:hidden; color:var(--c-text-3); font-size:.58rem; text-overflow:ellipsis; white-space:nowrap; }.session-viewer { display:flex; min-height:min(72vh,720px); flex-direction:column; gap:12px; }.session-summary { display:flex; flex-wrap:wrap; gap:14px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--c-bg-1); color:var(--c-text-3); font-size:.6rem; }.session-summary span { display:flex; align-items:center; gap:5px; }.session-messages { flex:1; max-height:calc(100vh - 190px); padding:4px 8px 18px 2px; overflow:auto; overscroll-behavior:contain; }.session-messages article { max-width:min(860px,90%); padding:13px 15px; border-radius:10px; box-shadow:0 4px 18px color-mix(in srgb,var(--ld-shadow) 55%,transparent); }.message-role { display:inline-flex; align-items:center; gap:5px; color:var(--c-text-2); font-weight:650; }.message-content { color:var(--c-text-1); font-size:.72rem; line-height:1.75; }.message-content :deep(p:first-child) { margin-top:0; }.message-content :deep(p:last-child) { margin-bottom:0; }.session-modal :deep(.ant-modal) { max-width:100vw; top:0; padding-bottom:0; }.session-modal :deep(.ant-modal-content) { min-height:calc(100vh - 16px); border-radius:14px 14px 0 0; }.session-modal :deep(.ant-modal-body) { min-height:calc(100vh - 106px); padding:8px 24px 24px; }
 
 @media (max-width: 900px) {
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

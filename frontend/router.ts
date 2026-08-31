@@ -137,7 +137,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/backups",
-    component: lazyRoute(() => import("./pages/admin/backups.vue")),
+    redirect: { path: "/admin/settings", query: { tab: "backups" } },
     meta: adminMeta,
   },
   {
@@ -197,7 +197,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/info",
-    component: lazyRoute(() => import("./pages/admin/info.vue")),
+    redirect: { path: "/admin/settings", query: { tab: "system" } },
     meta: adminMeta,
   },
   {
@@ -237,7 +237,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/newsletter",
-    component: lazyRoute(() => import("./pages/admin/newsletter.vue")),
+    redirect: { path: "/admin/email", query: { tab: "newsletter" } },
     meta: adminMeta,
   },
   {
@@ -252,12 +252,12 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/visitor-messages",
-    redirect: "/admin/visitor-content",
+    redirect: { path: "/admin/visitor-content", query: { tab: "messages" } },
     meta: adminMeta,
   },
   {
     path: "/admin/visitor-bottles",
-    redirect: "/admin/visitor-content",
+    redirect: { path: "/admin/visitor-content", query: { tab: "bottles" } },
     meta: adminMeta,
   },
   {

@@ -775,11 +775,11 @@
     </div>
 
     <div v-show="tab === 'backups'" class="tab-body">
-      <component :is="BackupsPage" />
+      <component :is="BackupsPage" embedded />
     </div>
 
     <div v-show="tab === 'system'" class="tab-body">
-      <component :is="InfoPage" />
+      <component :is="InfoPage" embedded />
     </div>
   </div>
 </template>
@@ -797,7 +797,10 @@ const toast = useToast();
 const { updateSiteSetting } = useSiteSettings();
 const { openItems } = useMediaLibrary();
 const router = useRouter();
-const tab = ref("website");
+const route = useRoute();
+const settingTabs = ["website", "basic", "email", "music", "backups", "system"];
+const requestedTab = String(route.query.tab || "");
+const tab = ref(settingTabs.includes(requestedTab) ? requestedTab : "website");
 const healthLoading = ref(false);
 const websiteSaving = ref(false);
 const basicSaving = ref(false);

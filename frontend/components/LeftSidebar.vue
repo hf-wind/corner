@@ -33,10 +33,10 @@
           v-for="group in navGroups"
           :key="group.key"
           class="nav-group"
-          :class="{ 'is-open': isGroupOpen(group) }"
+          :class="{ 'is-open': isGroupOpen(group), 'single-group': group.key === 'articles' }"
         >
           <button
-            v-if="!collapsed"
+            v-if="!collapsed && group.key !== 'articles'"
             type="button"
             class="nav-group-toggle"
             :aria-expanded="isGroupOpen(group)"
@@ -238,6 +238,7 @@ const siteNav = [
   { to: "/circle", icon: "ph:wind-bold", label: "风讯角" },
   { to: "/time/map", icon: "ph:map-trifold-bold", label: "地图" },
   { to: "/time/constellation", icon: "ph:graph-bold", label: "星图" },
+  { to: "/stories", icon: "ph:path-bold", label: "故事" },
   { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
   { to: "/guestbook", icon: "ph:chat-circle-dots-bold", label: "时光留言" },
   { to: "/friends", icon: "ph:handshake-bold", label: "友链" },
@@ -265,13 +266,10 @@ const adminFullNav = [
   { to: "/admin/visitor-content", icon: "ph:chat-circle-dots-bold", label: "留言与漂流瓶" },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件功能" },
-  { to: "/admin/newsletter", icon: "ph:newspaper-bold", label: "订阅周报" },
   { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情资源" },
   { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
   { to: "/admin/changelog", icon: "ph:git-commit-bold", label: "风迹" },
   { to: "/admin/settings", icon: "ph:gear-bold", label: "站点设置" },
-  { to: "/admin/backups", icon: "ph:database-bold", label: "备份与恢复" },
-  { to: "/admin/info", icon: "ph:info-bold", label: "系统信息" },
   { to: "/admin/profile", icon: "ph:user-bold", label: "我的信息" },
   { to: "/admin/messages", icon: "ph:bell-bold", label: "我的消息" },
 ];
@@ -307,6 +305,7 @@ const expandedGroups = ref<Record<string, boolean>>({
   taxonomy: true,
   timeline: true,
   community: true,
+  "community-content": false,
   overview: true,
   content: true,
   resources: false,
@@ -357,7 +356,12 @@ const navGroups = computed<NavGroup[]>(() => {
       {
         key: "engagement",
         label: "社区与用户",
-        items: select(["/admin/comments", "/admin/users", "/admin/visitor", "/admin/visitor-content"]),
+        items: select(["/admin/comments", "/admin/users", "/admin/visitor"]),
+      },
+      {
+        key: "community-content",
+        label: "留言与漂流瓶",
+        items: select(["/admin/visitor-content"]),
       },
       {
         key: "intelligence",
@@ -369,10 +373,7 @@ const navGroups = computed<NavGroup[]>(() => {
         label: "系统与通知",
         items: select([
           "/admin/email",
-          "/admin/newsletter",
           "/admin/settings",
-          "/admin/backups",
-          "/admin/info",
           "/admin/about",
           "/admin/changelog",
         ]),
@@ -387,7 +388,7 @@ const navGroups = computed<NavGroup[]>(() => {
   const select = (paths: string[]) =>
     items.filter((item) => paths.includes(item.to));
   return [
-    { key: "articles", label: "文章", items: select(["/home"]) },
+    { key: "articles", label: "首页", items: select(["/home"]) },
     {
       key: "taxonomy",
       label: "文章索引",

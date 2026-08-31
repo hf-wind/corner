@@ -1,6 +1,6 @@
 <template>
-  <div class="newsletter-admin admin-page-shell">
-    <header class="admin-page-head"><div><span>CONTENT MANAGEMENT</span><h1>订阅周报</h1><p>管理邮件订阅者与周报发送计划。</p></div></header>
+  <div class="newsletter-admin" :class="{ 'newsletter-embedded': embedded }">
+    <header v-if="!embedded" class="admin-page-head"><div><span>CONTENT MANAGEMENT</span><h1>订阅周报</h1><p>管理邮件订阅者与周报发送计划。</p></div></header>
 
     <div class="table-toolbar newsletter-config-toolbar">
       <strong>发送计划</strong>
@@ -86,6 +86,9 @@
 
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
+
+const props = defineProps<{ embedded?: boolean }>()
+const embedded = computed(() => Boolean(props.embedded))
 
 const api = useApi()
 const toast = useToast()

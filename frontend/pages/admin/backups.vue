@@ -1,6 +1,6 @@
 <template>
-  <div class="admin-page-shell backup-page">
-    <header class="admin-page-head">
+  <div class="admin-page-shell backup-page" :class="{ embedded }">
+    <header v-if="!embedded" class="admin-page-head">
       <div>
         <span>DISASTER RECOVERY</span>
         <h1>备份与恢复</h1>
@@ -110,6 +110,7 @@
 </template>
 
 <script setup lang="ts">
+const { embedded = false } = defineProps<{ embedded?: boolean }>()
 definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
 
 const api = useApi();
@@ -239,4 +240,7 @@ useHead({ title: "备份与恢复" });
 
 <style scoped>
 .backup-page{width:min(1280px,100%);margin:0 auto}.task-status{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.status-icon{display:grid;width:36px;height:36px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.task-status.running .status-icon :deep(svg){animation:spin 1s linear infinite}.task-status.failed{border-color:color-mix(in srgb,#d95c5c 34%,var(--border))}.task-status.failed .status-icon{background:color-mix(in srgb,#d95c5c 12%,transparent);color:#d95c5c}.task-status strong{font-size:.75rem}.task-status p{margin:3px 0 0;color:var(--c-text-3);font-size:.58rem}.task-status small{color:var(--c-text-3);font-size:.56rem}.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.summary-grid article{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;padding:15px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.summary-grid article>svg{width:36px;height:36px;padding:9px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary)}.summary-grid small,.summary-grid p{color:var(--c-text-3);font-size:.54rem}.summary-grid strong{display:block;margin-top:2px;font-size:.86rem}.summary-grid p{margin:4px 0 0}.asset-section,.records-section{margin-top:12px;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.asset-section>header,.records-section>header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.asset-section header span,.records-section header span{color:var(--c-primary);font-size:.52rem;letter-spacing:.12em}.asset-section h2,.records-section h2{margin:3px 0 0;font-size:.9rem}.asset-section header small{color:var(--c-text-3);font-size:.58rem}.asset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.asset-grid article{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;border:1px solid var(--border);border-radius:7px;background:var(--c-bg-1)}.asset-state{display:grid;width:28px;height:28px;border-radius:7px;background:color-mix(in srgb,#d79d37 12%,transparent);color:#b87914;place-items:center}.asset-state.managed{background:color-mix(in srgb,#43a977 12%,transparent);color:#34875e}.asset-grid strong{display:block;font-size:.62rem}.asset-grid code{display:block;margin-top:3px;color:var(--c-text-3);font-size:.5rem;overflow:hidden;text-overflow:ellipsis}.backup-id strong{display:block;font-size:.64rem}.backup-id small,.mail-state small,.mail-state span{display:block;margin-top:3px;color:var(--c-text-3);font-size:.52rem}.mail-state strong{font-size:.6rem}.restore-fields{display:grid;gap:14px;margin-top:18px}.restore-fields label>span{display:block;margin-bottom:6px;color:var(--c-text-2);font-size:.65rem}.restore-fields label>small{display:block;margin-top:5px;color:var(--c-text-3);font-size:.56rem}.backup-detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.backup-detail>div{display:grid;gap:4px;padding:10px;border-radius:7px;background:var(--c-bg-1)}.backup-detail span{color:var(--c-text-3);font-size:.58rem}.backup-detail strong,.backup-detail code{overflow:hidden;color:var(--c-text);font-size:.65rem;text-overflow:ellipsis}.backup-detail section{grid-column:1/-1}.backup-detail pre{max-height:240px;margin:6px 0 0;padding:10px;overflow:auto;border-radius:7px;background:var(--c-bg-2);color:var(--c-text-2);font:10px/1.5 var(--font-mono);white-space:pre-wrap;word-break:break-word}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:1000px){.summary-grid{grid-template-columns:repeat(2,1fr)}.asset-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.task-status{grid-template-columns:36px minmax(0,1fr)}.task-status>small{grid-column:2}.summary-grid,.asset-grid,.backup-detail{grid-template-columns:1fr}.asset-section,.records-section{padding:12px}}
+</style>
+<style scoped>
+.backup-page.embedded { padding: 0; }
 </style>

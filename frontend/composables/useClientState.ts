@@ -70,7 +70,7 @@ function migrate() {
   write(KEYS.ai, ai)
   write(KEYS.auth, auth)
   write(KEYS.session, session)
-  ;[legacy.visitorId, legacy.nickname, legacy.aiGuestId, legacy.theme, legacy.fontPreset, legacy.sidebar, legacy.token, legacy.user, 'corner:circle:reading'].forEach((key) => localStorage.removeItem(key))
+  ;[legacy.visitorId, legacy.nickname, legacy.aiGuestId, legacy.theme, legacy.fontPreset, legacy.sidebar, legacy.token, legacy.user, 'corner:circle:reading', 'corner:last-public-route', 'corner:pet:last-greeting'].forEach((key) => localStorage.removeItem(key))
 }
 
 let migrated = false
