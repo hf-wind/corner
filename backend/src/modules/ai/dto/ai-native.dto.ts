@@ -38,8 +38,8 @@ export class AiEventDto {
 
 export class AiWriteTransformDto {
   @IsString() @MaxLength(12000) text!: string;
-  @IsIn(['polish', 'expand', 'compress']) action!:
-    'polish' | 'expand' | 'compress';
+  @IsIn(['polish', 'expand', 'compress', 'style']) action!:
+    'polish' | 'expand' | 'compress' | 'style';
 }
 
 export class AiNarrativeDto {

@@ -15,7 +15,7 @@
 
     <a-spin :spinning="loading" class="table-spin">
       <div class="admin-table-shell">
-        <a-table :dataSource="posts" :columns="columns" rowKey="slug" size="small" :pagination="false" :scroll="{ x: 1230 }" :locale="{ emptyText: '暂无文章' }">
+        <a-table :dataSource="posts" :columns="columns" rowKey="slug" size="small" :pagination="false" :scroll="{ x: 1300 }" :locale="{ emptyText: '暂无文章' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'title'">
               <div class="post-title">
@@ -35,10 +35,13 @@
               <AdminRowActions
                 :record="record"
                 settings-menu
+                show-unpublish
                 :publishing="publishingSlug === record.slug"
                 @edit="$router.push('/admin/posts/' + record.slug)"
                 @preview="preview(record.slug)"
                 @publish="publish(record)"
+                @unpublish="unpublish(record)"
+                @versions="openVersions(record)"
                 @schedule="openSchedule(record)"
                 @privacy="changePrivacy(record)"
                 @delete="remove(record.slug, record.title)"
@@ -58,6 +61,32 @@
           <a-button @click="settingDialog.open = false"><Icon name="ph:x-bold" /> 取消</a-button>
           <a-button type="primary" :loading="settingDialog.saving" @click="saveSchedule"><Icon name="ph:floppy-disk-bold" /> 保存设置</a-button>
         </div>
+      </div>
+    </a-modal>
+
+    <a-modal v-model:open="versionsDialog.open" :title="`版本记录 · ${versionsDialog.record?.title || ''}`" width="760px" :footer="null">
+      <a-spin :spinning="versionsDialog.loading">
+        <div v-if="versionsDialog.items.length" class="version-list">
+          <article v-for="item in versionsDialog.items" :key="item.id">
+            <span class="version-index">V{{ item.version }}</span>
+            <div class="version-copy">
+              <header><strong>{{ item.title || '未命名版本' }}</strong><a-tag color="blue">{{ versionSource(item.source) }}</a-tag></header>
+              <p>{{ item.excerpt || '该版本未填写摘要' }}</p>
+              <small>{{ formatVersionTime(item.createdAt) }} · {{ item.createdBy?.username || '系统' }} · 正文 {{ item.contentLength }} 字符</small>
+            </div>
+            <a-button size="small" @click="previewVersion(item)"><Icon name="ph:eye-bold" /> 预览</a-button>
+            <a-button size="small" :loading="versionsDialog.restoring === item.id" @click="confirmRestoreVersion(item)"><Icon name="ph:arrow-counter-clockwise-bold" /> 回退</a-button>
+          </article>
+        </div>
+        <a-empty v-else-if="!versionsDialog.loading" description="暂无版本记录" />
+      </a-spin>
+    </a-modal>
+
+    <a-modal v-model:open="versionPreview.open" :title="versionPreview.item ? `V${versionPreview.item.version} · ${versionPreview.item.title || '未命名版本'}` : '版本预览'" width="min(860px, calc(100vw - 24px))" :footer="null">
+      <div v-if="versionPreview.item" class="version-preview">
+        <div><span>{{ versionSource(versionPreview.item.source) }}</span><small>{{ formatVersionTime(versionPreview.item.createdAt) }} · {{ versionPreview.item.createdBy?.username || '系统' }}</small></div>
+        <p v-if="versionPreview.item.excerpt">{{ versionPreview.item.excerpt }}</p>
+        <pre>{{ versionPreview.item.content || '该版本没有正文内容' }}</pre>
       </div>
     </a-modal>
   </div>
@@ -84,6 +113,7 @@ const statusOptions = [
   { label: '全部', value: 'all' },
   { label: '已发布', value: 'published' },
   { label: '草稿', value: 'draft' },
+  { label: '已下架', value: 'unpublished' },
   { label: '私密', value: 'private' },
   { label: '有新内容', value: 'pending' },
 ]
@@ -95,12 +125,14 @@ const columns = [
   { title: '状态', key: 'status', width: 100 },
   { title: '阅读', dataIndex: 'views', key: 'views', width: 60, align: 'center' as const },
   { title: '日期', dataIndex: 'date', key: 'date', width: 100 },
-  { title: '操作', key: 'actions', width: 300, fixed: 'right' as const },
+  { title: '操作', key: 'actions', width: 370, fixed: 'right' as const },
 ]
 const settingDialog = reactive<{ open: boolean; saving: boolean; record: any | null; scheduledAt: Dayjs | null }>({ open: false, saving: false, record: null, scheduledAt: null })
+const versionsDialog = reactive({ open: false, loading: false, restoring: '', record: null as any, items: [] as any[] })
+const versionPreview = reactive({ open: false, item: null as any })
 
-function statusText(status: string) { return status === 'published' ? '已发布' : status === 'private' ? '私密' : '草稿' }
-function statusColor(status: string) { return status === 'published' ? 'green' : status === 'private' ? 'purple' : 'default' }
+function statusText(status: string) { return status === 'published' ? '已发布' : status === 'unpublished' ? '已下架' : status === 'private' ? '私密' : '草稿' }
+function statusColor(status: string) { return status === 'published' ? 'green' : status === 'unpublished' ? 'orange' : status === 'private' ? 'purple' : 'default' }
 
 function onFilterChange() {
   page.value = 1
@@ -116,7 +148,7 @@ async function loadPosts() {
   loading.value = true
   try {
     const params: any = { page: page.value, limit, status: 'all' }
-    if (['published', 'draft', 'private'].includes(filter.value.status)) {
+    if (['published', 'unpublished', 'draft', 'private'].includes(filter.value.status)) {
       params.status = filter.value.status
     } else if (filter.value.status === 'pending') {
       params.status = 'all'
@@ -195,7 +227,54 @@ async function restorePublic() {
 }
 
 function preview(slug: string) {
-  router.push(`/admin/posts/preview?slug=${encodeURIComponent(slug)}`)
+  router.push(`/article/${encodeURIComponent(slug)}?preview=1`)
+}
+
+async function openVersions(record: any) {
+  versionsDialog.open = true
+  versionsDialog.loading = true
+  versionsDialog.record = record
+  versionsDialog.items = []
+  try { versionsDialog.items = await api.get<any[]>(`/posts/${record.slug}/versions`) }
+  catch (error: any) { toast.error(error?.message || '版本记录加载失败') }
+  finally { versionsDialog.loading = false }
+}
+
+function versionSource(source: string) {
+  return source === 'publish' ? '发布快照' : source === 'draft-preserve' ? '回退前发布快照' : '历史版本'
+}
+
+function formatVersionTime(value: string) {
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+}
+
+function previewVersion(item: any) {
+  versionPreview.item = item
+  versionPreview.open = true
+}
+
+function confirmRestoreVersion(item: any) {
+  const record = versionsDialog.record
+  if (!record) return
+  Modal.confirm({
+    title: `回退到 V${item.version}？`,
+    content: record.needsPublish
+      ? '当前保存内容还未发布。系统会先发布并形成新版本，再回退到所选版本，当前修改不会丢失。回退结果会作为待发布草稿。'
+      : '所选版本会载入为新的待发布草稿，当前线上版本暂时保持不变。',
+    okText: '确认回退',
+    cancelText: '取消',
+    onOk: async () => {
+      versionsDialog.restoring = item.id
+      try {
+        const restored = await api.post<any>(`/posts/${record.slug}/versions/${item.id}/restore`)
+        versionsDialog.open = false
+        toast.success(record.needsPublish ? '当前修改已发布留档，历史版本已回退为草稿' : '历史版本已回退为草稿')
+        await loadPosts()
+        await router.push(`/admin/posts/${encodeURIComponent(restored.slug || record.slug)}`)
+      } catch (error: any) { toast.error(error?.message || '版本回退失败') }
+      finally { versionsDialog.restoring = '' }
+    },
+  })
 }
 
 async function publish(record: any) {
@@ -212,6 +291,27 @@ async function publish(record: any) {
         await loadPosts()
       } catch (e: any) {
         toast.error('发布失败: ' + (e.message || ''))
+      }
+      publishingSlug.value = ''
+    },
+  })
+}
+
+async function unpublish(record: any) {
+  Modal.confirm({
+    title: '确认下架',
+    content: `下架「${record.title}」后，前台、RSS、搜索、相关推荐与站点文风画像都会立即停止引用；文章和版本记录仍会保留。`,
+    okText: '下架',
+    cancelText: '取消',
+    okType: 'danger',
+    onOk: async () => {
+      publishingSlug.value = record.slug
+      try {
+        await api.post(`/posts/${record.slug}/unpublish`)
+        toast.success('文章已下架')
+        await loadPosts()
+      } catch (e: any) {
+        toast.error('下架失败: ' + (e.message || ''))
       }
       publishingSlug.value = ''
     },
@@ -249,9 +349,16 @@ onMounted(loadPosts)
 .change-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 18%,transparent); }
 .table-actions { display:flex; align-items:center; flex-wrap:nowrap; white-space:nowrap; }
 .setting-form { display:grid; gap:12px; }.setting-form label { display:grid; gap:7px; color:var(--c-text-2); font-size:.76rem; }.setting-form p { margin:0; color:var(--c-text-3); font-size:.7rem; }.setting-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+.version-list { display:grid; max-height:62vh; overflow:auto; }
+.version-list article { display:grid; grid-template-columns:44px minmax(0,1fr) auto auto; align-items:center; gap:10px; padding:13px 2px; border-bottom:1px solid var(--border); }
+.version-index { display:grid; width:40px; height:32px; border-radius:8px; background:var(--c-primary-soft); color:var(--c-primary); font-size:.64rem; font-weight:700; place-items:center; }
+.version-copy { min-width:0; }.version-copy header { display:flex; align-items:center; gap:7px; }.version-copy strong { font-size:.7rem; }.version-copy p { overflow:hidden; margin:5px 0; color:var(--c-text-3); font-size:.58rem; text-overflow:ellipsis; white-space:nowrap; }.version-copy small { color:var(--c-text-4); font-size:.52rem; }
+.version-preview { display:grid; gap:14px; }.version-preview > div { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--c-primary); font-size:.64rem; }.version-preview small { color:var(--c-text-3); font-size:.56rem; }.version-preview p { margin:0; padding:11px 13px; border-left:3px solid var(--c-primary); background:var(--c-bg-1); color:var(--c-text-2); font-size:.7rem; line-height:1.7; }.version-preview pre { max-height:min(62vh,620px); margin:0; padding:16px; overflow:auto; border:1px solid var(--border); border-radius:8px; background:var(--c-bg-1); color:var(--c-text-1); font:.72rem/1.85 var(--font-body); white-space:pre-wrap; word-break:break-word; }
 .table-pagination { display:flex; justify-content:center; padding:16px 0 4px; }
 @media (max-width:700px) {
   .post-toolbar { align-items:stretch; flex-direction:column; }
   .post-search { width:auto; flex:1; }
+  .version-list article { grid-template-columns:40px minmax(0,1fr); }
+  .version-list article > :deep(.ant-btn) { grid-column:1 / -1; }
 }
 </style>

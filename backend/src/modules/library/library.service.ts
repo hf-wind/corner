@@ -72,11 +72,14 @@ export class LibraryService {
       type === 'book'
         ? `reflection（以第一人称写一篇300至500字、自然克制且有具体作品理解的阅读体会草稿）, highlights（3至6条主题摘记或短摘录的字符串数组，每条不超过60字）, quotes（3至6条准确的短名句字符串数组，每条不超过50字）`
         : `reflection（以第一人称写一篇300至500字、避免关键剧透且有具体作品理解的观影体会草稿）, highlights（3至6条令人印象深刻的情节或镜头描述字符串数组，不泄露结局）, quotes（2至5条准确的短台词字符串数组，每条不超过50字）`;
+    const style = await this.ai.getSiteStyleInstruction('书影体会');
     const response = await this.ai.chat(
       [
         {
           role: 'system',
-          content: aiConfig.ai_library_prompt,
+          content: [aiConfig.ai_library_prompt, style]
+            .filter(Boolean)
+            .join('\n\n'),
         },
         {
           role: 'user',

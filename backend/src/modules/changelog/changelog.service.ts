@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -66,15 +72,24 @@ type Snapshot = {
 type ListQuery = { page?: number; limit?: number };
 
 @Injectable()
-export class ChangelogService {
+export class ChangelogService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ChangelogService.name);
   private readonly parser = new Parser();
   private refreshPromise: Promise<Snapshot> | null = null;
+  private refreshTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly settings: SettingsService,
     private readonly ai: AiService,
   ) {}
+
+  onModuleInit() {
+    this.scheduleAutomaticRefresh(5_000);
+  }
+
+  onModuleDestroy() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+  }
 
   async status() {
     const config = await this.getConfig();
@@ -167,6 +182,7 @@ export class ChangelogService {
       ),
     };
     await this.settings.set(CONFIG_KEY, next);
+    this.scheduleAutomaticRefresh(1_000);
     return next;
   }
 
@@ -215,14 +231,23 @@ export class ChangelogService {
   private async getConfig(): Promise<ChangelogConfig> {
     const value = this.record(await this.settings.get(CONFIG_KEY));
     const repository = String(process.env.GITHUB_REPOSITORY || '').split('/');
+    const storedTitle = this.text(value.title, '', 80);
+    const storedSubtitle = this.text(value.subtitle, '', 240);
     return {
       enabled: value.enabled !== false,
-      title: this.text(value.title, '最近更新', 80),
-      subtitle: this.text(
-        value.subtitle,
-        '记录每一次推送，也留下那些不适合写进提交信息的细节。',
-        240,
-      ),
+      title:
+        !storedTitle ||
+        ['最近更新', '更新日志', '风隅更新手记'].includes(storedTitle)
+          ? '风迹'
+          : storedTitle,
+      subtitle:
+        !storedSubtitle ||
+        [
+          '记录每一次推送，也留下那些不适合写进提交信息的细节。',
+          '记录每一次功能完善、内容调整与体验修补，也说明风隅随笔如何一步步变得更好。',
+        ].includes(storedSubtitle)
+          ? '风过无声，循迹可寻。每一次改变，都在时间里留下属于自己的印记，那些细微的更迭与变化，也终将成为一路走来不可忽略的痕迹。'
+          : storedSubtitle,
       repositoryOwner: this.identifier(
         value.repositoryOwner,
         repository[0] || 'hf-wind',
@@ -261,6 +286,26 @@ export class ChangelogService {
       return stored;
     }
     return this.runRefresh(config, stored);
+  }
+
+  private scheduleAutomaticRefresh(delayMs: number) {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(
+      async () => {
+        let nextDelay = 30 * 60 * 1000;
+        try {
+          const config = await this.getConfig();
+          nextDelay = config.cacheTtl * 1000;
+          if (config.enabled) await this.getAutomatic(config, true);
+        } catch (error) {
+          this.logger.warn(`自动刷新风迹失败: ${this.errorMessage(error)}`);
+        } finally {
+          this.scheduleAutomaticRefresh(nextDelay);
+        }
+      },
+      Math.max(1_000, delayMs),
+    );
+    this.refreshTimer.unref?.();
   }
 
   private runRefresh(config: ChangelogConfig, previous: Snapshot | null) {
@@ -564,12 +609,17 @@ export class ChangelogService {
     if (!pending.length) return result;
 
     try {
+      const style = await this.ai.getSiteStyleInstruction('风迹');
       const response = await this.ai.chat(
         [
           {
             role: 'system',
-            content:
-              '你是中文产品更新日志编辑。把 Git 提交整理成自然、克制、具体的中文，不夸大、不虚构。每次推送必须有一个概括标题、一句摘要，并保留全部提交为顺序列表。技术名词可以保留英文。只输出 JSON 数组。',
+            content: [
+              '你是「风迹」编辑。把 Git 提交整理成自然、克制、具体的中文，不夸大、不虚构。每次推送必须有一个概括标题、一句摘要，并保留全部提交为顺序列表。技术名词可以保留英文。只输出 JSON 数组。',
+              style,
+            ]
+              .filter(Boolean)
+              .join('\n\n'),
           },
           {
             role: 'user',

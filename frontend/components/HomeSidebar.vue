@@ -44,8 +44,14 @@ import { defineAsyncComponent } from "vue";
 
 const AiPet = defineAsyncComponent(() => import("~/components/AiPet.vue"));
 const api = useApi();
-const loading = ref(true);
-const stats = ref({ posts: 0, comments: 0, views: 0 });
+const { state: homePreload } = useHomePreload();
+const loading = ref(homePreload.value.stats === null);
+const stats = ref({
+  posts: 0,
+  comments: 0,
+  views: 0,
+  ...(homePreload.value.stats || {}),
+});
 let idleHandle: number | null = null;
 let petIdleHandle: number | null = null;
 const showPet = ref(false);
@@ -80,9 +86,10 @@ async function loadSidebar() {
 
 onMounted(() => {
   if ("requestIdleCallback" in window) {
-    idleHandle = window.requestIdleCallback(() => void loadSidebar(), {
-      timeout: 1200,
-    });
+    if (homePreload.value.stats === null)
+      idleHandle = window.requestIdleCallback(() => void loadSidebar(), {
+        timeout: 1200,
+      });
     petIdleHandle = window.requestIdleCallback(
       () => {
         showPet.value = true;
@@ -90,7 +97,8 @@ onMounted(() => {
       { timeout: 2200 },
     );
   } else {
-    idleHandle = window.setTimeout(() => void loadSidebar(), 220);
+    if (homePreload.value.stats === null)
+      idleHandle = window.setTimeout(() => void loadSidebar(), 220);
     petIdleHandle = window.setTimeout(() => {
       showPet.value = true;
     }, 1000);

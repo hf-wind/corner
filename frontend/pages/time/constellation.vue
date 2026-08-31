@@ -5,7 +5,7 @@
   >
     <section class="constellation-stage" aria-label="时光星图">
       <TimeConstellationScene
-        v-if="!fallbackMode && graphReady"
+        v-if="!fallbackMode && graphReady && homePreload.ready"
         ref="sceneRef"
         :nodes="displayNodes"
         :relations="displayRelations"
@@ -23,13 +23,18 @@
         @fallback="fallbackMode = true"
       />
       <MemoryGraph2D
-        v-else-if="graphReady && fallbackMode"
+        v-else-if="graphReady && fallbackMode && homePreload.ready"
         :nodes="displayNodes"
         :relations="displayRelations"
         :selected-id="selected?.id"
         @select="handleSceneSelect"
       />
-      <Loading v-else variant="space" fullscreen text="正在展开你的时间轨道" />
+      <Loading
+        v-else
+        variant="space"
+        fullscreen
+        text="正在同步首页内容与时光轨道"
+      />
     </section>
 
     <header class="constellation-nav">
@@ -331,6 +336,7 @@ const router = useRouter();
 const { mediaUrl } = useMediaUrl();
 const { navigate } = useCosmicNavigation();
 const { selectMemory, clearMemory } = useMemorySelection();
+const { state: homePreload, preloadHomeContent } = useHomePreload();
 const graph = reactive<{
   nodes: GraphNode[];
   relations: GraphRelation[];
@@ -748,6 +754,7 @@ function buildDiscoveryTelemetry(
 
 onMounted(() => {
   void loadGraph();
+  void preloadHomeContent();
   telemetryTimer = setInterval(() => {
     telemetryNow.value = new Date();
   }, 30_000);

@@ -68,6 +68,14 @@ export const AI_SETTING_KEYS = [
   'ai_library_model_config_id',
   'ai_library_temperature',
   'ai_library_max_tokens',
+  'ai_style_enabled',
+  'ai_style_min_samples',
+  'ai_style_max_samples',
+  'ai_style_sample_char_limit',
+  'ai_style_strength',
+  'ai_style_base_guide',
+  'ai_style_custom_rules',
+  'ai_style_auto_rebuild',
 ] as const;
 
 export type AiSettingKey = (typeof AI_SETTING_KEYS)[number];
@@ -142,6 +150,14 @@ export type AiConfig = {
   ai_library_model_config_id: string;
   ai_library_temperature: number;
   ai_library_max_tokens: number;
+  ai_style_enabled: boolean;
+  ai_style_min_samples: number;
+  ai_style_max_samples: number;
+  ai_style_sample_char_limit: number;
+  ai_style_strength: string;
+  ai_style_base_guide: string;
+  ai_style_custom_rules: string;
+  ai_style_auto_rebuild: boolean;
 };
 
 export const AI_DEFAULTS: AiConfig = {
@@ -178,7 +194,8 @@ export const AI_DEFAULTS: AiConfig = {
     '始终保持哆啦A梦人设，不提及自己是 AI、大语言模型或「模型」。',
   ].join('\n'),
 
-  ai_summarize_prompt: '你是哆啦A梦（Doraemon）。你的好友“阿风”刚刚敲完一篇新文章，又顺手丢给你来提炼导语摘要。请你写一段 80 到 120 字的纯文本摘要。【创作准则】角色与情境：用轻松、自然、三分傲娇七分操心的口吻。就好像你正一边嚼着铜锣烧，一边帮他检查刚写完的稿子，带着一种“真拿你没办法”的陪伴感。精准概括：用最精炼的语言概括这篇文章的核心主题与干货要点，让读者一眼看懂文章价值。绝对不能脱离原文编造事实。融境式吐槽：不要把“吐槽”和“摘要”生硬地分开。请在概括内容的字里行间，结合文章的具体主题对阿风进行打趣。比如他写了一篇硬核技术文，你可以吐槽他掉头发；他写了生活感悟，你可以调侃他突然多愁善感。偶尔可以极其自然地带入一句关于神奇道具的联想，但切忌刻意。拒绝套路：严禁每次都使用“阿风今天又写了……”、“哎，阿风总是……”这类刻板句式开头，要根据文章内容灵活切入。【严格排版要求】只需输出 80 到 120 字的正文！绝对不要写标题，不要加任何引号，开头绝对不要出现“摘要：”、“导语：”或“哆啦A梦：”等任何前缀，直接生成正文即可。',
+  ai_summarize_prompt:
+    '你是哆啦A梦（Doraemon）。你的好友“阿风”刚刚敲完一篇新文章，又顺手丢给你来提炼导语摘要。请你写一段 80 到 120 字的纯文本摘要。【创作准则】角色与情境：用轻松、自然、三分傲娇七分操心的口吻。就好像你正一边嚼着铜锣烧，一边帮他检查刚写完的稿子，带着一种“真拿你没办法”的陪伴感。精准概括：用最精炼的语言概括这篇文章的核心主题与干货要点，让读者一眼看懂文章价值。绝对不能脱离原文编造事实。融境式吐槽：不要把“吐槽”和“摘要”生硬地分开。请在概括内容的字里行间，结合文章的具体主题对阿风进行打趣。比如他写了一篇硬核技术文，你可以吐槽他掉头发；他写了生活感悟，你可以调侃他突然多愁善感。偶尔可以极其自然地带入一句关于神奇道具的联想，但切忌刻意。拒绝套路：严禁每次都使用“阿风今天又写了……”、“哎，阿风总是……”这类刻板句式开头，要根据文章内容灵活切入。【严格排版要求】只需输出 80 到 120 字的正文！绝对不要写标题，不要加任何引号，开头绝对不要出现“摘要：”、“导语：”或“哆啦A梦：”等任何前缀，直接生成正文即可。',
 
   ai_moderate_prompt: [
     '你是博客评论审核助手，负责判断一条评论能不能放出来。',
@@ -256,7 +273,7 @@ export const AI_DEFAULTS: AiConfig = {
     '结构：开头要有代入感（可以是具体场景或真实感受），中间层次清楚，结尾落在实处，不要用「总而言之」式套话。',
     '语气：自然、真诚，像作者本人写的一样；技术文不端着，生活文不矫情；短句为主，允许口语，拒绝 AI 腔和空洞排比。',
     '内容：只使用用户提供的灵感与要点，可补充常识性过渡，但绝不编造具体数据、引文或未给出的事实。',
-    '文风：参考下方「作者风格档案」学习作者的表达习惯，保持既有风格，但不要复制原句。',
+    '文风：遵循后台「站点文风」中维护的基础指南、补充规则与站点画像，保持既有表达习惯，但不要复制原句。',
     'Markdown：适度使用二级/三级标题分段，列表、代码块按内容需要出现，不为了凑结构硬加。',
     '【严格排版要求】',
     '只返回一个合法 JSON 对象：{"title":"标题","content":"Markdown 正文"}。',
@@ -280,7 +297,8 @@ export const AI_DEFAULTS: AiConfig = {
   ai_article_model_config_id: '',
   ai_article_temperature: 0.7,
   ai_article_max_tokens: 4096,
-  ai_wallpaper_source_url: 'https://images.unsplash.com/photo-1500534623283-312aede485b7?auto=format&fit=crop&w=1600&q=85',
+  ai_wallpaper_source_url:
+    'https://images.unsplash.com/photo-1500534623283-312aede485b7?auto=format&fit=crop&w=1600&q=85',
 
   ai_moment_enabled: true,
   ai_moment_prompt: [
@@ -329,4 +347,18 @@ export const AI_DEFAULTS: AiConfig = {
   ai_library_model_config_id: '',
   ai_library_temperature: 0.35,
   ai_library_max_tokens: 2600,
+  ai_style_enabled: true,
+  ai_style_min_samples: 8,
+  ai_style_max_samples: 30,
+  ai_style_sample_char_limit: 1600,
+  ai_style_strength: 'balanced',
+  ai_style_base_guide: [
+    '使用第一人称，像作者在和熟悉的朋友交流；自然、真诚、克制，不端着。',
+    '先从具体缘由、场景或问题写起，再说明取舍与实际落地；技术内容要讲清为什么、失败边界和解决了什么。',
+    '短句为主，关键结论可以独立成段；生活内容依靠可感知的细节，不滥情，也不强行升华。',
+    '不编造事实、数据、引文或私人经历，不复制参考内容的原句。',
+    '避免公文腔、客服腔、营销腔、空洞排比，以及“综上所述”“众所周知”“值得注意的是”和机械的“首先、其次、最后”。',
+  ].join('\n'),
+  ai_style_custom_rules: '',
+  ai_style_auto_rebuild: true,
 };

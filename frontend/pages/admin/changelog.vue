@@ -3,15 +3,15 @@
     <header class="admin-page-head changelog-head">
       <div>
         <span>RELEASE NOTES / SOURCES</span>
-        <h1>更新日志</h1>
-        <p>Git 自动记录持续同步，人工补记只负责补充无法从提交中表达的内容。</p>
+        <h1>风迹</h1>
+        <p>仓库记录会自动读取和整理，人工补记只负责补充提交信息没有说清的内容。</p>
       </div>
       <div class="head-actions">
         <a-button href="/changelog" target="_blank">
           <Icon name="ph:arrow-square-out-bold" />查看页面
         </a-button>
         <a-button :loading="syncing" @click="syncGit">
-          <Icon name="ph:arrows-clockwise-bold" />同步并翻译
+          <Icon name="ph:arrows-clockwise-bold" />立即刷新
         </a-button>
         <a-button type="primary" :loading="saving" @click="saveConfig">
           <Icon name="ph:floppy-disk-bold" />保存设置
@@ -34,6 +34,9 @@
           <i />
           <span>{{ adminData.sourceLabel || "等待首次同步" }}</span>
           <small v-if="adminData.fetchedAt">
+            {{
+              adminData.sourceStatus === "unavailable" ? "最后检查" : "同步于"
+            }}
             {{ formatTime(adminData.fetchedAt) }}
           </small>
         </div>
@@ -46,11 +49,7 @@
             "
           />
           <span>
-            {{
-              adminData.tokenConfigured
-                ? "已配置 GitHub Token"
-                : "未配置 Token，本机仍可同步"
-            }}
+            {{ tokenStateLabel }}
           </span>
         </div>
       </section>
@@ -67,7 +66,7 @@
 
           <div class="enable-setting">
             <div>
-              <strong>公开更新日志</strong>
+              <strong>公开风迹</strong>
               <small>关闭后前台菜单自动隐藏，已有记录仍会保留。</small>
             </div>
             <a-switch v-model:checked="config.enabled" />
@@ -198,7 +197,7 @@
             <div v-else class="automatic-empty">
               <Icon
                 name="ph:cloud-arrow-down-bold"
-              />点击“同步并翻译”读取仓库记录
+              />服务会自动读取仓库记录，也可以点击“立即刷新”马上检查
             </div>
           </section>
         </div>
@@ -293,8 +292,9 @@ const saving = ref(false);
 const syncing = ref(false);
 const config = reactive<ChangelogConfig>({
   enabled: true,
-  title: "最近更新",
-  subtitle: "记录每一次推送，也留下那些不适合写进提交信息的细节。",
+  title: "风迹",
+  subtitle:
+    "风过无声，循迹可寻。每一次改变，都在时间里留下属于自己的印记，那些细微的更迭与变化，也终将成为一路走来不可忽略的痕迹。",
   repositoryOwner: "hf-wind",
   repositoryName: "corner",
   branch: "main",
@@ -331,6 +331,14 @@ const automaticItemCount = computed(() =>
     0,
   ),
 );
+const tokenStateLabel = computed(() => {
+  if (adminData.tokenConfigured) return "已配置 GitHub Token";
+  if (adminData.sourceStatus === "unavailable")
+    return "未配置 Token，请检查仓库访问";
+  if (adminData.sourceLabel === "本地 Git 提交")
+    return "未配置 Token，当前使用本地 Git";
+  return "未配置 Token，当前使用公开数据源";
+});
 
 async function load() {
   loading.value = true;
@@ -339,7 +347,7 @@ async function load() {
     Object.assign(adminData, result);
     Object.assign(config, result.config);
   } catch (error: any) {
-    toast.error(error?.message || "更新日志配置加载失败");
+    toast.error(error?.message || "风迹配置加载失败");
   } finally {
     loading.value = false;
   }
@@ -353,7 +361,7 @@ async function saveConfig() {
       config,
     );
     Object.assign(config, result);
-    toast.success("更新日志设置已保存");
+    toast.success("风迹设置已保存");
   } catch (error: any) {
     toast.error(error?.message || "保存失败");
   } finally {
@@ -470,7 +478,7 @@ function formatDate(value: string) {
 }
 
 onMounted(load);
-useHead({ title: "更新日志管理" });
+useHead({ title: "风迹管理" });
 </script>
 
 <style scoped>

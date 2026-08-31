@@ -296,6 +296,9 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
       return record;
     });
 
+    if (this.styleChangeSize('', created.content) > 20) {
+      void this.aiNative?.scheduleStyleRebuild(created.authorId);
+    }
     return this.format(created);
   }
 
@@ -365,7 +368,33 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.memoryGraph?.scheduleRebuild();
+    if (this.styleChangeSize(existing.content, updated.content) > 20) {
+      void this.aiNative?.scheduleStyleRebuild(updated.authorId);
+    }
     return this.format(updated);
+  }
+
+  private styleChangeSize(previous: string, next: string) {
+    const before = String(previous || '');
+    const after = String(next || '');
+    if (before === after) return 0;
+    let prefix = 0;
+    while (
+      prefix < before.length &&
+      prefix < after.length &&
+      before[prefix] === after[prefix]
+    ) {
+      prefix += 1;
+    }
+    let suffix = 0;
+    while (
+      suffix < before.length - prefix &&
+      suffix < after.length - prefix &&
+      before[before.length - 1 - suffix] === after[after.length - 1 - suffix]
+    ) {
+      suffix += 1;
+    }
+    return before.length - prefix - suffix + (after.length - prefix - suffix);
   }
 
   async listVersions(slug: string) {
@@ -412,7 +441,8 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
     const restoredSlug = await this.uniqueSlug(snapshot.slug, existing.id);
     const restored = await this.prisma.$transaction(async (tx) => {
       const currentSnapshot = this.buildSnapshotFromPost(existing);
-      const needsPreservePublish = existing.needsPublish || existing.status !== 'published';
+      const needsPreservePublish =
+        existing.needsPublish || existing.status !== 'published';
       if (needsPreservePublish) {
         // Publish the current draft first so restoring an old version never discards it.
         await this.createVersion(tx, existing, actorId, 'draft-preserve');
@@ -421,7 +451,8 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
           data: {
             status: 'published',
             needsPublish: false,
-            publishedSnapshot: currentSnapshot as unknown as Prisma.InputJsonValue,
+            publishedSnapshot:
+              currentSnapshot as unknown as Prisma.InputJsonValue,
             publishedAt: existing.publishedAt ?? new Date(),
           },
         });
@@ -469,7 +500,8 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
             : null,
           status: 'draft',
           needsPublish: true,
-          publishedSnapshot: currentSnapshot as unknown as Prisma.InputJsonValue,
+          publishedSnapshot:
+            currentSnapshot as unknown as Prisma.InputJsonValue,
           tags: tags.length
             ? { create: tags.map((tag) => ({ tagId: tag.id })) }
             : undefined,
@@ -533,6 +565,7 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
 
     this.memoryGraph?.scheduleRebuild();
     this.aiNative?.schedulePrecompute('post', post.id);
+    void this.aiNative?.scheduleStyleRebuild(post.authorId);
     return this.format(post);
   }
 
@@ -571,7 +604,7 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
   async makePrivate(slug: string) {
     const existing = await this.prisma.post.findUnique({
       where: { slug },
-      select: { id: true },
+      select: { id: true, authorId: true },
     });
     if (!existing) throw new NotFoundException('Post not found');
     const post = await this.prisma.post.update({
@@ -580,6 +613,26 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
       select: postAdminSelect,
     });
     this.memoryGraph?.scheduleRebuild();
+    void this.aiNative?.scheduleStyleRebuild(existing.authorId);
+    return this.format(post);
+  }
+
+  async unpublish(slug: string) {
+    const existing = await this.prisma.post.findUnique({
+      where: { slug },
+      select: { id: true, authorId: true, status: true },
+    });
+    if (!existing) throw new NotFoundException('Post not found');
+    if (existing.status !== 'published') {
+      throw new BadRequestException('只有已发布文章可以下架');
+    }
+    const post = await this.prisma.post.update({
+      where: { id: existing.id },
+      data: { status: 'unpublished', scheduledAt: null },
+      select: postAdminSelect,
+    });
+    this.memoryGraph?.scheduleRebuild();
+    void this.aiNative?.scheduleStyleRebuild(existing.authorId);
     return this.format(post);
   }
 

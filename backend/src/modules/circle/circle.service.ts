@@ -14,15 +14,18 @@ const MAX_REDIRECTS = 3;
 const FEED_CONCURRENCY = 6;
 const SOURCE_CONFIG_REVISION = 1;
 const DEFAULT_SUBSCRIPTIONS: CircleSubscription[] = [
-  { name: 'IT之家', url: 'https://www.ithome.com/', rssUrl: 'https://www.ithome.com/rss/', avatar: '', section: 'tech', enabled: true, kind: 'subscription', origin: 'default' },
+  {
+    name: 'IT之家',
+    url: 'https://www.ithome.com/',
+    rssUrl: 'https://www.ithome.com/rss/',
+    avatar: '',
+    section: 'tech',
+    enabled: true,
+    kind: 'subscription',
+    origin: 'default',
+  },
 ];
-const LEGACY_DEFAULT_RSS = new Set([
-  'https://mrxwlb.com/feed',
-  'https://onojyun.com/feed',
-  'https://mobius.blog/feed',
-  'https://rsshub.app/zhihu/hot',
-  'https://sspai.com/feed',
-]);
+const LEGACY_DEFAULT_RSS = new Set(['https://mrxwlb.com/feed', 'https://onojyun.com/feed', 'https://mobius.blog/feed', 'https://rsshub.app/zhihu/hot', 'https://sspai.com/feed']);
 
 export type CircleConfig = {
   enabled: boolean;
@@ -57,7 +60,14 @@ type CircleItem = {
   summary: string;
   url: string;
   publishedAt: string;
-  source: { name: string; url: string; avatar: string; rssUrl: string; section?: string; kind?: 'subscription' | 'friend' };
+  source: {
+    name: string;
+    url: string;
+    avatar: string;
+    rssUrl: string;
+    section?: string;
+    kind?: 'subscription' | 'friend';
+  };
   image?: string;
   categories: string[];
   author?: string;
@@ -84,7 +94,11 @@ export class CircleService {
       ],
     },
   });
-  private cache: { expires: number; fingerprint: string; items: CircleItem[] } | null = null;
+  private cache: {
+    expires: number;
+    fingerprint: string;
+    items: CircleItem[];
+  } | null = null;
 
   constructor(
     private readonly settings: SettingsService,
@@ -92,49 +106,35 @@ export class CircleService {
   ) {}
 
   async getConfig(): Promise<CircleConfig> {
-    const [raw, rawFriends] = await Promise.all([
-      this.settings.get('circle_config'),
-      this.settings.get('friends'),
-    ]);
+    const [raw, rawFriends] = await Promise.all([this.settings.get('circle_config'), this.settings.get('friends')]);
     const value = this.objectValue(raw);
     const sourceRevision = Number(value.sourceRevision) || 0;
-    const resetLegacySubscriptions =
-      process.env.NODE_ENV !== 'test' && sourceRevision < SOURCE_CONFIG_REVISION;
-    const covers = Array.isArray(value.covers)
-      ? value.covers.map((cover) => this.stringValue(cover)).filter(Boolean)
-      : [];
+    const resetLegacySubscriptions = process.env.NODE_ENV !== 'test' && sourceRevision < SOURCE_CONFIG_REVISION;
+    const covers = Array.isArray(value.covers) ? value.covers.map((cover) => this.stringValue(cover)).filter(Boolean) : [];
     const subscriptionsConfigured = Array.isArray(value.subscriptions);
-    const subscriptionExclusions = !resetLegacySubscriptions && Array.isArray(value.subscriptionExclusions)
-      ? value.subscriptionExclusions
-          .map((item: unknown) => this.subscriptionKey(this.stringValue(item)))
-          .filter(Boolean)
-      : [];
-    const configuredSubscriptions: CircleSubscription[] = subscriptionsConfigured && !resetLegacySubscriptions
-      ? value.subscriptions
-          .map((item: unknown) => this.subscriptionValue(item))
-          .filter(Boolean)
-          .filter((item: CircleSubscription) => item.kind !== 'friend' && !LEGACY_DEFAULT_RSS.has(this.subscriptionKey(item.rssUrl))) as CircleSubscription[]
-      : [];
+    const subscriptionExclusions = !resetLegacySubscriptions && Array.isArray(value.subscriptionExclusions) ? value.subscriptionExclusions.map((item: unknown) => this.subscriptionKey(this.stringValue(item))).filter(Boolean) : [];
+    const configuredSubscriptions: CircleSubscription[] =
+      subscriptionsConfigured && !resetLegacySubscriptions
+        ? (value.subscriptions
+            .map((item: unknown) => this.subscriptionValue(item))
+            .filter(Boolean)
+            .filter((item: CircleSubscription) => item.kind !== 'friend' && !LEGACY_DEFAULT_RSS.has(this.subscriptionKey(item.rssUrl))) as CircleSubscription[])
+        : [];
     const friendSubscriptions = Array.isArray(rawFriends)
-      ? rawFriends
+      ? (rawFriends
           .map((item: unknown) => {
             const value = this.subscriptionValue(item);
             return value ? { ...value, kind: 'friend' as const } : null;
           })
-          .filter(Boolean) as CircleSubscription[]
+          .filter(Boolean) as CircleSubscription[])
       : [];
     // Keep explicit edits as the source of truth for matching RSS URLs, while
     // continuously bringing newly-added RSS links into the list.
     const defaultSubscriptions = process.env.NODE_ENV === 'test' ? [] : DEFAULT_SUBSCRIPTIONS;
-    const subscriptions = this.mergeSubscriptions(
-      this.mergeSubscriptions(configuredSubscriptions, defaultSubscriptions, subscriptionExclusions),
-      friendSubscriptions,
-    ).slice(0, 40);
+    const subscriptions = this.mergeSubscriptions(this.mergeSubscriptions(configuredSubscriptions, defaultSubscriptions, subscriptionExclusions), friendSubscriptions, subscriptionExclusions, true).slice(0, 40);
     const config: CircleConfig = {
       enabled: value.enabled !== false,
-      title: this.stringValue(value.title) && this.stringValue(value.title) !== '朋友圈'
-        ? this.stringValue(value.title)
-        : '风讯角',
+      title: this.stringValue(value.title) && this.stringValue(value.title) !== '朋友圈' ? this.stringValue(value.title) : '风讯角',
       subtitle: this.stringValue(value.subtitle) || '从不同的角落，收拢值得读完的文字。',
       covers,
       subscriptions,
@@ -162,29 +162,26 @@ export class CircleService {
           .split(/\r?\n|,/)
           .map((cover) => cover.trim())
           .filter(Boolean);
-    const subscriptions = input.subscriptions === undefined
-      ? current.subscriptions.filter((item) => item.kind !== 'friend')
-      : input.subscriptions
-          .map((item) => this.subscriptionValue(item))
-          .filter((item): item is CircleSubscription => Boolean(item && item.kind !== 'friend'))
-          .slice(0, 40);
+    const submittedSubscriptions = input.subscriptions === undefined ? undefined : input.subscriptions.map((item) => this.subscriptionValue(item)).filter((item): item is CircleSubscription => Boolean(item));
+    const subscriptions = submittedSubscriptions === undefined ? current.subscriptions.filter((item) => item.kind !== 'friend') : submittedSubscriptions.filter((item) => item.kind !== 'friend').slice(0, 40);
     const exclusions = new Set(current.subscriptionExclusions);
     if (input.subscriptions !== undefined) {
       const defaultKeys = DEFAULT_SUBSCRIPTIONS.map((item) => this.subscriptionKey(item.rssUrl));
-      const currentKeys = new Set(
-        current.subscriptions.map((item) => this.subscriptionKey(item.rssUrl)),
-      );
-      const nextKeys = new Set(
-        subscriptions.map((item) => this.subscriptionKey(item.rssUrl)),
-      );
+      const currentKeys = new Set(current.subscriptions.map((item) => this.subscriptionKey(item.rssUrl)));
+      const nextKeys = new Set(subscriptions.map((item) => this.subscriptionKey(item.rssUrl)));
       for (const key of defaultKeys) {
         if (currentKeys.has(key) && !nextKeys.has(key)) exclusions.add(key);
       }
       for (const key of nextKeys) exclusions.delete(key);
+      for (const friend of submittedSubscriptions || []) {
+        if (friend.kind !== 'friend') continue;
+        const key = this.subscriptionKey(friend.rssUrl);
+        if (friend.enabled === false) exclusions.add(key);
+        else exclusions.delete(key);
+      }
     }
     const next: CircleConfig = {
-      enabled:
-        input.enabled === undefined ? current.enabled : Boolean(input.enabled),
+      enabled: input.enabled === undefined ? current.enabled : Boolean(input.enabled),
       title: this.stringValue(input.title) || current.title,
       subtitle: this.stringValue(input.subtitle) || current.subtitle,
       covers: Array.from(new Set(covers)).slice(0, 20),
@@ -192,10 +189,7 @@ export class CircleService {
       subscriptions,
       subscriptionExclusions: Array.from(exclusions),
       sourceRevision: SOURCE_CONFIG_REVISION,
-      cacheTtl: Math.min(
-        3600,
-        Math.max(60, Number(input.cacheTtl) || current.cacheTtl),
-      ),
+      cacheTtl: Math.min(3600, Math.max(60, Number(input.cacheTtl) || current.cacheTtl)),
     };
     await this.settings.set('circle_config', next);
     this.cache = null;
@@ -220,30 +214,20 @@ export class CircleService {
     const friends = Array.isArray(config.subscriptions)
       ? config.subscriptions
           .map((friend) => this.objectValue(friend))
-          .filter(
-            (friend) =>
-              friend.enabled !== false &&
-              this.stringValue(friend.rssUrl || friend.siteRssUrl),
-          )
+          .filter((friend) => friend.enabled !== false && this.stringValue(friend.rssUrl || friend.siteRssUrl))
           .slice(0, 40)
       : [];
     const results: CircleItem[][] = [];
     for (let index = 0; index < friends.length; index += FEED_CONCURRENCY) {
-      results.push(
-        ...(await Promise.all(
-          friends
-            .slice(index, index + FEED_CONCURRENCY)
-            .map((friend) => this.fetchFriendFeed(friend)),
-        )),
-      );
+      results.push(...(await Promise.all(friends.slice(index, index + FEED_CONCURRENCY).map((friend) => this.fetchFriendFeed(friend)))));
     }
-    const items = this.distributeItems(
-      results.flat().sort(
-        (left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
-      ),
-    ).slice(0, 500);
+    const items = this.distributeItems(results.flat().sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt))).slice(0, 500);
     const fetchedAt = new Date().toISOString();
-    this.cache = { expires: Date.now() + config.cacheTtl * 1000, fingerprint, items };
+    this.cache = {
+      expires: Date.now() + config.cacheTtl * 1000,
+      fingerprint,
+      items,
+    };
     if (this.redis) await this.redis.setJson(cacheKey, { items, fetchedAt }, config.cacheTtl).catch(() => undefined);
     return this.pageResult(items, config, page, limit, fetchedAt);
   }
@@ -287,23 +271,14 @@ export class CircleService {
     };
   }
 
-  private async fetchFriendFeed(
-    friend: Record<string, unknown>,
-  ): Promise<CircleItem[]> {
+  private async fetchFriendFeed(friend: Record<string, unknown>): Promise<CircleItem[]> {
     const rssUrl = this.stringValue(friend.rssUrl || friend.siteRssUrl);
     const configuredSiteUrl = this.stringValue(friend.url || friend.siteUrl);
     const siteUrl = this.absoluteUrl(configuredSiteUrl, rssUrl) || rssUrl;
     const source: CircleItem['source'] = {
-      name:
-        this.stringValue(friend.name || friend.siteName) ||
-        this.hostName(siteUrl),
+      name: this.stringValue(friend.name || friend.siteName) || this.hostName(siteUrl),
       url: siteUrl,
-      avatar: this.stringValue(friend.avatar || friend.siteAvatar)
-        ? this.absoluteUrl(
-            this.stringValue(friend.avatar || friend.siteAvatar),
-            siteUrl,
-          )
-        : '',
+      avatar: this.stringValue(friend.avatar || friend.siteAvatar) ? this.absoluteUrl(this.stringValue(friend.avatar || friend.siteAvatar), siteUrl) : '',
       section: this.stringValue(friend.section),
       kind: friend.kind === 'friend' ? 'friend' : 'subscription',
       rssUrl,
@@ -320,11 +295,7 @@ export class CircleService {
         const description = this.stringValue(entry.descriptionHtml || entry.content || entry.summary);
         const rawContent = encoded || description;
         const hasHtml = /<([a-z][\w-]*)(?:\s[^>]*)?>/i.test(rawContent);
-        const parserRule = encoded
-          ? 'rss-content-encoded'
-          : hasHtml
-            ? atomFeed ? 'atom-content-html' : 'rss-description-html'
-            : 'text-summary';
+        const parserRule = encoded ? 'rss-content-encoded' : hasHtml ? (atomFeed ? 'atom-content-html' : 'rss-description-html') : 'text-summary';
         const contentHtml = hasHtml ? this.sanitizeFeedHtml(rawContent, url || siteUrl) : '';
         const image = this.extractImage('', rawContent, url || siteUrl);
         const enclosure = this.stringValue(entry.enclosure?.url);
@@ -334,9 +305,7 @@ export class CircleService {
           title: this.cleanText(title).slice(0, 180),
           summary: this.cleanText(description).slice(0, 360),
           url: this.absoluteUrl(url, siteUrl) || siteUrl,
-          publishedAt: Number.isNaN(Date.parse(published))
-            ? new Date().toISOString()
-            : new Date(published).toISOString(),
+          publishedAt: Number.isNaN(Date.parse(published)) ? new Date().toISOString() : new Date(published).toISOString(),
           source,
           image,
           categories: (Array.isArray(entry.categories) ? entry.categories : [])
@@ -346,16 +315,14 @@ export class CircleService {
           author: this.cleanText(this.stringValue(entry.creator || entry.author)).slice(0, 120),
           content: hasHtml ? '' : this.cleanText(rawContent).slice(0, MAX_ITEM_CONTENT_CHARS),
           contentHtml: contentHtml.slice(0, MAX_ITEM_CONTENT_CHARS * 4),
-          contentFormat: hasHtml ? 'html' as const : 'text' as const,
+          contentFormat: hasHtml ? ('html' as const) : ('text' as const),
           parserRule,
           enclosure: this.absoluteUrl(enclosure, siteUrl) || '',
           comments: this.absoluteUrl(this.stringValue(entry.comments), siteUrl) || '',
         };
       });
     } catch (error) {
-      this.logger.warn(
-        `见闻 RSS 读取失败 ${rssUrl}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`见闻 RSS 读取失败 ${rssUrl}: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }
@@ -368,8 +335,24 @@ export class CircleService {
         img: ['src', 'alt', 'title', 'width', 'height', 'loading', 'referrerpolicy'],
       },
       transformTags: {
-        a: (_tag, attrs) => ({ tagName: 'a', attribs: { ...attrs, href: this.absoluteUrl(attrs.href || '', base), target: '_blank', rel: 'noopener noreferrer' } }),
-        img: (_tag, attrs) => ({ tagName: 'img', attribs: { ...attrs, src: this.absoluteUrl(attrs.src || '', base), loading: 'lazy', referrerpolicy: 'no-referrer' } }),
+        a: (_tag, attrs) => ({
+          tagName: 'a',
+          attribs: {
+            ...attrs,
+            href: this.absoluteUrl(attrs.href || '', base),
+            target: '_blank',
+            rel: 'noopener noreferrer',
+          },
+        }),
+        img: (_tag, attrs) => ({
+          tagName: 'img',
+          attribs: {
+            ...attrs,
+            src: this.absoluteUrl(attrs.src || '', base),
+            loading: 'lazy',
+            referrerpolicy: 'no-referrer',
+          },
+        }),
       },
       allowedSchemes: ['http', 'https'],
     });
@@ -396,7 +379,9 @@ export class CircleService {
             contentEncoded: this.xmlText(block, 'content:encoded'),
             creator: this.xmlText(block, 'dc:creator') || this.xmlText(block, 'author') || this.xmlText(block, 'name'),
             categories: this.xmlTexts(block, 'category'),
-            enclosure: { url: this.xmlAttr(block, 'enclosure', 'url') || this.xmlAttr(block, 'media:content', 'url') },
+            enclosure: {
+              url: this.xmlAttr(block, 'enclosure', 'url') || this.xmlAttr(block, 'media:content', 'url'),
+            },
             comments: this.xmlText(block, 'comments'),
           };
         }),
@@ -432,11 +417,17 @@ export class CircleService {
       if (declaredSize > MAX_FEED_BYTES) return '';
       const xml = await this.readLimitedText(response, MAX_FEED_BYTES);
       if (this.redis && xml) {
-        await this.redis.setJson(cacheKey, {
-          xml,
-          etag: response.headers.get('etag') || undefined,
-          lastModified: response.headers.get('last-modified') || undefined,
-        }, 86400).catch(() => undefined);
+        await this.redis
+          .setJson(
+            cacheKey,
+            {
+              xml,
+              etag: response.headers.get('etag') || undefined,
+              lastModified: response.headers.get('last-modified') || undefined,
+            },
+            86400,
+          )
+          .catch(() => undefined);
       }
       return xml;
     }
@@ -464,27 +455,14 @@ export class CircleService {
 
   private async safeFeedUrl(value: string) {
     const url = new URL(value);
-    if (
-      !['http:', 'https:'].includes(url.protocol) ||
-      url.username ||
-      url.password
-    ) {
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
       throw new Error('RSS 地址必须是公开的 HTTP/HTTPS 地址');
     }
     const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-    if (
-      host === 'localhost' ||
-      host.endsWith('.localhost') ||
-      host.endsWith('.local') ||
-      host.endsWith('.internal')
-    ) {
+    if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
       throw new Error('RSS 地址不允许访问本机或私有网络');
     }
-    const addresses = isIP(host)
-      ? [host]
-      : (await lookup(host, { all: true, verbatim: true })).map(
-          (entry) => entry.address,
-        );
+    const addresses = isIP(host) ? [host] : (await lookup(host, { all: true, verbatim: true })).map((entry) => entry.address);
     if (!addresses.length || addresses.some((address) => !this.isPublicIp(address))) {
       throw new Error('RSS 地址解析到了非公开网络');
     }
@@ -495,80 +473,41 @@ export class CircleService {
     const normalized = value.toLowerCase();
     if (isIP(normalized) === 4) {
       const [a, b, c] = normalized.split('.').map(Number);
-      return !(
-        a === 0 ||
-        a === 10 ||
-        a === 127 ||
-        (a === 100 && b >= 64 && b <= 127) ||
-        (a === 169 && b === 254) ||
-        (a === 172 && b >= 16 && b <= 31) ||
-        (a === 192 && b === 0) ||
-        (a === 192 && b === 168) ||
-        (a === 198 && (b === 18 || b === 19)) ||
-        (a === 198 && b === 51 && c === 100) ||
-        (a === 203 && b === 0 && c === 113) ||
-        a >= 224
-      );
+      return !(a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 0) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113) || a >= 224);
     }
     if (isIP(normalized) !== 6) return false;
-    const mappedDotted = normalized.match(
-      /^::ffff:(\d+\.\d+\.\d+\.\d+)$/,
-    )?.[1];
+    const mappedDotted = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
     if (mappedDotted) return this.isPublicIp(mappedDotted);
     const mappedHex = normalized.match(/^::ffff:([\da-f]{1,4}):([\da-f]{1,4})$/);
     if (mappedHex) {
       const high = Number.parseInt(mappedHex[1], 16);
       const low = Number.parseInt(mappedHex[2], 16);
-      return this.isPublicIp(
-        `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`,
-      );
+      return this.isPublicIp(`${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`);
     }
-    return !(
-      normalized === '::' ||
-      normalized === '::1' ||
-      /^f[cd]/.test(normalized) ||
-      /^fe[89ab]/.test(normalized) ||
-      /^ff/.test(normalized) ||
-      /^2001:db8/.test(normalized)
-    );
+    return !(normalized === '::' || normalized === '::1' || /^f[cd]/.test(normalized) || /^fe[89ab]/.test(normalized) || /^ff/.test(normalized) || /^2001:db8/.test(normalized));
   }
 
   private withCover(items: CircleItem[], config: CircleConfig) {
     if (config.covers.length === 0) return items.map((item) => ({ ...item, cover: undefined }));
     if (config.covers.length === 1) return items.map((item) => ({ ...item, cover: config.covers[0] }));
     const start = Math.floor(Math.random() * config.covers.length);
-    return items.map((item, index) => ({ ...item, cover: config.covers[(start + index) % config.covers.length] }));
+    return items.map((item, index) => ({
+      ...item,
+      cover: config.covers[(start + index) % config.covers.length],
+    }));
   }
   private xmlText(block: string, tag: string) {
-    const match = block.match(
-      new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'i'),
-    );
-    return match
-      ? this.decode(
-          match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(),
-        )
-      : '';
+    const match = block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+    return match ? this.decode(match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim()) : '';
   }
   private xmlTexts(block: string, tag: string) {
-    return [
-      ...block.matchAll(
-        new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'gi'),
-      ),
-    ].map((item) => this.decode(item[1]));
+    return [...block.matchAll(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'gi'))].map((item) => this.decode(item[1]));
   }
   private xmlAttr(block: string, tag: string, attr: string) {
-    return (
-      block.match(
-        new RegExp(`<${tag}[^>]*\\b${attr}=["']([^"']+)["']`, 'i'),
-      )?.[1] || ''
-    );
+    return block.match(new RegExp(`<${tag}[^>]*\\b${attr}=["']([^"']+)["']`, 'i'))?.[1] || '';
   }
   private extractImage(block: string, description: string, base: string) {
-    const value =
-      this.xmlAttr(block, 'enclosure', 'url') ||
-      this.xmlAttr(block, 'media:content', 'url') ||
-      description.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] ||
-      '';
+    const value = this.xmlAttr(block, 'enclosure', 'url') || this.xmlAttr(block, 'media:content', 'url') || description.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] || '';
     return value ? this.absoluteUrl(value, base) : undefined;
   }
   private absoluteUrl(value: string, base: string) {
@@ -606,18 +545,13 @@ export class CircleService {
       apos: "'",
       nbsp: ' ',
     };
-    return value.replace(
-      /&(amp|lt|gt|quot|apos|nbsp);/gi,
-      (whole, name: string) => entities[name.toLowerCase()] || whole,
-    );
+    return value.replace(/&(amp|lt|gt|quot|apos|nbsp);/gi, (whole, name: string) => entities[name.toLowerCase()] || whole);
   }
   private stringValue(value: unknown) {
     return typeof value === 'string' ? value.trim() : '';
   }
   private objectValue(value: unknown): Record<string, any> {
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Record<string, any>)
-      : {};
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, any>) : {};
   }
 
   private subscriptionValue(value: unknown): CircleSubscription | null {
@@ -636,19 +570,15 @@ export class CircleService {
     };
   }
 
-  private mergeSubscriptions(
-    configured: CircleSubscription[],
-    fromFriends: CircleSubscription[],
-    exclusions: string[] = [],
-  ) {
+  private mergeSubscriptions(configured: CircleSubscription[], fromFriends: CircleSubscription[], exclusions: string[] = [], retainExcluded = false) {
     const result = [...configured];
     const known = new Set(configured.map((item) => this.subscriptionKey(item.rssUrl)));
     const excluded = new Set(exclusions);
     for (const friend of fromFriends) {
       const key = this.subscriptionKey(friend.rssUrl);
-      if (known.has(key) || excluded.has(key)) continue;
+      if (known.has(key) || (excluded.has(key) && !retainExcluded)) continue;
       known.add(key);
-      result.push(friend);
+      result.push(excluded.has(key) ? { ...friend, enabled: false } : friend);
     }
     return result;
   }
@@ -674,9 +604,7 @@ export class CircleService {
       group.push(item);
       groups.set(key, group);
     }
-    const queues = Array.from(groups.values()).map((group) =>
-      group.sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt)),
-    );
+    const queues = Array.from(groups.values()).map((group) => group.sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt)));
     const result: CircleItem[] = [];
     let offset = 0;
     while (queues.some((queue) => queue.length)) {

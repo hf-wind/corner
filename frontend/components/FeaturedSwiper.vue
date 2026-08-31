@@ -70,8 +70,9 @@ import SectionHead from "~/components/SectionHead.vue";
 import { getDisplayImageUrl } from "~/utils/imagePerformance";
 
 const api = useApi();
-const featured = ref<any[]>([]);
-const loading = ref(true);
+const { state: homePreload } = useHomePreload();
+const featured = ref<any[]>(mapFeatured(homePreload.value.featured || []));
+const loading = ref(homePreload.value.featured === null);
 const mounted = ref(false);
 const reduceMotion = ref(false);
 const swiperModules = [A11y, Autoplay, EffectCreative, Keyboard, Pagination];
@@ -124,12 +125,7 @@ function formatIndex(value: number) {
 async function fetchFeatured() {
   try {
     const items = await api.get<any[]>("/posts/featured");
-    featured.value = (items || []).map((post: any) => ({
-      slug: post.slug,
-      cover: post.coverImage,
-      title: post.title,
-      date: post.publishedAt?.slice(0, 10) ?? "",
-    }));
+    featured.value = mapFeatured(items || []);
   } catch {
     featured.value = [];
   } finally {
@@ -141,11 +137,27 @@ async function fetchFeatured() {
   }
 }
 
+function mapFeatured(items: any[]) {
+  return items.map((post: any) => ({
+    slug: post.slug,
+    cover: post.coverImage,
+    title: post.title,
+    date: post.publishedAt?.slice(0, 10) ?? "",
+  }));
+}
+
 onMounted(() => {
   reduceMotion.value = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
-  void fetchFeatured();
+  if (homePreload.value.featured === null) void fetchFeatured();
+  else {
+    nextTick(() =>
+      requestAnimationFrame(() => {
+        mounted.value = true;
+      }),
+    );
+  }
 });
 </script>
 

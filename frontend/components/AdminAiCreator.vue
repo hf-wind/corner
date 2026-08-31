@@ -7,6 +7,7 @@
         <em>Beta</em>
       </div>
       <a-button @click="router.push(mode === 'article' ? '/admin/posts' : '/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回{{ modeConfig.listName }}</a-button>
+      <a-button type="primary" ghost @click="openEditor"><Icon name="ph:pencil-simple-bold" /> 直接进入编辑器</a-button>
     </header>
 
     <section class="mode-hero">
@@ -60,7 +61,7 @@
               <div class="picker-wrap"><button type="button" class="tool-button" :class="{ active: pickerOpen }" title="插入表情" @click="pickerOpen = !pickerOpen"><Icon name="ph:smiley-bold" /></button><EmojiPalette :open="pickerOpen" @select="insertEmoji" @close="pickerOpen = false" /></div>
               <button type="button" class="tool-button" title="插入图片" @click="pickImages"><Icon name="ph:image-bold" /></button>
             </template>
-            <span><Icon name="ph:shield-check" />生成结果会先保存为草稿</span>
+            <span><Icon name="ph:shield-check" />生成结果只会带入编辑器，由你确认后保存</span>
           </div>
           <button type="button" class="generate-button" :disabled="!prompt.trim() || generating" @click="generate">
             <Icon :name="generating ? 'ph:spinner-gap-bold' : 'ph:sparkle-bold'" :class="{ spinning: generating }" />
@@ -87,10 +88,6 @@
 </template>
 
 <script setup lang="ts">
-import { Modal } from 'ant-design-vue'
-import { buildSlug } from '~/utils/postMeta'
-import { buildMomentTitle } from '~/utils/moment'
-
 type CreatorMode = 'article' | 'moment'
 const props = withDefaults(defineProps<{ initialMode?: CreatorMode }>(), { initialMode: 'article' })
 const api = useApi()
@@ -138,6 +135,14 @@ const presets = computed(() => mode.value === 'article' ? [
 function focusEditor() { mode.value === 'moment' ? momentEditorRef.value?.focus() : articleEditorRef.value?.focus() }
 watch(mode, () => { pickerOpen.value=false; nextTick(focusEditor) })
 
+function editorPath(target = mode.value) {
+  return target === 'article' ? '/admin/posts/new' : '/admin/moments/new'
+}
+
+function openEditor() {
+  router.push(editorPath())
+}
+
 function applyPreset(text:string) { prompt.value = prompt.value.trim() ? `${prompt.value}\n\n${text}` : text; nextTick(focusEditor) }
 function insertAtCursor(token:string) {
   if (mode.value === 'moment' && momentEditorRef.value) {
@@ -162,16 +167,14 @@ async function generate() {
 
 async function generateArticle(text:string) {
   const result=await api.post<any>('/ai/generate-article',{outline:text})
-  const title=result.title || text.slice(0,40); const slug=result.slug || buildSlug(title)
-  const post=await api.post<any>('/posts',{title,slug,content:result.content || '',excerpt:result.excerpt || '',coverImage:result.coverImage || '',categoryId:result.categoryId || undefined,tagIds:result.tagIds || [],featured:false})
-  const finalSlug=post?.slug || slug
-  Modal.confirm({title:'文章草稿已创建',content:`《${title}》已保存，可以继续编辑或预览。`,okText:'继续编辑',cancelText:'返回列表',onOk:()=>router.push(`/admin/posts/${encodeURIComponent(finalSlug)}`),onCancel:()=>router.push('/admin/posts')})
+  sessionStorage.setItem('corner:article-editor-draft', JSON.stringify(result))
+  await router.push(`${editorPath('article')}?generated=1`)
 }
 
 async function generateMoment(text:string) {
-  const result=await api.post<any>('/ai/polish-moment',{inspiration:text}); const content=result.content || text; const title=result.title || buildMomentTitle(content)
-  const created=await api.post<any>('/moments',{title,slug:result.slug || buildSlug(title),content,excerpt:result.excerpt || undefined})
-  Modal.confirm({title:'瞬间草稿已创建',content:`「${created.title || title}」已保存。`,okText:'去预览',cancelText:'返回列表',onOk:()=>router.push(`/admin/moments/preview?slug=${encodeURIComponent(created.slug)}`),onCancel:()=>router.push('/admin/moments')})
+  const result=await api.post<any>('/ai/polish-moment',{inspiration:text})
+  sessionStorage.setItem('corner:moment-editor-draft', JSON.stringify({ ...result, content: result.content || text }))
+  await router.push(`${editorPath('moment')}?generated=1`)
 }
 </script>
 

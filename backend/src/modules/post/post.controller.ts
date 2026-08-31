@@ -72,6 +72,13 @@ export class PostController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
+  @Post(':slug/unpublish')
+  unpublish(@Param('slug') slug: string) {
+    return this.post.unpublish(slug);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
   @Post(':slug/schedule')
   schedule(@Param('slug') slug: string, @Body() dto: SchedulePostDto) {
     return this.post.schedule(slug, dto.scheduledAt);

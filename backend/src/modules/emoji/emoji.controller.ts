@@ -13,6 +13,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { existsSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { AuthGuard } from '@nestjs/passport';
 import { EmojiService } from './emoji.service';
 import { CreateEmojiPackDto } from './dto/create-emoji-pack.dto';
@@ -21,51 +23,30 @@ import { CreateEmojiItemDto } from './dto/create-emoji-item.dto';
 import { UpdateEmojiItemDto } from './dto/update-emoji-item.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { normalizeEmojiSource } from '../../common/utils/emoji-source';
 
 @Controller('emoji-packs')
 export class EmojiController {
   constructor(private emoji: EmojiService) {}
 
   @Get('asset')
-  async asset(@Query('url') url: string, @Res() res: Response) {
+  asset(@Query('url') url: string, @Res() res: Response) {
     if (!url) throw new BadRequestException('缺少表情资源地址');
-    let remote: URL;
-    try {
-      remote = new URL(url);
-    } catch {
-      throw new BadRequestException('表情资源地址无效');
-    }
-    const allowedHosts = new Set(['koishi.js.org', 'cdn.jsdelivr.net']);
+    const local = normalizeEmojiSource(url);
+    if (!local.startsWith('/uploads/emoji/qq/'))
+      throw new BadRequestException('不支持的旧表情资源地址');
+    const file = resolve(process.cwd(), local.replace(/^\/+/, ''));
+    const root = resolve(process.cwd(), 'uploads', 'emoji', 'qq');
+    const relativePath = relative(root, file);
     if (
-      remote.protocol !== 'https:' ||
-      !allowedHosts.has(remote.hostname.toLowerCase())
-    ) {
-      throw new BadRequestException('不支持的表情资源地址');
-    }
-    try {
-      const response = await fetch(remote, {
-        headers: {
-          'User-Agent': 'CornerEmojiProxy/1.0',
-          Referer: `https://${remote.hostname}/`,
-        },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!response.ok) throw new Error(`upstream ${response.status}`);
-      const contentType = response.headers.get('content-type') || 'image/gif';
-      if (!contentType.toLowerCase().startsWith('image/'))
-        throw new Error('upstream content is not an image');
-      const data = Buffer.from(await response.arrayBuffer());
-      res.setHeader('Content-Type', contentType);
-      res.setHeader(
-        'Cache-Control',
-        'public, max-age=86400, stale-while-revalidate=604800',
-      );
-      res.send(data);
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        `表情资源暂时不可用: ${error instanceof Error ? error.message : 'upstream error'}`,
-      );
-    }
+      !relativePath ||
+      relativePath.startsWith('..') ||
+      isAbsolute(relativePath) ||
+      !existsSync(file)
+    )
+      throw new ServiceUnavailableException('本地表情资源不存在');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.sendFile(file);
   }
 
   @Get()

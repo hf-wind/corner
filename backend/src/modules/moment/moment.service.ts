@@ -322,6 +322,7 @@ export class MomentService {
     });
     this.memoryGraph?.scheduleRebuild();
     this.aiNative?.schedulePrecompute('moment', moment.id);
+    void this.aiNative?.scheduleStyleRebuild(moment.authorId);
     return this.format(moment);
   }
 

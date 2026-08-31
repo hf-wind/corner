@@ -36,18 +36,21 @@ export const WEATHER_ICON_MAP: Record<WeatherKind, string> = {
 export function useWeather(options: { autoRefresh?: boolean } = {}) {
   const autoRefresh = options.autoRefresh !== false
   const api = useApi()
-  const weather = ref<WeatherData>({
-    temperature: 0,
-    feelsLike: 0,
-    condition: '天气加载中',
-    icon: '0',
-    city: '绍兴',
-    humidity: 0,
-    windDirection: '微风',
-    windScale: '0级',
-  })
-  const loading = ref(true)
-  let fetchedAt = 0
+  const { state: homePreload } = useHomePreload()
+  const weather = ref<WeatherData>(
+    homePreload.value.weather || {
+      temperature: 0,
+      feelsLike: 0,
+      condition: '天气加载中',
+      icon: '0',
+      city: '绍兴',
+      humidity: 0,
+      windDirection: '微风',
+      windScale: '0级',
+    },
+  )
+  const loading = ref(homePreload.value.weather === null)
+  let fetchedAt = homePreload.value.weather ? Date.now() : 0
 
   const weatherKind = computed<WeatherKind>(() => {
     const code = Number.parseInt(weather.value.icon, 10)
@@ -79,8 +82,11 @@ export function useWeather(options: { autoRefresh?: boolean } = {}) {
       refreshTimer = setInterval(() => void refresh(), 15 * 60_000)
       document.addEventListener('visibilitychange', onVisibilityChange)
     }
+    if (homePreload.value.weather) return
     if ('requestIdleCallback' in window) {
-      idleHandle = window.requestIdleCallback(() => void refresh(), { timeout: 1200 })
+      idleHandle = window.requestIdleCallback(() => void refresh(), {
+        timeout: 1200,
+      })
     } else {
       idleHandle = window.setTimeout(() => void refresh(), 180)
     }

@@ -114,11 +114,14 @@ const HomeSidebar = defineAsyncComponent(() =>
 );
 import SectionHead from "~/components/SectionHead.vue";
 const api = useApi();
-const articles = ref<any[]>([]);
-const loading = ref(true);
+const { state: homePreload } = useHomePreload();
+const articles = ref<any[]>(
+  normalizeArticles(homePreload.value.articles?.items ?? []),
+);
+const loading = ref(homePreload.value.articles === null);
 const refreshing = ref(false);
 const page = ref(1);
-const totalPages = ref(1);
+const totalPages = ref(homePreload.value.articles?.totalPages ?? 1);
 const legalOpen = ref(false);
 const legalTab = ref<"terms" | "privacy">("terms");
 const homeReady = ref(false);
@@ -182,6 +185,30 @@ function articleSnapshot(items: any[]) {
   );
 }
 
+function normalizeArticles(items: any[]) {
+  return (items ?? []).map((p: any) => ({
+    slug: p.slug,
+    cover: p.coverImage,
+    tag: p.category?.name ?? p.tags?.[0]?.name ?? "",
+    categoryIcon: p.category?.icon || "ph:folder-open-bold",
+    categoryColor: p.category?.color || "",
+    tags: (p.tags ?? []).map((t: any) => t.name),
+    tagItems: (p.tags ?? []).map((t: any) => ({
+      name: t.name,
+      icon: t.icon,
+      color: t.color,
+    })),
+    title: p.title,
+    date: p.publishedAt?.slice(0, 10) ?? "",
+    desc: p.excerpt ?? "",
+    author: p.author
+      ? { name: p.author.username, avatar: p.author.avatar }
+      : undefined,
+    views: p.viewCount ?? 0,
+    comments: p._count?.comments ?? 0,
+  }));
+}
+
 async function loadArticles(options: { silent?: boolean } = {}) {
   const id = ++requestId;
   const silent = options.silent === true;
@@ -197,27 +224,7 @@ async function loadArticles(options: { silent?: boolean } = {}) {
       sort: "latest",
     });
     if (id !== requestId) return;
-    const nextArticles = (res.items ?? []).map((p: any) => ({
-      slug: p.slug,
-      cover: p.coverImage,
-      tag: p.category?.name ?? p.tags?.[0]?.name ?? "",
-      categoryIcon: p.category?.icon || "ph:folder-open-bold",
-      categoryColor: p.category?.color || "",
-      tags: (p.tags ?? []).map((t: any) => t.name),
-      tagItems: (p.tags ?? []).map((t: any) => ({
-        name: t.name,
-        icon: t.icon,
-        color: t.color,
-      })),
-      title: p.title,
-      date: p.publishedAt?.slice(0, 10) ?? "",
-      desc: p.excerpt ?? "",
-      author: p.author
-        ? { name: p.author.username, avatar: p.author.avatar }
-        : undefined,
-      views: p.viewCount ?? 0,
-      comments: p._count?.comments ?? 0,
-    }));
+    const nextArticles = normalizeArticles(res.items ?? []);
     const nextTotalPages = res.totalPages ?? 1;
     if (
       articleSnapshot(nextArticles) !== articleSnapshot(articles.value) ||
@@ -289,7 +296,12 @@ onMounted(() => {
   enterFrame = window.requestAnimationFrame(() => {
     homeReady.value = true;
   });
-  loadArticles().then(restoreScroll);
+  if (homePreload.value.articles !== null) {
+    setBottomDockContentReady(true);
+    void restoreScroll();
+  } else {
+    loadArticles().then(restoreScroll);
+  }
 
   observeRecords();
 });

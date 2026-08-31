@@ -1,13 +1,28 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { cp, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmojiPackDto } from './dto/create-emoji-pack.dto';
 import { UpdateEmojiPackDto } from './dto/update-emoji-pack.dto';
 import { CreateEmojiItemDto } from './dto/create-emoji-item.dto';
 import { UpdateEmojiItemDto } from './dto/update-emoji-item.dto';
+import {
+  normalizeEmojiSource,
+  twemojiCharacter,
+} from '../../common/utils/emoji-source';
 
 @Injectable()
-export class EmojiService {
+export class EmojiService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    const source = join(process.cwd(), 'prisma', 'seed-assets', 'emoji', 'qq');
+    const target = join(process.cwd(), 'uploads', 'emoji', 'qq');
+    await mkdir(target, { recursive: true });
+    await cp(source, target, { recursive: true, force: false }).catch(
+      () => undefined,
+    );
+  }
 
   async getPacks(includeDisabled = false) {
     const packs = await this.prisma.emojiPack.findMany({
@@ -35,9 +50,24 @@ export class EmojiService {
       ...(keyword?.trim()
         ? {
             OR: [
-              { label: { contains: keyword.trim(), mode: 'insensitive' as const } },
-              { char: { contains: keyword.trim(), mode: 'insensitive' as const } },
-              { imageUrl: { contains: keyword.trim(), mode: 'insensitive' as const } },
+              {
+                label: {
+                  contains: keyword.trim(),
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                char: {
+                  contains: keyword.trim(),
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                imageUrl: {
+                  contains: keyword.trim(),
+                  mode: 'insensitive' as const,
+                },
+              },
             ],
           }
         : {}),
@@ -92,8 +122,15 @@ export class EmojiService {
     return this.prisma.emojiItem.update({ where: { id }, data: dto });
   }
 
-  private presentItem<T extends { imageUrl: string | null }>(item: T) {
-    return item;
+  private presentItem<
+    T extends { imageUrl: string | null; char?: string | null },
+  >(item: T) {
+    const character = item.char || twemojiCharacter(item.imageUrl);
+    return {
+      ...item,
+      char: character || item.char,
+      imageUrl: character ? null : normalizeEmojiSource(item.imageUrl),
+    };
   }
 
   async deleteItem(id: string) {

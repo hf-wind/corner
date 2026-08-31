@@ -9,6 +9,10 @@ import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import {
+  normalizeEmojiSource,
+  twemojiCharacter,
+} from '../../common/utils/emoji-source';
 import * as nodemailer from 'nodemailer';
 
 type EmailTemplateKey =
@@ -615,10 +619,15 @@ export class EmailService {
   ) {
     const stored = (await this.getStoredTemplates())[key];
     if (!stored?.custom || !stored.subject?.trim() || !stored.html?.trim()) {
-      const definition = this.templateDefinitions(String(variables.siteUrl || 'https://corner.ink')).find((item) => item.key === key);
+      const definition = this.templateDefinitions(
+        String(variables.siteUrl || 'https://corner.ink'),
+      ).find((item) => item.key === key);
       if (definition) {
         return {
-          subject: this.renderTemplateText(definition.defaultSubject, variables),
+          subject: this.renderTemplateText(
+            definition.defaultSubject,
+            variables,
+          ),
           html: this.renderTemplateText(definition.defaultHtml, variables),
         };
       }
@@ -827,13 +836,9 @@ export class EmailService {
       {
         key: 'newsletter_confirm' as const,
         name: '订阅确认',
-        description: '访客订阅周报后发送的确认邮件，点击链接完成 double opt-in。',
-        variables: [
-          'siteName',
-          'siteUrl',
-          'confirmUrl',
-          'unsubscribeUrl',
-        ],
+        description:
+          '访客订阅周报后发送的确认邮件，点击链接完成 double opt-in。',
+        variables: ['siteName', 'siteUrl', 'confirmUrl', 'unsubscribeUrl'],
         sample: {
           ...sampleBase,
           confirmUrl: `${siteUrl}/newsletter/confirm?token=sample`,
@@ -914,53 +919,16 @@ export class EmailService {
     label: string,
     siteUrl: string,
   ): string {
-    const original = this.unwrapEmojiProxy(source);
-    const twemoji = this.twemojiCharacter(original);
+    const original = normalizeEmojiSource(source);
+    const twemoji = twemojiCharacter(original);
     if (twemoji) return this.escapeHtml(twemoji);
 
     const baseUrl = siteUrl.replace(/\/$/, '');
-    let imageUrl = source;
-    try {
-      const remote = new URL(original);
-      if (
-        ['cdn.jsdelivr.net', 'koishi.js.org'].includes(
-          remote.hostname.toLowerCase(),
-        )
-      ) {
-        imageUrl = `${baseUrl}/api/emoji-packs/asset?url=${encodeURIComponent(remote.toString())}`;
-      }
-    } catch {
-      if (source.startsWith('/')) imageUrl = `${baseUrl}${source}`;
-    }
+    const imageUrl = original.startsWith('/')
+      ? `${baseUrl}${original}`
+      : original;
     if (!/^(?:https?:\/\/)/i.test(imageUrl)) return this.escapeHtml(label);
     return `<img src="${this.escapeHtml(imageUrl)}" alt="${this.escapeHtml(label)}" style="width:20px;height:20px;vertical-align:-4px;display:inline-block;object-fit:contain;" />`;
-  }
-
-  private unwrapEmojiProxy(source: string): string {
-    if (!source.startsWith('/api/emoji-packs/asset')) return source;
-    try {
-      return (
-        new URL(source, 'https://corner.local').searchParams.get('url') ||
-        source
-      );
-    } catch {
-      return source;
-    }
-  }
-
-  private twemojiCharacter(source: string): string {
-    if (!/twemoji/i.test(source)) return '';
-    const codepoints = source.match(
-      /\/([0-9a-f]+(?:-[0-9a-f]+)*)\.(?:png|svg)(?:\?|$)/i,
-    )?.[1];
-    if (!codepoints) return '';
-    try {
-      return String.fromCodePoint(
-        ...codepoints.split('-').map((value) => Number.parseInt(value, 16)),
-      );
-    } catch {
-      return '';
-    }
   }
 
   private escapeHtml(value: string): string {

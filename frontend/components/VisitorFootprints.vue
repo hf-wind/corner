@@ -110,8 +110,9 @@ type RecentVisit = {
 };
 
 const { fetchRecent } = useVisitor();
+const { state: homePreload } = useHomePreload();
 const footprintsRef = ref<HTMLElement | null>(null);
-const allItems = ref<RecentVisit[]>([]);
+const allItems = ref<RecentVisit[]>(homePreload.value.visitors || []);
 const visibleCount = ref(4);
 const items = computed(() => allItems.value.slice(0, visibleCount.value));
 const footprintStyle = computed(() => ({
@@ -236,7 +237,9 @@ onMounted(() => {
   resizeObserver = new ResizeObserver(updateVisibleCount);
   if (footprintsRef.value) resizeObserver.observe(footprintsRef.value);
   updateVisibleCount();
-  if ("requestIdleCallback" in window) {
+  if (homePreload.value.visitors !== null) {
+    listKey.value += 1;
+  } else if ("requestIdleCallback" in window) {
     idleHandle = window.requestIdleCallback(() => void load(true), {
       timeout: 1400,
     });

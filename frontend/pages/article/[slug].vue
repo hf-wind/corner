@@ -11,10 +11,11 @@
       @scroll.passive="handleArticleScroll"
     >
       <template v-if="!articleLoading && article.id">
-        <AppLink to="/home" class="back-btn">
+        <AppLink :to="isAdminPreview ? '/admin/posts' : '/home'" class="back-btn">
           <Icon name="ph:arrow-left-bold" />
-          返回首页
+          {{ isAdminPreview ? "返回文章管理" : "返回首页" }}
         </AppLink>
+        <div v-if="isAdminPreview" class="preview-notice"><Icon name="ph:eye-bold" /> 正在预览后台保存版本，页面结构与真实文章详情一致</div>
 
         <div
           class="post-header article-anim"
@@ -33,7 +34,7 @@
           />
 
           <div class="post-nav">
-            <div class="operations">
+            <div v-if="!isAdminPreview" class="operations">
               <button
                 type="button"
                 class="z-btn"
@@ -164,9 +165,9 @@
           </section>
         </div>
 
-        <AsyncNewsletterBar v-if="adjacentLoaded" class="article-anim" />
+        <AsyncNewsletterBar v-if="adjacentLoaded && !isAdminPreview" class="article-anim" />
 
-        <div v-if="adjacentLoaded" class="surround-post article-anim">
+        <div v-if="adjacentLoaded && !isAdminPreview" class="surround-post article-anim">
           <AppLink
             v-if="prevArticle"
             :to="'/article/' + prevArticle.slug"
@@ -206,7 +207,7 @@
           </div>
         </div>
 
-        <div ref="commentsSentinelRef" class="comments-stage">
+        <div v-if="!isAdminPreview" ref="commentsSentinelRef" class="comments-stage">
           <AsyncArticleComments
             v-if="commentsReady"
             :post-id="article.id"
@@ -249,7 +250,7 @@
         @toggle-immersive="toggleImmersive"
       >
         <template #pet>
-          <ClientOnly>
+          <ClientOnly v-if="!isAdminPreview">
             <AsyncAiPet
               v-if="petMountReady"
               docked
@@ -306,6 +307,7 @@ function coverUrl(source: string) {
 const api = useApi();
 const route = useRoute();
 const slug = route.params.slug as string;
+const isAdminPreview = computed(() => route.query.preview === "1");
 const editorId = "article-preview";
 const CATALOG_VIEW_OFFSET = 32;
 const CATALOG_ACTIVE_TOLERANCE = 1;
@@ -379,13 +381,15 @@ async function loadArticle() {
   articleLoading.value = true;
   coverLoaded.value = false;
   try {
-    const p = await api.get<any>(`/posts/${slug}`);
+    const p = await api.get<any>(
+      isAdminPreview.value ? `/posts/${slug}/preview` : `/posts/${slug}`,
+    );
     article.value = {
       author: p.author?.username ?? "作者",
       tag: p.category?.name ?? "",
       category: p.category || null,
       title: p.title,
-      date: p.publishedAt?.slice(0, 10) ?? "",
+      date: (p.publishedAt || p.createdAt || "").slice(0, 10),
       comments: p._count?.comments ?? 0,
       views: p.viewCount ?? 0,
       hero: p.coverImage,
@@ -663,7 +667,7 @@ function scheduleDeferredModules() {
     deferredIdleHandle = null;
     deferredFallbackTimer = null;
     petMountReady.value = true;
-    void loadAdjacent();
+    if (!isAdminPreview.value) void loadAdjacent();
   };
   if ("requestIdleCallback" in window) {
     deferredIdleHandle = window.requestIdleCallback(reveal, { timeout: 900 });
@@ -781,7 +785,7 @@ onMounted(async () => {
   await loadArticle();
   if (!article.value.id) return;
   await nextTick();
-  commentsReady.value = Boolean(focusCommentId.value || focusParentId.value);
+  commentsReady.value = !isAdminPreview.value && Boolean(focusCommentId.value || focusParentId.value);
   typeExcerpt();
   checkOutdated();
   requestAnimationFrame(() => {
@@ -923,6 +927,19 @@ onUnmounted(() => {
 
 .back-btn:hover {
   color: var(--c-primary);
+}
+
+.preview-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 16px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 24%, var(--border));
+  border-radius: 8px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-size: 0.68rem;
 }
 
 .post-header {

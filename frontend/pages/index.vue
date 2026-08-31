@@ -139,6 +139,7 @@ const TimeConstellationScene = defineAsyncComponent(
 );
 const { mediaUrl } = useMediaUrl();
 const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings();
+const { preloadHomeContent } = useHomePreload();
 const { navigating, navigate } = useCosmicNavigation();
 const currentYear = new Date().getFullYear();
 const sceneReady = ref(false);
@@ -248,6 +249,12 @@ onMounted(async () => {
   advanceProgress(22, "同步站点信息", "读取标题与欢迎页配置");
 
   const settingsRequest = loadSiteSettings();
+  const homeRequest = Promise.allSettled([
+    preloadHomeContent(),
+    import("~/pages/home.vue"),
+    import("~/components/FeaturedSwiper.vue"),
+    import("~/components/HomeSidebar.vue"),
+  ]);
   const graphRequest = Promise.allSettled([
     api.get<any>(
       "/memories/graph",
@@ -271,7 +278,9 @@ onMounted(async () => {
   } else {
     sceneFailed.value = true;
   }
-  advanceProgress(72, "时光坐标已载入", "构建星图与首帧画面");
+  advanceProgress(62, "时光坐标已载入", "同步首页文章与侧栏内容");
+  await homeRequest;
+  advanceProgress(78, "首页内容已就绪", "构建星图与首帧画面");
   await nextTick();
 
   if (!graph.nodes.length || sceneFailed.value) {

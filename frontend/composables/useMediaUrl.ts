@@ -21,17 +21,17 @@ export function useMediaUrl() {
     if (/^https?:\/\//i.test(source)) {
       try {
         const url = new URL(source);
-        if (
-          ["cdn.jsdelivr.net", "koishi.js.org"].includes(
-            url.hostname.toLowerCase(),
-          )
-        ) {
-          return `/api/emoji-packs/asset?url=${encodeURIComponent(url.toString())}`;
+        const qqFace = url.toString().match(
+          /^https:\/\/koishi\.js\.org\/QFace\/(gif|static)\/([^/?#]+)$/i,
+        );
+        if (qqFace) {
+          source = `/uploads/emoji/qq/${qqFace[1].toLowerCase()}/${qqFace[2]}`;
+        } else {
+          return source;
         }
       } catch {
         /* keep the original URL */
       }
-      return source;
     }
     if (source.startsWith("data:")) return source;
     const normalized = source.startsWith("/") ? source : `/${source}`;

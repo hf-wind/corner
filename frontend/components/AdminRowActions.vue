@@ -9,13 +9,23 @@
       <Icon name="ph:pencil-simple-bold" /> 编辑
     </a-button>
     <a-button
-      v-if="showPublish && record?.needsPublish"
+      v-if="showPublish && (record?.needsPublish || (showUnpublish && record?.status === 'unpublished'))"
       type="link"
       size="small"
       :loading="publishing"
       @click="emit('publish')"
     >
-      <Icon name="ph:paper-plane-tilt-bold" /> 发布
+      <Icon name="ph:paper-plane-tilt-bold" /> {{ record?.status === 'unpublished' ? '重新发布' : '发布' }}
+    </a-button>
+    <a-button
+      v-if="showUnpublish && record?.status === 'published'"
+      type="link"
+      size="small"
+      danger
+      :loading="publishing"
+      @click="emit('unpublish')"
+    >
+      <Icon name="ph:eye-slash-bold" /> 下架
     </a-button>
     <a-button
       v-if="showPreview && canPreview"
@@ -29,6 +39,7 @@
       <a-button type="link" size="small"><Icon name="ph:gear-six-bold" /> 设置 <Icon name="ph:caret-down-bold" /></a-button>
       <template #overlay>
         <a-menu @click="onSettingsMenuClick">
+          <a-menu-item key="versions"><span class="settings-menu-item"><Icon name="ph:clock-counter-clockwise-bold" /> 版本记录</span></a-menu-item>
           <a-menu-item key="schedule"><span class="settings-menu-item"><Icon name="ph:clock-countdown-bold" /> 定时发布</span></a-menu-item>
           <a-menu-item key="privacy"><span class="settings-menu-item"><Icon name="ph:lock-key-bold" /> {{ record?.status === 'private' ? '恢复公开' : '设置私密' }}</span></a-menu-item>
         </a-menu>
@@ -54,6 +65,7 @@ const props = withDefaults(
     showEdit?: boolean
     showPreview?: boolean
     showPublish?: boolean
+    showUnpublish?: boolean
     showSettings?: boolean
     showDelete?: boolean
     publishing?: boolean
@@ -64,6 +76,7 @@ const props = withDefaults(
     showEdit: true,
     showPreview: true,
     showPublish: true,
+    showUnpublish: false,
     showSettings: true,
     showDelete: true,
     publishing: false,
@@ -75,13 +88,16 @@ const emit = defineEmits<{
   (e: 'edit'): void
   (e: 'preview'): void
   (e: 'publish'): void
+  (e: 'unpublish'): void
   (e: 'settings'): void
   (e: 'delete'): void
   (e: 'schedule'): void
   (e: 'privacy'): void
+  (e: 'versions'): void
 }>()
 
 function onSettingsMenuClick({ key }: { key: string }) {
+  if (key === 'versions') emit('versions')
   if (key === 'schedule') emit('schedule')
   if (key === 'privacy') emit('privacy')
 }

@@ -93,12 +93,17 @@ export class MemoryNarrativeAiService {
       3,
       Math.min(20, Math.round((dto.durationMinutes || 5) * 1.5)),
     );
+    const style = await this.ai.getSiteStyleInstruction('故事编排');
     const text = await this.ai.chat(
       [
         {
           role: 'system',
-          content:
+          content: [
             '你是克制的个人记忆叙事编辑。只使用提供的公开内容，不补造地点、人物或经历。仅输出 JSON。',
+            style,
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
         },
         {
           role: 'user',
@@ -135,12 +140,17 @@ export class MemoryNarrativeAiService {
     });
     if (!nodes.length)
       throw new BadRequestException('没有可生成旁白的公开记忆');
+    const style = await this.ai.getSiteStyleInstruction('故事旁白');
     const text = await this.ai.chat(
       [
         {
           role: 'system',
-          content:
+          content: [
             '为个人记忆故事撰写自然、克制的第一人称旁白草稿。不得虚构给定摘要之外的事实。仅输出 JSON。',
+            style,
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
         },
         {
           role: 'user',

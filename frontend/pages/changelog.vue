@@ -208,8 +208,9 @@ const ready = ref(false);
 const error = ref("");
 const data = reactive<ChangelogResponse>({
   enabled: true,
-  title: "最近更新",
-  subtitle: "记录每一次推送，也留下那些不适合写进提交信息的细节。",
+  title: "风迹",
+  subtitle:
+    "风过无声，循迹可寻。每一次改变，都在时间里留下属于自己的印记，那些细微的更迭与变化，也终将成为一路走来不可忽略的痕迹。",
   repository: { owner: "", name: "", branch: "main", url: "" },
   releases: [],
   page: 1,
@@ -228,7 +229,7 @@ async function load(nextPage = page.value) {
   try {
     const result = await api.get<ChangelogResponse>("/changelog", {
       page: nextPage,
-      limit: 6,
+      limit: 10,
     });
     Object.assign(data, result);
     page.value = result.page;
@@ -281,7 +282,7 @@ function formatSyncTime(value: string) {
 
 onMounted(() => load(1));
 useHead({
-  title: "最近更新 · 风隅随笔",
+  title: "风迹 · 风隅随笔",
   meta: [
     {
       name: "description",

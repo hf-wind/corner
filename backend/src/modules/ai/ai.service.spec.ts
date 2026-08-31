@@ -9,6 +9,18 @@ describe('AiService model configuration compatibility', () => {
 
   function createService() {
     const prisma = {
+      user: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'admin-id' }),
+      },
+      post: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      moment: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      aiAuthorStyleProfile: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       aiModelConfig: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -102,6 +114,55 @@ describe('AiService model configuration compatibility', () => {
         limits: { catalog: 12, topK: 3, snippetLen: 480 },
       }),
     );
+  });
+
+  it('uses the base writing guide before reaching the style profile threshold', async () => {
+    const { service, prisma } = createService();
+    const samples = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `${prefix}-${index}`,
+        title: `${prefix} ${index}`,
+        content: '这是一段超过二十个字并且可以参与作者文风画像学习的正文内容。',
+        updatedAt: new Date(),
+        publishedAt: new Date(),
+      }));
+    prisma.post.findMany.mockResolvedValue(samples(4, 'post'));
+    prisma.moment.findMany.mockResolvedValue(samples(3, 'moment'));
+    prisma.aiAuthorStyleProfile.findUnique.mockResolvedValue({
+      profile: { tone: 'sample-profile' },
+      updatedAt: new Date(),
+    });
+
+    const instruction = await service.getSiteStyleInstruction('文章创作');
+
+    expect(instruction).toContain('第一人称');
+    expect(instruction).not.toContain('sample-profile');
+    await expect(service.getSiteStyleStatus()).resolves.toEqual(
+      expect.objectContaining({ eligible: false, sampleCount: 7, minimum: 8 }),
+    );
+  });
+
+  it('adds the learned site profile after reaching eight published items', async () => {
+    const { service, prisma } = createService();
+    const samples = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `${prefix}-${index}`,
+        title: `${prefix} ${index}`,
+        content: '这是一段超过二十个字并且可以参与作者文风画像学习的正文内容。',
+        updatedAt: new Date(),
+        publishedAt: new Date(),
+      }));
+    prisma.post.findMany.mockResolvedValue(samples(5, 'post'));
+    prisma.moment.findMany.mockResolvedValue(samples(3, 'moment'));
+    prisma.aiAuthorStyleProfile.findUnique.mockResolvedValue({
+      profile: { tone: 'sample-profile' },
+      updatedAt: new Date(),
+    });
+
+    const instruction = await service.getSiteStyleInstruction('文章创作');
+
+    expect(instruction).toContain('站点已发布内容画像');
+    expect(instruction).toContain('sample-profile');
   });
 
   it('creates AI taxonomy records with complete visual metadata', async () => {

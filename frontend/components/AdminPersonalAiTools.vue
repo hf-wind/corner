@@ -4,8 +4,11 @@
     <div class="tool-grid">
       <article>
         <span class="tool-icon"><Icon name="ph:fingerprint-bold" /></span>
-        <div><h3>作者风格档案</h3><p>从已发布文章和瞬间提取语气、节奏、词汇与结构偏好。</p></div>
-        <a-button :loading="busy === 'style'" @click="rebuildStyle"><Icon name="ph:arrows-clockwise-bold" /> 重建档案</a-button>
+        <div><h3>站点文风维护</h3><p>维护基础指南、补充规则、文风样本与站点画像；已发布正文超过 20 字才会纳入。</p></div>
+        <div class="tool-actions">
+          <a-button type="primary" @click="openStyleSettings"><Icon name="ph:sliders-horizontal-bold" /> 查看维护内容</a-button>
+          <a-button :loading="busy === 'style'" @click="rebuildStyle"><Icon name="ph:arrows-clockwise-bold" /> 重建画像</a-button>
+        </div>
         <pre v-if="styleResult">{{ JSON.stringify(styleResult.profile, null, 2) }}</pre>
       </article>
       <article>
@@ -40,10 +43,14 @@ const privateResult = ref<any>();
 const narrative = reactive({ kind: "weekly", theme: "" });
 const narrativeResult = ref<any>();
 
+function openStyleSettings() {
+  navigateTo({ path: "/admin/ai", query: { tab: "style" } });
+}
+
 async function rebuildStyle() {
   busy.value = "style";
-  try { styleResult.value = await api.post("/ai/admin/style/rebuild"); toast.success("风格档案已更新"); }
-  catch (error: any) { toast.error(error?.message || "风格档案更新失败"); }
+  try { styleResult.value = await api.post("/ai/admin/style/rebuild"); toast.success("站点文风画像已更新"); }
+  catch (error: any) { toast.error(error?.message || "站点文风画像更新失败"); }
   finally { busy.value = ""; }
 }
 async function askPrivate() {
@@ -62,5 +69,5 @@ async function generateNarrative() {
 </script>
 
 <style scoped>
-.personal-ai-tools{margin-top:16px;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.personal-ai-tools>header span{color:var(--c-primary);font-size:.52rem;letter-spacing:.12em}.personal-ai-tools h2{margin:3px 0 0;font-size:.9rem}.personal-ai-tools header p{margin:4px 0 14px;color:var(--c-text-3);font-size:.58rem}.tool-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.tool-grid article{display:flex;min-width:0;flex-direction:column;align-items:flex-start;gap:10px;padding:15px;border:1px solid var(--border);border-radius:8px;background:var(--c-bg-1)}.tool-icon{display:grid;width:34px;height:34px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.tool-grid h3{margin:0;font-size:.72rem}.tool-grid p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem;line-height:1.65}.tool-grid :deep(.ant-select){width:100%}.tool-grid pre{width:100%;max-height:240px;margin:0;padding:10px;overflow:auto;border-radius:6px;background:var(--ld-bg-card);color:var(--c-text-2);font-size:.52rem;white-space:pre-wrap}.tool-grid a{color:var(--c-primary);font-size:.56rem}.tool-grid .answer{padding:10px;border-radius:6px;background:var(--ld-bg-card);color:var(--c-text-2)}.narrative-result{width:100%}.narrative-result h4{margin:0 0 7px;font-size:.65rem}@media(max-width:980px){.tool-grid{grid-template-columns:1fr}}
+.personal-ai-tools{margin-top:16px;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--ld-bg-card)}.personal-ai-tools>header span{color:var(--c-primary);font-size:.52rem;letter-spacing:.12em}.personal-ai-tools h2{margin:3px 0 0;font-size:.9rem}.personal-ai-tools header p{margin:4px 0 14px;color:var(--c-text-3);font-size:.58rem}.tool-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.tool-grid article{display:flex;min-width:0;flex-direction:column;align-items:flex-start;gap:10px;padding:15px;border:1px solid var(--border);border-radius:8px;background:var(--c-bg-1)}.tool-icon{display:grid;width:34px;height:34px;border-radius:8px;background:var(--c-primary-soft);color:var(--c-primary);place-items:center}.tool-grid h3{margin:0;font-size:.72rem}.tool-grid p{margin:4px 0 0;color:var(--c-text-3);font-size:.56rem;line-height:1.65}.tool-actions{display:flex;flex-wrap:wrap;gap:8px}.tool-grid :deep(.ant-select){width:100%}.tool-grid pre{width:100%;max-height:240px;margin:0;padding:10px;overflow:auto;border-radius:6px;background:var(--ld-bg-card);color:var(--c-text-2);font-size:.52rem;white-space:pre-wrap}.tool-grid a{color:var(--c-primary);font-size:.56rem}.tool-grid .answer{padding:10px;border-radius:6px;background:var(--ld-bg-card);color:var(--c-text-2)}.narrative-result{width:100%}.narrative-result h4{margin:0 0 7px;font-size:.65rem}@media(max-width:980px){.tool-grid{grid-template-columns:1fr}}
 </style>

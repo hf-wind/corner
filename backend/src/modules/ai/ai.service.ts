@@ -286,6 +286,117 @@ export class AiService {
     return this.getConfig();
   }
 
+  private async styleOwner(userId?: string) {
+    if (userId) return userId;
+    const owner = await this.prisma.user.findFirst({
+      where: { role: 'admin', isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    return owner?.id;
+  }
+
+  async getSiteStyleStatus(userId?: string) {
+    const cfg = await this.getConfig();
+    const ownerId = await this.styleOwner(userId);
+    const minimum = Math.max(1, Math.min(100, cfg.ai_style_min_samples));
+    if (!ownerId) {
+      return {
+        enabled: cfg.ai_style_enabled,
+        eligible: false,
+        sampleCount: 0,
+        minimum,
+        profile: null,
+        updatedAt: null,
+        samples: [],
+      };
+    }
+    const [posts, moments, profile] = await Promise.all([
+      this.prisma.post.findMany({
+        where: { authorId: ownerId, status: 'published' },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          updatedAt: true,
+          publishedAt: true,
+        },
+      }),
+      this.prisma.moment.findMany({
+        where: { authorId: ownerId, status: 'published' },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          updatedAt: true,
+          publishedAt: true,
+        },
+      }),
+      this.prisma.aiAuthorStyleProfile.findUnique({
+        where: { userId: ownerId },
+      }),
+    ]);
+    const samples = [
+      ...posts.map((item) => ({ ...item, type: 'article' as const })),
+      ...moments.map((item) => ({ ...item, type: 'moment' as const })),
+    ]
+      .map((item) => ({
+        id: item.id,
+        type: item.type,
+        title: item.title || '未命名内容',
+        chars: this.toPlainText(item.content).length,
+        updatedAt: item.updatedAt,
+        publishedAt: item.publishedAt,
+      }))
+      .filter((item) => item.chars > 20)
+      .sort(
+        (left, right) =>
+          Number(right.updatedAt || 0) - Number(left.updatedAt || 0),
+      );
+    const sampleCount = samples.length;
+    return {
+      enabled: cfg.ai_style_enabled,
+      eligible: sampleCount >= minimum,
+      sampleCount,
+      minimum,
+      profile: profile?.profile || null,
+      updatedAt: profile?.updatedAt || null,
+      samples,
+    };
+  }
+
+  async getSiteStyleInstruction(task: string, userId?: string) {
+    const cfg = await this.getConfig();
+    if (!cfg.ai_style_enabled) return '';
+    const status = await this.getSiteStyleStatus(userId);
+    const strength =
+      {
+        light: '轻度参考，优先保持任务原本的表达要求。',
+        strong:
+          '强度较高，在不损害事实与任务约束的前提下明显保持站点表达习惯。',
+        balanced: '平衡参考，在准确完成任务的同时自然保持站点表达习惯。',
+      }[cfg.ai_style_strength] ||
+      '平衡参考，在准确完成任务的同时自然保持站点表达习惯。';
+    const parts = [
+      `【风隅随笔统一文风 · ${task}】`,
+      strength,
+      cfg.ai_style_base_guide.trim(),
+      cfg.ai_style_custom_rules.trim()
+        ? `补充规则：\n${cfg.ai_style_custom_rules.trim()}`
+        : '',
+    ];
+    if (status.eligible && status.profile) {
+      parts.push(
+        `站点已发布内容画像（只学习表达习惯，不复制原句）：${JSON.stringify(status.profile)}`,
+      );
+    }
+    return parts.filter(Boolean).join('\n\n');
+  }
+
   getDefaults() {
     return { ...AI_DEFAULTS };
   }
@@ -751,7 +862,7 @@ export class AiService {
     return this.polishMomentWithConfig(inspiration);
   }
 
-  async polishMomentWithConfig(inspiration: string) {
+  async polishMomentWithConfig(inspiration: string, userId?: string) {
     const text = String(inspiration || '').trim();
     if (text.length < 2) {
       throw new BadRequestException('请先写一点灵感或想法');
@@ -769,6 +880,10 @@ export class AiService {
       120,
     );
     const cfg = await this.getConfig();
+    const styleInstruction = await this.getSiteStyleInstruction(
+      '瞬间润色',
+      userId,
+    );
 
     if (
       !cfg.ai_moment_enabled ||
@@ -785,7 +900,12 @@ export class AiService {
     try {
       const result = await this.chat(
         [
-          { role: 'system', content: cfg.ai_moment_prompt },
+          {
+            role: 'system',
+            content: [cfg.ai_moment_prompt, styleInstruction]
+              .filter(Boolean)
+              .join('\n\n'),
+          },
           {
             role: 'user',
             content: `请润色下面这段瞬间灵感：\n${text.slice(0, 6000)}`,
@@ -1084,20 +1204,43 @@ export class AiService {
     const cfg = await this.getConfig();
     const configured = String(cfg.ai_wallpaper_source_url || '').trim();
     if (/^https:\/\/images\.unsplash\.com\//i.test(configured)) {
-      return { items: [{ id: createHash('sha256').update(configured).digest('hex').slice(0, 16), url: configured, thumb: configured }], source: configured };
+      return {
+        items: [
+          {
+            id: createHash('sha256')
+              .update(configured)
+              .digest('hex')
+              .slice(0, 16),
+            url: configured,
+            thumb: configured,
+          },
+        ],
+        source: configured,
+      };
     }
     const sourceUrl = this.safeWallpaperSource(configured);
 
-    if (sourceUrl.hostname === 'wallhaven.cc' || sourceUrl.hostname.endsWith('.wallhaven.cc')) {
+    if (
+      sourceUrl.hostname === 'wallhaven.cc' ||
+      sourceUrl.hostname.endsWith('.wallhaven.cc')
+    ) {
       const params = new URLSearchParams({
-        sorting: sourceUrl.pathname.includes('toplist') ? 'toplist' : 'favorites',
+        sorting: sourceUrl.pathname.includes('toplist')
+          ? 'toplist'
+          : 'favorites',
         page: String(p),
       });
       try {
-        const response = await fetch(`https://wallhaven.cc/api/v1/search?${params}`, {
-          signal: AbortSignal.timeout(12000),
-          headers: { Accept: 'application/json', 'User-Agent': 'corner-blog-wallpaper/1.0' },
-        });
+        const response = await fetch(
+          `https://wallhaven.cc/api/v1/search?${params}`,
+          {
+            signal: AbortSignal.timeout(12000),
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'corner-blog-wallpaper/1.0',
+            },
+          },
+        );
         if (response.ok) {
           const payload = (await response.json()) as any;
           const items = (Array.isArray(payload?.data) ? payload.data : [])
@@ -1105,7 +1248,12 @@ export class AiService {
             .map((item: any) => ({
               id: String(item?.id || ''),
               url: String(item?.path || ''),
-              thumb: String(item?.thumbs?.large || item?.thumbs?.original || item?.path || ''),
+              thumb: String(
+                item?.thumbs?.large ||
+                  item?.thumbs?.original ||
+                  item?.path ||
+                  '',
+              ),
             }))
             .filter((item: any) => item.id && /^https?:\/\//i.test(item.url));
           if (items.length) return { items, source: sourceUrl.toString() };
@@ -1138,7 +1286,11 @@ export class AiService {
     }
 
     // Fallback: known CDN image pattern with IDs extracted from homepage once
-    const fallback = DEFAULT_COVER_SOURCES.slice(0, r).map((url) => ({ id: createHash('sha256').update(url).digest('hex').slice(0, 16), url, thumb: url }));
+    const fallback = DEFAULT_COVER_SOURCES.slice(0, r).map((url) => ({
+      id: createHash('sha256').update(url).digest('hex').slice(0, 16),
+      url,
+      thumb: url,
+    }));
     return { items: fallback, source: 'bundled-stable-cover-sources' };
   }
 
@@ -1175,7 +1327,11 @@ export class AiService {
         if (!/^https?:\/\//i.test(url) || seen.has(url)) continue;
         if (!/\.(?:avif|jpe?g|png|webp)(?:\?|$)/i.test(url)) continue;
         seen.add(url);
-        out.push({ id: createHash('sha256').update(url).digest('hex').slice(0, 16), url, thumb: url });
+        out.push({
+          id: createHash('sha256').update(url).digest('hex').slice(0, 16),
+          url,
+          thumb: url,
+        });
       } catch {
         /* ignore invalid image URLs */
       }
@@ -1210,16 +1366,17 @@ export class AiService {
       throw new ServiceUnavailableException('AI 未配置或已关闭');
     }
 
-    const styleProfile = userId
-      ? await this.prisma.aiAuthorStyleProfile
-          .findUnique({ where: { userId } })
-          .catch(() => null)
-      : null;
+    const styleInstruction = await this.getSiteStyleInstruction(
+      '文章创作',
+      userId,
+    );
     const bodyText = await this.chat(
       [
         {
           role: 'system',
-          content: `${cfg.ai_article_prompt}\n\n作者风格档案：${JSON.stringify(styleProfile?.profile || {})}\n保持作者既有表达习惯，但不要复制旧句。`,
+          content: [cfg.ai_article_prompt, styleInstruction]
+            .filter(Boolean)
+            .join('\n\n'),
         },
         { role: 'user', content: `灵感/要点：\n${text}` },
       ],
@@ -2136,7 +2293,10 @@ export class AiService {
       return tb - ta;
     });
     const safePage = Math.max(1, Number.isFinite(page) ? page : 1);
-    const safePageSize = Math.max(1, Math.min(100, Number.isFinite(pageSize) ? pageSize : 10));
+    const safePageSize = Math.max(
+      1,
+      Math.min(100, Number.isFinite(pageSize) ? pageSize : 10),
+    );
     const start = (safePage - 1) * safePageSize;
     return {
       items: all.slice(start, start + safePageSize),

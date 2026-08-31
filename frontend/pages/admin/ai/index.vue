@@ -4,6 +4,7 @@
     <a-tabs v-model:activeKey="tab" size="small">
       <a-tab-pane key="base" tab="基础配置" />
       <a-tab-pane key="content" tab="内容生成" />
+      <a-tab-pane key="style" tab="站点文风" />
       <a-tab-pane key="chat" tab="聊天助手" />
       <a-tab-pane key="moderation" tab="审核" />
       <a-tab-pane key="chats" tab="会话管理" />
@@ -412,6 +413,148 @@
             
           
 
+        </a-space>
+      </a-spin>
+    </div>
+
+    <div v-show="tab === 'style'" class="tab-body">
+      <a-spin :spinning="cfgLoading || styleLoading">
+        <a-space direction="vertical" :size="16" style="width: 100%">
+          <AdminCard
+            icon="ph:signature-bold"
+            title="风隅文风引擎"
+            desc="统一控制文章、瞬间、书影体会、风迹与记忆叙事等内容的表达方式"
+          >
+            <template #extra>
+              <a-button
+                type="primary"
+                :loading="styleRebuilding"
+                :disabled="!styleStatus.eligible"
+                @click="rebuildStyle"
+              >
+                <Icon name="ph:sparkle-bold" /> 立即建立画像
+              </a-button>
+            </template>
+            <a-alert
+              :type="styleStatus.eligible ? 'success' : 'info'"
+              show-icon
+              class="inline-alert"
+              :message="
+                styleStatus.eligible
+                  ? `已达到画像门槛：${styleStatus.sampleCount} 篇已发布内容，可基于站点表达持续学习。`
+                  : `当前 ${styleStatus.sampleCount} 篇已发布内容，达到 ${styleStatus.minimum} 篇后可建立站点画像；基础文风仍会生效。`
+              "
+              :description="
+                styleStatus.updatedAt
+                  ? `最近建立于 ${formatStyleTime(styleStatus.updatedAt)}`
+                  : '尚未建立站点画像'
+              "
+            />
+
+            <a-form layout="vertical" size="middle">
+              <div class="switch-grid">
+                <div class="switch-item">
+                  <div class="switch-label">
+                    <Icon name="ph:pen-nib-bold" class="switch-icon" />
+                    <div>
+                      <div class="switch-name">启用统一文风</div>
+                      <div class="switch-note">不影响哆啦A梦角色内容</div>
+                    </div>
+                  </div>
+                  <a-switch v-model:checked="form.ai_style_enabled" />
+                </div>
+                <div class="switch-item">
+                  <div class="switch-label">
+                    <Icon name="ph:arrows-clockwise-bold" class="switch-icon" />
+                    <div>
+                      <div class="switch-name">发布后自动重建</div>
+                      <div class="switch-note">仅达到样本门槛后调用模型</div>
+                    </div>
+                  </div>
+                  <a-switch v-model:checked="form.ai_style_auto_rebuild" />
+                </div>
+              </div>
+
+              <a-row :gutter="16">
+                <a-col :xs="24" :sm="12" :lg="6">
+                  <a-form-item label="画像门槛">
+                    <a-input-number v-model:value="form.ai_style_min_samples" :min="1" :max="100" addon-after="篇" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :lg="6">
+                  <a-form-item label="最大样本数">
+                    <a-input-number v-model:value="form.ai_style_max_samples" :min="8" :max="100" addon-after="篇" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :lg="6">
+                  <a-form-item label="单篇采样长度">
+                    <a-input-number v-model:value="form.ai_style_sample_char_limit" :min="400" :max="6000" :step="100" addon-after="字" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :sm="12" :lg="6">
+                  <a-form-item label="文风强度">
+                    <a-select v-model:value="form.ai_style_strength" :options="styleStrengthOptions" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+
+              <a-form-item label="基础文风指南">
+                <a-textarea v-model:value="form.ai_style_base_guide" :rows="9" maxlength="6000" show-count />
+              </a-form-item>
+              <a-form-item label="站点补充规则">
+                <a-textarea
+                  v-model:value="form.ai_style_custom_rules"
+                  :rows="5"
+                  maxlength="3000"
+                  show-count
+                  placeholder="填写特定栏目、用词、节奏或禁用表达；留空时只使用基础指南与站点画像"
+                />
+              </a-form-item>
+            </a-form>
+          </AdminCard>
+
+          <AdminCard
+            icon="ph:files-bold"
+            title="文风样本维护"
+            desc="只统计已发布且正文超过 20 字的内容；文章正文增改超过 20 字时会自动触发画像更新"
+          >
+            <a-table
+              v-if="styleStatus.samples.length"
+              :columns="styleSampleColumns"
+              :data-source="styleStatus.samples"
+              :pagination="false"
+              :scroll="{ x: 620 }"
+              row-key="id"
+              size="small"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'type'">
+                  <a-tag :color="record.type === 'article' ? 'blue' : 'cyan'">
+                    {{ record.type === "article" ? "文章" : "瞬间" }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'chars'">
+                  {{ record.chars }} 字
+                </template>
+                <template v-else-if="column.key === 'updatedAt'">
+                  {{ formatStyleTime(record.updatedAt) }}
+                </template>
+              </template>
+            </a-table>
+            <a-empty
+              v-else
+              description="还没有符合条件的已发布文风样本"
+            />
+          </AdminCard>
+
+          <AdminCard
+            v-if="styleStatus.profile"
+            icon="ph:chart-radar-bold"
+            title="当前站点画像"
+            desc="画像只总结表达习惯，不保存或复制文章原句"
+          >
+            <pre class="preview-box">{{ JSON.stringify(styleStatus.profile, null, 2) }}</pre>
+          </AdminCard>
         </a-space>
       </a-spin>
     </div>
@@ -919,7 +1062,7 @@ const router = useRouter();
 const api = useApi();
 const toast = useToast();
 
-const validTabs = new Set(["base", "content", "chat", "moderation", "chats"]);
+const validTabs = new Set(["base", "content", "style", "chat", "moderation", "chats"]);
 const tab = ref(validTabs.has(String(route.query.tab)) ? String(route.query.tab) : "base");
 watch(tab, (value) => {
   const query = { ...route.query };
@@ -952,7 +1095,7 @@ const modelOptions = computed(() =>
     .filter((item) => item.enabled)
     .map((item) => ({
       value: item.id,
-      label: `${item.name} · ${item.model}${item.isDefault ? "（默认）" : ""}`,
+      label: item.name || "DeepSeek Flash",
     })),
 );
 const modelDialog = reactive({
@@ -972,6 +1115,35 @@ const greetingsText = ref("");
 const previewQuery = ref("");
 const previewLoading = ref(false);
 const previewText = ref("");
+const styleLoading = ref(false);
+const styleRebuilding = ref(false);
+const styleStatus = reactive({
+  enabled: true,
+  eligible: false,
+  sampleCount: 0,
+  minimum: 8,
+  profile: null as Record<string, unknown> | null,
+  updatedAt: "" as string | null,
+  samples: [] as Array<{
+    id: string;
+    type: "article" | "moment";
+    title: string;
+    chars: number;
+    updatedAt: string;
+    publishedAt: string | null;
+  }>,
+});
+const styleSampleColumns = [
+  { title: "类型", key: "type", width: 90 },
+  { title: "样本内容", dataIndex: "title", key: "title" },
+  { title: "正文长度", key: "chars", width: 110 },
+  { title: "最后更新", key: "updatedAt", width: 180 },
+];
+const styleStrengthOptions = [
+  { value: "light", label: "轻度参考" },
+  { value: "balanced", label: "平衡" },
+  { value: "strong", label: "明显保持" },
+];
 
 const knowledgeListLoading = ref(false);
 const knowledgeList = ref<{ total: number; items: any[] }>({
@@ -980,9 +1152,43 @@ const knowledgeList = ref<{ total: number; items: any[] }>({
 });
 
 onMounted(async () => {
-  await Promise.all([loadConfig(), loadModels()]);
+  await Promise.all([loadConfig(), loadModels(), loadStyleStatus()]);
   await loadKnowledgeList();
 });
+
+async function loadStyleStatus() {
+  styleLoading.value = true;
+  try {
+    Object.assign(styleStatus, await api.get<any>("/ai/admin/style"));
+  } catch {
+    toast.error("加载站点文风状态失败");
+  } finally {
+    styleLoading.value = false;
+  }
+}
+
+async function rebuildStyle() {
+  styleRebuilding.value = true;
+  try {
+    await api.post("/ai/admin/style/rebuild");
+    await loadStyleStatus();
+    toast.success("站点文风画像已更新");
+  } catch (error: any) {
+    toast.error(error?.message || "站点文风画像建立失败");
+  } finally {
+    styleRebuilding.value = false;
+  }
+}
+
+function formatStyleTime(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 
 async function loadModels() {
   modelsLoading.value = true;
@@ -993,7 +1199,26 @@ async function loadModels() {
     toast.error("加载模型配置失败");
   } finally {
     modelsLoading.value = false;
+    applySingleModelDefaults();
   }
+}
+
+function applySingleModelDefaults() {
+  const enabledModels = models.value.filter((item) => item.enabled);
+  if (enabledModels.length !== 1) return;
+  const modelId = enabledModels[0].id;
+  const modelKeys = [
+    "ai_chat_model_config_id",
+    "ai_summarize_model_config_id",
+    "ai_moderate_model_config_id",
+    "ai_friend_moderate_model_config_id",
+    "ai_article_model_config_id",
+    "ai_moment_model_config_id",
+    "ai_library_model_config_id",
+  ];
+  modelKeys.forEach((key) => {
+    if (!form[key]) form[key] = modelId;
+  });
 }
 
 function resetModelDialog() {
@@ -1119,6 +1344,7 @@ async function loadConfig() {
     toast.error("加载 AI 配置失败");
   } finally {
     cfgLoading.value = false;
+    applySingleModelDefaults();
   }
 }
 
@@ -1134,6 +1360,7 @@ async function saveConfig() {
     };
     const res = await api.put<any>("/ai/admin/config", { config: payload });
     applyConfig(res.config || payload);
+    await loadStyleStatus();
     apiConfigured.value = !!res.apiConfigured;
     toast.success("已保存");
     return true;

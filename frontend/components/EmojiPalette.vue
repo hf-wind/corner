@@ -325,7 +325,7 @@ function shortName(name: string) {
 function emitSelect(item: EmojiItem) {
   emit("select", {
     char: item.char,
-    imageUrl: item.imageUrl,
+    imageUrl: item.char ? undefined : item.imageUrl,
     label: item.label,
   });
   emit("close");

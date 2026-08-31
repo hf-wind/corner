@@ -79,8 +79,11 @@ export class AiController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Post('polish-moment')
-  polishMoment(@Body() dto: PolishMomentDto) {
-    return this.ai.polishMomentWithConfig(dto.inspiration);
+  polishMoment(@Body() dto: PolishMomentDto, @Req() req: Request) {
+    return this.ai.polishMomentWithConfig(
+      dto.inspiration,
+      (req.user as any)?.id,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -440,6 +443,13 @@ export class AiController {
   @Post('admin/style/rebuild')
   rebuildStyle(@Req() req: Request) {
     return this.aiNative.rebuildStyle((req.user as any).id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get('admin/style')
+  styleStatus(@Req() req: Request) {
+    return this.ai.getSiteStyleStatus((req.user as any).id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

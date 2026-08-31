@@ -68,12 +68,12 @@
             <span class="studio-icon"><Icon name="ph:pencil-simple-line-bold" /></span>
             <div>
               <p>Moment Editor</p>
-              <h1>{{ form.title || '编辑瞬间' }}</h1>
+              <h1>{{ form.title || (isCreate ? '写下一条瞬间' : '编辑瞬间') }}</h1>
             </div>
           </div>
           <div class="header-actions">
             <a-button @click="router.push('/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回列表</a-button>
-            <a-button @click="openPreview"><Icon name="ph:eye-bold" /> 预览</a-button>
+            <a-button :disabled="!currentSlug" @click="openPreview"><Icon name="ph:eye-bold" /> 预览</a-button>
             <a-button type="primary" :loading="saving" @click="save"><Icon name="ph:floppy-disk-bold" /> 保存</a-button>
           </div>
         </header>
@@ -143,13 +143,14 @@ const editorRef = ref<{
   insertText: (text: string) => void
   insertToken: (token: string) => void
 } | null>(null)
-const loading = ref(Boolean(props.slug))
+const isCreate = computed(() => props.slug === 'new')
+const loading = ref(Boolean(props.slug && !isCreate.value))
 const creating = ref(false)
 const saving = ref(false)
 const generatingExcerpt = ref(false)
 const pickerOpen = ref(false)
 const inspiration = ref('')
-const currentSlug = ref(props.slug || '')
+const currentSlug = ref(isCreate.value ? '' : props.slug || '')
 const needsPublish = ref(false)
 
 const form = reactive<{
@@ -238,7 +239,7 @@ async function createFromInspiration() {
 }
 
 async function loadExisting() {
-  if (!props.slug) return
+  if (!props.slug || isCreate.value) return
   loading.value = true
   try {
     const moment = await api.get<any>(`/moments/${props.slug}/preview`)
@@ -261,28 +262,49 @@ async function loadExisting() {
   }
 }
 
+function loadGeneratedDraft() {
+  if (!isCreate.value) return
+  try {
+    const raw = sessionStorage.getItem('corner:moment-editor-draft')
+    const draft = raw ? JSON.parse(raw) : null
+    if (!draft) return
+    form.title = String(draft.title || '')
+    form.slug = String(draft.slug || '')
+    form.content = String(draft.content || '')
+    form.excerpt = String(draft.excerpt || '')
+    sessionStorage.removeItem('corner:moment-editor-draft')
+    toast.info('AI 草稿已带入编辑器，确认后再保存')
+  } catch {
+    sessionStorage.removeItem('corner:moment-editor-draft')
+  }
+}
+
 async function save() {
-  if (!currentSlug.value || !form.content.trim()) {
+  if (!form.content.trim()) {
     toast.warning('正文不能为空')
     return
   }
   saving.value = true
   try {
+    const creatingNew = !currentSlug.value
     const confirmExactLocation = await confirmExactLocationIfNeeded()
     if (confirmExactLocation === null) return
     const title = form.title.trim() || buildMomentTitle(form.content)
-    const result = await api.put<any>(`/moments/${currentSlug.value}`, {
+    const payload = {
       title,
       slug: form.slug.trim() || buildSlug(title),
       excerpt: form.excerpt.trim() || undefined,
       content: form.content.trim(),
       ...locationPayload(confirmExactLocation),
-    })
+    }
+    const result = currentSlug.value
+      ? await api.put<any>(`/moments/${currentSlug.value}`, payload)
+      : await api.post<any>('/moments', payload)
     form.title = result.title || title
     form.slug = result.slug || form.slug
     currentSlug.value = result.slug || currentSlug.value
     needsPublish.value = !!result.needsPublish
-    toast.success('已保存')
+    toast.success(creatingNew ? '瞬间草稿已创建' : '已保存')
     if (result.slug && result.slug !== props.slug) await router.replace(`/admin/moments/${result.slug}`)
   } catch (error: any) {
     toast.error(`保存失败：${error?.message || ''}`)
@@ -356,7 +378,10 @@ function confirmExactLocationIfNeeded(): Promise<boolean | null> {
   })
 }
 
-onMounted(() => { void loadExisting() })
+onMounted(() => {
+  loadGeneratedDraft()
+  void loadExisting()
+})
 </script>
 
 <style scoped>
