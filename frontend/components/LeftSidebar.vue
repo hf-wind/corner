@@ -223,6 +223,8 @@ const {
   guestbookEnabled,
   circleEnabled,
   loadCircleFeature,
+  changelogEnabled,
+  loadChangelogFeature,
 } = useFeatureFlags();
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar));
 
@@ -239,6 +241,7 @@ const siteNav = [
   { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
   { to: "/guestbook", icon: "ph:chat-circle-dots-bold", label: "时光留言" },
   { to: "/friends", icon: "ph:handshake-bold", label: "友链" },
+  { to: "/changelog", icon: "ph:git-commit-bold", label: "更新日志" },
   { to: "/about", icon: "ph:info-bold", label: "关于" },
 ];
 
@@ -263,6 +266,7 @@ const adminFullNav = [
   { to: "/admin/newsletter", icon: "ph:newspaper-bold", label: "订阅周报" },
   { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情资源" },
   { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
+  { to: "/admin/changelog", icon: "ph:git-commit-bold", label: "更新日志" },
   { to: "/admin/settings", icon: "ph:gear-bold", label: "站点设置" },
   { to: "/admin/backups", icon: "ph:database-bold", label: "备份与恢复" },
   { to: "/admin/info", icon: "ph:info-bold", label: "系统信息" },
@@ -284,7 +288,12 @@ const navItems = computed(() => {
         (constellationEnabled || !item.to.includes("/time/constellation")) &&
         (storiesEnabled || !item.to.includes("/stories")) &&
         (guestbookEnabled || !item.to.includes("/guestbook")) &&
-        (isPanel.value || circleEnabled.value || !item.to.includes("/circle")),
+        (isPanel.value ||
+          circleEnabled.value ||
+          !item.to.includes("/circle")) &&
+        (isPanel.value ||
+          changelogEnabled.value ||
+          !item.to.includes("/changelog")),
     );
   if (!isPanel.value) return filterFeatures(siteNav);
   return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav;
@@ -362,6 +371,7 @@ const navGroups = computed<NavGroup[]>(() => {
           "/admin/backups",
           "/admin/info",
           "/admin/about",
+          "/admin/changelog",
         ]),
       },
       {
@@ -396,7 +406,7 @@ const navGroups = computed<NavGroup[]>(() => {
     {
       key: "community",
       label: "相遇",
-      items: select(["/guestbook", "/friends", "/about"]),
+      items: select(["/guestbook", "/friends", "/changelog", "/about"]),
     },
   ].filter((group) => group.items.length);
 });
@@ -443,7 +453,7 @@ function openSearch() {
 }
 
 function goPanel() {
-  router.push(isUserAdmin.value ? '/admin' : '/admin/profile');
+  router.push(isUserAdmin.value ? "/admin" : "/admin/profile");
 }
 
 async function handleLogout() {
@@ -470,6 +480,7 @@ async function handleLogout() {
 onMounted(() => {
   void loadSiteSettings();
   void loadCircleFeature();
+  void loadChangelogFeature();
   readStorage();
   expandActiveGroup();
   if (isLoggedIn.value) refreshProfile();

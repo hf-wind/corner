@@ -47,6 +47,10 @@ const routes: RouteRecordRaw[] = [
   },
   { path: "/about", component: lazyRoute(() => import("./pages/about.vue")) },
   {
+    path: "/changelog",
+    component: lazyRoute(() => import("./pages/changelog.vue")),
+  },
+  {
     path: "/moments",
     component: lazyRoute(() => import("./pages/moments/index.vue")),
   },
@@ -252,6 +256,11 @@ const routes: RouteRecordRaw[] = [
     meta: adminMeta,
   },
   {
+    path: "/admin/changelog",
+    component: lazyRoute(() => import("./pages/admin/changelog.vue")),
+    meta: adminMeta,
+  },
+  {
     path: "/admin/moments/create",
     component: lazyRoute(() => import("./pages/admin/moments/create.vue")),
     meta: adminMeta,
@@ -311,7 +320,10 @@ const routes: RouteRecordRaw[] = [
     component: lazyRoute(() => import("./pages/admin/users.vue")),
     meta: adminMeta,
   },
-  { path: "/:pathMatch(.*)*", redirect: "/" },
+  {
+    path: "/:pathMatch(.*)*",
+    component: lazyRoute(() => import("./pages/404.vue")),
+  },
 ];
 
 const router = createRouter({

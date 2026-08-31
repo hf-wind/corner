@@ -39,6 +39,7 @@ import { VisitorModule } from './modules/visitor/visitor.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { CircleModule } from './modules/circle/circle.module';
+import { ChangelogModule } from './modules/changelog/changelog.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { CircleModule } from './modules/circle/circle.module';
     GeoModule,
     BackupModule,
     CircleModule,
+    ChangelogModule,
   ],
   controllers: [AppController],
   providers: [
