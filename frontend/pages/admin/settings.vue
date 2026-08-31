@@ -61,6 +61,8 @@
       <a-tab-pane key="basic" tab="基本设置" />
       <a-tab-pane key="email" tab="邮件配置" />
       <a-tab-pane key="music" tab="音乐播放器" />
+      <a-tab-pane key="backups" tab="备份与恢复" />
+      <a-tab-pane key="system" tab="系统信息" />
     </a-tabs>
 
     <div v-show="tab === 'website'" class="tab-body">
@@ -770,6 +772,18 @@
           </a-button>
         </template>
       </a-modal>
+    </div>
+
+    <div v-show="tab === 'backups'" class="tab-body">
+      <AdminCard icon="ph:cloud-arrow-up-bold" title="备份与恢复" desc="完整归档、敏感资产和恢复任务统一管理">
+        <div class="linked-admin-panel"><div><strong>打开备份中心</strong><p>在独立工作区创建备份、查看校验结果或执行受控恢复。</p></div><NuxtLink class="linked-admin-button" to="/admin/backups"><Icon name="ph:arrow-square-out-bold" />进入备份中心</NuxtLink></div>
+      </AdminCard>
+    </div>
+
+    <div v-show="tab === 'system'" class="tab-body">
+      <AdminCard icon="ph:heartbeat-bold" title="系统信息" desc="查看当前生产进程、数据库与运行环境状态">
+        <div class="linked-admin-panel"><div><strong>打开系统信息</strong><p>系统状态会在页面打开时从后端实时读取，不使用前端缓存。</p></div><NuxtLink class="linked-admin-button" to="/admin/info"><Icon name="ph:arrow-square-out-bold" />查看系统信息</NuxtLink></div>
+      </AdminCard>
     </div>
   </div>
 </template>
@@ -1588,6 +1602,10 @@ async function refreshCache() {
 </script>
 
 <style scoped>
+.linked-admin-panel{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--c-bg-1)}
+.linked-admin-panel strong{display:block;color:var(--c-text);font-size:.82rem}.linked-admin-panel p{margin:5px 0 0;color:var(--c-text-3);font-size:.64rem;line-height:1.6}
+.linked-admin-button{display:inline-flex;min-height:34px;align-items:center;gap:6px;flex:0 0 auto;padding:0 12px;border-radius:7px;background:var(--c-primary);color:#fff;text-decoration:none;font-size:.66rem}
+@media(max-width:620px){.linked-admin-panel{align-items:stretch;flex-direction:column}.linked-admin-button{justify-content:center}}
 .settings-page {
   width: min(1120px, 100%);
   margin: 0 auto;

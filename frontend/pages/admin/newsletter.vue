@@ -254,6 +254,7 @@ onMounted(loadAll)
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 40px;
   gap: 16px;
 }
 

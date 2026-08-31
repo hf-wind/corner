@@ -167,13 +167,13 @@ async function generate() {
 
 async function generateArticle(text:string) {
   const result=await api.post<any>('/ai/generate-article',{outline:text})
-  sessionStorage.setItem('corner:article-editor-draft', JSON.stringify(result))
+  useClientState().setSession('articleEditorDraft', result)
   await router.push(`${editorPath('article')}?generated=1`)
 }
 
 async function generateMoment(text:string) {
   const result=await api.post<any>('/ai/polish-moment',{inspiration:text})
-  sessionStorage.setItem('corner:moment-editor-draft', JSON.stringify({ ...result, content: result.content || text }))
+  useClientState().setSession('momentEditorDraft', { ...result, content: result.content || text })
   await router.push(`${editorPath('moment')}?generated=1`)
 }
 </script>

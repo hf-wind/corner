@@ -10,7 +10,7 @@ export function importWithRetry<T>(
   const run = (): Promise<T> =>
     loader().then((value) => {
       if (recoveryKey && typeof window !== "undefined")
-        sessionStorage.removeItem(`corner:module-reload:${recoveryKey}`);
+        useClientState().removeSession(`moduleReload:${recoveryKey}`);
       return value;
     }).catch((error) => {
       if (attempt < retries) {
@@ -21,13 +21,12 @@ export function importWithRetry<T>(
       }
 
       if (recoveryKey && typeof window !== "undefined") {
-        const marker = `corner:module-reload:${recoveryKey}`;
-        if (sessionStorage.getItem(marker) !== "1") {
-          sessionStorage.setItem(marker, "1");
+        if (useClientState().getSession(`moduleReload:${recoveryKey}`, false) !== true) {
+          useClientState().setSession(`moduleReload:${recoveryKey}`, true);
           window.location.reload();
           return new Promise<T>(() => undefined);
         }
-        sessionStorage.removeItem(marker);
+        useClientState().removeSession(`moduleReload:${recoveryKey}`);
       }
       attempt += 1;
       throw error;

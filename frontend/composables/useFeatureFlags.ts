@@ -3,6 +3,9 @@ function envEnabled(value: string | undefined, fallback = true) {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
+let circleLoadPromise: Promise<void> | null = null;
+let changelogLoadPromise: Promise<void> | null = null;
+
 export function useFeatureFlags() {
   const circleEnabled = useState("feature-circle-enabled", () => true);
   const circleLoaded = useState("feature-circle-loaded", () => false);
@@ -10,29 +13,39 @@ export function useFeatureFlags() {
   const changelogLoaded = useState("feature-changelog-loaded", () => false);
   async function loadCircleFeature() {
     if (circleLoaded.value) return;
-    try {
-      const result = await useApi().get<{ enabled?: boolean }>(
-        "/circle/status",
-      );
-      circleEnabled.value = result?.enabled !== false;
-    } catch {
-      // Keep the menu visible when the status endpoint is unavailable.
-    } finally {
-      circleLoaded.value = true;
-    }
+    if (circleLoadPromise) return circleLoadPromise;
+    circleLoadPromise = (async () => {
+      try {
+        const result = await useApi().get<{ enabled?: boolean }>(
+          "/circle/status",
+        );
+        circleEnabled.value = result?.enabled !== false;
+      } catch {
+        // Keep the menu visible when the status endpoint is unavailable.
+      } finally {
+        circleLoaded.value = true;
+        circleLoadPromise = null;
+      }
+    })();
+    return circleLoadPromise;
   }
   async function loadChangelogFeature() {
     if (changelogLoaded.value) return;
-    try {
-      const result = await useApi().get<{ enabled?: boolean }>(
-        "/changelog/status",
-      );
-      changelogEnabled.value = result?.enabled !== false;
-    } catch {
-      // Keep the menu visible when the status endpoint is unavailable.
-    } finally {
-      changelogLoaded.value = true;
-    }
+    if (changelogLoadPromise) return changelogLoadPromise;
+    changelogLoadPromise = (async () => {
+      try {
+        const result = await useApi().get<{ enabled?: boolean }>(
+          "/changelog/status",
+        );
+        changelogEnabled.value = result?.enabled !== false;
+      } catch {
+        // Keep the menu visible when the status endpoint is unavailable.
+      } finally {
+        changelogLoaded.value = true;
+        changelogLoadPromise = null;
+      }
+    })();
+    return changelogLoadPromise;
   }
   return {
     albumsEnabled: envEnabled(

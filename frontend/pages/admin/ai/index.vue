@@ -549,7 +549,7 @@
 
           <AdminCard
             v-if="styleStatus.profile"
-            icon="ph:chart-radar-bold"
+            icon="ph:chart-line-up-bold"
             title="当前站点画像"
             desc="画像只总结表达习惯，不保存或复制文章原句"
           >

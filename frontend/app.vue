@@ -49,6 +49,7 @@ const { init: initTheme } = useTheme();
 const { readStorage, refreshProfile, isLoggedIn, isAdmin } = useAuth();
 const { connectRealtime, disconnectRealtime, refreshUnread } =
   useNotifications();
+const visitor = useVisitor();
 const { toasts } = useToast();
 const { siteTitle, loadSiteSettings } = useSiteSettings();
 const route = useRoute();
@@ -93,7 +94,13 @@ watch(
 
 watch(
   () => route.fullPath,
-  (path) => void trackUmamiPageview(path),
+  (path) => {
+    void trackUmamiPageview(path);
+    if (typeof window !== 'undefined') {
+      const contentType = path.startsWith('/circle') ? 'circle' : path.startsWith('/article/') ? 'article' : route.meta.layout === 'admin' ? 'admin' : 'page';
+      visitor.queueEvent({ action: 'page_view', path, contentType, sourceId: path.split('/').filter(Boolean).pop() });
+    }
+  },
   { immediate: true },
 );
 
@@ -102,7 +109,7 @@ onMounted(() => {
   void loadSiteSettings();
   initTheme();
   initTypography();
-  void useVisitor().trackVisit();
+  window.addEventListener('pagehide', () => { void visitor.flushEvents(true) });
   if (sessionReady.value) {
     void refreshProfile();
     connectRealtime();
@@ -113,10 +120,12 @@ onMounted(() => {
 onUnmounted(() => {
   clientProtection.stop();
   disconnectRealtime();
+  void visitor.flushEvents();
 });
 
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
+    void visitor.trackVisit();
     connectRealtime();
     void refreshUnread();
   } else {

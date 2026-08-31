@@ -1,26 +1,26 @@
 import { useApi } from "./useApi";
 
-const NICKNAME_KEY = "corner:visitor:nickname";
 let activeVisit: Promise<any> | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+const pendingEvents: any[] = [];
+let flushing: Promise<any> | null = null;
 
 export function useVisitor() {
   const api = useApi();
+  const state = useClientState();
 
   const nickname = ref(
-    typeof window !== "undefined"
-      ? (localStorage.getItem(NICKNAME_KEY) ?? "")
-      : "",
+    String(state.get('visitor', 'nickname', '')),
   );
   const setNickname = (value: string) => {
     const clean = value.trim().slice(0, 20);
-    localStorage.setItem(NICKNAME_KEY, clean);
+    state.set('visitor', 'nickname', clean);
     nickname.value = clean;
   };
 
   const visitorId = () => {
     if (typeof window === "undefined") return "";
-    const storageKey = "corner:visitor:id";
-    const existing = localStorage.getItem(storageKey);
+    const existing = String(state.get('visitor', 'visitorId', ''));
     if (existing && /^[a-zA-Z0-9-]{8,64}$/.test(existing)) return existing;
     const generated =
       typeof crypto.randomUUID === "function"
@@ -28,7 +28,7 @@ export function useVisitor() {
         : Array.from(crypto.getRandomValues(new Uint8Array(16)), (v) =>
             v.toString(16).padStart(2, "0"),
           ).join("");
-    localStorage.setItem(storageKey, generated);
+    state.set('visitor', 'visitorId', generated);
     return generated;
   };
 
@@ -43,14 +43,37 @@ export function useVisitor() {
 
   const trackVisit = async () => {
     if (!visitorId()) return null;
+    const authToken = String(state.get('auth', 'token', ''));
+    const identity = authToken ? 'user' : (nickname.value.trim() ? 'registered' : 'anonymous');
+    const trackedIdentity = String(state.getSession('visitTrackedIdentity', ''));
+    if (trackedIdentity === identity) return { ok: true, deduped: true };
     if (activeVisit) return activeVisit;
     const visit = api.post<any>("/visitor/track").catch(() => null);
     activeVisit = visit;
     try {
-      return await visit;
+      const result = await visit;
+      if (result?.ok !== false) state.setSession('visitTrackedIdentity', identity);
+      return result;
     } finally {
       if (activeVisit === visit) activeVisit = null;
     }
+  };
+
+  const queueEvent = (event: Record<string, unknown>) => {
+    if (typeof window === 'undefined' || !visitorId()) return;
+    const authToken = String(state.get('auth', 'token', ''));
+    pendingEvents.push({ ...event, identity: event.identity || (authToken ? 'user' : nickname.value.trim() ? 'registered' : 'anonymous'), at: new Date().toISOString(), sessionId: state.getSession('id', '') });
+    if (pendingEvents.length >= 20) void flushEvents();
+    else if (!flushTimer) flushTimer = setTimeout(() => void flushEvents(), 5 * 60 * 1000);
+  };
+  const flushEvents = async (keepalive = false) => {
+    if (flushing || !pendingEvents.length || !visitorId()) return flushing;
+    const batch = pendingEvents.splice(0);
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    flushing = api.post<any>('/visitor/track/batch', { events: batch }, keepalive ? { keepalive } as any : undefined)
+      .catch(() => { pendingEvents.unshift(...batch); return null; })
+      .finally(() => { flushing = null; });
+    return flushing;
   };
 
   const fetchWall = () => api.get<any>("/visitor/wall");
@@ -89,5 +112,7 @@ export function useVisitor() {
     fetchBottleQuota,
     fishBottle,
     releaseBottle,
+    queueEvent,
+    flushEvents,
   };
 }

@@ -39,6 +39,7 @@ export class SettingsController {
       'site_url',
       'about_profile',
       'constellation_music_url',
+      'constellation_config',
     ]);
     if (!publicKeys.has(key)) return null;
     const value = await this.settings.get(key);

@@ -207,7 +207,7 @@ async function handleGitHubLogin() {
   try {
     const token = await resolveTurnstile();
     if (!token) return;
-    sessionStorage.setItem("corner:github-turnstile-token", token);
+    useClientState().setSession("githubTurnstileToken", token);
     // Let Vue paint the loading state before Supabase starts a full-page
     // navigation, otherwise a resolved Turnstile token makes it invisible.
     await new Promise<void>((resolve) => {
@@ -217,7 +217,7 @@ async function handleGitHubLogin() {
     // Supabase starts a full-page navigation; keep the state until this page unloads.
     navigationStarted = true;
   } catch (err: any) {
-    sessionStorage.removeItem("corner:github-turnstile-token");
+    useClientState().removeSession("githubTurnstileToken");
     toast.error(err.message || "GitHub登录失败");
   } finally {
     if (!navigationStarted) githubLoading.value = false;

@@ -405,7 +405,7 @@ router.afterEach((to) => {
     to.fullPath.startsWith("/") &&
     !to.fullPath.startsWith("//")
   ) {
-    sessionStorage.setItem("corner:last-public-route", to.fullPath);
+    useClientState().setSession('lastPublicRoute', to.fullPath);
   }
   window.requestAnimationFrame(() =>
     document.documentElement.classList.remove("space-pending"),
@@ -425,12 +425,12 @@ router.onError((error, to) => {
 
   // A stale dev-server graph or an old deployed chunk can recover after one reload.
   // Keep a per-route marker so a genuinely broken module cannot reload forever.
-  const marker = `corner:module-reload:${to.fullPath}`;
-  if (sessionStorage.getItem(marker) === "1") {
-    sessionStorage.removeItem(marker);
+  const marker = `moduleReload:${to.fullPath}`;
+  if (useClientState().getSession(marker, false) === true) {
+    useClientState().removeSession(marker);
     return;
   }
-  sessionStorage.setItem(marker, "1");
+  useClientState().setSession(marker, true);
   window.location.reload();
 });
 

@@ -90,7 +90,7 @@ function rememberAndClose() {
   const normalized = query.value.trim()
   const next = [normalized, ...history.value.filter((item) => item !== normalized)].filter(Boolean).slice(0, 12)
   history.value = next
-  sessionStorage.setItem('corner:search-history', JSON.stringify(next))
+  useClientState().setSession('searchHistory', next)
   close()
 }
 
@@ -101,7 +101,7 @@ function useHistory(value: string) {
 
 function clearHistory() {
   history.value = []
-  sessionStorage.removeItem('corner:search-history')
+  useClientState().removeSession('searchHistory')
 }
 
 function withHighlight(href: string, value: string) {
@@ -132,7 +132,8 @@ function onPanelKeydown(event: KeyboardEvent) {
 
 watch(() => props.visible, (v) => {
   if (v) {
-    try { history.value = JSON.parse(sessionStorage.getItem('corner:search-history') || '[]') } catch { history.value = [] }
+    const stored = useClientState().getSession('searchHistory', [])
+    history.value = Array.isArray(stored) ? stored.map(String) : []
     nextTick(() => inputRef.value?.focus())
   }
 })

@@ -1,9 +1,16 @@
 import {
+  IsArray,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
+
+export class TrackVisitorEventsDto {
+  @IsOptional()
+  @IsArray()
+  events?: Array<Record<string, unknown>>;
+}
 import {
   VISITOR_BOTTLE_MAX_LENGTH,
   VISITOR_MESSAGE_MAX_LENGTH,

@@ -14,7 +14,8 @@ let transitionTimer: ReturnType<typeof setTimeout> | null = null
 export function useTheme(): ThemeContext {
   if (instance) return instance
 
-  const initialTheme = typeof window === 'undefined' ? 'auto' : localStorage.getItem('theme') || 'auto'
+  const clientState = useClientState()
+  const initialTheme = typeof window === 'undefined' ? 'auto' : String(clientState.get('site', 'theme', 'auto'))
   const initialResolved = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
   const theme: Ref<string> = useState('theme', () => initialTheme)
   const resolvedTheme = useState<'light' | 'dark'>('resolved-theme', () => initialResolved)
@@ -36,7 +37,7 @@ export function useTheme(): ThemeContext {
     const next = ['light', 'dark', 'auto'].includes(mode) ? mode : 'auto'
     document.documentElement.classList.add('theme-switching')
     theme.value = next
-    localStorage.setItem('theme', next)
+    clientState.set('site', 'theme', next)
     applyTheme()
     if (transitionTimer) clearTimeout(transitionTimer)
     transitionTimer = setTimeout(() => {
@@ -45,7 +46,7 @@ export function useTheme(): ThemeContext {
   }
 
   function init() {
-    const saved = localStorage.getItem('theme') || 'auto'
+    const saved = String(clientState.get('site', 'theme', 'auto'))
     theme.value = saved
     applyTheme()
 

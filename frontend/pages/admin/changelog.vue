@@ -19,7 +19,12 @@
       </div>
     </header>
 
+    <a-tabs v-model:activeKey="activeTab" size="small" class="changelog-tabs">
+      <a-tab-pane key="stream" tab="更新记录" />
+      <a-tab-pane key="config" tab="配置" />
+    </a-tabs>
     <a-spin :spinning="loading">
+      <div v-show="activeTab === 'stream'">
       <section class="source-overview">
         <span class="source-icon"><Icon name="ph:github-logo-bold" /></span>
         <div class="source-copy">
@@ -54,68 +59,7 @@
         </div>
       </section>
 
-      <div class="admin-columns">
-        <section class="settings-panel">
-          <header class="panel-head">
-            <span><Icon name="ph:sliders-horizontal-bold" /></span>
-            <div>
-              <h2>页面与仓库</h2>
-              <p>控制菜单入口、公开文案和同步范围。</p>
-            </div>
-          </header>
-
-          <div class="enable-setting">
-            <div>
-              <strong>公开风迹</strong>
-              <small>关闭后前台菜单自动隐藏，已有记录仍会保留。</small>
-            </div>
-            <a-switch v-model:checked="config.enabled" />
-          </div>
-
-          <a-form layout="vertical" class="settings-form">
-            <a-form-item label="页面标题">
-              <a-input v-model:value="config.title" maxlength="80" />
-            </a-form-item>
-            <a-form-item label="页面描述">
-              <a-textarea
-                v-model:value="config.subtitle"
-                :rows="3"
-                maxlength="240"
-                show-count
-              />
-            </a-form-item>
-            <div class="repository-fields">
-              <a-form-item label="仓库所有者">
-                <a-input v-model:value="config.repositoryOwner" />
-              </a-form-item>
-              <a-form-item label="仓库名称">
-                <a-input v-model:value="config.repositoryName" />
-              </a-form-item>
-              <a-form-item label="分支">
-                <a-input v-model:value="config.branch" />
-              </a-form-item>
-            </div>
-            <div class="number-fields">
-              <a-form-item label="缓存时间">
-                <a-input-number
-                  v-model:value="config.cacheTtl"
-                  :min="300"
-                  :max="86400"
-                  addon-after="秒"
-                />
-              </a-form-item>
-              <a-form-item label="自动记录数量">
-                <a-input-number
-                  v-model:value="config.maxGroups"
-                  :min="4"
-                  :max="30"
-                  addon-after="组"
-                />
-              </a-form-item>
-            </div>
-          </a-form>
-        </section>
-
+      <div class="admin-columns single-column">
         <div class="admin-side-column">
           <section class="manual-panel">
             <header class="panel-head manual-head">
@@ -201,6 +145,20 @@
             </div>
           </section>
         </div>
+      </div>
+      </div>
+      <div v-show="activeTab === 'config'" class="config-tab-note">
+        <a-alert type="info" show-icon message="风迹配置" description="维护公开入口、仓库来源与同步周期，保存后立即用于下一次同步。" />
+        <section class="config-tab-form">
+          <div class="enable-setting"><div><strong>公开风迹</strong><small>关闭后前台菜单自动隐藏，已有记录仍会保留。</small></div><a-switch v-model:checked="config.enabled" /></div>
+          <a-form layout="vertical" class="settings-form">
+            <a-form-item label="页面标题"><a-input v-model:value="config.title" maxlength="80" /></a-form-item>
+            <a-form-item label="页面描述"><a-textarea v-model:value="config.subtitle" :rows="3" maxlength="240" show-count /></a-form-item>
+            <div class="repository-fields"><a-form-item label="仓库所有者"><a-input v-model:value="config.repositoryOwner" /></a-form-item><a-form-item label="仓库名称"><a-input v-model:value="config.repositoryName" /></a-form-item><a-form-item label="分支"><a-input v-model:value="config.branch" /></a-form-item></div>
+            <div class="number-fields"><a-form-item label="缓存时间"><a-input-number v-model:value="config.cacheTtl" :min="300" :max="86400" addon-after="秒" /></a-form-item><a-form-item label="自动记录数量"><a-input-number v-model:value="config.maxGroups" :min="4" :max="30" addon-after="组" /></a-form-item></div>
+            <a-button type="primary" :loading="saving" @click="saveConfig"><Icon name="ph:floppy-disk-bold" />保存设置</a-button>
+          </a-form>
+        </section>
       </div>
     </a-spin>
 
@@ -288,6 +246,7 @@ definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
 const api = useApi();
 const toast = useToast();
 const loading = ref(true);
+const activeTab = ref<'stream' | 'config'>('stream');
 const saving = ref(false);
 const syncing = ref(false);
 const config = reactive<ChangelogConfig>({
@@ -596,6 +555,7 @@ useHead({ title: "风迹管理" });
   gap: 18px;
   margin-top: 18px;
 }
+.admin-columns.single-column { grid-template-columns: minmax(0, 1fr); }
 
 .admin-side-column {
   display: grid;

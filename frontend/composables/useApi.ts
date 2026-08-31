@@ -1,20 +1,20 @@
 function authHeaders(): Record<string, string> {
   const { token } = useAuth();
-  const accessToken = token.value || localStorage.getItem("token");
+  const accessToken = token.value;
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
 
 function aiGuestId(): string {
   if (typeof window === "undefined") return "";
   const id = visitorGuestId();
-  localStorage.setItem("corner:ai:guest-id", id);
+  useClientState().set('ai', 'guestId', id);
   return id;
 }
 
 function visitorGuestId(): string {
   if (typeof window === "undefined") return "";
-  const storageKey = "corner:visitor:id";
-  const existing = localStorage.getItem(storageKey);
+  const state = useClientState();
+  const existing = String(state.get('visitor', 'visitorId', ''));
   if (existing && /^[a-zA-Z0-9-]{8,64}$/.test(existing)) return existing;
 
   const generated =
@@ -23,7 +23,7 @@ function visitorGuestId(): string {
       : Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) =>
           value.toString(16).padStart(2, "0"),
         ).join("");
-  localStorage.setItem(storageKey, generated);
+  state.set('visitor', 'visitorId', generated);
   return generated;
 }
 
@@ -113,10 +113,11 @@ export function useApi() {
         : "";
       return request<T>(`${path}${query}`, options);
     },
-    async post<T = any>(path: string, body?: any): Promise<T> {
+    async post<T = any>(path: string, body?: any, options: RequestInit = {}): Promise<T> {
       return request<T>(path, {
         method: "POST",
         body: body as BodyInit,
+        ...options,
       });
     },
     async postStream(

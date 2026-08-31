@@ -1,15 +1,22 @@
 <template>
   <div class="visitor-admin admin-page-shell">
     <header class="admin-page-head">
-      <div><span>VISITOR MANAGEMENT</span><h1>访客时光</h1><p>审核留言与漂流瓶，管理途经这座角落的旅人。</p></div>
+      <div><span>{{ contentOnly ? 'CONTENT MANAGEMENT' : 'ACCESS MANAGEMENT' }}</span><h1>{{ contentOnly ? '留言与漂流瓶' : '访问管理' }}</h1><p>{{ contentOnly ? '独立管理留言和漂流瓶内容，不混入访问身份统计。' : '沿未登记访客、登记访客与登录用户链路查看访问和操作。' }}</p></div>
       <AdminRefreshButton :loading="loadingStats" @click="loadStats" />
     </header>
 
-    <div class="stats-grid">
+    <div v-if="!contentOnly" class="stats-grid">
       <div class="stat-card">
         <span class="stat-icon"><Icon name="ph:users-three-bold" /></span>
         <div><strong>{{ stats.visitors }}</strong><small>累计访客</small></div>
       </div>
+      <div class="stat-card identity-stat"><span class="stat-icon"><Icon name="ph:user-focus-bold" /></span><div><strong>{{ stats.identity?.anonymous || 0 }}</strong><small>未登记访问</small></div></div>
+      <div class="stat-card identity-stat"><span class="stat-icon"><Icon name="ph:identification-badge-bold" /></span><div><strong>{{ stats.identity?.registered || 0 }}</strong><small>登记访客访问</small></div></div>
+      <div class="stat-card identity-stat"><span class="stat-icon"><Icon name="ph:user-circle-gear-bold" /></span><div><strong>{{ stats.identity?.users || 0 }}</strong><small>登录用户访问</small></div></div>
+      <div class="stat-card identity-stat"><span class="stat-icon"><Icon name="ph:book-open-text-bold" /></span><div><strong>{{ stats.contentReads?.articles || 0 }}</strong><small>文章阅读</small></div></div>
+      <div class="stat-card identity-stat"><span class="stat-icon"><Icon name="ph:wind-bold" /></span><div><strong>{{ stats.contentReads?.circle || 0 }}</strong><small>风讯角阅读</small></div></div>
+      <div class="stat-card identity-stat"><span class="stat-icon"><Icon name="ph:robot-bold" /></span><div><strong>{{ stats.ai?.experiences || 0 }}</strong><small>AI 体验次数</small></div></div>
+      <div class="stat-card identity-stat"><span class="stat-icon"><Icon name="ph:chat-circle-text-bold" /></span><div><strong>{{ stats.ai?.sessions || 0 }}</strong><small>AI 会话数量</small></div></div>
       <div class="stat-card">
         <span class="stat-icon"><Icon name="ph:user-fill" /></span>
         <div><strong>{{ stats.todayVisitors }}</strong><small>今日访客</small></div>
@@ -28,8 +35,13 @@
       </div>
     </div>
 
-    <a-tabs v-model:active-key="activeTab" class="visitor-tabs">
-      <a-tab-pane key="messages" :tab="`留言与漂流瓶${pendingTotal ? `（${pendingTotal} 待审）` : ''}`">
+    <a-tabs v-if="!contentOnly" v-model:active-key="activeTab" class="visitor-tabs">
+      <a-tab-pane key="messages" :tab="`留言${stats.pendingMessages ? `（${stats.pendingMessages} 待审）` : ''}`" />
+      <a-tab-pane key="bottles" :tab="`漂流瓶${stats.pendingBottles ? `（${stats.pendingBottles} 待审）` : ''}`" />
+      <a-tab-pane key="profiles" tab="身份档案" />
+    </a-tabs>
+
+    <div v-if="activeTab === 'messages' || activeTab === 'bottles'" class="message-review-pane">
         <div class="table-toolbar">
             <a-input v-model:value="msgFilter.keyword" allow-clear placeholder="搜索内容、署名或账号" class="message-search" @press-enter="loadMessages(1)">
               <template #prefix><Icon name="ph:magnifying-glass" /></template>
@@ -94,9 +106,9 @@
             <AdminPagination v-model:current="msgPagination.current" :page-size="msgPagination.pageSize" :total="msgPagination.total" :show-size-changer="false" @change="loadMessages" />
           </div>
         </a-spin>
-      </a-tab-pane>
+    </div>
 
-      <a-tab-pane key="profiles" :tab="'访客列表'">
+    <div v-if="activeTab === 'profiles'" class="visitor-profile-pane">
         <div class="table-toolbar">
             <a-input v-model:value="profileFilter.keyword" placeholder="搜索昵称" allow-clear style="width: 220px" @press-enter="loadProfiles(1)"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
             <a-select v-model:value="profileFilter.type" style="width: 140px">
@@ -130,7 +142,7 @@
                   <span class="region-cell">{{ record.region || '未定位' }}</span>
                 </template>
                 <template v-else-if="column.key === 'counts'">
-                  <span class="count-cell">访 {{ record.visitCount }} · 言 {{ record.messageCount }} · 瓶 {{ record.bottleCount }} · 捞 {{ record.caughtCount }}</span>
+                  <div class="access-counts"><span>访问 {{ record.access?.visits ?? record.visitCount }}</span><span>文章阅读 {{ record.access?.articles || 0 }}</span><span>风讯角阅读 {{ record.access?.circle || 0 }}</span><span>站点操作 {{ record.access?.operations || 0 }}</span><span>AI 体验 {{ record.ai?.experiences || 0 }}</span><span>AI 会话 {{ record.ai?.sessions || 0 }}</span><span>反馈 {{ record.ai?.feedback || 0 }}（有帮助 {{ record.ai?.helpful || 0 }}）</span></div>
                 </template>
                 <template v-else-if="column.key === 'achievements'">
                   <a-tag color="gold">{{ record.achievementCount }} 枚</a-tag>
@@ -143,8 +155,7 @@
             <AdminPagination v-model:current="profilePagination.current" :page-size="profilePagination.pageSize" :total="profilePagination.total" :show-size-changer="false" @change="loadProfiles" />
           </div>
         </a-spin>
-      </a-tab-pane>
-    </a-tabs>
+    </div>
 
     <a-modal
       v-model:open="detailDialog.open"
@@ -196,15 +207,17 @@ definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
-const activeTab = ref('messages')
+const route = useRoute()
+const contentOnly = computed(() => String(route.query.section || '') === 'content')
+const activeTab = ref(contentOnly.value ? 'messages' : 'profiles')
 const loadingStats = ref(false)
-const stats = reactive({ visitors: 0, todayVisitors: 0, visits: 0, messages: 0, bottles: 0, pendingMessages: 0, pendingBottles: 0 })
+const stats = reactive({ visitors: 0, todayVisitors: 0, visits: 0, messages: 0, bottles: 0, pendingMessages: 0, pendingBottles: 0, identity: {}, contentReads: {}, ai: {} } as any)
 
 const pendingTotal = computed(() => stats.pendingMessages + stats.pendingBottles)
 
 const loadingMsgs = ref(false)
 const messages = ref<any[]>([])
-const msgFilter = reactive({ keyword: '', type: '', status: '' })
+const msgFilter = reactive({ keyword: '', type: 'message', status: '' })
 const msgPagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: false })
 const msgColumns = [
   { title: '内容', key: 'content', minWidth: 280 },
@@ -215,7 +228,7 @@ const msgColumns = [
   { title: '时间', key: 'createdAt', width: 150 },
   { title: '操作', key: 'actions', width: 170, fixed: 'right' as const },
 ]
-function resetMessageFilters() { Object.assign(msgFilter, { keyword: '', type: '', status: '' }); void loadMessages(1) }
+function resetMessageFilters() { Object.assign(msgFilter, { keyword: '', type: activeTab.value === 'bottles' ? 'bottle' : 'message', status: '' }); void loadMessages(1) }
 
 const loadingProfiles = ref(false)
 const profiles = ref<any[]>([])
@@ -224,7 +237,7 @@ const profilePagination = reactive({ current: 1, pageSize: 10, total: 0, showSiz
 const profileColumns = [
   { title: '昵称', key: 'nickname', width: 160 },
   { title: '地区', key: 'region', width: 130 },
-  { title: '数据', key: 'counts', minWidth: 220 },
+  { title: '访问与行为', key: 'counts', minWidth: 360 },
   { title: '成就', key: 'achievements', width: 90 },
   { title: '最近到访', key: 'lastSeen', width: 230 },
 ]
@@ -235,8 +248,19 @@ const detailDialog = reactive({ open: false, record: null as any })
 
 onMounted(() => {
   void loadStats()
-  void loadMessages(1)
-  void loadProfiles(1)
+  if (contentOnly.value) void loadMessages(1)
+  else void loadProfiles(1)
+})
+watch(contentOnly, (onlyContent) => {
+  activeTab.value = onlyContent ? 'messages' : 'profiles'
+  if (onlyContent) void loadMessages(1)
+  else void loadProfiles(1)
+})
+watch(activeTab, (key) => {
+  if (key === 'messages' || key === 'bottles') {
+    msgFilter.type = key === 'bottles' ? 'bottle' : 'message'
+    void loadMessages(1)
+  }
 })
 
 function statusColor(status: string) {
@@ -366,7 +390,7 @@ function handleProfileChange(pag: any) {
 .admin-heading h1 { margin: 0 0 3px; color: var(--c-text); font-size: 1.5rem; }
 .admin-heading p { margin: 0; color: var(--c-text-3); font-size: .76rem; }
 
-.stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .stat-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--ld-bg-card); position: relative; }
 .stat-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--c-primary) 10%, transparent); color: var(--c-primary); font-size: 1.05rem; }
 .stat-card strong { display: block; color: var(--c-text); font-size: 1.1rem; line-height: 1.2; }
@@ -402,6 +426,7 @@ function handleProfileChange(pag: any) {
 }
 .region-cell { color: var(--c-text-2); font-size: .7rem; }
 .count-cell { color: var(--c-text-2); font-size: .72rem; white-space: nowrap; }
+.access-counts{display:flex;flex-wrap:wrap;gap:5px}.access-counts span{padding:3px 6px;border-radius:5px;background:var(--c-bg-1);color:var(--c-text-2);font-size:.61rem;white-space:nowrap}.access-counts span:nth-child(-n+3){color:var(--c-primary)}
 .first-seen { display: block; margin-top: 2px; color: var(--c-text-4); font-size: .6rem; }
 .detail-body { display: flex; flex-direction: column; gap: 12px; }
 .detail-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: start; gap: 12px; color: var(--c-text-2); font-size: .78rem; }

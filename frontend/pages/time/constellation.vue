@@ -13,6 +13,7 @@
         :route-node-ids="routeNodeIds"
         :selected-id="selected?.id"
         :resolve-image="mediaUrl"
+        :scene-settings="sceneSettings"
         :intro-delay-ms="180"
         @ready="sceneReady = true"
         @select="handleSceneSelect"
@@ -342,6 +343,7 @@ const graph = reactive<{
   relations: GraphRelation[];
   graphVersion: string;
 }>({ nodes: [], relations: [], graphVersion: "" });
+const sceneSettings = reactive({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1 });
 const sceneRef = ref<{
   resetView: () => void;
   focusDiscovery: (id: DiscoveryId) => void;
@@ -754,6 +756,7 @@ function buildDiscoveryTelemetry(
 
 onMounted(() => {
   void loadGraph();
+  void loadSceneSettings();
   void preloadHomeContent();
   telemetryTimer = setInterval(() => {
     telemetryNow.value = new Date();
@@ -1036,6 +1039,15 @@ function evidenceText(value?: Record<string, unknown>) {
       value.stop ||
       (value.days !== undefined ? `相隔 ${value.days} 天` : ""),
   );
+}
+
+async function loadSceneSettings() {
+  try {
+    const result = await api.get<any>("/settings/constellation_config");
+    if (result && typeof result === "object") Object.assign(sceneSettings, result);
+  } catch {
+    // Public settings are optional; retain defaults when unavailable.
+  }
 }
 
 useHead({ title: "时光星图" });
@@ -1769,6 +1781,7 @@ useHead({ title: "时光星图" });
     0 30px 100px rgb(0 0 0 / 0.7),
     inset 0 0 70px color-mix(in srgb, var(--c-primary) 8%, transparent);
 }
+
 .discovery-mercury {
   --discovery-accent: #b9e8ff;
   box-shadow: 0 26px 90px rgb(0 0 0 / 0.62), inset 0 0 34px rgb(183 232 255 / 0.1);

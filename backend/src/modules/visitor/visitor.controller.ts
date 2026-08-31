@@ -10,6 +10,7 @@ import {
   CreateVisitorBottleDto,
   CreateVisitorMessageDto,
   SetVisitorNicknameDto,
+  TrackVisitorEventsDto,
 } from './dto/create-visitor-message.dto';
 
 @Controller('visitor')
@@ -56,6 +57,18 @@ export class VisitorController {
       ip: req.ip,
     });
     return this.visitorService.trackVisit({ headers: req.headers, ip: req.ip }, hash, req.user?.id ?? null);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('track/batch')
+  @HttpCode(200)
+  async trackBatch(
+    @Req() req: { ip: string; user?: { id?: string }; headers: Record<string, string | string[] | undefined> },
+    @Headers('x-visitor-id') visitorId: string,
+    @Body() body: TrackVisitorEventsDto,
+  ) {
+    const hash = this.visitorService.resolveVisitorId({ headers: { 'x-visitor-id': visitorId }, ip: req.ip });
+    return this.visitorService.trackEvents({ headers: req.headers, ip: req.ip }, hash, req.user?.id ?? null, Array.isArray(body?.events) ? body.events : []);
   }
 
   @Get('messages')

@@ -93,18 +93,13 @@ onMounted(async () => {
   mobileQuery.addEventListener("change", syncMobile);
   window.addEventListener("keydown", onKeydown);
   await guardPanel();
-  sidebarCollapsed.value =
-    isAdmin.value &&
-    localStorage.getItem("corner-admin-sidebar-collapsed") === "1";
+  sidebarCollapsed.value = isAdmin.value && Boolean(useClientState().get('site', 'adminSidebarCollapsed', false));
 });
 
 function toggleSidebar() {
   if (!isAdmin.value || isMobile.value) return;
   sidebarCollapsed.value = !sidebarCollapsed.value;
-  localStorage.setItem(
-    "corner-admin-sidebar-collapsed",
-    sidebarCollapsed.value ? "1" : "0",
-  );
+  useClientState().set('site', 'adminSidebarCollapsed', sidebarCollapsed.value);
 }
 
 function onKeydown(event: KeyboardEvent) {

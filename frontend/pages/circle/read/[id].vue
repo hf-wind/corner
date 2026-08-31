@@ -332,7 +332,7 @@ onMounted(load);
 watch(itemId, load);
 onBeforeRouteLeave((to) => {
   if (to.path !== "/circle")
-    sessionStorage.removeItem("corner:circle:returning");
+    useClientState().removeSession("circleReturning");
 });
 onUnmounted(() => {
   if (progressDragFrame !== null) cancelAnimationFrame(progressDragFrame);

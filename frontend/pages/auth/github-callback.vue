@@ -92,7 +92,8 @@ const handleCallback = async () => {
     // including when the local account request fails and the user retries.
     clearOAuthHash()
     
-    const turnstileToken = sessionStorage.getItem('corner:github-turnstile-token') || ''
+    const state = useClientState()
+    const turnstileToken = String(state.getSession('githubTurnstileToken', ''))
     const response = await api.post('/auth/github', {
       githubUser: {
         id: user.id,
@@ -105,7 +106,7 @@ const handleCallback = async () => {
     
     await setSession(response.access_token, response.user)
 
-    sessionStorage.removeItem('corner:github-turnstile-token')
+    state.removeSession('githubTurnstileToken')
     const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
     await router.replace(redirect)

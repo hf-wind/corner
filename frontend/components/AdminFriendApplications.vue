@@ -1,7 +1,7 @@
 <template>
   <section class="review-section" aria-label="友链申请审核列表">
     <div class="table-toolbar">
-      <a-input v-model:value="keyword" allow-clear placeholder="搜索站点名称、地址或邮箱" @press-enter="resetAndLoad"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
+      <a-input v-model:value="keyword" allow-clear class="review-search" placeholder="搜索站点名称、地址或邮箱" @press-enter="resetAndLoad"><template #prefix><Icon name="ph:magnifying-glass" /></template></a-input>
       <a-select v-model:value="status" style="width:130px"><a-select-option value="">全部状态</a-select-option><a-select-option value="pending">待审核</a-select-option><a-select-option value="approved">已通过</a-select-option><a-select-option value="rejected">已拒绝</a-select-option></a-select>
       <a-button type="primary" @click="resetAndLoad"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
       <a-button @click="resetFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
@@ -57,5 +57,5 @@ onMounted(load)
 </script>
 
 <style scoped>
-.review-section{min-width:0}.table-toolbar{justify-content:flex-start}.table-toolbar :deep(.ant-input-affix-wrapper){width:min(360px,100%)}.toolbar-spacer{flex:1}
+.review-section{min-width:0}.table-toolbar{justify-content:flex-start}.review-search{width:min(360px,100%)}.table-toolbar :deep(.ant-input-affix-wrapper){width:min(360px,100%)}.toolbar-spacer{flex:1}
 </style>

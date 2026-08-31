@@ -265,17 +265,16 @@ async function loadExisting() {
 function loadGeneratedDraft() {
   if (!isCreate.value) return
   try {
-    const raw = sessionStorage.getItem('corner:moment-editor-draft')
-    const draft = raw ? JSON.parse(raw) : null
+    const draft = useClientState().getSession('momentEditorDraft', null)
     if (!draft) return
     form.title = String(draft.title || '')
     form.slug = String(draft.slug || '')
     form.content = String(draft.content || '')
     form.excerpt = String(draft.excerpt || '')
-    sessionStorage.removeItem('corner:moment-editor-draft')
+    useClientState().removeSession('momentEditorDraft')
     toast.info('AI 草稿已带入编辑器，确认后再保存')
   } catch {
-    sessionStorage.removeItem('corner:moment-editor-draft')
+    useClientState().removeSession('momentEditorDraft')
   }
 }
 

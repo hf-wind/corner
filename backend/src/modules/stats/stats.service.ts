@@ -299,6 +299,10 @@ export class StatsService {
       trendAlbums,
       trendLibrary,
       trendAi,
+      visitorEvents,
+      anonymousProfiles,
+      registeredProfiles,
+      userProfiles,
     ] = await Promise.all([
       this.prisma.post.groupBy({ by: ['status'], _count: { _all: true }, _sum: { viewCount: true, likeCount: true } }),
       this.prisma.moment.groupBy({ by: ['status'], _count: { _all: true }, _sum: { likeCount: true } }),
@@ -327,6 +331,10 @@ export class StatsService {
       this.prisma.album.findMany({ where: { publishedAt: { gte: trendSince } }, select: { publishedAt: true } }),
       this.prisma.libraryItem.findMany({ where: { publishedAt: { gte: trendSince } }, select: { publishedAt: true } }),
       this.prisma.aiInteraction.findMany({ where: { action: 'chat', createdAt: { gte: trendSince } }, select: { createdAt: true, inputTokens: true, outputTokens: true } }),
+      this.prisma.visitorEvent.findMany({ where: { createdAt: { gte: trendSince } }, select: { createdAt: true, action: true, identity: true, contentType: true } }),
+      this.prisma.visitorProfile.count({ where: { userId: null, nickname: '' } }),
+      this.prisma.visitorProfile.count({ where: { userId: null, nickname: { not: '' } } }),
+      this.prisma.visitorProfile.count({ where: { userId: { not: null } } }),
     ]);
     const summarize = (rows: Array<Record<string, any>>, key: string) => Object.fromEntries(rows.map((row) => [String(row[key]), row._count._all]));
     const postStatus = summarize(posts, 'status');
@@ -360,6 +368,19 @@ export class StatsService {
       current.outputTokens += item.outputTokens || 0;
       aiDaily.set(key, current);
     }
+    const identityDaily = new Map<string, { anonymous: number; registered: number; users: number; articles: number; circle: number }>();
+    for (const item of visitorEvents) {
+      const key = dateKey(item.createdAt);
+      const current = identityDaily.get(key) || { anonymous: 0, registered: 0, users: 0, articles: 0, circle: 0 };
+      if (item.action === 'page_view' || item.action === 'content_view' || item.action === 'content_read') {
+        if (item.identity === 'anonymous') current.anonymous += 1;
+        else if (item.identity === 'registered') current.registered += 1;
+        else if (item.identity === 'user') current.users += 1;
+        if (['article', 'post'].includes(String(item.contentType))) current.articles += 1;
+        if (item.contentType === 'circle') current.circle += 1;
+      }
+      identityDaily.set(key, current);
+    }
     return {
       content: {
         posts: postStatus,
@@ -372,7 +393,22 @@ export class StatsService {
         views: posts.reduce((sum, row) => sum + (row._sum.viewCount || 0), 0),
         likes: posts.reduce((sum, row) => sum + (row._sum.likeCount || 0), 0) + moments.reduce((sum, row) => sum + (row._sum.likeCount || 0), 0),
       },
-      community: { users, visitors, visitsToday, messages, bottles },
+      community: {
+        users,
+        visitors,
+        visitsToday,
+        messages,
+        bottles,
+        identity: {
+          anonymous: anonymousProfiles,
+          registered: registeredProfiles,
+          users: userProfiles,
+        },
+        contentReads: {
+          articles: visitorEvents.filter((item) => ['article', 'post'].includes(String(item.contentType)) && ['page_view', 'content_view', 'content_read'].includes(item.action)).length,
+          circle: visitorEvents.filter((item) => item.contentType === 'circle' && ['page_view', 'content_view', 'content_read'].includes(item.action)).length,
+        },
+      },
       pending: { articleComments: pendingComments, momentComments: pendingMomentComments, friendApplications: pendingFriendApplications, messages: pendingMessages, bottles: pendingBottles, total: pendingComments + pendingMomentComments + pendingFriendApplications + pendingMessages + pendingBottles },
       ai: { calls: aiTotals._count._all, recentCalls: aiRecent, inputTokens: aiTotals._sum.inputTokens || 0, outputTokens: aiTotals._sum.outputTokens || 0 },
       recent,
@@ -390,6 +426,13 @@ export class StatsService {
           calls: dates.map((key) => aiDaily.get(key)?.calls || 0),
           inputTokens: dates.map((key) => aiDaily.get(key)?.inputTokens || 0),
           outputTokens: dates.map((key) => aiDaily.get(key)?.outputTokens || 0),
+        },
+        identity: {
+          anonymous: dates.map((key) => identityDaily.get(key)?.anonymous || 0),
+          registered: dates.map((key) => identityDaily.get(key)?.registered || 0),
+          users: dates.map((key) => identityDaily.get(key)?.users || 0),
+          articles: dates.map((key) => identityDaily.get(key)?.articles || 0),
+          circle: dates.map((key) => identityDaily.get(key)?.circle || 0),
         },
       },
     };

@@ -4,7 +4,11 @@
     root.classList.add("no-transition");
     root.dataset.font = localStorage.getItem("font-preset") || "ayuan";
 
-    var theme = localStorage.getItem("theme") || "auto";
+    var theme = "auto";
+    try {
+      var site = JSON.parse(localStorage.getItem("corner:site") || "{}");
+      theme = site.theme || localStorage.getItem("theme") || "auto";
+    } catch (_) { theme = localStorage.getItem("theme") || "auto"; }
     var dark =
       theme === "dark" ||
       (theme === "auto" &&

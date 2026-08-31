@@ -54,8 +54,9 @@
                 <div class="media-check" @click.stop>
                   <a-checkbox :checked="selectedIds.has(item.id)" @change="toggleSelect(item.id, i)" />
                 </div>
-                <div v-if="isImage(item)" class="media-img-wrap">
-                  <img :src="mediaUrl(item.path)" :alt="item.originalName || item.filename" />
+                <div v-if="isImage(item)" class="media-img-wrap" :class="{ failed: failedImages.has(item.id) }">
+                  <img v-if="!failedImages.has(item.id)" :src="mediaUrl(item.path)" :alt="item.originalName || item.filename" @error="failedImages.add(item.id)" />
+                  <span v-else><Icon name="ph:image-broken-bold" /><small>图片无法加载</small></span>
                 </div>
                 <div v-else-if="isAudio(item)" class="media-audio-wrap" @click.stop>
                   <Icon name="ph:waveform-bold" />
@@ -115,6 +116,7 @@ const activeFolder = ref('all')
 const showNewFolder = ref(false)
 const newFolderName = ref('')
 const selectedIds = reactive(new Set<string>())
+const failedImages = reactive(new Set<string>())
 const preview = reactive({ open: false, index: 0 })
 const previewItems = computed(() => items.value.map(item => ({
   id: item.id,
@@ -131,7 +133,10 @@ const moveDialog = reactive({
   folders: [] as { key: string; label: string }[],
 })
 
-const isImage = (item: any) => item.mimeType?.startsWith('image/')
+const isImage = (item: any) => {
+  const value = `${item.mimeType || ''} ${item.path || ''} ${item.filename || ''}`.toLowerCase()
+  return /image\//.test(value) || /\.(avif|gif|jpe?g|png|svg|webp)(?:\?|$)/.test(value) || item.folder === 'emoji'
+}
 const isAudio = (item: any) => item.mimeType?.startsWith('audio/')
 
 function previewItem(item: any) {

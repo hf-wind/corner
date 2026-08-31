@@ -365,6 +365,44 @@ export class VisitorService {
     return { ok: true, unlocked, userBound: userId ?? null };
   }
 
+  async trackEvents(
+    req: VisitorRequest,
+    visitorIdHash: string,
+    userId: string | null | undefined,
+    events: Array<Record<string, unknown>>,
+  ) {
+    if (!events.length) return { ok: true, accepted: 0 };
+    // Batch submission is the only network-triggered visit path. Redis keeps the
+    // daily visit/profile counters idempotent while events retain each action.
+    const visitResult = await this.trackVisit(req, visitorIdHash, userId);
+    if (visitResult?.ok === false) return visitResult;
+    if (userId) {
+      const bound = await this.prisma.visitorProfile.findFirst({ where: { userId }, select: { visitorIdHash: true } });
+      if (bound?.visitorIdHash) visitorIdHash = bound.visitorIdHash;
+    }
+    const now = new Date();
+    const identity = userId ? 'user' : undefined;
+    await this.prisma.visitorProfile.upsert({
+      where: { visitorIdHash },
+      update: { ...(userId ? { userId } : {}), lastSeenAt: now },
+      create: { visitorIdHash, userId: userId || undefined, nickname: '', ipHash: this.ipHash(req), lastSeenAt: now },
+    });
+    const rows = events.slice(0, 100).map((event) => ({
+      visitorIdHash,
+      userId: userId || null,
+      identity: identity || (String(event.identity || '') === 'registered' ? 'registered' : 'anonymous'),
+      action: String(event.action || 'page_view').slice(0, 40),
+      path: String(event.path || '').slice(0, 500) || null,
+      contentType: String(event.contentType || '').slice(0, 40) || null,
+      sourceId: String(event.sourceId || '').slice(0, 180) || null,
+      sessionId: String(event.sessionId || '').slice(0, 64) || null,
+      metadata: (event.metadata && typeof event.metadata === 'object' ? event.metadata : {}) as any,
+      createdAt: event.at ? new Date(String(event.at)) : now,
+    }));
+    if (rows.length) await this.prisma.visitorEvent.createMany({ data: rows });
+    return { ok: true, accepted: rows.length };
+  }
+
   private async createMessage(
     req: VisitorRequest,
     actor: VisitorActor,
@@ -1132,6 +1170,16 @@ export class VisitorService {
       bottles,
       pendingMessages,
       pendingBottles,
+      anonymous,
+      registered,
+      eventUsers,
+      articleReads,
+      circleReads,
+      eventCount,
+      aiExperiences,
+      aiSessions,
+      aiFeedback,
+      aiHelpful,
     ] = await Promise.all([
       this.prisma.visitorProfile.count(),
       this.prisma.visitorProfile.count({
@@ -1146,6 +1194,16 @@ export class VisitorService {
       this.prisma.visitorMessage.count({
         where: { type: 'bottle', status: 'pending' },
       }),
+      this.prisma.visitorProfile.count({ where: { nickname: '' , userId: null } }),
+      this.prisma.visitorProfile.count({ where: { nickname: { not: '' }, userId: null } }),
+      this.prisma.visitorProfile.count({ where: { userId: { not: null } } }),
+      this.prisma.visitorEvent.count({ where: { action: { in: ['page_view', 'content_view', 'content_read'] }, contentType: 'article' } }),
+      this.prisma.visitorEvent.count({ where: { action: { in: ['page_view', 'content_view', 'content_read'] }, contentType: 'circle' } }),
+      this.prisma.visitorEvent.count(),
+      this.prisma.aiInteraction.count(),
+      this.prisma.aiInteraction.count({ where: { action: 'chat' } }),
+      this.prisma.aiInteraction.count({ where: { helpful: { not: null } } }),
+      this.prisma.aiInteraction.count({ where: { helpful: true } }),
     ]);
     return {
       visitors,
@@ -1155,6 +1213,10 @@ export class VisitorService {
       bottles,
       pendingMessages,
       pendingBottles,
+      identity: { anonymous, registered, users: eventUsers },
+      contentReads: { articles: articleReads, circle: circleReads },
+      eventCount,
+      ai: { experiences: aiExperiences, sessions: aiSessions, feedback: aiFeedback, helpful: aiHelpful },
     };
   }
 
@@ -1369,6 +1431,8 @@ export class VisitorService {
       achievementCounts,
       users,
       visits,
+      accessEvents,
+      aiInteractions,
     ] = await Promise.all([
       this.prisma.visitorMessage.groupBy({
         by: ['visitorIdHash'],
@@ -1421,6 +1485,18 @@ export class VisitorService {
             select: { visitorIdHash: true, region: true },
           })
         : [],
+      hashes.length && (this.prisma as any).visitorEvent?.findMany
+        ? (this.prisma as any).visitorEvent.findMany({
+            where: { visitorIdHash: { in: hashes } },
+            select: { visitorIdHash: true, action: true, contentType: true },
+          })
+        : [],
+      hashes.length && (this.prisma as any).aiInteraction?.findMany
+        ? (this.prisma as any).aiInteraction.findMany({
+            where: { guestIdHash: { in: hashes } },
+            select: { guestIdHash: true, action: true, helpful: true },
+          })
+        : [],
     ]);
     const countBy = (rows: Array<Record<string, unknown>>, key: string) =>
       new Map(
@@ -1436,6 +1512,24 @@ export class VisitorService {
       if (visit.region && !regionByHash.has(visit.visitorIdHash)) {
         regionByHash.set(visit.visitorIdHash, visit.region);
       }
+    }
+    const accessByHash = new Map<string, { visits: number; articles: number; circle: number; operations: number }>();
+    for (const event of accessEvents) {
+      const current = accessByHash.get(event.visitorIdHash) || { visits: 0, articles: 0, circle: 0, operations: 0 };
+      current.operations += 1;
+      if (event.action === 'page_view') current.visits += 1;
+      if (['article', 'post'].includes(String(event.contentType)) && ['page_view', 'content_view', 'content_read'].includes(event.action)) current.articles += 1;
+      if (event.contentType === 'circle' && ['page_view', 'content_view', 'content_read'].includes(event.action)) current.circle += 1;
+      accessByHash.set(event.visitorIdHash, current);
+    }
+    const aiByHash = new Map<string, { experiences: number; sessions: number; feedback: number; helpful: number }>();
+    for (const interaction of aiInteractions) {
+      if (!interaction.guestIdHash) continue;
+      const current = aiByHash.get(interaction.guestIdHash) || { experiences: 0, sessions: 0, feedback: 0, helpful: 0 };
+      current.experiences += 1;
+      if (interaction.action === 'chat') current.sessions += 1;
+      if (interaction.helpful !== null) { current.feedback += 1; if (interaction.helpful) current.helpful += 1; }
+      aiByHash.set(interaction.guestIdHash, current);
     }
     return {
       items: items.map((p) => ({
@@ -1455,6 +1549,8 @@ export class VisitorService {
         bottleCount: bottleMap.get(p.visitorIdHash) ?? 0,
         caughtCount: caughtMap.get(p.visitorIdHash) ?? 0,
         achievementCount: achMap.get(p.visitorIdHash) ?? 0,
+        access: accessByHash.get(p.visitorIdHash) || { visits: 0, articles: 0, circle: 0, operations: 0 },
+        ai: aiByHash.get(p.visitorIdHash) || { experiences: 0, sessions: 0, feedback: 0, helpful: 0 },
         firstSeenAt: p.firstSeenAt,
         lastSeenAt: p.lastSeenAt,
       })),

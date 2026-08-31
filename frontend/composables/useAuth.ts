@@ -8,23 +8,19 @@ export type AuthUser = {
 }
 
 const USER_PATHS = ['/admin/profile', '/admin/messages']
-const LAST_PUBLIC_ROUTE_KEY = 'corner:last-public-route'
 const PROFILE_TTL = 5 * 60 * 1000
 let refreshing: Promise<void> | null = null
 let lastProfileRefreshAt = 0
 let lastProfileToken: string | null = null
 
 function storedToken() {
-  return typeof window === 'undefined' ? null : window.localStorage.getItem('token')
+  return typeof window === 'undefined' ? null : String(useClientState().get('auth', 'token', '')) || null
 }
 
 function storedUser(): AuthUser | null {
   if (typeof window === 'undefined') return null
-  try {
-    return JSON.parse(window.localStorage.getItem('user') ?? 'null') as AuthUser | null
-  } catch {
-    return null
-  }
+  const value = useClientState().get('auth', 'user', null)
+  return value && typeof value === 'object' ? value as AuthUser : null
 }
 
 export function useAuth() {
@@ -79,10 +75,10 @@ export function useAuth() {
     token.value = accessToken
     user.value = nextUser
     if (typeof window !== 'undefined') {
-      localStorage.setItem('token', accessToken)
-      localStorage.setItem('user', JSON.stringify(nextUser))
+      const state = useClientState()
+      state.set('auth', 'token', accessToken)
+      state.set('auth', 'user', nextUser)
     }
-    void useVisitor().trackVisit()
   }
 
   function clearSession() {
@@ -92,8 +88,9 @@ export function useAuth() {
     lastProfileRefreshAt = 0
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+        const state = useClientState()
+        state.remove('auth', 'token')
+        state.remove('auth', 'user')
       } catch {
         // ignore storage errors
       }
@@ -106,7 +103,7 @@ export function useAuth() {
 
   function lastPublicPath() {
     if (typeof window === 'undefined') return '/home'
-    const target = sessionStorage.getItem(LAST_PUBLIC_ROUTE_KEY) || ''
+    const target = String(useClientState().getSession('lastPublicRoute', ''))
     if (!target.startsWith('/') || target.startsWith('//')) return '/home'
     if (/^\/(?:admin|login|register)(?:\/|$)/.test(target)) return '/home'
     return target

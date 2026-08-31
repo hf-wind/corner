@@ -77,7 +77,7 @@ const coverUrl = computed(() => getDisplayImageUrl(props.cover, 280, 220))
 const avatarUrl = computed(() => getDisplayImageUrl(props.author?.avatar || avatarFallback, 48, 48))
 function saveScroll() {
   const el = document.querySelector('.main-content')
-  if (el) sessionStorage.setItem('home-scroll', String(el.scrollTop))
+  if (el) useClientState().setSession('homeScroll', el.scrollTop)
 }
 
 let articlePrefetched = false

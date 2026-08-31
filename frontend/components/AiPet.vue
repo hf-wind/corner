@@ -722,13 +722,14 @@ function chooseGreeting() {
   const list = greetings.value.length
     ? greetings.value
     : ["你好，我是哆啦A梦！"];
-  const previous = sessionStorage.getItem("corner:pet:last-greeting") || "";
+  const state = useClientState();
+  const previous = String(state.getSession('petLastGreeting', ''));
   const candidates =
     list.length > 1 ? list.filter((item) => item !== previous) : list;
   const next =
     candidates[Math.floor(Math.random() * candidates.length)] || list[0];
   selectedGreeting.value = next;
-  sessionStorage.setItem("corner:pet:last-greeting", next);
+  state.setSession('petLastGreeting', next);
 }
 
 async function loadPetMeta() {

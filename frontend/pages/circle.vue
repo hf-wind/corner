@@ -197,9 +197,7 @@ const activeSection = useState<SectionKey>(
   () => "all",
 );
 const reading = reactive({ lastSeenAt: "" });
-const readingKey = "corner:circle:reading";
-const scrollKey = "corner:circle:scroll";
-const returnKey = "corner:circle:returning";
+const clientState = useClientState();
 let scrollPersistedForNavigation = false;
 let scrollRestoreTimer: ReturnType<typeof setTimeout> | null = null;
 let scrollRestoreFrame: number | null = null;
@@ -277,16 +275,10 @@ function readingMinutes(item: CircleItem) {
 }
 function dismissNewItems() {
   reading.lastSeenAt = items.value[0]?.publishedAt || new Date().toISOString();
-  localStorage.setItem(readingKey, JSON.stringify(reading));
+  clientState.set('site', 'circleLastSeenAt', reading.lastSeenAt);
 }
 function restoreReading() {
-  try {
-    const value = JSON.parse(localStorage.getItem(readingKey) || "{}");
-    reading.lastSeenAt =
-      typeof value.lastSeenAt === "string" ? value.lastSeenAt : "";
-  } catch {
-    reading.lastSeenAt = "";
-  }
+  reading.lastSeenAt = String(clientState.get('site', 'circleLastSeenAt', ''));
 }
 function validateListImage(event: Event, id: string) {
   const image = event.target;
@@ -311,15 +303,12 @@ function persistScroll() {
     entries.find(
       (entry) => entry.offsetTop + entry.offsetHeight >= host.scrollTop + 20,
     ) || entries.at(-1);
-  sessionStorage.setItem(
-    scrollKey,
-    JSON.stringify({
+  clientState.setSession('circleScroll', {
       top: host.scrollTop,
       anchorId: anchor?.dataset.itemId || "",
       anchorOffset: anchor ? host.scrollTop - scrollLayoutTop(anchor, host) : 0,
       page: page.value,
-    }),
-  );
+    });
 }
 function clearScrollRestore() {
   scrollRestoreActive = false;
@@ -358,7 +347,7 @@ async function restoreScroll() {
   const host = pageRef.value;
   if (!host) return;
   try {
-    const value = JSON.parse(sessionStorage.getItem(scrollKey) || "{}");
+    const value = clientState.getSession('circleScroll', {}) as Record<string, any>;
     await nextTick();
     const anchor = value.anchorId
       ? host.querySelector<HTMLElement>(
@@ -377,7 +366,7 @@ async function restoreScroll() {
 }
 function openItem(item: CircleItem) {
   persistScroll();
-  sessionStorage.setItem(returnKey, "1");
+  clientState.setSession('circleReturning', true);
   scrollPersistedForNavigation = true;
   void router.push({ path: "/circle/read", query: { id: item.id } });
 }
@@ -415,8 +404,8 @@ async function changePage(target: number) {
 let clockTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(async () => {
   restoreReading();
-  const shouldRestore = sessionStorage.getItem(returnKey) === "1";
-  sessionStorage.removeItem(returnKey);
+  const shouldRestore = clientState.getSession('circleReturning', false) === true;
+  clientState.removeSession('circleReturning');
   if (!items.value.length) await loadFeed();
   await nextTick();
   if (shouldRestore) await restoreScroll();
@@ -429,7 +418,7 @@ onUnmounted(() => {
   clearScrollRestore();
   if (!scrollPersistedForNavigation) persistScroll();
   if (clockTimer) clearInterval(clockTimer);
-  localStorage.setItem(readingKey, JSON.stringify(reading));
+  clientState.set('site', 'circleLastSeenAt', reading.lastSeenAt);
 });
 useHead(() => ({ title: `${config.value.title || "风讯角"} · 风隅随笔` }));
 </script>

@@ -259,7 +259,7 @@ async function confirmReject() {
 <style scoped>
 .review-tabs :deep(.ant-tabs-content-holder) { display:none; }
 .comment-filter { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
-.comment-search { width:260px; }
+.comment-search { width:min(360px,100%); }
 .toolbar-spacer { flex:1; }
 .comment-author { font-weight:500; font-size:0.82rem; }
 .moderation-content { white-space:pre-wrap; word-break:break-word; }

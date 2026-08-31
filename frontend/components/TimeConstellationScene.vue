@@ -93,6 +93,11 @@ const props = withDefaults(
     ambient?: boolean;
     introDelayMs?: number;
     narrativeProgress?: number;
+    sceneSettings?: {
+      nonContentStarCount?: number;
+      ringGap?: number;
+      movementSpeed?: number;
+    };
   }>(),
   {
     selectedId: "",
@@ -101,6 +106,7 @@ const props = withDefaults(
     ambient: false,
     introDelayMs: 0,
     narrativeProgress: -1,
+    sceneSettings: () => ({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1 }),
   },
 );
 
@@ -340,7 +346,8 @@ function buildPosition(
     date && !Number.isNaN(date.getTime()) ? date.getFullYear() : null;
   const ringIndex =
     year == null ? years.length : Math.max(0, years.indexOf(year));
-  const radius = 58 + ringIndex * 34 + (random() - 0.5) * 16;
+  const ringGap = Math.max(12, Number(props.sceneSettings.ringGap) || 34);
+  const radius = 58 + ringIndex * ringGap + (random() - 0.5) * Math.min(24, ringGap * 0.48);
   const angle =
     ringSize > 1
       ? (slot / ringSize) * Math.PI * 2 +
@@ -888,10 +895,11 @@ function accretionDiskTexture() {
 function addStarField() {
   if (!scene) return;
   const random = randomFrom(20260731);
+  const configuredCount = Math.max(100, Math.min(5000, Number(props.sceneSettings.nonContentStarCount) || 2400));
   const layerSettings = lowQuality
     ? [
         {
-          count: 920,
+          count: Math.round(configuredCount * 0.38),
           near: 125,
           depth: 430,
           size: 1.45,
@@ -909,7 +917,7 @@ function addStarField() {
       ]
     : [
         {
-          count: 2400,
+          count: configuredCount,
           near: 125,
           depth: 520,
           size: 1.26,
@@ -3651,7 +3659,8 @@ function animate(now = performance.now()) {
       }
     }
     starLayers.forEach((stars, index) => {
-      stars.rotation.y += delta * (0.004 + index * 0.006);
+      const movementSpeed = Math.max(0.2, Math.min(3, Number(props.sceneSettings.movementSpeed) || 1));
+      stars.rotation.y += delta * (0.004 + index * 0.006) * movementSpeed;
       stars.rotation.x = Math.sin(elapsed * (0.018 + index * 0.007)) * 0.018;
     });
     cosmicBodies.forEach((body, index) => {

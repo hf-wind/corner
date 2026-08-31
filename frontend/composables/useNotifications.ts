@@ -17,6 +17,7 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let connectedToken: string | null = null
 let pendingFeedback: AppNotification[] = []
 let feedbackTimer: ReturnType<typeof setTimeout> | null = null
+let unreadRefreshPromise: Promise<void> | null = null
 
 function queueNotificationFeedback(item: AppNotification) {
   pendingFeedback.push(item)
@@ -84,10 +85,12 @@ export function useNotifications() {
       unreadCount.value = 0
       return
     }
-    try {
+    if (unreadRefreshPromise) return unreadRefreshPromise
+    unreadRefreshPromise = (async () => { try {
       const response = await api.get<{ count: number }>('/notifications/unread-count')
       unreadCount.value = Math.max(0, Number(response.count) || 0)
-    } catch { /* the realtime connection will retry */ }
+    } catch { /* the realtime connection will retry */ } finally { unreadRefreshPromise = null } })()
+    return unreadRefreshPromise
   }
 
   function disconnectRealtime(clearState = false) {

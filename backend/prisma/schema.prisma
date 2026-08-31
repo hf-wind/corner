@@ -39,6 +39,7 @@ model User {
   storyRoutes        StoryRoute[]
   musicFavorites     MusicFavorite[]
   visitorMessages    VisitorMessage[]
+  visitorEvents      VisitorEvent[]
   authProviders      AuthProvider[]
 
   @@index([isActive, role])
@@ -966,6 +967,27 @@ model VisitorVisit {
 
   @@index([visitorIdHash, createdAt])
   @@map("visitor_visits")
+}
+
+model VisitorEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  visitorIdHash String   @map("visitor_id_hash") @db.VarChar(64)
+  userId        String?  @map("user_id") @db.Uuid
+  sessionId     String?  @map("session_id") @db.VarChar(64)
+  identity      String   @default("anonymous") @db.VarChar(20)
+  action        String   @db.VarChar(40)
+  path          String?  @db.Text
+  contentType   String?  @map("content_type") @db.VarChar(40)
+  sourceId      String?  @map("source_id") @db.VarChar(180)
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([visitorIdHash, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([contentType, createdAt])
+  @@map("visitor_events")
 }
 
 model VisitorAchievement {

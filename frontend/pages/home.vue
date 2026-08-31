@@ -263,11 +263,12 @@ async function changePage() {
 }
 
 async function restoreScroll() {
-  const saved = sessionStorage.getItem("home-scroll");
+  const state = useClientState();
+  const saved = state.getSession("homeScroll", 0);
   if (!saved) return;
-  sessionStorage.removeItem("home-scroll");
+  state.removeSession("homeScroll");
 
-  const target = parseInt(saved, 10);
+  const target = Number(saved);
   if (target <= 0) return;
 
   await nextTick();

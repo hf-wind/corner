@@ -444,8 +444,7 @@ onMounted(async () => {
     needsPublish.value = !!post.needsPublish;
   } else if (isCreate.value && route.query.generated === "1") {
     try {
-      const raw = sessionStorage.getItem("corner:article-editor-draft");
-      const draft = raw ? JSON.parse(raw) : null;
+      const draft = useClientState().getSession("articleEditorDraft", null);
       if (draft) {
         form.value = {
           ...form.value,
@@ -457,11 +456,11 @@ onMounted(async () => {
           categoryId: draft.categoryId || undefined,
           tagIds: Array.isArray(draft.tagIds) ? draft.tagIds : [],
         };
-        sessionStorage.removeItem("corner:article-editor-draft");
+        useClientState().removeSession("articleEditorDraft");
         toast.info("AI 草稿已带入编辑器，确认后再保存");
       }
     } catch {
-      sessionStorage.removeItem("corner:article-editor-draft");
+      useClientState().removeSession("articleEditorDraft");
     }
   }
   originalContent = JSON.stringify(form.value);
