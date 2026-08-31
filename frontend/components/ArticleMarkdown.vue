@@ -6,19 +6,22 @@
     @click.capture="onContentClick"
   >
     <ClientOnly>
-      <MdPreview
-        v-if="editorReady"
-        :id="editorId"
-        :model-value="content || ''"
-        :theme="mdTheme"
-        language="zh-CN"
-        preview-theme="smart-blue"
-        code-theme="github"
-        class="article-md-preview"
-      />
-      <div v-else class="article-md-loading" aria-label="正文渲染中">
-        <i /><i /><i />
-      </div>
+      <Transition name="markdown-ready" appear>
+        <MdPreview
+          v-if="editorReady"
+          :id="editorId"
+          :model-value="previewContent"
+          :theme="mdTheme"
+          language="zh-CN"
+          preview-theme="smart-blue"
+          code-theme="github"
+          :no-highlight="!enabledFeatures.highlight"
+          :no-mermaid="!enabledFeatures.mermaid"
+          :no-katex="!enabledFeatures.katex"
+          :no-echarts="!enabledFeatures.echarts"
+          class="article-md-preview"
+        />
+      </Transition>
     </ClientOnly>
     <ImageLightbox
       v-model="previewOpen"
@@ -33,9 +36,14 @@
 import { MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/preview.css";
 import ImageLightbox from "~/components/ImageLightbox.vue";
-import { configureMarkdownEditor } from "~/utils/configureMarkdownEditor";
+import {
+  configureMarkdownPreview,
+  markdownPreviewFeatures,
+  normalizeMarkdownPreviewContent,
+  type MarkdownPreviewFeatures,
+} from "~/utils/configureMarkdownPreview";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     content?: string;
     editorId?: string;
@@ -51,6 +59,16 @@ const emit = defineEmits<{ rendered: [] }>();
 const isDark = ref(false);
 const themeRefreshing = ref(false);
 const editorReady = ref(false);
+const previewContent = computed(() =>
+  normalizeMarkdownPreviewContent(props.content || ""),
+);
+const requestedFeatures = markdownPreviewFeatures(previewContent.value);
+const enabledFeatures = reactive<MarkdownPreviewFeatures>({
+  highlight: false,
+  mermaid: false,
+  katex: false,
+  echarts: false,
+});
 const mdTheme = computed(() => (isDark.value ? "dark" : "light"));
 const wrapperRef = ref<HTMLElement | null>(null);
 const previewOpen = ref(false);
@@ -78,9 +96,8 @@ type ReadingAnchor = {
 
 function previewBlocks() {
   return Array.from(
-    wrapperRef.value?.querySelectorAll<HTMLElement>(
-      ".md-editor-preview > *",
-    ) || [],
+    wrapperRef.value?.querySelectorAll<HTMLElement>(".md-editor-preview > *") ||
+      [],
   );
 }
 
@@ -136,7 +153,10 @@ function beginDiagramThemeRefresh() {
   ensureDiagramLoaders();
   if (wrapperRef.value) {
     diagramObserver = new MutationObserver(ensureDiagramLoaders);
-    diagramObserver.observe(wrapperRef.value, { childList: true, subtree: true });
+    diagramObserver.observe(wrapperRef.value, {
+      childList: true,
+      subtree: true,
+    });
   }
   diagramRefreshTimer = window.setTimeout(
     clearDiagramThemeRefresh,
@@ -252,7 +272,12 @@ onMounted(async () => {
     attributes: true,
     attributeFilter: ["class"],
   });
-  await configureMarkdownEditor();
+  try {
+    await configureMarkdownPreview(requestedFeatures);
+    Object.assign(enabledFeatures, requestedFeatures);
+  } catch {
+    // 基础 Markdown 仍可阅读，增强模块失败时不阻塞正文。
+  }
   editorReady.value = true;
   await nextTick();
   if (wrapperRef.value) {
@@ -260,9 +285,9 @@ onMounted(async () => {
       for (const record of records) {
         const box = record.target as HTMLElement;
         if (box.hasAttribute("data-grab")) continue;
-        box.querySelector<SVGElement>(":scope > svg")?.style.removeProperty(
-          "transform",
-        );
+        box
+          .querySelector<SVGElement>(":scope > svg")
+          ?.style.removeProperty("transform");
       }
     });
     diagramInteractionObserver.observe(wrapperRef.value, {
@@ -289,25 +314,17 @@ onUnmounted(() => {
   background-color: transparent !important;
 }
 
-.article-md-loading {
-  display: grid;
-  gap: 12px;
-  padding: 12px 0;
+.markdown-ready-enter-active,
+.markdown-ready-leave-active {
+  transition:
+    opacity 0.32s ease,
+    transform 0.46s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.article-md-loading i {
-  display: block;
-  width: 100%;
-  height: 14px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--c-text) 8%, transparent);
-}
-
-.article-md-loading i:nth-child(2) {
-  width: 88%;
-}
-.article-md-loading i:nth-child(3) {
-  width: 72%;
+.markdown-ready-enter-from,
+.markdown-ready-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 .article-md-wrap :deep(.md-editor-mermaid) {
@@ -467,109 +484,75 @@ onUnmounted(() => {
   display: none;
 }
 
-.article-md-wrap :deep(.md-editor-preview h1::after) {
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 44px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--c-primary);
-  content: "";
-}
-
 .article-md-wrap :deep(.md-editor-preview h2) {
   counter-increment: article-h2;
   counter-reset: article-h3;
-  display: flex;
-  align-items: center;
-  gap: 11px;
+  position: relative;
   margin: 2.25rem 0 0.9rem;
-  padding: 2px 0;
+  padding: 2px 0 2px 15px;
   border: 0;
   font-size: 21px;
 }
 
 .article-md-wrap :deep(.md-editor-preview h2::before) {
+  position: absolute;
+  top: 50%;
+  left: 0;
   display: block;
   width: 4px;
   height: 1.05em;
-  flex: 0 0 4px;
   border: 0;
   border-radius: 999px;
   background: var(--c-primary);
   content: "";
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 10%, transparent);
+  transform: translateY(-50%);
 }
 
 .article-md-wrap :deep(.md-editor-preview h3) {
   counter-increment: article-h3;
-  display: flex;
-  align-items: center;
-  gap: 9px;
+  position: relative;
   margin: 1.8rem 0 0.75rem;
+  padding-left: 16px;
   font-size: 16.5px;
 }
 
 .article-md-wrap :deep(.md-editor-preview h3::before) {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: block;
   width: 7px;
   height: 7px;
-  flex: 0 0 7px;
   border-radius: 50%;
   background: var(--c-primary);
   content: "";
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 9%, transparent);
+  transform: translateY(-50%);
 }
 
 .article-md-wrap :deep(.md-editor-preview h4) {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+  position: relative;
   margin: 1.65rem 0 0.7rem;
+  padding-left: 23px;
   color: var(--c-text-1);
   font-size: 1.02rem;
 }
 
 .article-md-wrap :deep(.md-editor-preview h4::before) {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: block;
   width: 16px;
   height: 16px;
-  flex: 0 0 16px;
   background: color-mix(in srgb, var(--c-primary) 82%, var(--c-text));
   content: "";
+  transform: translateY(-50%);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     center / contain no-repeat;
-}
-
-.article-md-wrap :deep(.md-editor-preview h2:has(code:not(pre code))),
-.article-md-wrap :deep(.md-editor-preview h3:has(code:not(pre code))),
-.article-md-wrap :deep(.md-editor-preview h4:has(code:not(pre code))) {
-  position: relative;
-  display: block;
-  min-width: 0;
-}
-
-.article-md-wrap :deep(.md-editor-preview h2:has(code:not(pre code))) {
-  padding-left: 15px;
-}
-
-.article-md-wrap :deep(.md-editor-preview h3:has(code:not(pre code))) {
-  padding-left: 16px;
-}
-
-.article-md-wrap :deep(.md-editor-preview h4:has(code:not(pre code))) {
-  padding-left: 23px;
-}
-
-.article-md-wrap :deep(.md-editor-preview h2:has(code:not(pre code))::before),
-.article-md-wrap :deep(.md-editor-preview h3:has(code:not(pre code))::before),
-.article-md-wrap :deep(.md-editor-preview h4:has(code:not(pre code))::before) {
-  position: absolute;
-  top: 0.71em;
-  left: 0;
-  display: block;
-  transform: translateY(-50%);
 }
 
 .article-md-wrap :deep(.md-editor-preview h5),
@@ -837,14 +820,12 @@ onUnmounted(() => {
 @keyframes article-block-reveal {
   from {
     opacity: 0;
-    filter: blur(10px);
-    transform: translateY(20px) scale(0.92);
+    transform: translateY(12px);
   }
 
   to {
     opacity: 1;
-    filter: blur(0);
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -855,9 +836,7 @@ onUnmounted(() => {
     animation-fill-mode: both;
     animation-timing-function: linear;
     animation-timeline: view();
-    animation-range: entry 0% entry 128px;
-    transform-origin: 50% center;
-    will-change: opacity, filter, transform;
+    animation-range: entry 0% entry 96px;
   }
 }
 
@@ -874,7 +853,6 @@ onUnmounted(() => {
   }
 
   .article-md-wrap :deep(.md-editor-preview h2) {
-    gap: 10px;
     margin-top: 2rem;
     font-size: 1.18rem;
   }
@@ -914,6 +892,11 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .markdown-ready-enter-active,
+  .markdown-ready-leave-active {
+    transition: none;
+  }
+
   .article-md-wrap :deep(.md-editor-preview > *) {
     animation: none;
     filter: none;

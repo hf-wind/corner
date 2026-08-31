@@ -15,8 +15,6 @@
     ]"
     aria-label="页面快捷控制"
     :aria-hidden="!dockReady"
-    @pointerenter="onDockPointerEnter"
-    @pointerleave="onDockPointerLeave"
   >
     <div id="corner-pagination-dock" class="pagination-dock" />
     <div class="music-dock">
@@ -35,7 +33,6 @@ const {
   activeBottomDock,
   contentReady,
   paginationVisible,
-  setActiveBottomDock,
   setAutoCollapsed,
 } = useBottomDockState();
 const musicReady = ref(false);
@@ -44,9 +41,6 @@ const isSpaceTheme = computed(
   () => route.path === "/" || route.path === "/time/constellation",
 );
 const musicVisible = ref(false);
-const initialDockPriorityApplied = ref(false);
-const dockHovered = ref(false);
-let autoCollapseTimer = 0;
 const dockReady = computed(() => contentReady.value && musicReady.value);
 
 function onMusicReady(payload: { visible: boolean }) {
@@ -54,81 +48,13 @@ function onMusicReady(payload: { visible: boolean }) {
   musicVisible.value = payload.visible;
 }
 
-function applyInitialDockPriority() {
-  if (
-    initialDockPriorityApplied.value ||
-    !musicReady.value ||
-    !paginationVisible.value ||
-    !musicVisible.value
-  ) {
-    return;
-  }
-  initialDockPriorityApplied.value = true;
-  setAutoCollapsed(false);
-  setActiveBottomDock("pagination");
-}
-
-function clearAutoCollapseTimer() {
-  window.clearTimeout(autoCollapseTimer);
-  autoCollapseTimer = 0;
-}
-
-function scheduleAutoCollapse() {
-  clearAutoCollapseTimer();
-  if (
-    dockHovered.value ||
-    !contentReady.value ||
-    !musicReady.value ||
-    (!paginationVisible.value && !musicVisible.value)
-  ) {
-    return;
-  }
-  setAutoCollapsed(false);
-  autoCollapseTimer = window.setTimeout(() => {
-    setAutoCollapsed(true);
-  }, 5000);
-}
-
-function canHoverDock(event: PointerEvent) {
-  return (
-    event.pointerType === "mouse" &&
-    window.matchMedia("(hover: hover) and (pointer: fine)").matches
-  );
-}
-
-function onDockPointerEnter(event: PointerEvent) {
-  if (!canHoverDock(event)) return;
-  dockHovered.value = true;
-  clearAutoCollapseTimer();
-}
-
-function onDockPointerLeave(event: PointerEvent) {
-  if (!canHoverDock(event)) return;
-  dockHovered.value = false;
-  scheduleAutoCollapse();
-}
-
 watch(
-  [contentReady, musicReady, paginationVisible, musicVisible],
-  scheduleAutoCollapse,
+  dockReady,
+  (ready) => setAutoCollapsed(ready),
   { immediate: true },
 );
 
-watch([musicReady, paginationVisible, musicVisible], applyInitialDockPriority, {
-  immediate: true,
-});
-
-watch(
-  () => route.path,
-  () => {
-    initialDockPriorityApplied.value = false;
-    void nextTick(applyInitialDockPriority);
-  },
-);
-
 onUnmounted(() => {
-  clearAutoCollapseTimer();
-  dockHovered.value = false;
   setAutoCollapsed(false);
 });
 </script>
@@ -199,7 +125,7 @@ onUnmounted(() => {
 }
 
 .pagination-dock {
-  max-width: 132px;
+  max-width: 116px;
 }
 
 .music-dock {

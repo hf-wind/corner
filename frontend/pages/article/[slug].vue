@@ -27,6 +27,9 @@
             :alt="article.title"
             decoding="async"
             fetchpriority="high"
+            :class="{ 'is-loaded': coverLoaded }"
+            @load="coverLoaded = true"
+            @error="article.hero = ''"
           />
 
           <div class="post-nav">
@@ -93,8 +96,11 @@
             </span>
             <span class="excerpt-content">
               <small><b>摘要</b><i>SUMMARY</i></small>
-              <span class="excerpt-copy">
-                <span class="excerpt-typed"
+              <span class="excerpt-copy" :aria-label="article.excerpt">
+                <span class="excerpt-reserve" aria-hidden="true">{{
+                  article.excerpt
+                }}</span>
+                <span class="excerpt-typed" aria-hidden="true"
                   >{{ typedExcerpt
                   }}<span
                     v-if="excerptTyping"
@@ -120,10 +126,10 @@
         </div>
 
         <div ref="articleContentRef" class="article-shell article-anim">
-          <ArticleMarkdown
+          <AsyncArticleMarkdown
             :content="article.content"
             :editor-id="editorId"
-            @rendered="scheduleCatalog"
+            @rendered="handleMarkdownRendered"
           />
         </div>
 
@@ -157,7 +163,7 @@
           </section>
         </div>
 
-        <NewsletterBar v-if="adjacentLoaded" class="article-anim" />
+        <AsyncNewsletterBar v-if="adjacentLoaded" class="article-anim" />
 
         <div v-if="adjacentLoaded" class="surround-post article-anim">
           <AppLink
@@ -199,12 +205,16 @@
           </div>
         </div>
 
-        <ArticleComments
-          :post-id="article.id"
-          :focus-comment-id="focusCommentId"
-          :focus-parent-id="focusParentId"
-          :highlight-query="highlightQuery"
-        />
+        <div ref="commentsSentinelRef" class="comments-stage">
+          <AsyncArticleComments
+            v-if="commentsReady"
+            :post-id="article.id"
+            :focus-comment-id="focusCommentId"
+            :focus-parent-id="focusParentId"
+            :highlight-query="highlightQuery"
+          />
+          <span v-else class="comments-anchor" aria-hidden="true" />
+        </div>
       </template>
       <section
         v-else-if="!articleLoading"
@@ -221,39 +231,72 @@
       </section>
     </main>
 
-    <ArticleSidebar
-      v-if="!articleLoading && article.id"
-      :editor-id="editorId"
-      scroll-element="#main-content"
-      :progress="readingProgress"
-      :show-top="showBackTop"
-      :immersive="immersiveMode"
-      :catalog-ready="catalogReady"
-      :catalog-items="catalogItems"
-      :active-catalog-index="activeCatalogIndex"
-      @scroll-top="scrollToTop"
-      @scroll-comment="scrollToComment"
-      @catalog-navigate="navigateCatalog"
-      @toggle-immersive="toggleImmersive"
-    >
-      <template #pet>
-        <ClientOnly>
-          <AiPet docked mode="article" :article="articleContext" />
-        </ClientOnly>
-      </template>
-    </ArticleSidebar>
+    <div v-if="article.id" class="article-aside-stage">
+      <AsyncArticleSidebar
+        v-if="sidebarReady"
+        :editor-id="editorId"
+        scroll-element="#main-content"
+        :progress="readingProgress"
+        :show-top="showBackTop"
+        :immersive="immersiveMode"
+        :catalog-ready="catalogReady"
+        :catalog-items="catalogItems"
+        :active-catalog-index="activeCatalogIndex"
+        @scroll-top="scrollToTop"
+        @scroll-comment="scrollToComment"
+        @catalog-navigate="navigateCatalog"
+        @toggle-immersive="toggleImmersive"
+      >
+        <template #pet>
+          <ClientOnly>
+            <AsyncAiPet
+              v-if="petMountReady"
+              docked
+              mode="article"
+              :article="articleContext"
+            />
+          </ClientOnly>
+        </template>
+      </AsyncArticleSidebar>
+    </div>
 
-    <ArticleShare v-model:open="shareOpen" :article="article" />
-    <ArticlePoster v-model:open="posterOpen" :article="article" />
+    <AsyncArticleShare
+      v-if="shareOpen"
+      v-model:open="shareOpen"
+      :article="article"
+    />
+    <AsyncArticlePoster
+      v-if="posterOpen"
+      v-model:open="posterOpen"
+      :article="article"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { defineAsyncComponent } from "vue";
 import avatarImg from "~/assets/images/avatar.jpg";
 import dramExcerptImg from "~/assets/images/dram-excerpt.processed.png";
 import { getDisplayImageUrl } from "~/utils/imagePerformance";
-import { gsap } from "gsap";
 import { focusSearchHighlight } from "~/composables/useSearchHighlight";
+
+const articleMarkdownModule = import("~/components/ArticleMarkdown.vue");
+const articleSidebarModule = import("~/components/ArticleSidebar.vue");
+const AsyncArticleMarkdown = defineAsyncComponent(() => articleMarkdownModule);
+const AsyncArticleSidebar = defineAsyncComponent(() => articleSidebarModule);
+const AsyncAiPet = defineAsyncComponent(() => import("~/components/AiPet.vue"));
+const AsyncArticleComments = defineAsyncComponent(
+  () => import("~/components/ArticleComments.vue"),
+);
+const AsyncNewsletterBar = defineAsyncComponent(
+  () => import("~/components/NewsletterBar.vue"),
+);
+const AsyncArticleShare = defineAsyncComponent(
+  () => import("~/components/ArticleShare.vue"),
+);
+const AsyncArticlePoster = defineAsyncComponent(
+  () => import("~/components/ArticlePoster.vue"),
+);
 
 function coverUrl(source: string) {
   return getDisplayImageUrl(source, 800, 300);
@@ -276,9 +319,14 @@ const posterOpen = ref(false);
 const noticeRef = ref<HTMLElement | null>(null);
 const articleMainRef = ref<HTMLElement | null>(null);
 const articleContentRef = ref<HTMLElement | null>(null);
+const commentsSentinelRef = ref<HTMLElement | null>(null);
 
 const articleLoading = ref(true);
 const articleReady = ref(false);
+const sidebarReady = ref(false);
+const petMountReady = ref(false);
+const commentsReady = ref(false);
+const coverLoaded = ref(false);
 const adjacentLoaded = ref(false);
 const readingProgress = ref(0);
 const showBackTop = ref(false);
@@ -328,6 +376,7 @@ const articleContext = computed(() => ({
 
 async function loadArticle() {
   articleLoading.value = true;
+  coverLoaded.value = false;
   try {
     const p = await api.get<any>(`/posts/${slug}`);
     article.value = {
@@ -379,18 +428,28 @@ function scrollArticleTo(destination: number) {
   const container = articleMainRef.value;
   if (!container) return;
   const next = Math.max(0, destination);
-  const distance = Math.abs(next - container.scrollTop);
+  const start = container.scrollTop;
+  const delta = next - start;
+  const distance = Math.abs(delta);
+  if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     container.scrollTop = next;
     return;
   }
-  gsap.killTweensOf(container);
-  gsap.to(container, {
-    scrollTop: next,
-    duration: Math.min(0.58, Math.max(0.24, distance / 6000)),
-    ease: "power3.out",
-    overwrite: true,
-  });
+  if (distance < 1) return;
+  const duration = Math.min(580, Math.max(240, distance / 6));
+  const startedAt = performance.now();
+  const tick = (now: number) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    container.scrollTop = start + delta * eased;
+    if (progress < 1) {
+      scrollAnimationFrame = requestAnimationFrame(tick);
+    } else {
+      scrollAnimationFrame = null;
+    }
+  };
+  scrollAnimationFrame = requestAnimationFrame(tick);
 }
 
 function scrollToTop() {
@@ -399,7 +458,9 @@ function scrollToTop() {
 
 function scrollToComment() {
   const container = articleMainRef.value;
-  const target = document.getElementById("comment");
+  commentsReady.value = true;
+  const target =
+    document.getElementById("comment") || commentsSentinelRef.value;
   if (!container || !target) return;
   const cRect = container.getBoundingClientRect();
   const tRect = target.getBoundingClientRect();
@@ -433,14 +494,12 @@ function headingLayoutTop(heading: HTMLElement, container: HTMLElement) {
     const is3d = style.transform.startsWith("matrix3d(");
     const scaleY = values[is3d ? 5 : 3] ?? 1;
     const translateY = values[is3d ? 13 : 5] ?? 0;
-    const originY = Number.parseFloat(style.transformOrigin.split(/\s+/)[1]) || 0;
+    const originY =
+      Number.parseFloat(style.transformOrigin.split(/\s+/)[1]) || 0;
     transformShift = translateY + (1 - scaleY) * originY;
   }
   return (
-    container.scrollTop +
-    headingRect.top -
-    containerRect.top -
-    transformShift
+    container.scrollTop + headingRect.top - containerRect.top - transformShift
   );
 }
 
@@ -477,23 +536,28 @@ function onPageKeydown(event: KeyboardEvent) {
 }
 
 let scrollFrame: number | null = null;
+let scrollAnimationFrame: number | null = null;
+let metricsFrame: number | null = null;
 let articleResizeObserver: ResizeObserver | null = null;
+let commentsObserver: IntersectionObserver | null = null;
 let excerptFrame: number | null = null;
 let catalogIdleHandle: number | null = null;
 let catalogFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+let deferredIdleHandle: number | null = null;
+let deferredFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 function refreshCatalogOffsets() {
   const container = articleMainRef.value;
   if (!container) return;
   const root = articleContentRef.value;
   const currentHeadings = root
-    ? Array.from(
-        root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"),
-      )
+    ? Array.from(root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"))
     : [];
   const headingsChanged =
     currentHeadings.length !== catalogHeadings.length ||
-    currentHeadings.some((heading, index) => heading !== catalogHeadings[index]);
+    currentHeadings.some(
+      (heading, index) => heading !== catalogHeadings[index],
+    );
   if (headingsChanged) {
     catalogHeadings = currentHeadings;
     catalogItems.value = catalogHeadings.map((heading, index) => {
@@ -507,17 +571,17 @@ function refreshCatalogOffsets() {
     });
   }
   catalogOffsets = catalogHeadings.map((heading) =>
-    Math.max(
-      0,
-      headingLayoutTop(heading, container) - CATALOG_VIEW_OFFSET,
-    ),
+    Math.max(0, headingLayoutTop(heading, container) - CATALOG_VIEW_OFFSET),
   );
 }
 
 function buildCatalog() {
   refreshCatalogOffsets();
   catalogReady.value = true;
-  updateActiveCatalog();
+  updateArticleScrollState();
+  requestAnimationFrame(() => {
+    sidebarReady.value = true;
+  });
 }
 
 function scheduleCatalog() {
@@ -528,9 +592,68 @@ function scheduleCatalog() {
     requestAnimationFrame(buildCatalog);
   };
   if ("requestIdleCallback" in window) {
-    catalogIdleHandle = window.requestIdleCallback(reveal, { timeout: 700 });
+    catalogIdleHandle = window.requestIdleCallback(reveal, { timeout: 320 });
   } else {
-    catalogFallbackTimer = window.setTimeout(reveal, 80);
+    catalogFallbackTimer = window.setTimeout(reveal, 40);
+  }
+}
+
+function scheduleArticleMetrics() {
+  if (metricsFrame !== null) return;
+  metricsFrame = requestAnimationFrame(() => {
+    metricsFrame = null;
+    if (catalogReady.value) refreshCatalogOffsets();
+    updateArticleScrollState();
+  });
+}
+
+let searchResultFocused = false;
+function handleMarkdownRendered() {
+  scheduleCatalog();
+  setupCommentsLoading();
+  if (!articleResizeObserver && articleContentRef.value) {
+    articleResizeObserver = new ResizeObserver(scheduleArticleMetrics);
+    articleResizeObserver.observe(articleContentRef.value);
+  }
+  if (!searchResultFocused && highlightQuery.value) {
+    searchResultFocused = true;
+    requestAnimationFrame(focusSearchResult);
+  }
+}
+
+function setupCommentsLoading() {
+  const target = commentsSentinelRef.value;
+  if (!target || commentsReady.value || commentsObserver) return;
+  if (!("IntersectionObserver" in window)) {
+    commentsReady.value = true;
+    return;
+  }
+  commentsObserver = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      commentsReady.value = true;
+      commentsObserver?.disconnect();
+      commentsObserver = null;
+    },
+    {
+      root: articleMainRef.value,
+      rootMargin: "720px 0px",
+    },
+  );
+  commentsObserver.observe(target);
+}
+
+function scheduleDeferredModules() {
+  const reveal = () => {
+    deferredIdleHandle = null;
+    deferredFallbackTimer = null;
+    petMountReady.value = true;
+    void loadAdjacent();
+  };
+  if ("requestIdleCallback" in window) {
+    deferredIdleHandle = window.requestIdleCallback(reveal, { timeout: 900 });
+  } else {
+    deferredFallbackTimer = window.setTimeout(reveal, 160);
   }
 }
 
@@ -641,35 +764,35 @@ function focusSearchResult() {
 onMounted(async () => {
   document.addEventListener("keydown", onPageKeydown);
   await loadArticle();
+  if (!article.value.id) return;
   await nextTick();
-  requestAnimationFrame(() => {
-    articleReady.value = true;
-  });
+  commentsReady.value = Boolean(focusCommentId.value || focusParentId.value);
   typeExcerpt();
-  focusSearchResult();
   checkOutdated();
-  updateArticleScrollState();
-
-  if (articleContentRef.value) {
-    articleResizeObserver = new ResizeObserver(() => {
-      refreshCatalogOffsets();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      articleReady.value = true;
       updateArticleScrollState();
+      scheduleDeferredModules();
     });
-    articleResizeObserver.observe(articleContentRef.value);
-  }
-  void loadAdjacent();
+  });
 });
 
 onUnmounted(() => {
   document.removeEventListener("keydown", onPageKeydown);
   setImmersive(false);
-  if (articleMainRef.value) gsap.killTweensOf(articleMainRef.value);
   articleResizeObserver?.disconnect();
+  commentsObserver?.disconnect();
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+  if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
+  if (metricsFrame !== null) cancelAnimationFrame(metricsFrame);
   if (excerptFrame !== null) cancelAnimationFrame(excerptFrame);
   if (catalogIdleHandle !== null && "cancelIdleCallback" in window)
     window.cancelIdleCallback(catalogIdleHandle);
   if (catalogFallbackTimer) clearTimeout(catalogFallbackTimer);
+  if (deferredIdleHandle !== null && "cancelIdleCallback" in window)
+    window.cancelIdleCallback(deferredIdleHandle);
+  if (deferredFallbackTimer) clearTimeout(deferredFallbackTimer);
 });
 </script>
 
@@ -713,6 +836,24 @@ onUnmounted(() => {
     padding 0.32s var(--ui-ease-out);
 }
 
+.article-aside-stage {
+  width: var(--article-aside-w);
+  min-width: var(--article-aside-w);
+  flex: 0 0 var(--article-aside-w);
+  height: 100%;
+  overflow: visible;
+  transition:
+    width 0.32s var(--ui-ease-out),
+    min-width 0.32s var(--ui-ease-out),
+    flex-basis 0.32s var(--ui-ease-out);
+}
+
+.article-aside-stage :deep(.sidebar-right) {
+  width: 100%;
+  min-width: 100%;
+  flex-basis: 100%;
+}
+
 .article-page :deep(.sidebar-right) {
   position: relative;
   z-index: 3;
@@ -748,6 +889,12 @@ onUnmounted(() => {
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
+}
+
+.article-page.is-immersive .article-aside-stage {
+  width: 0;
+  min-width: 0;
+  flex-basis: 0;
 }
 
 .article-page.is-immersive .post-title,
@@ -794,6 +941,12 @@ onUnmounted(() => {
   object-fit: cover;
   display: block;
   box-shadow: 0 14px 36px var(--ld-shadow);
+  opacity: 0;
+  transition: opacity 0.38s ease;
+}
+
+.post-cover.is-loaded {
+  opacity: 1;
 }
 
 .post-header.has-cover {
@@ -1079,9 +1232,15 @@ onUnmounted(() => {
   white-space: normal;
 }
 
-.excerpt-typed {
+.excerpt-reserve {
   display: block;
-  min-height: 0;
+  visibility: hidden;
+}
+
+.excerpt-typed {
+  position: absolute;
+  inset: 0;
+  display: block;
 }
 
 .excerpt-caret {
@@ -1120,13 +1279,11 @@ onUnmounted(() => {
 @keyframes article-fade-up {
   from {
     opacity: 0;
-    transform: translateY(14px);
-    filter: blur(2px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    filter: none;
   }
 }
 
@@ -1136,29 +1293,21 @@ onUnmounted(() => {
 
 .article-ready .article-anim,
 .comments-enter {
-  animation: article-fade-up 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: article-fade-up 0.46s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.article-anim:nth-child(2) {
-  animation-delay: 0.05s;
+.article-ready .article-lead {
+  animation-delay: 0.035s;
 }
-.article-anim:nth-child(3) {
+
+.article-ready .outdated-notice,
+.article-ready .article-shell {
+  animation-delay: 0.07s;
+}
+
+.article-ready .post-footer,
+.article-ready .surround-post {
   animation-delay: 0.1s;
-}
-.article-anim:nth-child(4) {
-  animation-delay: 0.15s;
-}
-.article-anim:nth-child(5) {
-  animation-delay: 0.2s;
-}
-.article-anim:nth-child(6) {
-  animation-delay: 0.25s;
-}
-.article-anim:nth-child(7) {
-  animation-delay: 0.3s;
-}
-.article-anim:nth-child(8) {
-  animation-delay: 0.35s;
 }
 
 .outdated-notice {
@@ -1191,6 +1340,16 @@ onUnmounted(() => {
 
 .article-shell {
   padding: 10px 0 4px;
+}
+
+.comments-stage {
+  min-height: 1px;
+}
+
+.comments-anchor {
+  display: block;
+  width: 100%;
+  height: 1px;
 }
 
 .post-footer {
@@ -1437,6 +1596,10 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
+  .article-aside-stage {
+    display: none;
+  }
+
   .article-page.is-immersive .article-main {
     padding-right: max(16px, env(safe-area-inset-right)) !important;
     padding-left: max(16px, env(safe-area-inset-left)) !important;
@@ -1445,11 +1608,11 @@ onUnmounted(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .article-page :deep(.sidebar-right),
+  .article-aside-stage,
   .article-main,
   .article-shell {
     transition: none;
   }
-
 }
 
 @media (prefers-reduced-motion: reduce) {

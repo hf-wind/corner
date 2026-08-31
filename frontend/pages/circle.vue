@@ -2,15 +2,24 @@
   <main ref="pageRef" class="wind-page" @scroll.passive="persistScroll">
     <div class="wind-shell">
       <header class="wind-masthead">
-        <div class="masthead-mark" aria-hidden="true"><Icon name="ph:wind-bold" /></div>
+        <div class="masthead-mark" aria-hidden="true"><Icon name="ph:wind-bold" /><i class="mark-status" /></div>
         <div class="masthead-copy">
-          <span>WIND DISPATCH</span>
-          <h1>{{ config.title || '风讯角' }}</h1>
-          <p>{{ config.subtitle || '从不同的角落，收拢值得读完的文字。' }}</p>
+          <template v-if="heroReady">
+            <span class="masthead-eyebrow">WIND DISPATCH</span>
+            <h1>{{ config.title || '风讯角' }}</h1>
+            <p>{{ config.subtitle || '从不同的角落，收拢值得读完的文字。' }}</p>
+          </template>
+          <div v-else class="masthead-skeleton" aria-hidden="true"><i /><b /><span /></div>
         </div>
         <div class="masthead-meta">
-          <span><b>{{ sourceCount }}</b> 个来源</span><i /><span><b>{{ totalCount }}</b> 篇收录</span>
-          <small v-if="fetchedAt">{{ relativeDate(fetchedAt) }}更新</small>
+          <template v-if="heroReady">
+            <div class="masthead-stats">
+              <span><b>{{ sourceCount }}</b><small>来源</small></span>
+              <span><b>{{ totalCount }}</b><small>收录</small></span>
+            </div>
+            <div v-if="fetchedAt" class="masthead-update"><i /><span>UPDATED</span><time :datetime="fetchedAt">{{ relativeDate(fetchedAt) }}</time></div>
+          </template>
+          <div v-else class="meta-skeleton" aria-hidden="true"><i /><i /><span /></div>
         </div>
       </header>
 
@@ -60,6 +69,7 @@ const clock = ref(Date.now())
 const brokenImages = reactive(new Set<string>())
 const brokenAvatars = reactive(new Set<string>())
 const cache = useState('circle-feed-cache', () => ({ items: [] as CircleItem[], page: 1, totalPages: 1, total: 0, sourceCount: 0, fetchedAt: '', config: { title: '风讯角', subtitle: '从不同的角落，收拢值得读完的文字。' } }))
+const heroReady = ref(Boolean(cache.value.fetchedAt || cache.value.items.length))
 const items = computed(() => cache.value.items)
 const page = computed({ get: () => cache.value.page, set: value => { cache.value.page = value } })
 const totalPages = computed(() => cache.value.totalPages)
@@ -71,6 +81,7 @@ const activeSection = useState<SectionKey>('circle-active-section', () => 'all')
 const reading = reactive({ lastSeenAt: '' })
 const readingKey = 'corner:circle:reading'
 const scrollKey = 'corner:circle:scroll'
+let scrollPersistedForNavigation = false
 const sectionDefs: Array<{ key: SectionKey; label: string; icon: string }> = [
   { key: 'all', label: '全部', icon: 'ph:squares-four-bold' }, { key: 'thought', label: '思考', icon: 'ph:lightbulb-filament-bold' },
   { key: 'news', label: '新闻', icon: 'ph:newspaper-bold' }, { key: 'tech', label: '科技', icon: 'ph:cpu-bold' },
@@ -87,15 +98,15 @@ function relativeDate(value: string) { const time = Date.parse(value); if (!Numb
 function readingMinutes(item: CircleItem) { return Math.max(1, Math.round((item.contentHtml || item.content || item.summary || '').length / 700)) }
 function dismissNewItems() { reading.lastSeenAt = items.value[0]?.publishedAt || new Date().toISOString(); localStorage.setItem(readingKey, JSON.stringify(reading)) }
 function restoreReading() { try { const value = JSON.parse(localStorage.getItem(readingKey) || '{}'); reading.lastSeenAt = typeof value.lastSeenAt === 'string' ? value.lastSeenAt : '' } catch { reading.lastSeenAt = '' } }
-function persistScroll() { const host = pageRef.value; if (!host) return; const entries = Array.from(host.querySelectorAll<HTMLElement>('.dispatch-item')); const anchor = entries.find(entry => entry.offsetTop + entry.offsetHeight >= host.scrollTop + 20) || entries.at(-1); sessionStorage.setItem(scrollKey, JSON.stringify({ top: host.scrollTop, anchorId: anchor?.dataset.itemId || '', anchorOffset: anchor ? host.scrollTop - anchor.offsetTop : 0, page: page.value })) }
+function persistScroll() { if (scrollPersistedForNavigation) return; const host = pageRef.value; if (!host) return; const entries = Array.from(host.querySelectorAll<HTMLElement>('.dispatch-item')); const anchor = entries.find(entry => entry.offsetTop + entry.offsetHeight >= host.scrollTop + 20) || entries.at(-1); sessionStorage.setItem(scrollKey, JSON.stringify({ top: host.scrollTop, anchorId: anchor?.dataset.itemId || '', anchorOffset: anchor ? host.scrollTop - anchor.offsetTop : 0, page: page.value })) }
 async function restoreScroll() { const host = pageRef.value; if (!host) return; try { const value = JSON.parse(sessionStorage.getItem(scrollKey) || '{}'); await nextTick(); const anchor = value.anchorId ? host.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(value.anchorId)}"]`) : null; const anchorOffset = Number(value.anchorOffset); host.scrollTop = anchor && Number.isFinite(anchorOffset) ? Math.max(0, anchor.offsetTop + anchorOffset) : Math.max(0, Number(value.top) || 0) } catch { /* ignore invalid session state */ } }
-function openItem(item: CircleItem) { persistScroll(); void router.push({ path: '/circle/read', query: { id: item.id } }) }
-async function loadFeed(target = page.value) { loading.value = true; try { const result = await api.get<any>('/circle/feed', { page: target, limit: pageSize }); cache.value = { items: Array.isArray(result?.items) ? result.items : [], page: Number(result?.page) || target, totalPages: Number(result?.totalPages) || 1, total: Number(result?.total) || 0, sourceCount: Number(result?.sourceCount) || 0, fetchedAt: String(result?.fetchedAt || ''), config: { title: String(result?.config?.title || '风讯角'), subtitle: String(result?.config?.subtitle || '从不同的角落，收拢值得读完的文字。') } } } finally { loading.value = false } }
+function openItem(item: CircleItem) { persistScroll(); scrollPersistedForNavigation = true; void router.push({ path: '/circle/read', query: { id: item.id } }) }
+async function loadFeed(target = page.value) { loading.value = true; try { const result = await api.get<any>('/circle/feed', { page: target, limit: pageSize }); cache.value = { items: Array.isArray(result?.items) ? result.items : [], page: Number(result?.page) || target, totalPages: Number(result?.totalPages) || 1, total: Number(result?.total) || 0, sourceCount: Number(result?.sourceCount) || 0, fetchedAt: String(result?.fetchedAt || ''), config: { title: String(result?.config?.title || '风讯角'), subtitle: String(result?.config?.subtitle || '从不同的角落，收拢值得读完的文字。') } } } finally { loading.value = false; heroReady.value = true } }
 async function changePage(target: number) { await loadFeed(target); pageRef.value?.scrollTo({ top: 0, behavior: 'smooth' }) }
 
 let clockTimer: ReturnType<typeof setInterval> | undefined
 onMounted(async () => { restoreReading(); if (items.value.length) await restoreScroll(); else { await loadFeed(); await restoreScroll() } clockTimer = setInterval(() => { clock.value = Date.now() }, 60000) })
-onUnmounted(() => { persistScroll(); if (clockTimer) clearInterval(clockTimer); localStorage.setItem(readingKey, JSON.stringify(reading)) })
+onUnmounted(() => { if (!scrollPersistedForNavigation) persistScroll(); if (clockTimer) clearInterval(clockTimer); localStorage.setItem(readingKey, JSON.stringify(reading)) })
 useHead(() => ({ title: `${config.value.title || '风讯角'} · 风隅随笔` }))
 </script>
 
@@ -104,4 +115,24 @@ useHead(() => ({ title: `${config.value.title || '风讯角'} · 风隅随笔` }
 @media(max-width:760px){.wind-shell{width:calc(100% - 28px);padding-top:max(72px,calc(env(safe-area-inset-top) + 58px))}.wind-masthead{grid-template-columns:40px 1fr;gap:12px}.masthead-mark{width:38px;height:38px}.masthead-copy h1{font-size:1.72rem}.masthead-meta{grid-column:1/-1;flex-wrap:wrap;margin-top:2px;padding-left:52px}.dispatch-item{--thumb-width:92px;grid-template-columns:20px minmax(0,1fr) var(--thumb-width);gap:9px;padding:17px 0}.dispatch-item:not(:has(figure)){grid-template-columns:20px minmax(0,1fr)}.item-index{padding-top:20px;font-size:.49rem}.item-body header{flex-wrap:wrap;gap:6px}.item-body time{margin-left:0}.item-body h2{font-size:.94rem}.item-body p{font-size:.64rem;-webkit-line-clamp:2}.dispatch-item figure{align-self:start;margin-top:20px}.channel-nav button{padding:8px 10px}.item-body footer span:nth-child(2){display:none}}
 @media(max-width:470px){.dispatch-item{grid-template-columns:20px minmax(0,1fr)}.dispatch-item figure{display:none}.masthead-copy p{max-width:260px}.masthead-meta{padding-left:0}.masthead-meta small{flex-basis:100%}}
 @media(prefers-reduced-motion:reduce){.masthead-mark,.dispatch-item,.wind-loading i{animation:none}.dispatch-item,.dispatch-item figure img,.channel-nav button::after{transition:none}}
+
+/* Keep the masthead editorial and compact while giving live feed data a clear hierarchy. */
+.wind-masthead{position:relative;grid-template-columns:52px minmax(0,1fr) auto;gap:18px;padding:4px 0 26px}.wind-masthead::after{position:absolute;bottom:-1px;left:0;width:64px;height:1px;background:var(--c-primary);content:''}.masthead-mark{position:relative;width:48px;height:48px;border-color:color-mix(in srgb,var(--c-primary) 34%,var(--border));background:transparent;box-shadow:inset 0 0 0 4px color-mix(in srgb,var(--c-primary-soft) 28%,transparent)}.masthead-mark::before{position:absolute;inset:7px;border:1px solid color-mix(in srgb,var(--c-primary) 18%,transparent);border-radius:5px;content:''}.masthead-mark :deep(svg){position:relative;z-index:1}.mark-status{position:absolute;z-index:2;top:4px;right:4px;width:6px;height:6px;border:2px solid var(--c-bg);border-radius:50%;background:var(--c-primary);box-sizing:content-box;animation:status-breathe 2.4s ease-in-out infinite}.masthead-eyebrow{display:flex;align-items:center;gap:8px}.masthead-eyebrow em{padding-left:8px;border-left:1px solid var(--border);color:var(--c-text-3);font-style:normal;font-weight:620;letter-spacing:.08em}.masthead-copy h1{margin-top:5px;font-size:2.25rem;font-weight:740}.masthead-copy p{margin-top:6px;max-width:560px;color:var(--c-text-2);line-height:1.65}.masthead-meta{display:grid;min-width:174px;gap:9px}.masthead-stats{display:grid;grid-template-columns:repeat(2,minmax(70px,1fr));border-top:1px solid var(--border);border-bottom:1px solid var(--border)}.masthead-stats>span{display:flex;align-items:baseline;gap:5px;padding:8px 10px}.masthead-stats>span+span{border-left:1px solid var(--border)}.masthead-stats b{color:var(--c-text);font:730 1rem var(--font-mono);font-variant-numeric:tabular-nums}.masthead-stats small{color:var(--c-text-3);font-size:.56rem}.masthead-update{display:flex;align-items:center;gap:6px;padding:0 2px;color:var(--c-text-3);font:.5rem var(--font-mono);letter-spacing:.08em}.masthead-update i{width:5px;height:5px;border-radius:50%;background:var(--c-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--c-primary) 12%,transparent)}.masthead-update time{margin-left:auto;color:var(--c-text-2);font-family:var(--font-system);letter-spacing:0}.dispatch-item{transition:background-color .2s,box-shadow .2s}.dispatch-item:hover,.dispatch-item:focus-visible{padding-right:4px;padding-left:4px;box-shadow:inset 2px 0 0 color-mix(in srgb,var(--c-primary) 72%,transparent)}
+@keyframes status-breathe{50%{opacity:.42;transform:scale(.82)}}
+@media(max-width:760px){.wind-masthead{grid-template-columns:44px minmax(0,1fr);gap:13px;padding-top:2px}.masthead-mark{width:42px;height:42px}.masthead-copy h1{font-size:1.82rem}.masthead-meta{grid-column:1/-1;min-width:0;margin-top:4px;padding-left:57px}.masthead-stats{width:min(220px,100%)}.dispatch-item:hover,.dispatch-item:focus-visible{padding-right:0;padding-left:0}}
+@media(max-width:470px){.wind-masthead{gap:11px}.masthead-meta{padding-left:0}.masthead-copy p{max-width:100%}.masthead-eyebrow em{display:none}.masthead-stats{width:100%}}
+@media(prefers-reduced-motion:reduce){.mark-status{animation:none}}
+
+/* Open hero treatment: no divider lines, with a quiet tinted data cluster. */
+.wind-masthead{padding-bottom:24px;border-bottom:0}.wind-masthead::after{display:none}.masthead-mark{border:0;background:color-mix(in srgb,var(--c-primary-soft) 64%,var(--c-bg-2));box-shadow:0 8px 24px color-mix(in srgb,var(--c-primary) 10%,transparent)}.masthead-mark::before{display:none}.masthead-eyebrow::before{width:5px;height:5px;border-radius:50%;background:var(--c-primary);content:'';box-shadow:0 0 0 4px color-mix(in srgb,var(--c-primary) 10%,transparent)}.masthead-meta{padding:11px 12px;border-radius:7px;background:color-mix(in srgb,var(--c-primary-soft) 25%,var(--c-bg-2));gap:7px}.masthead-stats{border:0}.masthead-stats>span{padding:0 10px}.masthead-stats>span:first-child{padding-left:0}.masthead-stats>span+span{border-left:0}.masthead-update{padding:0}.dispatch-item:hover,.dispatch-item:focus-visible{box-shadow:none}.item-index,.item-body,.dispatch-item figure{transition:transform .25s var(--ui-ease-out)}.dispatch-item:hover .item-index,.dispatch-item:hover .item-body,.dispatch-item:focus-visible .item-index,.dispatch-item:focus-visible .item-body{transform:translateX(6px)}.dispatch-item:hover figure,.dispatch-item:focus-visible figure{transform:translateX(-6px)}
+@media(prefers-reduced-motion:reduce){.item-index,.item-body,.dispatch-item figure{transition:none}}
+
+.masthead-meta{min-width:188px;padding:0;border-radius:0;background:transparent;gap:8px}.masthead-stats{grid-template-columns:repeat(2,max-content);justify-content:end;gap:24px}.masthead-stats>span{gap:6px;padding:0}.masthead-stats b{font-size:1.08rem}.masthead-update{justify-content:flex-end}.masthead-update time{margin-left:6px}.channel-nav{border-bottom:0}
+@media(max-width:760px){.masthead-stats{justify-content:start}.masthead-update{justify-content:flex-start}.masthead-update time{margin-left:6px}}
+
+.masthead-copy{min-height:69px}.masthead-copy>span,.masthead-copy>h1,.masthead-copy>p,.masthead-meta>.masthead-stats,.masthead-meta>.masthead-update{animation:hero-content-in .42s ease both}.masthead-skeleton{display:grid;height:69px;align-content:center;gap:8px}.masthead-skeleton i,.masthead-skeleton b,.masthead-skeleton span,.meta-skeleton i,.meta-skeleton span{display:block;border-radius:3px;background:var(--c-bg-2);animation:skeleton-breathe 1.2s ease-in-out infinite alternate}.masthead-skeleton i{width:88px;height:6px}.masthead-skeleton b{width:128px;height:30px}.masthead-skeleton span{width:min(260px,80%);height:8px}.meta-skeleton{display:grid;grid-template-columns:54px 62px;justify-content:end;gap:8px}.meta-skeleton i{height:20px}.meta-skeleton span{grid-column:1/-1;justify-self:end;width:94px;height:7px}.dispatch-item,.dispatch-item:hover,.dispatch-item:focus-visible{padding-right:10px;padding-left:10px}.item-index,.item-body{transform:translateX(-6px)}.dispatch-item figure{transform:translateX(6px)}.item-index,.item-body,.dispatch-item figure{transition:transform .25s ease}.dispatch-item:hover .item-index,.dispatch-item:hover .item-body,.dispatch-item:focus-visible .item-index,.dispatch-item:focus-visible .item-body,.dispatch-item:hover figure,.dispatch-item:focus-visible figure{transform:none}
+@keyframes hero-content-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes skeleton-breathe{to{opacity:.46}}
+@media(max-width:760px){.dispatch-item{padding-right:10px;padding-left:10px}.item-index,.item-body{transform:translateX(-10px)}.dispatch-item figure{transform:translateX(10px)}}
+@media(prefers-reduced-motion:reduce){.masthead-copy>span,.masthead-copy>h1,.masthead-copy>p,.masthead-meta>.masthead-stats,.masthead-meta>.masthead-update,.masthead-skeleton i,.masthead-skeleton b,.masthead-skeleton span,.meta-skeleton i,.meta-skeleton span{animation:none}}
 </style>

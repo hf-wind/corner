@@ -19,7 +19,11 @@ const routes: RouteRecordRaw[] = [
     component: lazyRoute(() => import("./pages/index.vue")),
     meta: { layout: "welcome" },
   },
-  { path: "/home", component: lazyRoute(() => import("./pages/home.vue")) },
+  {
+    path: "/home",
+    component: lazyRoute(() => import("./pages/home.vue")),
+    meta: { keepAlive: true },
+  },
   {
     path: "/article/:slug",
     component: lazyRoute(() => import("./pages/article/[slug].vue")),

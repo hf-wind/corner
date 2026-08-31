@@ -1,227 +1,236 @@
 <template>
   <Teleport to="body" :disabled="!teleportToBody">
-    <div
-      class="ai-pet"
-      :class="{ open: chatOpen, 'is-article': isArticleMode, docked }"
-    >
-      <Transition name="pet-panel">
-        <div
-          v-if="chatOpen"
-          class="pet-chat"
-          role="dialog"
-          aria-label="和哆啦A梦聊天"
-        >
-          <header class="pet-chat-head">
-            <div class="pet-chat-title">
-              <span class="pet-chat-avatar" aria-hidden="true">
-                <img class="dora-avatar-image" :src="dramAvatarImg" alt="" />
-              </span>
-              <div>
-                <div class="pet-name-row">
-                  <strong>{{ displayName }}</strong>
-                  <span class="pet-online">在线</span>
+    <Transition name="pet-ready" appear>
+      <div
+        v-if="petReady"
+        class="ai-pet"
+        :class="{ open: chatOpen, 'is-article': isArticleMode, docked }"
+      >
+        <Transition name="pet-panel">
+          <div
+            v-if="chatOpen"
+            class="pet-chat"
+            role="dialog"
+            aria-label="和哆啦A梦聊天"
+          >
+            <header class="pet-chat-head">
+              <div class="pet-chat-title">
+                <span class="pet-chat-avatar" aria-hidden="true">
+                  <img class="dora-avatar-image" :src="dramAvatarImg" alt="" />
+                </span>
+                <div>
+                  <div class="pet-name-row">
+                    <strong>{{ displayName }}</strong>
+                    <span class="pet-online">在线</span>
+                  </div>
+                  <p>{{ description }}</p>
+                  <span v-if="isContentMode" class="pet-context-label">{{
+                    contextLabel
+                  }}</span>
                 </div>
-                <p>{{ description }}</p>
-                <span v-if="isContentMode" class="pet-context-label">{{
-                  contextLabel
-                }}</span>
               </div>
-            </div>
-            <button
-              type="button"
-              class="pet-icon-btn"
-              aria-label="关闭"
-              @click="closeChat"
-            >
-              <Icon name="ph:x-bold" />
-            </button>
-          </header>
+              <button
+                type="button"
+                class="pet-icon-btn"
+                aria-label="关闭"
+                @click="closeChat"
+              >
+                <Icon name="ph:x-bold" />
+              </button>
+            </header>
 
-          <div ref="listRef" class="pet-chat-list">
-            <div
-              v-if="historyLoading"
-              class="pet-history-loading"
-              aria-label="正在加载历史消息"
-            >
-              <span /><span /><span />
-            </div>
-            <div
-              v-for="(m, i) in messages"
-              :key="i"
-              class="pet-msg"
-              :class="m.role"
-            >
-              <template v-if="m.role === 'assistant'">
-                <div
-                  v-if="m.streaming && m.renderedHtml"
-                  class="pet-bubble pet-markdown pet-streaming"
-                  v-html="m.renderedHtml"
-                />
-                <div
-                  v-else-if="!m.streaming"
-                  class="pet-bubble pet-markdown"
-                  v-html="renderMarkdown(m.content)"
-                />
-                <div
-                  v-if="!m.streaming && m.cards?.length"
-                  class="pet-source-cards"
-                >
-                  <AppLink
-                    v-for="card in m.cards"
-                    :key="`${card.type}:${card.sourceId}`"
-                    :to="card.href"
-                    @click="trackCard(card)"
+            <div ref="listRef" class="pet-chat-list">
+              <div
+                v-if="historyLoading"
+                class="pet-history-loading"
+                aria-label="正在加载历史消息"
+              >
+                <span /><span /><span />
+              </div>
+              <div
+                v-for="(m, i) in messages"
+                :key="i"
+                class="pet-msg"
+                :class="m.role"
+              >
+                <template v-if="m.role === 'assistant'">
+                  <div
+                    v-if="m.streaming && m.renderedHtml"
+                    class="pet-bubble pet-markdown pet-streaming"
+                    v-html="m.renderedHtml"
+                  />
+                  <div
+                    v-else-if="!m.streaming"
+                    class="pet-bubble pet-markdown"
+                    v-html="renderMarkdown(m.content)"
+                  />
+                  <div
+                    v-if="!m.streaming && m.cards?.length"
+                    class="pet-source-cards"
                   >
-                    <span class="pet-source-media">
-                      <img
-                        v-if="sourceImage(card)"
-                        :src="sourceImage(card)"
-                        :alt="card.title"
-                        loading="lazy"
+                    <AppLink
+                      v-for="card in m.cards"
+                      :key="`${card.type}:${card.sourceId}`"
+                      :to="card.href"
+                      @click="trackCard(card)"
+                    >
+                      <span class="pet-source-media">
+                        <img
+                          v-if="sourceImage(card)"
+                          :src="sourceImage(card)"
+                          :alt="card.title"
+                          loading="lazy"
+                        />
+                        <Icon v-else :name="sourceIcon(card.type)" />
+                      </span>
+                      <span class="pet-source-copy">
+                        <small>{{ sourceLabel(card.type) }}</small>
+                        <strong>{{ sourceTitle(card) }}</strong>
+                        <span v-if="sourceExcerpt(card)">{{
+                          sourceExcerpt(card)
+                        }}</span>
+                      </span>
+                      <Icon
+                        name="ph:arrow-up-right-bold"
+                        class="pet-source-arrow"
                       />
-                      <Icon v-else :name="sourceIcon(card.type)" />
-                    </span>
-                    <span class="pet-source-copy">
-                      <small>{{ sourceLabel(card.type) }}</small>
-                      <strong>{{ sourceTitle(card) }}</strong>
-                      <span v-if="sourceExcerpt(card)">{{
-                        sourceExcerpt(card)
-                      }}</span>
-                    </span>
-                    <Icon
-                      name="ph:arrow-up-right-bold"
-                      class="pet-source-arrow"
-                    />
-                  </AppLink>
-                </div>
-                <div
-                  v-if="!m.streaming && m.music?.length"
-                  class="pet-music-cards"
-                >
-                  <button
-                    v-for="track in m.music"
-                    :key="`${track.name}:${track.artist}`"
-                    type="button"
-                    @click="playTrack(track)"
+                    </AppLink>
+                  </div>
+                  <div
+                    v-if="!m.streaming && m.music?.length"
+                    class="pet-music-cards"
                   >
-                    <span class="pet-music-cover">
-                      <img
-                        v-if="track.pic"
-                        :src="track.pic"
-                        :alt="track.name"
-                        loading="lazy"
-                      />
-                      <Icon v-else name="ph:music-notes-fill" />
-                    </span>
-                    <span
-                      ><strong>{{ track.name }}</strong
-                      ><small>{{ track.artist }}</small></span
-                    >
-                    <Icon name="ph:play-fill" />
-                  </button>
-                </div>
-                <div v-if="shouldAskFeedback(m, i)" class="pet-feedback">
-                  <span>这次有帮到你吗？</span>
-                  <div>
                     <button
+                      v-for="track in m.music"
+                      :key="`${track.name}:${track.artist}`"
                       type="button"
-                      title="有帮助"
-                      :disabled="m.feedbackPending"
-                      @click="feedback(m, true)"
+                      @click="playTrack(track)"
                     >
-                      <Icon name="ph:thumbs-up-bold" /><span>有</span>
-                    </button>
-                    <button
-                      type="button"
-                      title="没帮助"
-                      :disabled="m.feedbackPending"
-                      @click="feedback(m, false)"
-                    >
-                      <Icon name="ph:thumbs-down-bold" /><span>没有</span>
+                      <span class="pet-music-cover">
+                        <img
+                          v-if="track.pic"
+                          :src="track.pic"
+                          :alt="track.name"
+                          loading="lazy"
+                        />
+                        <Icon v-else name="ph:music-notes-fill" />
+                      </span>
+                      <span
+                        ><strong>{{ track.name }}</strong
+                        ><small>{{ track.artist }}</small></span
+                      >
+                      <Icon name="ph:play-fill" />
                     </button>
                   </div>
-                </div>
-                <div
-                  v-else-if="m.feedbackRecorded && i === latestFeedbackIndex"
-                  class="pet-feedback-confirmed"
-                >
-                  <Icon name="ph:check-circle-fill" />
-                  <span>谢谢，我记下了</span>
-                </div>
-              </template>
-              <div v-else class="pet-bubble">{{ m.content }}</div>
+                  <div v-if="shouldAskFeedback(m, i)" class="pet-feedback">
+                    <span>这次有帮到你吗？</span>
+                    <div>
+                      <button
+                        type="button"
+                        title="有帮助"
+                        :disabled="m.feedbackPending"
+                        @click="feedback(m, true)"
+                      >
+                        <Icon name="ph:thumbs-up-bold" /><span>有</span>
+                      </button>
+                      <button
+                        type="button"
+                        title="没帮助"
+                        :disabled="m.feedbackPending"
+                        @click="feedback(m, false)"
+                      >
+                        <Icon name="ph:thumbs-down-bold" /><span>没有</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    v-else-if="m.feedbackRecorded && i === latestFeedbackIndex"
+                    class="pet-feedback-confirmed"
+                  >
+                    <Icon name="ph:check-circle-fill" />
+                    <span>谢谢，我记下了</span>
+                  </div>
+                </template>
+                <div v-else class="pet-bubble">{{ m.content }}</div>
+              </div>
+              <div v-if="sending && !streamStarted" class="pet-msg assistant">
+                <div class="pet-bubble typing"><span /><span /><span /></div>
+              </div>
             </div>
-            <div v-if="sending && !streamStarted" class="pet-msg assistant">
-              <div class="pet-bubble typing"><span /><span /><span /></div>
-            </div>
-          </div>
 
-          <div class="pet-suggestions">
+            <div class="pet-suggestions">
+              <button
+                v-for="action in quickActions"
+                :key="action.label"
+                type="button"
+                :disabled="sending"
+                @click="runQuickAction(action)"
+              >
+                <Icon :name="action.icon" />
+                <span>{{ action.label }}</span>
+              </button>
+            </div>
+
+            <form class="pet-chat-form" @submit.prevent="send">
+              <Icon name="ph:sparkle-bold" class="pet-input-mark" />
+              <textarea
+                ref="inputRef"
+                v-model="input"
+                class="pet-input"
+                rows="1"
+                :maxlength="inputMaxChars"
+                :placeholder="inputPlaceholder"
+                :disabled="sending"
+                @input="resizeInput"
+                @keydown.enter.exact.prevent="send"
+              />
+              <button
+                type="submit"
+                class="pet-send"
+                :disabled="sending || !input.trim()"
+                aria-label="发送"
+              >
+                <Icon name="ph:paper-plane-right-fill" />
+              </button>
+            </form>
+          </div>
+        </Transition>
+
+        <Transition name="pet-actions">
+          <div
+            v-if="actionsVisible"
+            class="pet-actions"
+            aria-label="AI 快捷功能"
+          >
             <button
-              v-for="action in quickActions"
+              v-for="action in homeActions"
               :key="action.label"
               type="button"
-              :disabled="sending"
               @click="runQuickAction(action)"
             >
               <Icon :name="action.icon" />
               <span>{{ action.label }}</span>
             </button>
           </div>
-
-          <form class="pet-chat-form" @submit.prevent="send">
-            <Icon name="ph:sparkle-bold" class="pet-input-mark" />
-            <textarea
-              ref="inputRef"
-              v-model="input"
-              class="pet-input"
-              rows="1"
-              :maxlength="inputMaxChars"
-              :placeholder="inputPlaceholder"
-              :disabled="sending"
-              @input="resizeInput"
-              @keydown.enter.exact.prevent="send"
-            />
-            <button
-              type="submit"
-              class="pet-send"
-              :disabled="sending || !input.trim()"
-              aria-label="发送"
-            >
-              <Icon name="ph:paper-plane-right-fill" />
-            </button>
-          </form>
-        </div>
-      </Transition>
-
-      <Transition name="pet-actions">
-        <div v-if="actionsVisible" class="pet-actions" aria-label="AI 快捷功能">
-          <button
-              v-for="action in homeActions"
-            :key="action.label"
-            type="button"
-            @click="runQuickAction(action)"
-          >
-            <Icon :name="action.icon" />
-            <span>{{ action.label }}</span>
-          </button>
-        </div>
-      </Transition>
-
-      <button
-        type="button"
-        class="pet-fab"
-        :title="chatOpen ? '收起' : '和哆啦A梦聊天'"
-        @click="toggleChat"
-      >
-        <span class="pet-sprite-wrap" :style="wrapStyle">
-          <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
-        </span>
-        <Transition name="pet-hint" appear>
-          <span v-if="petReady && showHint" class="pet-hint">{{ hintText }}</span>
         </Transition>
-      </button>
-    </div>
+
+        <button
+          type="button"
+          class="pet-fab"
+          :title="chatOpen ? '收起' : '和哆啦A梦聊天'"
+          @click="toggleChat"
+        >
+          <span class="pet-sprite-wrap" :style="wrapStyle">
+            <span class="pet-sprite-img" :key="animKey" :style="spriteStyle" />
+          </span>
+          <Transition name="pet-hint" appear>
+            <span v-if="petReady && showHint" class="pet-hint">{{
+              hintText
+            }}</span>
+          </Transition>
+        </button>
+      </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -703,7 +712,11 @@ const quickActions = computed<QuickAction[]>(() =>
         },
       ],
 );
-const homeActions = computed(() => quickActions.value.filter((action) => action.label !== "推荐一首歌").slice(0, 3));
+const homeActions = computed(() =>
+  quickActions.value
+    .filter((action) => action.label !== "推荐一首歌")
+    .slice(0, 3),
+);
 
 function chooseGreeting() {
   const list = greetings.value.length
@@ -1164,20 +1177,42 @@ function waitForTypingDrain() {
   return new Promise<void>((resolve) => typingDrainResolvers.push(resolve));
 }
 
+function preloadPetImage(source: string) {
+  return new Promise<boolean>((resolve) => {
+    const image = new Image();
+    image.onload = async () => {
+      try {
+        await image.decode?.();
+      } catch {
+        // onload 已确认资源可绘制，decode 失败不应阻塞组件。
+      }
+      resolve(true);
+    };
+    image.onerror = () => resolve(false);
+    image.src = source;
+  });
+}
+
 onMounted(async () => {
   syncViewport();
   window.addEventListener("resize", syncViewport);
   chooseGreeting();
-  const spriteReady = new Promise<void>((resolve) => {
-    const image = new Image();
-    image.onload = () => resolve();
-    image.onerror = () => resolve();
-    image.src = spriteUrl;
-  });
-  await Promise.all([loadPetMeta(), spriteReady]);
+  const [spriteReady, avatarReady] = await Promise.all([
+    preloadPetImage(spriteUrl),
+    preloadPetImage(dramAvatarImg),
+    loadPetMeta(),
+    document.fonts?.ready.catch(() => undefined),
+  ]);
+  if (!spriteReady || !avatarReady) return;
+  await nextTick();
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
   petReady.value = true;
   showHint.value = true;
-  hintTimer = setTimeout(() => { showHint.value = false; }, 6000);
+  hintTimer = setTimeout(() => {
+    showHint.value = false;
+  }, 6000);
 });
 
 onUnmounted(() => {
@@ -1205,6 +1240,20 @@ onUnmounted(() => {
 
 .ai-pet > * {
   pointer-events: auto;
+}
+
+.pet-ready-enter-active,
+.pet-ready-leave-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: right bottom;
+}
+
+.pet-ready-enter-from,
+.pet-ready-leave-to {
+  opacity: 0;
+  transform: translate3d(0, 8px, 0) scale(0.96);
 }
 
 .pet-fab {
@@ -1675,7 +1724,16 @@ onUnmounted(() => {
   position: relative;
   transition: border-color 0.2s ease;
 }
-.pet-chat-form::after { content:""; position:absolute; left:0; right:100%; bottom:-1px; height:2px; background:var(--c-primary); transition:right .35s ease; }
+.pet-chat-form::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -1px;
+  height: 2px;
+  background: var(--c-primary);
+  transition: right 0.35s ease;
+}
 
 .pet-history-loading {
   display: grid;
@@ -1714,7 +1772,7 @@ onUnmounted(() => {
   border-color: color-mix(in srgb, var(--c-primary) 30%, var(--border));
 }
 .pet-chat-form:focus-within::after {
-  right:0;
+  right: 0;
 }
 .pet-input-mark {
   margin-bottom: 10px;

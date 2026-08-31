@@ -8,9 +8,13 @@ export function setCompatRouter(router: Router) {
   activeRouter = router
 }
 
-export function useState<T>(key: string, init: () => T): Ref<T> {
-  if (!state.has(key)) state.set(key, ref(init()) as Ref<unknown>)
-  return state.get(key) as Ref<T>
+export function useState<T>(key: string, init: () => T): Ref<T>
+export function useState<T = undefined>(key: string): Ref<T | undefined>
+export function useState<T>(key: string, init?: () => T): Ref<T | undefined> {
+  if (!state.has(key)) state.set(key, ref() as Ref<unknown>)
+  const value = state.get(key) as Ref<T | undefined>
+  if (value.value === undefined && init) value.value = init()
+  return value
 }
 
 export function useRuntimeConfig() {

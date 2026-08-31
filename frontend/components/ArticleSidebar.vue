@@ -4,7 +4,7 @@
     class="sidebar-right"
     :class="{ 'immersive-sidebar': immersive }"
   >
-    <header class="widget-head">
+    <header v-if="hasCatalog" class="widget-head">
       <div class="head-title">
         <Icon name="ph:list-bullets-bold" class="head-icon" />
         <span>文章目录</span>
@@ -18,6 +18,7 @@
     </header>
 
     <div
+      v-if="hasCatalog"
       ref="catalogWrapRef"
       class="catalog-wrap"
       :class="{ 'catalog-ready': catalogReady }"
@@ -85,6 +86,7 @@
   <Transition name="immersive-ui">
     <div v-if="immersive" class="immersive-ui">
       <button
+        v-if="hasCatalog"
         type="button"
         class="immersive-catalog-bar"
         :class="{ open: immersiveCatalogOpen }"
@@ -109,7 +111,7 @@
 
       <Transition name="immersive-catalog">
         <section
-          v-if="immersiveCatalogOpen"
+          v-if="hasCatalog && immersiveCatalogOpen"
           class="immersive-catalog-panel"
           role="dialog"
           aria-label="文章目录"
@@ -202,7 +204,7 @@
   >
     <Transition name="catalog-backdrop">
       <button
-        v-if="mobileCatalogOpen"
+        v-if="hasCatalog && mobileCatalogOpen"
         type="button"
         class="mobile-catalog-backdrop"
         aria-label="关闭文章目录"
@@ -212,7 +214,7 @@
 
     <Transition name="mobile-catalog">
       <section
-        v-if="mobileCatalogOpen"
+        v-if="hasCatalog && mobileCatalogOpen"
         class="mobile-catalog-panel"
         role="dialog"
         aria-label="文章目录"
@@ -271,6 +273,7 @@
     <Transition name="mobile-tool-menu">
       <div v-if="mobileActionsOpen" class="mobile-tool-menu">
         <button
+          v-show="hasCatalog"
           type="button"
           aria-label="文章目录"
           title="文章目录"
@@ -385,6 +388,9 @@ const mobileActionsOpen = ref(false);
 const mobileCatalogOpen = ref(false);
 const percent = computed(() =>
   Math.round(Math.min(1, Math.max(0, props.progress)) * 100),
+);
+const hasCatalog = computed(
+  () => props.catalogReady && props.catalogItems.length > 0,
 );
 
 function articleScrollHost() {
@@ -738,30 +744,41 @@ onUnmounted(() => {
 }
 
 .sidebar-actions {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  z-index: 4;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 10px 0 0;
-  border-top: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
+  box-shadow:
+    0 12px 34px color-mix(in srgb, #000 10%, var(--ld-shadow)),
+    0 1px 0 color-mix(in srgb, #fff 52%, transparent) inset;
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  transform: translateY(-50%);
 }
 
 .action-btn {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   color: var(--c-text-3);
-  font-size: 0.95rem;
+  font-size: 1rem;
+  place-items: center;
   cursor: pointer;
   transition:
     color 0.18s ease,
-    background 0.18s ease,
+    background-color 0.18s ease,
     opacity 0.2s ease,
     transform 0.18s ease;
   opacity: 0.42;
@@ -773,9 +790,8 @@ onUnmounted(() => {
 }
 
 .action-btn.primary {
-  border-color: color-mix(in srgb, var(--c-primary) 24%, var(--border));
   color: var(--c-primary);
-  background: color-mix(in srgb, var(--c-primary-soft) 46%, transparent);
+  background: color-mix(in srgb, var(--c-primary-soft) 68%, transparent);
 }
 
 .action-btn:disabled {

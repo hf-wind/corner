@@ -14,7 +14,10 @@
         "
         :mode="viewRoute.meta.layout === 'admin' ? 'out-in' : undefined"
       >
-        <component :is="Component" :key="viewRoute.path" />
+        <KeepAlive v-if="viewRoute.meta.keepAlive">
+          <component :is="Component" :key="viewRoute.path" />
+        </KeepAlive>
+        <component v-else :is="Component" :key="viewRoute.path" />
       </Transition>
     </RouterView>
   </component>

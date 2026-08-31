@@ -31,6 +31,7 @@
           <ArticleCard
             v-for="(article, i) in articles"
             :key="article.slug"
+            :data-article-slug="article.slug"
             :style="{ '--article-index': i }"
             :eager="i < 2"
             :priority="i === 0"
@@ -91,15 +92,25 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, onActivated, onDeactivated } from "vue";
 import { useBottomDockState } from "~/composables/useBottomDockState";
 import { importWithRetry } from "~/utils/lazyImport";
 
-const FeaturedSwiper = defineAsyncComponent(
-  () => importWithRetry(() => import("~/components/FeaturedSwiper.vue"), 2, 180, "featured-swiper"),
+const FeaturedSwiper = defineAsyncComponent(() =>
+  importWithRetry(
+    () => import("~/components/FeaturedSwiper.vue"),
+    2,
+    180,
+    "featured-swiper",
+  ),
 );
-const HomeSidebar = defineAsyncComponent(
-  () => importWithRetry(() => import("~/components/HomeSidebar.vue"), 2, 180, "home-sidebar"),
+const HomeSidebar = defineAsyncComponent(() =>
+  importWithRetry(
+    () => import("~/components/HomeSidebar.vue"),
+    2,
+    180,
+    "home-sidebar",
+  ),
 );
 import SectionHead from "~/components/SectionHead.vue";
 const api = useApi();
@@ -125,10 +136,60 @@ function openLegal(tab: "terms" | "privacy") {
   legalOpen.value = true;
 }
 
-async function loadArticles() {
+type HomeAnchor = { slug: string; offset: number };
+
+function captureHomeAnchor(): HomeAnchor | null {
+  const host = mainContentRef.value;
+  if (!host) return null;
+  const cards = Array.from(
+    host.querySelectorAll<HTMLElement>("[data-article-slug]"),
+  );
+  const anchor =
+    cards.find(
+      (card) => card.offsetTop + card.offsetHeight >= host.scrollTop,
+    ) || cards.at(-1);
+  if (!anchor) return null;
+  return {
+    slug: anchor.dataset.articleSlug || "",
+    offset: host.scrollTop - anchor.offsetTop,
+  };
+}
+
+async function restoreHomeAnchor(anchor: HomeAnchor | null) {
+  if (!anchor?.slug || !mainContentRef.value) return;
+  await nextTick();
+  const target = mainContentRef.value.querySelector<HTMLElement>(
+    `[data-article-slug="${CSS.escape(anchor.slug)}"]`,
+  );
+  if (target)
+    mainContentRef.value.scrollTop = Math.max(
+      0,
+      target.offsetTop + anchor.offset,
+    );
+}
+
+function articleSnapshot(items: any[]) {
+  return JSON.stringify(
+    items.map((item) => [
+      item.slug,
+      item.title,
+      item.date,
+      item.desc,
+      item.cover,
+      item.views,
+      item.comments,
+    ]),
+  );
+}
+
+async function loadArticles(options: { silent?: boolean } = {}) {
   const id = ++requestId;
-  if (articles.value.length) refreshing.value = true;
-  else loading.value = true;
+  const silent = options.silent === true;
+  const anchor = silent ? captureHomeAnchor() : null;
+  if (!silent) {
+    if (articles.value.length) refreshing.value = true;
+    else loading.value = true;
+  }
   try {
     const res = await api.get<any>("/posts", {
       page: page.value,
@@ -136,7 +197,7 @@ async function loadArticles() {
       sort: "latest",
     });
     if (id !== requestId) return;
-    articles.value = (res.items ?? []).map((p: any) => ({
+    const nextArticles = (res.items ?? []).map((p: any) => ({
       slug: p.slug,
       cover: p.coverImage,
       tag: p.category?.name ?? p.tags?.[0]?.name ?? "",
@@ -157,13 +218,23 @@ async function loadArticles() {
       views: p.viewCount ?? 0,
       comments: p._count?.comments ?? 0,
     }));
-    totalPages.value = res.totalPages ?? 1;
+    const nextTotalPages = res.totalPages ?? 1;
+    if (
+      articleSnapshot(nextArticles) !== articleSnapshot(articles.value) ||
+      nextTotalPages !== totalPages.value
+    ) {
+      articles.value = nextArticles;
+      totalPages.value = nextTotalPages;
+      await restoreHomeAnchor(anchor);
+    }
   } catch {
     /* keep empty */
   } finally {
     if (id === requestId) {
-      loading.value = false;
-      refreshing.value = false;
+      if (!silent) {
+        loading.value = false;
+        refreshing.value = false;
+      }
       setBottomDockContentReady(true);
     }
   }
@@ -199,12 +270,8 @@ async function restoreScroll() {
   el.scrollTop = target;
 }
 
-onMounted(() => {
-  enterFrame = window.requestAnimationFrame(() => {
-    homeReady.value = true;
-  });
-  loadArticles().then(restoreScroll);
-
+function observeRecords() {
+  recordsObserver?.disconnect();
   recordsObserver = new IntersectionObserver(
     ([entry]) => {
       setRecordsIntersecting(entry?.isIntersecting ?? false);
@@ -215,6 +282,32 @@ onMounted(() => {
     },
   );
   if (recordsRef.value) recordsObserver.observe(recordsRef.value);
+}
+
+let firstActivation = true;
+onMounted(() => {
+  enterFrame = window.requestAnimationFrame(() => {
+    homeReady.value = true;
+  });
+  loadArticles().then(restoreScroll);
+
+  observeRecords();
+});
+
+onActivated(() => {
+  if (firstActivation) {
+    firstActivation = false;
+    return;
+  }
+  homeReady.value = true;
+  setBottomDockContentReady(true);
+  observeRecords();
+  void loadArticles({ silent: true });
+});
+
+onDeactivated(() => {
+  recordsObserver?.disconnect();
+  setRecordsIntersecting(false);
 });
 
 onUnmounted(() => {
@@ -355,10 +448,30 @@ onUnmounted(() => {
   height: 10px;
   background: var(--border);
 }
-.records-legal { display:inline-flex; align-items:center; gap:7px; margin-left:4px; padding-left:10px; border-left:1px solid var(--border); }
-.records-legal button { padding:0; border:0; background:transparent; color:inherit; cursor:pointer; font:inherit; }
-.records-legal button:hover { color:var(--c-primary); }
-.records-legal i { width:1px; height:10px; background:var(--border); }
+.records-legal {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.records-legal button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.records-legal button:hover {
+  color: var(--c-primary);
+}
+.records-legal i {
+  width: 1px;
+  height: 10px;
+  background: var(--border);
+}
 
 @keyframes article-loading {
   from {
@@ -425,6 +538,10 @@ onUnmounted(() => {
   .site-records > i {
     display: none;
   }
-  .records-legal { margin-left:0; padding-left:0; border-left:0; }
+  .records-legal {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
 }
 </style>

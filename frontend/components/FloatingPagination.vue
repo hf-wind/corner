@@ -5,6 +5,7 @@
         v-if="total > 1 && !hidden"
         class="pagination-anchor"
         :class="{ 'is-devtools-collapsed': isDevtoolsCollapsed }"
+        @mousemove="bringUp"
       >
         <span class="pagination-glowing" aria-hidden="true" />
         <nav class="corner-pagination" aria-label="分页导航">
@@ -21,7 +22,7 @@
               :disabled="modelValue <= 1"
               @click="goTo(modelValue - 1)"
             >
-              <Icon name="ph:caret-left-bold" />
+              <Icon name="ph:caret-left" />
             </button>
 
             <div class="page-indicator" aria-live="polite">
@@ -40,20 +41,13 @@
               :disabled="modelValue >= total"
               @click="goTo(modelValue + 1)"
             >
-              <Icon name="ph:caret-right-bold" />
+              <Icon name="ph:caret-right" />
             </button>
           </div>
 
-          <button
-            type="button"
-            class="pagination-toggle"
-            :aria-expanded="!isDevtoolsCollapsed"
-            :title="isDevtoolsCollapsed ? '展开分页' : '折叠分页'"
-            :aria-label="isDevtoolsCollapsed ? '展开分页' : '折叠分页'"
-            @click="toggleDevtoolsCollapsed"
-          >
-            <Icon name="ph:book-open-text-bold" />
-          </button>
+          <span class="pagination-toggle" aria-hidden="true">
+            <Icon name="ph:list-numbers-bold" />
+          </span>
         </nav>
       </div>
     </Transition>
@@ -86,39 +80,19 @@ const emit = defineEmits<{
 const slideDirection = ref<"page-up" | "page-down">("page-up");
 const {
   autoCollapsed: dockAutoCollapsed,
-  activeBottomDock,
   recordsIntersecting,
-  clearAutoCollapse,
-  setActiveBottomDock,
   setPaginationVisible,
 } = useBottomDockState();
-const devtoolsCollapsed = ref(false);
-const autoCollapseDismissed = ref(false);
-const recordsCollapseDismissed = ref(false);
-const mobileViewport = ref(false);
-let mobileMedia: MediaQueryList | null = null;
+const isHovering = ref(false);
+const isTouchDevice = ref(false);
+let hoverTimer = 0;
 const isDevtoolsCollapsed = computed(
   () =>
-    devtoolsCollapsed.value ||
-    (dockAutoCollapsed.value && !autoCollapseDismissed.value) ||
-    (mobileViewport.value && activeBottomDock.value === "music") ||
-    (recordsIntersecting.value && !recordsCollapseDismissed.value),
+    !isTouchDevice.value &&
+    !isHovering.value &&
+    (dockAutoCollapsed.value || recordsIntersecting.value),
 );
 let previousPage = props.modelValue;
-
-watch(dockAutoCollapsed, (collapsed) => {
-  if (!collapsed) autoCollapseDismissed.value = false;
-});
-
-watch(recordsIntersecting, (intersecting) => {
-  if (!intersecting) recordsCollapseDismissed.value = false;
-});
-
-watch(isDevtoolsCollapsed, (collapsed) => {
-  if (collapsed && activeBottomDock.value === "pagination") {
-    setActiveBottomDock(null);
-  }
-});
 
 watch(
   () => props.total > 1 && !props.hidden,
@@ -127,15 +101,15 @@ watch(
 );
 
 onMounted(() => {
-  mobileMedia = window.matchMedia("(max-width: 640px)");
-  syncMobileViewport();
-  mobileMedia.addEventListener("change", syncMobileViewport);
+  isTouchDevice.value =
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia("(hover: none), (pointer: coarse)").matches;
 });
 
 onUnmounted(() => {
+  window.clearTimeout(hoverTimer);
   setPaginationVisible(false);
-  mobileMedia?.removeEventListener("change", syncMobileViewport);
-  if (activeBottomDock.value === "pagination") setActiveBottomDock(null);
 });
 
 watch(
@@ -152,33 +126,13 @@ function goTo(page: number) {
   emit("change", page);
 }
 
-async function toggleDevtoolsCollapsed() {
-  const wasCollapsed = isDevtoolsCollapsed.value;
-  if (wasCollapsed && recordsIntersecting.value) {
-    const scrollContainer =
-      document.querySelector<HTMLElement>(".main-content");
-    if (scrollContainer) {
-      scrollContainer.scrollBy({
-        top: -Math.min(240, window.innerHeight * 0.3),
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth",
-      });
-    }
-    recordsCollapseDismissed.value = true;
-    await nextTick();
-  }
-  if (dockAutoCollapsed.value && !recordsIntersecting.value) {
-    autoCollapseDismissed.value = true;
-  } else {
-    clearAutoCollapse();
-  }
-  devtoolsCollapsed.value = !wasCollapsed;
-  setActiveBottomDock(wasCollapsed ? "pagination" : null);
-}
-
-function syncMobileViewport() {
-  mobileViewport.value = mobileMedia?.matches ?? false;
+function bringUp() {
+  if (isTouchDevice.value) return;
+  isHovering.value = true;
+  window.clearTimeout(hoverTimer);
+  hoverTimer = window.setTimeout(() => {
+    isHovering.value = false;
+  }, 5000);
 }
 </script>
 
@@ -186,21 +140,17 @@ function syncMobileViewport() {
 .pagination-anchor {
   position: relative;
   display: flex;
-  width: 132px;
-  min-width: 132px;
+  width: 116px;
+  min-width: 0;
+  max-width: 116px;
   height: var(--capsule-height);
-  flex: 0 0 132px;
+  flex: 0 1 116px;
   align-items: center;
-  transition:
-    width 0.6s ease,
-    min-width 0.6s ease,
-    flex-basis 0.6s ease,
-    transform 0.4s ease;
+  transition: all 0.6s, max-width 0.6s, padding 0.5s, transform 0.4s, opacity 0.2s;
 }
 
 .pagination-anchor.is-devtools-collapsed {
-  width: 32px;
-  min-width: 32px;
+  max-width: 32px;
   flex-basis: 32px;
   transform: translateY(15px);
 }
@@ -229,17 +179,18 @@ function syncMobileViewport() {
   user-select: none;
   touch-action: none;
   transition:
-    max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    padding 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.24s ease,
-    background-color 0.24s ease,
-    box-shadow 0.24s ease,
-    opacity 0.2s ease;
+    all 0.6s,
+    max-width 0.6s,
+    padding 0.5s,
+    transform 0.4s,
+    opacity 0.2s;
 }
 
 .pagination-anchor.is-devtools-collapsed .corner-pagination {
   max-width: 32px;
-  padding: 0;
+  padding: 2px 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .pagination-toggle {
@@ -258,7 +209,7 @@ function syncMobileViewport() {
   border-radius: 100%;
   background: transparent;
   color: inherit;
-  cursor: pointer;
+  pointer-events: none;
   font-size: 0.78rem;
   opacity: 0.8;
   transform: translateY(-50%);
@@ -287,7 +238,7 @@ function syncMobileViewport() {
 .pagination-content {
   display: flex;
   min-width: 0;
-  max-width: 96px;
+  max-width: 80px;
   align-items: center;
   gap: 1px;
   overflow: hidden;
@@ -327,14 +278,14 @@ function syncMobileViewport() {
 
 .page-step {
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--c-text-2);
   cursor: pointer;
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   place-items: center;
   transition:
     color 0.18s ease,
@@ -343,7 +294,7 @@ function syncMobileViewport() {
 }
 
 .page-step:hover:not(:disabled) {
-  background: var(--c-primary-soft);
+  background: color-mix(in srgb, var(--c-primary-soft) 72%, transparent);
   color: var(--c-primary);
   transform: translateY(-1px);
 }
@@ -362,10 +313,10 @@ function syncMobileViewport() {
 
 .page-indicator {
   display: flex;
-  min-width: 37px;
+  min-width: 34px;
   align-items: baseline;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -373,7 +324,7 @@ function syncMobileViewport() {
 .page-indicator strong {
   min-width: 1.1em;
   color: var(--c-primary);
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   font-weight: 760;
   line-height: 1;
   text-align: center;
@@ -382,7 +333,7 @@ function syncMobileViewport() {
 .page-indicator span,
 .page-indicator small {
   color: var(--c-text-3);
-  font-size: 0.54rem;
+  font-size: 0.49rem;
   font-weight: 520;
 }
 
@@ -427,11 +378,11 @@ function syncMobileViewport() {
 
 @media (max-width: 390px) {
   .page-step {
-    width: 24px;
-    height: 24px;
+    width: 21px;
+    height: 21px;
   }
   .page-indicator {
-    min-width: 35px;
+    min-width: 34px;
   }
 }
 

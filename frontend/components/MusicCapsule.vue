@@ -25,6 +25,8 @@
       'has-auth': isLoggedIn,
     }"
     aria-label="音乐播放器"
+    @mousemove="bringUp"
+    @click="bringUp"
   >
     <span class="devtools-glowing" aria-hidden="true" />
 
@@ -189,20 +191,13 @@
     </Transition>
 
     <div class="capsule-shell">
-      <button
-        type="button"
-        class="devtools-toggle"
-        :aria-expanded="!isDevtoolsCollapsed"
-        :title="isDevtoolsCollapsed ? '展开音乐播放器' : '折叠音乐播放器'"
-        :aria-label="isDevtoolsCollapsed ? '展开音乐播放器' : '折叠音乐播放器'"
-        @click="toggleDevtoolsCollapsed"
-      >
+      <span class="devtools-toggle" aria-hidden="true">
         <Icon
           class="devtools-mark"
           name="ph:waveform-bold"
           aria-hidden="true"
         />
-      </button>
+      </span>
 
       <span class="water-progress" aria-hidden="true">
         <LiquidProgress
@@ -359,7 +354,6 @@ const {
   autoCollapsed: dockAutoCollapsed,
   activeBottomDock,
   recordsIntersecting,
-  clearAutoCollapse,
   setActiveBottomDock,
 } = useBottomDockState();
 
@@ -369,9 +363,8 @@ const queueBodyRef = ref<HTMLElement | null>(null);
 const enabled = ref(false);
 const ready = ref(false);
 const expanded = ref(false);
-const devtoolsCollapsed = ref(false);
-const autoCollapseDismissed = ref(false);
-const recordsCollapseDismissed = ref(false);
+const isHovering = ref(false);
+const isTouchDevice = ref(false);
 const queueOpen = ref(false);
 const queueLoading = ref(false);
 const autoplay = ref(false);
@@ -402,6 +395,7 @@ let playlistRequestId = 0;
 let playRequestId = 0;
 let coverObserver: IntersectionObserver | null = null;
 let warmAudio: HTMLAudioElement | null = null;
+let hoverTimer = 0;
 
 const vLazyCover = {
   mounted(element: HTMLElement, binding: { value?: string }) {
@@ -435,24 +429,12 @@ const activePlaylistName = computed(() => {
 });
 const isDevtoolsCollapsed = computed(
   () =>
-    devtoolsCollapsed.value ||
-    (dockAutoCollapsed.value && !autoCollapseDismissed.value) ||
-    (recordsIntersecting.value && !recordsCollapseDismissed.value),
+    !isTouchDevice.value &&
+    !isHovering.value &&
+    !expanded.value &&
+    !queueOpen.value &&
+    (dockAutoCollapsed.value || recordsIntersecting.value),
 );
-
-watch(dockAutoCollapsed, (collapsed) => {
-  if (!collapsed) autoCollapseDismissed.value = false;
-});
-
-watch(recordsIntersecting, (intersecting) => {
-  if (!intersecting) recordsCollapseDismissed.value = false;
-});
-
-watch(activeBottomDock, (activeDock) => {
-  if (activeDock === "pagination") {
-    devtoolsCollapsed.value = true;
-  }
-});
 
 watch(isDevtoolsCollapsed, (collapsed) => {
   if (collapsed) {
@@ -484,6 +466,10 @@ watch(isLoggedIn, (loggedIn) => {
 });
 
 onMounted(async () => {
+  isTouchDevice.value =
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia("(hover: none), (pointer: coarse)").matches;
   document.addEventListener("pointerdown", onDocumentPointerDown);
   document.addEventListener("keydown", onDocumentKeydown);
   warmAudio = new Audio();
@@ -492,6 +478,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.clearTimeout(hoverTimer);
   document.removeEventListener("pointerdown", onDocumentPointerDown);
   document.removeEventListener("keydown", onDocumentKeydown);
   if (activeBottomDock.value === "music") setActiveBottomDock(null);
@@ -713,31 +700,18 @@ function toggleExpanded() {
   }
 }
 
-async function toggleDevtoolsCollapsed() {
-  const wasCollapsed = isDevtoolsCollapsed.value;
-  if (wasCollapsed && recordsIntersecting.value) {
-    const scrollContainer =
-      document.querySelector<HTMLElement>(".main-content");
-    if (scrollContainer) {
-      scrollContainer.scrollBy({
-        top: -Math.min(240, window.innerHeight * 0.3),
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth",
-      });
+function bringUp() {
+  if (isTouchDevice.value) return;
+  isHovering.value = true;
+  window.clearTimeout(hoverTimer);
+  hoverTimer = window.setTimeout(() => {
+    isHovering.value = false;
+    expanded.value = false;
+    queueOpen.value = false;
+    if (activeBottomDock.value === "music") {
+      setActiveBottomDock(null);
     }
-    recordsCollapseDismissed.value = true;
-    await nextTick();
-  }
-  if (dockAutoCollapsed.value && !recordsIntersecting.value) {
-    autoCollapseDismissed.value = true;
-  } else {
-    clearAutoCollapse();
-  }
-  devtoolsCollapsed.value = !wasCollapsed;
-  expanded.value = false;
-  queueOpen.value = false;
-  setActiveBottomDock(wasCollapsed ? "music" : null);
+  }, 5000);
 }
 
 function toggleQueue() {
@@ -1167,20 +1141,15 @@ function clamp(value: number, minimum: number, maximum: number) {
   position: relative;
   display: flex;
   width: 198px;
-  min-width: 198px;
+  min-width: 0;
+  max-width: 198px;
   height: var(--capsule-height);
-  flex: 0 0 198px;
+  flex: 0 1 198px;
   align-items: center;
   opacity: 0;
   visibility: hidden;
   transform: translate3d(0, 9px, 0) scale(0.97);
-  transition:
-    width 0.6s ease,
-    min-width 0.6s ease,
-    flex-basis 0.6s ease,
-    opacity 0.32s ease,
-    visibility 0.32s,
-    transform 0.52s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.6s, max-width 0.6s, padding 0.5s, transform 0.4s, opacity 0.2s;
 }
 
 .music-capsule.is-ready {
@@ -1191,19 +1160,18 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 .music-capsule.is-expanded {
   width: 232px;
-  min-width: 232px;
+  max-width: 232px;
   flex-basis: 232px;
 }
 
 .music-capsule.has-auth.is-expanded {
   width: 255px;
-  min-width: 255px;
+  max-width: 255px;
   flex-basis: 255px;
 }
 
 .music-capsule.is-devtools-collapsed {
-  width: 32px;
-  min-width: 32px;
+  max-width: 32px;
   flex-basis: 32px;
 }
 
@@ -1225,7 +1193,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   border-radius: 100%;
   background: transparent;
   color: inherit;
-  cursor: pointer;
+  pointer-events: none;
   opacity: 0.8;
   transition: opacity 0.2s ease-in-out;
 }
@@ -1273,18 +1241,18 @@ function clamp(value: number, minimum: number, maximum: number) {
   touch-action: none;
   outline: none;
   transition:
+    all 0.6s,
     max-width 0.6s,
     padding 0.5s,
-    border-color 0.24s ease,
-    background-color 0.24s ease,
-    box-shadow 0.24s ease,
     transform 0.4s,
     opacity 0.2s;
 }
 
 .music-capsule.is-devtools-collapsed .capsule-shell {
   max-width: 32px;
-  padding: 0;
+  padding: 2px 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .music-capsule.is-devtools-collapsed .devtools-toggle {
@@ -1964,21 +1932,20 @@ function clamp(value: number, minimum: number, maximum: number) {
 @media (max-width: 640px) {
   .music-capsule {
     width: 162px;
-    min-width: 162px;
+    max-width: 162px;
     flex-basis: 162px;
   }
 
   .music-capsule.is-expanded,
   .music-capsule.has-auth.is-expanded {
     width: 186px;
-    min-width: 186px;
+    max-width: 186px;
     flex-basis: 186px;
   }
 
   .music-capsule.is-devtools-collapsed,
   .music-capsule.has-auth.is-expanded.is-devtools-collapsed {
-    width: 32px;
-    min-width: 32px;
+    max-width: 32px;
     flex-basis: 32px;
   }
 
@@ -2019,7 +1986,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   .music-capsule.is-expanded,
   .music-capsule.has-auth.is-expanded {
     width: 150px;
-    min-width: 150px;
+    max-width: 150px;
     flex-basis: 150px;
   }
 

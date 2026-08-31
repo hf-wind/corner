@@ -18,7 +18,7 @@
             <p v-if="item.summary && !contentStartsWithSummary" class="feed-summary">{{ item.summary }}</p>
             <figure v-if="item.image && !coverBroken" class="feed-cover"><img :src="item.image" :alt="item.title" referrerpolicy="no-referrer" @error="coverBroken = true" /></figure>
 
-            <div ref="contentRef" class="feed-content">
+            <div ref="contentRef" class="feed-content" @error.capture="onContentImageError">
               <div v-if="item.contentFormat === 'html' && item.contentHtml" class="rss-html" v-html="item.contentHtml" />
               <div v-else class="rss-text">{{ item.content || item.summary || '该订阅源未提供正文内容。' }}</div>
             </div>
@@ -59,6 +59,15 @@ const contentStartsWithSummary = computed(() => { const summary = String(item.va
 
 function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date) }
 function onScroll() { const host = mainRef.value; if (!host) return; const max = Math.max(1, host.scrollHeight - host.clientHeight); readingProgress.value = Math.min(100, Math.max(0, host.scrollTop / max * 100)) }
+function onContentImageError(event: Event) {
+  const image = event.target
+  if (!(image instanceof HTMLImageElement)) return
+  image.hidden = true
+  image.setAttribute('aria-hidden', 'true')
+  const container = image.closest('figure, p')
+  if (!(container instanceof HTMLElement) || container.textContent?.trim()) return
+  if (Array.from(container.querySelectorAll('img')).every(candidate => candidate.hidden)) container.hidden = true
+}
 function goBack() { if (window.history.length > 1) router.back(); else void router.push('/circle') }
 async function reveal() { await nextTick(); requestAnimationFrame(() => requestAnimationFrame(() => { ready.value = true; requestAnimationFrame(onScroll) })) }
 async function load() {
