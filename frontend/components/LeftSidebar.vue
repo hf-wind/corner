@@ -221,6 +221,8 @@ const {
   constellationEnabled,
   storiesEnabled,
   guestbookEnabled,
+  circleEnabled,
+  loadCircleFeature,
 } = useFeatureFlags();
 const avatarSrc = computed(() => mediaUrl(user.value?.avatar));
 
@@ -231,7 +233,7 @@ const siteNav = [
   { to: "/tags", icon: "ph:tag-bold", label: "标签" },
   { to: "/library", icon: "ph:books-bold", label: "书影" },
   { to: "/moments", icon: "ph:sparkle-bold", label: "瞬间" },
-  { to: "/circle", icon: "ph:radio-tower-bold", label: "见闻" },
+  { to: "/circle", icon: "ph:wind-bold", label: "风讯角" },
   { to: "/time/map", icon: "ph:map-trifold-bold", label: "地图" },
   { to: "/time/constellation", icon: "ph:graph-bold", label: "星图" },
   { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
@@ -245,7 +247,7 @@ const adminFullNav = [
   { to: "/admin/analytics", icon: "ph:chart-line-up-bold", label: "访问统计" },
   { to: "/admin/posts", icon: "ph:article-bold", label: "文章" },
   { to: "/admin/moments", icon: "ph:sparkle-bold", label: "瞬间" },
-  { to: "/admin/circle", icon: "ph:radio-tower-bold", label: "见闻" },
+  { to: "/admin/circle", icon: "ph:wind-bold", label: "风讯角" },
   { to: "/admin/library", icon: "ph:books-bold", label: "书影" },
   { to: "/admin/albums", icon: "ph:images-square-bold", label: "相册" },
   { to: "/admin/memory-graph", icon: "ph:planet-bold", label: "时光星图" },
@@ -281,7 +283,8 @@ const navItems = computed(() => {
         (mapEnabled || !item.to.includes("/time/map")) &&
         (constellationEnabled || !item.to.includes("/time/constellation")) &&
         (storiesEnabled || !item.to.includes("/stories")) &&
-        (guestbookEnabled || !item.to.includes("/guestbook")),
+        (guestbookEnabled || !item.to.includes("/guestbook")) &&
+        (isPanel.value || circleEnabled.value || !item.to.includes("/circle")),
     );
   if (!isPanel.value) return filterFeatures(siteNav);
   return isUserAdmin.value ? filterFeatures(adminFullNav) : userPanelNav;
@@ -466,6 +469,7 @@ async function handleLogout() {
 
 onMounted(() => {
   void loadSiteSettings();
+  void loadCircleFeature();
   readStorage();
   expandActiveGroup();
   if (isLoggedIn.value) refreshProfile();

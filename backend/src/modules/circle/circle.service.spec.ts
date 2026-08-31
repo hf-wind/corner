@@ -79,6 +79,102 @@ describe('CircleService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it('preserves and sanitizes HTML descriptions with an explicit parser rule', async () => {
+    const settings = settingsWithFriends([
+      { name: 'HTML 来源', url: 'https://friend.example', rssUrl: 'https://93.184.216.34/html.xml' },
+    ]);
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>HTML 来源</title><link>https://friend.example</link><item><title>HTML 正文</title><link>https://friend.example/1</link><guid>html-1</guid><description><![CDATA[<p>第一段<strong>重点</strong></p><img src="/cover.jpg"><script>alert(1)</script>]]></description></item></channel></rss>`, { status: 200 }),
+    );
+    const service = new CircleService(settings);
+
+    const result = await service.getFeed();
+
+    expect(result.items[0]).toMatchObject({
+      contentFormat: 'html',
+      parserRule: 'rss-description-html',
+      image: 'https://friend.example/cover.jpg',
+    });
+    expect(result.items[0].contentHtml).toContain('<strong>重点</strong>');
+    expect(result.items[0].contentHtml).toContain('src="https://friend.example/cover.jpg"');
+    expect(result.items[0].contentHtml).not.toContain('<script');
+  });
+
+  it('prefers Mobius-style content:encoded HTML over the description summary', async () => {
+    const settings = settingsWithFriends([
+      { name: 'Mobius', url: 'https://mobius.blog', rssUrl: 'https://93.184.216.34/mobius.xml' },
+    ]);
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(`<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Mobius</title><link>https://mobius.blog</link><item><title>完整正文</title><link>https://mobius.blog/post/1</link><description><![CDATA[<p>这里只是摘要</p>]]></description><content:encoded><![CDATA[<p>这是完整正文</p><p><strong>第二段</strong></p>]]></content:encoded></item></channel></rss>`, { status: 200 }),
+    );
+    const service = new CircleService(settings);
+
+    const result = await service.getFeed();
+
+    expect(result.items[0]).toMatchObject({
+      summary: '这里只是摘要',
+      contentFormat: 'html',
+      parserRule: 'rss-content-encoded',
+    });
+    expect(result.items[0].contentHtml).toContain('这是完整正文');
+    expect(result.items[0].contentHtml).not.toContain('这里只是摘要');
+  });
+
+  it('interleaves prolific sources instead of letting one source fill the first page', () => {
+    const service = new CircleService(settingsWithFriends([]));
+    const item = (source: string, index: number) => ({
+      id: `${source}-${index}`, title: `${source}-${index}`, summary: '', url: `https://${source}.example/${index}`,
+      publishedAt: new Date(Date.UTC(2026, 7, 30, 10, 0, 10 - index)).toISOString(),
+      source: { name: source, url: `https://${source}.example`, rssUrl: `https://${source}.example/rss`, avatar: '' }, categories: [],
+    });
+    const distributed = (service as any).distributeItems([
+      item('frequent', 1), item('frequent', 2), item('frequent', 3), item('quiet', 1), item('other', 1),
+    ]);
+
+    expect(distributed.slice(0, 3).map((entry: any) => entry.source.name)).toEqual(['frequent', 'quiet', 'other']);
+  });
+
+  it('resets legacy manual sources once while keeping friend subscriptions automatic', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const settings = settingsWithFriends([
+        { name: '友链站点', url: 'https://friend.example', rssUrl: 'https://friend.example/rss.xml' },
+      ]);
+      settings.get.mockImplementation((key: string) => {
+        if (key === 'friends') {
+          return Promise.resolve([
+            { name: '友链站点', url: 'https://friend.example', rssUrl: 'https://friend.example/rss.xml' },
+          ]);
+        }
+        if (key === 'circle_config') {
+          return Promise.resolve({
+            subscriptions: [
+              { name: '旧订阅', url: 'https://legacy.example', rssUrl: 'https://legacy.example/rss.xml' },
+            ],
+            subscriptionExclusions: ['https://www.ithome.com/rss/'],
+          });
+        }
+        return Promise.resolve(null);
+      });
+      const service = new CircleService(settings);
+
+      const config = await service.getConfig();
+
+      expect(config.subscriptions.map((item) => item.name)).toEqual(['IT之家', '友链站点']);
+      expect(settings.set).toHaveBeenCalledWith(
+        'circle_config',
+        expect.objectContaining({
+          subscriptions: [],
+          subscriptionExclusions: [],
+          sourceRevision: 1,
+        }),
+      );
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   it('prefers explicit circle subscriptions over the legacy friends setting', async () => {
     const settings = settingsWithFriends([]);
     settings.get.mockImplementation((key: string) => {

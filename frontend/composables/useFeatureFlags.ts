@@ -4,6 +4,19 @@ function envEnabled(value: string | undefined, fallback = true) {
 }
 
 export function useFeatureFlags() {
+  const circleEnabled = useState('feature-circle-enabled', () => true)
+  const loaded = useState('feature-circle-loaded', () => false)
+  async function loadCircleFeature() {
+    if (loaded.value) return
+    try {
+      const result = await useApi().get<{ enabled?: boolean }>('/circle/status')
+      circleEnabled.value = result?.enabled !== false
+    } catch {
+      // Keep the menu visible when the status endpoint is unavailable.
+    } finally {
+      loaded.value = true
+    }
+  }
   return {
     albumsEnabled: envEnabled(import.meta.env.VITE_FEATURE_ALBUMS_ENABLED, true),
     mapEnabled: envEnabled(import.meta.env.VITE_FEATURE_MAP_ENABLED, true),
@@ -12,5 +25,7 @@ export function useFeatureFlags() {
     storiesEnabled: envEnabled(import.meta.env.VITE_FEATURE_STORIES_ENABLED, false),
     footprintsEnabled: envEnabled(import.meta.env.VITE_FEATURE_FOOTPRINTS_ENABLED, true),
     guestbookEnabled: envEnabled(import.meta.env.VITE_FEATURE_GUESTBOOK_ENABLED, true),
+    circleEnabled,
+    loadCircleFeature,
   }
 }

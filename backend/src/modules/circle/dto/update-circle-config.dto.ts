@@ -37,6 +37,16 @@ export class CircleSubscriptionDto {
   section?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  kind?: 'subscription' | 'friend';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  origin?: 'default' | 'manual';
+
+  @IsOptional()
   @IsBoolean()
   enabled?: boolean;
 }

@@ -9,6 +9,11 @@ import { UpdateCircleConfigDto } from './dto/update-circle-config.dto';
 export class CircleController {
   constructor(private readonly circle: CircleService) {}
 
+  @Get('status')
+  status() {
+    return this.circle.getConfig().then((config) => ({ enabled: config.enabled }));
+  }
+
   @Get('feed')
   feed(
     @Query('page') page?: string,
