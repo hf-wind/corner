@@ -36,11 +36,19 @@
 
       <section class="constellation-settings">
         <div class="section-head"><div><small>SCENE SETTINGS</small><h2>星图显示配置</h2></div><a-button type="primary" size="small" :loading="settingsSaving" @click="saveSceneSettings"><Icon name="ph:floppy-disk-bold" />保存配置</a-button></div>
-        <p class="section-intro">控制非内容星球数量、时间环间隙和整体移动速度；前台点击行星后的科普内容仍按行星条目维护。</p>
+        <p class="section-intro">控制星体密度、时间环间隙、移动速度，以及前台太阳系行星的名称、特点和解析内容。</p>
         <div class="scene-settings-grid">
           <label><span>非内容星球数量</span><a-input-number v-model:value="sceneSettings.nonContentStarCount" :min="100" :max="5000" :step="100" /></label>
           <label><span>时间环间隙</span><a-input-number v-model:value="sceneSettings.ringGap" :min="12" :max="100" :step="2" addon-after="单位" /></label>
           <label><span>移动速度</span><a-slider v-model:value="sceneSettings.movementSpeed" :min="0.2" :max="3" :step="0.1" /><output>{{ sceneSettings.movementSpeed.toFixed(1) }}x</output></label>
+        </div>
+        <div class="planet-settings-grid">
+          <article v-for="planet in sceneSettings.solarPlanets" :key="planet.id">
+            <header><Icon name="ph:planet-bold" /><strong>{{ planet.id }}</strong></header>
+            <label><span>名称</span><a-input v-model:value="planet.name" /></label>
+            <label><span>特点</span><a-input v-model:value="planet.feature" /></label>
+            <label class="wide"><span>解析 / 科普</span><a-textarea v-model:value="planet.description" :auto-size="{ minRows: 2, maxRows: 4 }" /></label>
+          </article>
         </div>
       </section>
 
@@ -69,7 +77,11 @@ const issueOpen = ref(false)
 const error = ref('')
 const activeIssue = ref<any>(null)
 const settingsSaving = ref(false)
-const sceneSettings = reactive({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1 })
+const defaultSolarPlanets = [
+  ['mercury', '水星', '撞击坑与铁质核心'], ['venus', '金星', '硫酸云带与温室效应'], ['mars', '火星', '铁锈地表与极冠'],
+  ['jupiter', '木星', '大红斑与条带云系'], ['saturn', '土星', '冰尘星环与卡西尼缝'], ['uranus', '天王星', '甲烷冰层与极端倾角'], ['neptune', '海王星', '深蓝色大气与暗斑'],
+].map(([id, name, feature]) => ({ id, name, feature, description: `${name}的前台解析内容待维护。` }))
+const sceneSettings = reactive<any>({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarPlanets: defaultSolarPlanets })
 const health = reactive<any>({
   totals: { nodes: 0, memories: 0, journeys: 0, relations: 0 },
   automation: { status: 'running', lastBuiltAt: null },
@@ -108,7 +120,12 @@ async function load() {
       api.get<any>('/settings/constellation_config'),
     ])
     Object.assign(health, healthResult)
-    if (sceneResult && typeof sceneResult === 'object') Object.assign(sceneSettings, sceneResult)
+    if (sceneResult && typeof sceneResult === 'object') {
+      Object.assign(sceneSettings, sceneResult)
+      sceneSettings.solarPlanets = Array.isArray(sceneResult.solarPlanets) && sceneResult.solarPlanets.length
+        ? sceneResult.solarPlanets.map((item: any) => ({ ...item }))
+        : defaultSolarPlanets.map(item => ({ ...item }))
+    }
   } catch (exception: any) {
     error.value = exception?.message || '读取星图状态失败'
   } finally {
@@ -170,11 +187,12 @@ useHead({ title: '时光星图' })
 .health-section { display:flex; flex-direction:column; gap:11px; }.section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }.section-head h2 { margin:3px 0 0; color:var(--c-text); font-size:1rem; }.section-head>span { color:var(--c-text-3); font-size:.67rem; }.section-intro { margin:-5px 0 0; color:var(--c-text-3); font-size:.59rem; }
 .health-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }.health-grid article { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:10px; padding:13px; border:1px solid color-mix(in srgb,#d48655 24%,var(--border)); border-radius:9px; background:var(--ld-bg-card); }.health-grid article>span { display:grid; width:36px; height:36px; border-radius:8px; background:color-mix(in srgb,#d48655 10%,var(--c-bg-2)); color:#c77748; place-items:center; }.health-grid article>div { display:flex; min-width:0; flex-direction:column; }.health-grid strong { color:var(--c-text); font-size:.7rem; }.health-grid p { margin:3px 0 0; color:var(--c-text-3); font-size:.56rem; }.health-grid button { display:inline-flex; align-items:center; gap:6px; border:0; background:none; color:var(--c-primary); cursor:pointer; font:inherit; font-size:.59rem; }.health-grid article.clear { border-color:var(--border); }.health-grid article.clear>span { background:color-mix(in srgb,#45a87b 9%,var(--c-bg-2)); color:#45a87b; }.clear-icon { color:#45a87b; }
 .constellation-settings{display:flex;flex-direction:column;gap:11px;padding-top:4px;border-top:1px solid var(--border)}.scene-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--ld-bg-card)}.scene-settings-grid label{display:flex;min-width:0;flex-direction:column;gap:7px;color:var(--c-text-2);font-size:.64rem}.scene-settings-grid .ant-slider{margin:8px 0 2px}.scene-settings-grid output{color:var(--c-primary);font-size:.62rem}
+.planet-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.planet-settings-grid article{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px;border:1px solid var(--border);border-radius:9px;background:var(--ld-bg-card)}.planet-settings-grid article header,.planet-settings-grid label.wide{grid-column:1/-1}.planet-settings-grid article header{display:flex;align-items:center;gap:7px;color:var(--c-primary);font-size:.66rem}.planet-settings-grid article header strong{text-transform:uppercase;letter-spacing:.08em}.planet-settings-grid label{display:flex;min-width:0;flex-direction:column;gap:5px;color:var(--c-text-2);font-size:.58rem}.planet-settings-grid :deep(.ant-input),.planet-settings-grid :deep(textarea){font-size:.65rem}
 .recovery-panel { border-block:1px solid var(--border); }.recovery-panel summary { display:flex; align-items:center; justify-content:space-between; padding:14px 2px; color:var(--c-text); cursor:pointer; list-style:none; }.recovery-panel summary>span { display:grid; grid-template-columns:20px 1fr; align-items:center; gap:2px 7px; }.recovery-panel summary>span>svg { grid-row:1/3; color:var(--c-text-3); }.recovery-panel summary b { font-size:.7rem; }.recovery-panel summary small { color:var(--c-text-3); font-size:.55rem; }.recovery-panel[open] summary>svg { transform:rotate(180deg); }.recovery-panel>div { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 2px 14px; }.recovery-panel p { margin:0; color:var(--c-text-3); font-size:.59rem; }
 .issue-list { display:grid; gap:7px; }.issue-list>a { display:grid; grid-template-columns:34px 1fr 18px; align-items:center; gap:9px; padding:9px; border:1px solid var(--border); border-radius:8px; color:var(--c-text); text-decoration:none; }.issue-list>a>span { display:grid; width:34px; height:34px; border-radius:7px; background:var(--c-primary-soft); color:var(--c-primary); place-items:center; }.issue-list div { display:flex; min-width:0; flex-direction:column; }.issue-list small { color:var(--c-text-3); font-size:.54rem; }.issue-list strong { overflow:hidden; font-size:.66rem; text-overflow:ellipsis; white-space:nowrap; }
 @keyframes orbit { to { transform:rotate(360deg); } }
 @media(max-width:900px) { .metrics { grid-template-columns:repeat(2,1fr); }.health-grid { grid-template-columns:1fr; } }
-@media(max-width:700px){.scene-settings-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.scene-settings-grid,.planet-settings-grid{grid-template-columns:1fr}.planet-settings-grid article{grid-template-columns:1fr}.planet-settings-grid article header,.planet-settings-grid label.wide{grid-column:auto}}
 @media(max-width:620px) { .page-header { align-items:flex-start; flex-direction:column; }.automation-card { grid-template-columns:48px 1fr; }.sync-time { grid-column:1/-1; }.metrics { grid-template-columns:1fr 1fr; }.recovery-panel>div { align-items:flex-start; flex-direction:column; } }
 @media(prefers-reduced-motion:reduce) { .automation-card::after { animation:none; } }
 </style>

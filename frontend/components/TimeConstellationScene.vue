@@ -97,6 +97,7 @@ const props = withDefaults(
       nonContentStarCount?: number;
       ringGap?: number;
       movementSpeed?: number;
+      solarPlanets?: Array<{ id?: string; name?: string }>;
     };
   }>(),
   {
@@ -106,7 +107,7 @@ const props = withDefaults(
     ambient: false,
     introDelayMs: 0,
     narrativeProgress: -1,
-    sceneSettings: () => ({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1 }),
+    sceneSettings: () => ({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarPlanets: [] }),
   },
 );
 
@@ -2397,6 +2398,7 @@ function addSolarSystem() {
   system.name = "reference-solar-system";
   system.position.set(0, -7, 0);
   system.rotation.set(0.22, -0.16, -0.08);
+  const configuredNames = new Map((props.sceneSettings.solarPlanets || []).map(item => [String(item.id || ""), String(item.name || "")]))
   const planets = [
     ["水星", 30, 1.15, 0x8a8b84],
     ["金星", 48, 1.75, 0xd7a56f],
@@ -2407,7 +2409,9 @@ function addSolarSystem() {
     ["海王星", 184, 3.1, 0x4168b4],
   ] as const;
   const discoveryIds: DiscoveryId[] = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"];
-  planets.forEach(([name, orbitRadius, radius, color], index) => {
+  planets.forEach(([defaultName, orbitRadius, radius, color], index) => {
+    const discoveryId = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"][index]
+    const name = configuredNames.get(discoveryId) || defaultName
     const angle = -1.92 + index * 0.88;
     const body = new THREE.Group();
     body.name = `solar-${name}`;

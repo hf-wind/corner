@@ -5,7 +5,7 @@
   >
     <section class="constellation-stage" aria-label="时光星图">
       <TimeConstellationScene
-        v-if="!fallbackMode && graphReady && homePreload.ready"
+        v-if="!fallbackMode && graphReady && homePreload.ready && sceneSettingsReady"
         ref="sceneRef"
         :nodes="displayNodes"
         :relations="displayRelations"
@@ -24,7 +24,7 @@
         @fallback="fallbackMode = true"
       />
       <MemoryGraph2D
-        v-else-if="graphReady && fallbackMode && homePreload.ready"
+        v-else-if="graphReady && fallbackMode && homePreload.ready && sceneSettingsReady"
         :nodes="displayNodes"
         :relations="displayRelations"
         :selected-id="selected?.id"
@@ -331,6 +331,16 @@ type SolarPlanetSpec = {
   commands: { id: DiscoveryCommandId; label: string; icon: string }[];
 };
 
+const DEFAULT_SOLAR_PLANETS: SolarPlanetSpec[] = [
+  { id: "mercury", name: "水星", catalog: "MERCURY · 类地行星", status: "昼夜温差极端", description: "距离太阳最近的行星，布满撞击坑，没有真正的大气层，缓慢的自转让一昼夜接近两个水星年。", distance: "0.39 AU", period: "87.97 日", temperature: "−173 至 427 °C", feature: "撞击坑与铁质核心", commands: [{ id: "frost", label: "冻结外框", icon: "ph:snowflake-bold" }, { id: "soil", label: "采集土质", icon: "ph:flask-bold" }] },
+  { id: "venus", name: "金星", catalog: "VENUS · 类地行星", status: "厚重云层覆盖", description: "被二氧化碳大气和硫酸云层包裹的高温世界，逆向自转，表面气压约为地球的九十倍。", distance: "0.72 AU", period: "224.70 日", temperature: "约 464 °C", feature: "硫酸云带与温室效应", commands: [{ id: "cloud", label: "解析云层", icon: "ph:cloud-fog-bold" }, { id: "sample", label: "读取光谱", icon: "ph:wave-sine-bold" }] },
+  { id: "mars", name: "火星", catalog: "MARS · 类地行星", status: "尘暴季节活跃", description: "红色来自含铁矿物氧化物，稀薄大气中可见极冠、古老河谷与全球性沙尘暴的痕迹。", distance: "1.52 AU", period: "686.98 日", temperature: "平均 −63 °C", feature: "铁锈地表与极冠", commands: [{ id: "soil", label: "采集土质", icon: "ph:flask-bold" }, { id: "dust", label: "追踪尘暴", icon: "ph:wind-bold" }] },
+  { id: "jupiter", name: "木星", catalog: "JUPITER · 气态巨行星", status: "大气带高速流动", description: "太阳系最大的行星，氢氦大气形成明暗条带，大红斑是持续数百年的巨大反气旋风暴。", distance: "5.20 AU", period: "11.86 年", temperature: "云顶约 −110 °C", feature: "大红斑与条带云系", commands: [{ id: "storm", label: "追踪大红斑", icon: "ph:wind-bold" }, { id: "sample", label: "采集云层谱", icon: "ph:wave-sine-bold" }] },
+  { id: "saturn", name: "土星", catalog: "SATURN · 气态巨行星", status: "环系层次清晰", description: "由冰粒、尘埃和碎石组成的复杂环系围绕着土星，卡西尼缝等结构在引力共振作用下保持清晰。", distance: "9.58 AU", period: "29.45 年", temperature: "云顶约 −140 °C", feature: "冰尘星环与卡西尼缝", commands: [{ id: "rings", label: "解析星环", icon: "ph:circle-dashed-bold" }, { id: "sample", label: "读取冰尘谱", icon: "ph:wave-sine-bold" }] },
+  { id: "uranus", name: "天王星", catalog: "URANUS · 冰巨行星", status: "横躺姿态运行", description: "自转轴几乎平行于轨道面，甲烷让它呈现青绿色，季节变化会持续数十年。", distance: "19.2 AU", period: "84.02 年", temperature: "约 −195 °C", feature: "甲烷冰层与极端倾角", commands: [{ id: "tilt", label: "校准横躺姿态", icon: "ph:compass-bold" }, { id: "sample", label: "读取甲烷谱", icon: "ph:wave-sine-bold" }] },
+  { id: "neptune", name: "海王星", catalog: "NEPTUNE · 冰巨行星", status: "超音速风暴活跃", description: "距离太阳最远的主行星，深蓝色大气中存在太阳系最快的行星风和不断消散、重现的暗斑。", distance: "30.1 AU", period: "164.79 年", temperature: "约 −200 °C", feature: "深蓝色大气与暗斑", commands: [{ id: "storm", label: "测量超音速风", icon: "ph:wind-bold" }, { id: "darkspot", label: "锁定暗斑", icon: "ph:crosshair-bold" }] },
+];
+
 const api = useApi();
 const route = useRoute();
 const router = useRouter();
@@ -343,7 +353,7 @@ const graph = reactive<{
   relations: GraphRelation[];
   graphVersion: string;
 }>({ nodes: [], relations: [], graphVersion: "" });
-const sceneSettings = reactive({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1 });
+const sceneSettings = reactive<any>({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarPlanets: DEFAULT_SOLAR_PLANETS });
 const sceneRef = ref<{
   resetView: () => void;
   focusDiscovery: (id: DiscoveryId) => void;
@@ -364,6 +374,7 @@ const error = ref("");
 const sceneReady = ref(false);
 const fallbackMode = ref(false);
 const graphReady = ref(false);
+const sceneSettingsReady = ref(false);
 const discoveryClosing = ref(false);
 const immersiveMode = ref(false);
 let requestSequence = 0;
@@ -381,7 +392,7 @@ const typeOptions = [
   { value: "journey", label: "旅行", icon: "ph:path-bold" },
 ];
 
-const solarPlanetSpecs: SolarPlanetSpec[] = [
+const solarPlanetSpecs = reactive<SolarPlanetSpec[]>([
   { id: "mercury", name: "水星", catalog: "MERCURY · 类地行星", status: "昼夜温差极端", description: "距离太阳最近的行星，布满撞击坑，没有真正的大气层，缓慢的自转让一昼夜接近两个水星年。", distance: "0.39 AU", period: "87.97 日", temperature: "−173 至 427 °C", feature: "撞击坑与铁质核心", commands: [{ id: "frost", label: "冻结外框", icon: "ph:snowflake-bold" }, { id: "soil", label: "采集土质", icon: "ph:flask-bold" }] },
   { id: "venus", name: "金星", catalog: "VENUS · 类地行星", status: "厚重云层覆盖", description: "被二氧化碳大气和硫酸云层包裹的高温世界，逆向自转，表面气压约为地球的九十倍。", distance: "0.72 AU", period: "224.70 日", temperature: "约 464 °C", feature: "硫酸云带与温室效应", commands: [{ id: "cloud", label: "解析云层", icon: "ph:cloud-fog-bold" }, { id: "sample", label: "读取光谱", icon: "ph:wave-sine-bold" }] },
   { id: "mars", name: "火星", catalog: "MARS · 类地行星", status: "尘暴季节活跃", description: "红色来自含铁矿物氧化物，稀薄大气中可见极冠、古老河谷与全球性沙尘暴的痕迹。", distance: "1.52 AU", period: "686.98 日", temperature: "平均 −63 °C", feature: "铁锈地表与极冠", commands: [{ id: "soil", label: "采集土质", icon: "ph:flask-bold" }, { id: "dust", label: "追踪尘暴", icon: "ph:wind-bold" }] },
@@ -389,7 +400,7 @@ const solarPlanetSpecs: SolarPlanetSpec[] = [
   { id: "saturn", name: "土星", catalog: "SATURN · 气态巨行星", status: "环系层次清晰", description: "由冰粒、尘埃和碎石组成的复杂环系围绕着土星，卡西尼缝等结构在引力共振作用下保持清晰。", distance: "9.58 AU", period: "29.45 年", temperature: "云顶约 −140 °C", feature: "冰尘星环与卡西尼缝", commands: [{ id: "rings", label: "解析星环", icon: "ph:circle-dashed-bold" }, { id: "sample", label: "读取冰尘谱", icon: "ph:wave-sine-bold" }] },
   { id: "uranus", name: "天王星", catalog: "URANUS · 冰巨行星", status: "横躺姿态运行", description: "自转轴几乎平行于轨道面，甲烷让它呈现青绿色，季节变化会持续数十年。", distance: "19.2 AU", period: "84.02 年", temperature: "约 −195 °C", feature: "甲烷冰层与极端倾角", commands: [{ id: "tilt", label: "校准横躺姿态", icon: "ph:compass-bold" }, { id: "sample", label: "读取甲烷谱", icon: "ph:wave-sine-bold" }] },
   { id: "neptune", name: "海王星", catalog: "NEPTUNE · 冰巨行星", status: "超音速风暴活跃", description: "距离太阳最远的主行星，深蓝色大气中存在太阳系最快的行星风和不断消散、重现的暗斑。", distance: "30.1 AU", period: "164.79 年", temperature: "约 −200 °C", feature: "深蓝色大气与暗斑", commands: [{ id: "storm", label: "测量超音速风", icon: "ph:wind-bold" }, { id: "darkspot", label: "锁定暗斑", icon: "ph:crosshair-bold" }] },
-];
+]);
 
 const discoveries: Discovery[] = [
   {
@@ -1044,9 +1055,24 @@ function evidenceText(value?: Record<string, unknown>) {
 async function loadSceneSettings() {
   try {
     const result = await api.get<any>("/settings/constellation_config");
-    if (result && typeof result === "object") Object.assign(sceneSettings, result);
+    if (result && typeof result === "object") {
+      Object.assign(sceneSettings, result);
+      const configured = Array.isArray(result.solarPlanets) ? result.solarPlanets : [];
+      for (const fallback of DEFAULT_SOLAR_PLANETS) {
+        const item = configured.find((candidate: any) => candidate?.id === fallback.id);
+        const target = solarPlanetSpecs.find(candidate => candidate.id === fallback.id);
+        if (item && target) Object.assign(target, fallback, item);
+      }
+      sceneSettings.solarPlanets = solarPlanetSpecs.map(item => ({ ...item }));
+      for (const discovery of discoveries) {
+        const spec = solarPlanetSpecs.find(item => item.id === discovery.id);
+        if (spec) Object.assign(discovery, { title: spec.name, status: spec.status, description: spec.description, catalog: spec.catalog, commands: spec.commands });
+      }
+    }
   } catch {
     // Public settings are optional; retain defaults when unavailable.
+  } finally {
+    sceneSettingsReady.value = true;
   }
 }
 
