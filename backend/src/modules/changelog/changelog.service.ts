@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import Parser from 'rss-parser';
 import { AiService } from '../ai/ai.service';
@@ -394,6 +395,8 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async fetchLocalCommits(config: ChangelogConfig) {
+    const runtimeLog = await this.readRuntimeLog();
+    if (runtimeLog.length) return this.groupLocalCommits(runtimeLog, config);
     const rootResult = await execFileAsync(
       'git',
       ['rev-parse', '--show-toplevel'],
@@ -430,6 +433,22 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       })
       .filter((commit) => commit.sha && commit.original);
 
+    return this.groupLocalCommits(commits, config);
+  }
+
+  private async readRuntimeLog() {
+    try {
+      const content = await readFile('/app/.runtime-git-log', 'utf8');
+      return content.split(/\r?\n/).map(line => {
+        const [sha = '', publishedAt = '', author = '', ...message] = line.split('\t');
+        return { sha, publishedAt, author, original: message.join('\t') };
+      }).filter(commit => commit.sha && commit.original);
+    } catch {
+      return [];
+    }
+  }
+
+  private groupLocalCommits(commits: Array<{ sha: string; publishedAt: string; author: string; original: string }>, config: ChangelogConfig) {
     const grouped = new Map<string, GitGroup>();
     for (const commit of commits) {
       const publishedAt = this.isoDate(commit.publishedAt);

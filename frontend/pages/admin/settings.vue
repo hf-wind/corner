@@ -776,13 +776,13 @@
 
     <div v-show="tab === 'backups'" class="tab-body">
       <AdminCard icon="ph:cloud-arrow-up-bold" title="备份与恢复" desc="完整归档、敏感资产和恢复任务统一管理">
-        <div class="linked-admin-panel"><div><strong>打开备份中心</strong><p>在独立工作区创建备份、查看校验结果或执行受控恢复。</p></div><NuxtLink class="linked-admin-button" to="/admin/backups"><Icon name="ph:arrow-square-out-bold" />进入备份中心</NuxtLink></div>
+        <div class="linked-admin-panel"><div><strong>打开备份中心</strong><p>在独立工作区创建备份、查看校验结果或执行受控恢复。</p></div><AppLink class="linked-admin-button" to="/admin/backups"><Icon name="ph:arrow-square-out-bold" />进入备份中心</AppLink></div>
       </AdminCard>
     </div>
 
     <div v-show="tab === 'system'" class="tab-body">
       <AdminCard icon="ph:heartbeat-bold" title="系统信息" desc="查看当前生产进程、数据库与运行环境状态">
-        <div class="linked-admin-panel"><div><strong>打开系统信息</strong><p>系统状态会在页面打开时从后端实时读取，不使用前端缓存。</p></div><NuxtLink class="linked-admin-button" to="/admin/info"><Icon name="ph:arrow-square-out-bold" />查看系统信息</NuxtLink></div>
+        <div class="linked-admin-panel"><div><strong>打开系统信息</strong><p>系统状态会在页面打开时从后端实时读取，不使用前端缓存。</p></div><AppLink class="linked-admin-button" to="/admin/info"><Icon name="ph:arrow-square-out-bold" />查看系统信息</AppLink></div>
       </AdminCard>
     </div>
   </div>

@@ -97,6 +97,8 @@ const props = withDefaults(
       nonContentStarCount?: number;
       ringGap?: number;
       movementSpeed?: number;
+      solarSystemPlanetCount?: number;
+      solarOrbitScale?: number;
       solarPlanets?: Array<{ id?: string; name?: string }>;
     };
   }>(),
@@ -107,7 +109,7 @@ const props = withDefaults(
     ambient: false,
     introDelayMs: 0,
     narrativeProgress: -1,
-    sceneSettings: () => ({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarPlanets: [] }),
+    sceneSettings: () => ({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarSystemPlanetCount: 7, solarOrbitScale: 1, solarPlanets: [] }),
   },
 );
 
@@ -2409,6 +2411,9 @@ function addSolarSystem() {
     ["海王星", 184, 3.1, 0x4168b4],
   ] as const;
   const discoveryIds: DiscoveryId[] = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"];
+  const planetCount = Math.max(1, Math.min(7, Number(props.sceneSettings.solarSystemPlanetCount) || 7));
+  const orbitScale = Math.max(0.6, Math.min(1.6, Number(props.sceneSettings.solarOrbitScale) || 1));
+  planets.splice(planetCount);
   planets.forEach(([defaultName, orbitRadius, radius, color], index) => {
     const discoveryId = ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"][index]
     const name = configuredNames.get(discoveryId) || defaultName
@@ -2416,7 +2421,7 @@ function addSolarSystem() {
     const body = new THREE.Group();
     body.name = `solar-${name}`;
     body.userData.discoveryId = discoveryIds[index];
-    body.position.set(Math.cos(angle) * orbitRadius, Math.sin(index * 1.17) * (8 + index * 1.2), Math.sin(angle) * orbitRadius * (0.58 + index * 0.018));
+    body.position.set(Math.cos(angle) * orbitRadius * orbitScale, Math.sin(index * 1.17) * (8 + index * 1.2) * orbitScale, Math.sin(angle) * orbitRadius * (0.58 + index * 0.018) * orbitScale);
     body.userData.spin = 0.012 + index * 0.002;
     const material = track(new THREE.MeshStandardMaterial({
       color,
@@ -2437,7 +2442,7 @@ function addSolarSystem() {
       blending: THREE.AdditiveBlending,
     })));
     glow.name = "solar-planet-glow";
-    glow.scale.set(radius * 3.8, radius * 3.8, 1);
+    glow.scale.set(radius * 3.8 * orbitScale, radius * 3.8 * orbitScale, 1);
     glow.userData.baseScale = glow.scale.x;
     body.add(glow);
     if (name === "土星") {

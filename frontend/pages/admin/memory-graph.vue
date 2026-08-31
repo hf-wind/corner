@@ -38,6 +38,8 @@
         <div class="section-head"><div><small>SCENE SETTINGS</small><h2>星图显示配置</h2></div><a-button type="primary" size="small" :loading="settingsSaving" @click="saveSceneSettings"><Icon name="ph:floppy-disk-bold" />保存配置</a-button></div>
         <p class="section-intro">控制星体密度、时间环间隙、移动速度，以及前台太阳系行星的名称、特点和解析内容。</p>
         <div class="scene-settings-grid">
+          <label><span>太阳系行星数量</span><a-input-number v-model:value="sceneSettings.solarSystemPlanetCount" :min="1" :max="7" :step="1" /></label>
+          <label><span>太阳系轨道缩放</span><a-slider v-model:value="sceneSettings.solarOrbitScale" :min="0.6" :max="1.6" :step="0.1" /><output>{{ sceneSettings.solarOrbitScale.toFixed(1) }}x</output></label>
           <label><span>非内容星球数量</span><a-input-number v-model:value="sceneSettings.nonContentStarCount" :min="100" :max="5000" :step="100" /></label>
           <label><span>时间环间隙</span><a-input-number v-model:value="sceneSettings.ringGap" :min="12" :max="100" :step="2" addon-after="单位" /></label>
           <label><span>移动速度</span><a-slider v-model:value="sceneSettings.movementSpeed" :min="0.2" :max="3" :step="0.1" /><output>{{ sceneSettings.movementSpeed.toFixed(1) }}x</output></label>
@@ -81,7 +83,7 @@ const defaultSolarPlanets = [
   ['mercury', '水星', '撞击坑与铁质核心'], ['venus', '金星', '硫酸云带与温室效应'], ['mars', '火星', '铁锈地表与极冠'],
   ['jupiter', '木星', '大红斑与条带云系'], ['saturn', '土星', '冰尘星环与卡西尼缝'], ['uranus', '天王星', '甲烷冰层与极端倾角'], ['neptune', '海王星', '深蓝色大气与暗斑'],
 ].map(([id, name, feature]) => ({ id, name, feature, description: `${name}的前台解析内容待维护。` }))
-const sceneSettings = reactive<any>({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarPlanets: defaultSolarPlanets })
+const sceneSettings = reactive<any>({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarSystemPlanetCount: 7, solarOrbitScale: 1, solarPlanets: defaultSolarPlanets })
 const health = reactive<any>({
   totals: { nodes: 0, memories: 0, journeys: 0, relations: 0 },
   automation: { status: 'running', lastBuiltAt: null },

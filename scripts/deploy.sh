@@ -4,6 +4,10 @@ set -Eeuo pipefail
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
 
+# The backend image intentionally has no checkout metadata. Export the current
+# history so the changelog can still show real commits in production.
+git log -n 240 --date=iso-strict --pretty=format:'%H%x09%aI%x09%an%x09%s' > backend/.runtime-git-log
+
 set -a
 # shellcheck disable=SC1091
 source ./.env
