@@ -4111,9 +4111,7 @@ function animate(now = performance.now()) {
     }
     if (spaceStation) {
       stationOrbitPhase -= (delta * Math.PI * 2) / 86;
-      spaceStation.position.copy(
-        safeAutopilotPosition(stationOrbitPosition(stationOrbitPhase), "station", 16),
-      );
+      spaceStation.position.copy(stationOrbitPosition(stationOrbitPhase));
       spaceStation.rotation.set(
         0.18 + Math.sin(stationOrbitPhase * 1.7) * 0.04,
         -stationOrbitPhase + Math.PI / 2,
