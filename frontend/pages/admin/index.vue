@@ -103,7 +103,6 @@
 <script setup lang="ts">
 import type * as ECharts from 'echarts/core'
 
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 const api = useApi()
 const router = useRouter()
 const { user } = useAuth()
@@ -270,7 +269,7 @@ onMounted(async () => {
   catch (error: any) { toast.error(error?.message || '仪表盘数据加载失败') }
   finally { loading.value = false }
   await nextTick()
-  try { echarts = (await import('~/utils/echartsLite')).default } catch { chartError.value = true }
+  try { echarts = (await import('@/utils/echartsLite')).default } catch { chartError.value = true }
   renderCharts()
   chartResizeObserver = new ResizeObserver(resizeCharts)
   ;[visitChartEl.value, contentChartEl.value, aiChartEl.value, identityChartEl.value].filter(Boolean).forEach(element => chartResizeObserver?.observe(element!))

@@ -1,16 +1,17 @@
 <template>
   <div class="ai-create-page admin-page-shell">
-    <header class="page-header">
+    <header class="creator-toolbar">
       <div class="page-title">
-        <span class="title-icon"><Icon name="ph:magic-wand-bold" /></span>
-        <div><p>AI CREATION STUDIO</p><h1>AI 创作台</h1></div>
-        <em>Beta</em>
+        <Icon name="ph:magic-wand-bold" /><strong>{{ modeConfig.listName }}创作</strong>
       </div>
-      <a-button @click="router.push(mode === 'article' ? '/admin/posts' : '/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回{{ modeConfig.listName }}</a-button>
-      <a-button type="primary" ghost @click="openEditor"><Icon name="ph:pencil-simple-bold" /> 直接进入编辑器</a-button>
+      <div class="page-actions">
+        <a-button size="small" @click="router.push(mode === 'article' ? '/admin/posts' : '/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回</a-button>
+        <a-button size="small" type="primary" ghost @click="openEditor"><Icon name="ph:pencil-simple-bold" /> 编辑器</a-button>
+      </div>
     </header>
 
-    <section class="mode-hero">
+    <div class="creator-scroll">
+      <section class="mode-hero">
       <div class="mode-intro">
         <span><Icon :name="modeConfig.icon" />{{ modeConfig.kicker }}</span>
         <Transition name="mode-fade" mode="out-in">
@@ -24,9 +25,9 @@
         <a-tab-pane key="article" tab="文章" />
         <a-tab-pane key="moment" tab="瞬间" />
       </a-tabs>
-    </section>
+      </section>
 
-    <div class="studio-grid">
+      <div class="studio-grid">
       <section class="prompt-card">
         <header class="prompt-head">
           <div><span>PROMPT</span><h2>{{ modeConfig.promptTitle }}</h2></div>
@@ -83,6 +84,7 @@
           <span>{{ mode === 'article' ? '适合完整表达' : '适合此刻就写' }}</span>
         </section>
       </aside>
+      </div>
     </div>
   </div>
 </template>
@@ -179,8 +181,9 @@ async function generateMoment(text:string) {
 </script>
 
 <style scoped>
-.ai-create-page { width:min(1160px,100%); min-height:100%; padding:6px 0 28px; }
-.page-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:22px; }.page-title { display:flex; align-items:center; gap:12px; }.title-icon { display:grid; width:44px; height:44px; place-items:center; border:1px solid color-mix(in srgb,var(--c-primary) 18%,var(--border)); border-radius:13px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.25rem; }.page-title p { margin:0; color:var(--c-text-3); font-size:.65rem; letter-spacing:.15em; }.page-title h1 { margin:2px 0 0; color:var(--c-text); font-size:1.45rem; }.page-title em { align-self:flex-start; padding:2px 6px; border-radius:999px; background:var(--c-primary-soft); color:var(--c-primary); font-size:.52rem; font-style:normal; }
+.ai-create-page { display:flex; width:min(1160px,100%); height:100vh; max-height:100vh; min-height:0; flex-direction:column; padding:0 0 12px; overflow:hidden; }
+.creator-toolbar { display:flex; flex:0 0 46px; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border); }.page-title { display:flex; align-items:center; gap:8px; color:var(--c-text); }.page-title :deep(svg) { color:var(--c-primary); }.page-title strong { font-size:.86rem; }.page-actions { display:flex; align-items:center; gap:7px; }.page-actions :deep(.ant-btn) { min-height:30px; padding-inline:9px; font-size:.62rem; }
+.creator-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; padding:14px 2px 20px 0; scrollbar-gutter:stable; }
 .mode-hero { position:relative; display:flex; min-height:160px; align-items:center; justify-content:space-between; gap:34px; padding:27px 30px; overflow:hidden; border:1px solid color-mix(in srgb,var(--border) 74%,transparent); border-radius:17px; background:radial-gradient(circle at 12% 0,color-mix(in srgb,var(--c-primary) 8%,transparent),transparent 34%),var(--ld-bg-card); box-shadow:0 9px 28px color-mix(in srgb,var(--ld-shadow) 34%,transparent); }.mode-hero::before { position:absolute; top:27px; bottom:27px; left:0; width:3px; background:linear-gradient(var(--c-primary),transparent); content:''; }.mode-intro { max-width:610px; }.mode-intro>span { display:flex; align-items:center; gap:7px; color:var(--c-primary); font-size:.6rem; font-weight:700; letter-spacing:.13em; }.mode-intro h2 { margin:10px 0 0; color:var(--c-text); font-size:1.4rem; }.mode-intro p { margin:8px 0 0; color:var(--c-text-2); font-size:.74rem; line-height:1.75; }
 .mode-switch { flex:0 0 auto; min-width:220px; }.mode-switch :deep(.ant-tabs-nav) { margin:0; }.mode-switch :deep(.ant-tabs-nav-list) { width:100%; }.mode-switch :deep(.ant-tabs-tab) { flex:1; justify-content:center; }.mode-switch :deep(.ant-tabs-content-holder) { display:none; }
 .studio-grid { display:grid; grid-template-columns:minmax(0,1fr) 275px; gap:18px; align-items:start; margin-top:18px; }.prompt-card,.rail-card { border:1px solid color-mix(in srgb,var(--border) 76%,transparent); border-radius:16px; background:var(--ld-bg-card); }.prompt-card { padding:23px 25px 19px; box-shadow:0 10px 30px color-mix(in srgb,var(--ld-shadow) 34%,transparent); }.prompt-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }.prompt-head span,.rail-card header span { color:var(--c-text-3); font-size:.58rem; letter-spacing:.15em; }.prompt-head h2 { margin:5px 0 0; color:var(--c-text); font-size:1rem; }.prompt-head small { color:var(--c-text-3); font-size:.66rem; font-variant-numeric:tabular-nums; }
@@ -191,6 +194,6 @@ async function generateMoment(text:string) {
 .studio-rail { display:grid; gap:12px; }.rail-card { padding:18px; }.rail-card header h3 { margin:5px 0 0; color:var(--c-text); font-size:.88rem; }.flow-card ol { display:grid; gap:0; margin:16px 0 0; padding:0; list-style:none; }.flow-card li { position:relative; display:grid; grid-template-columns:25px 1fr; gap:9px; padding-bottom:16px; }.flow-card li:last-child { padding-bottom:0; }.flow-card li:not(:last-child)::before { position:absolute; top:24px; bottom:0; left:12px; width:1px; background:var(--border); content:''; }.flow-card i { z-index:1; display:grid; width:25px; height:25px; place-items:center; border-radius:50%; background:var(--c-primary-soft); color:var(--c-primary); font-size:.6rem; font-style:normal; }.flow-card li div { display:flex; flex-direction:column; }.flow-card strong { color:var(--c-text-2); font-size:.69rem; }.flow-card li span { margin-top:3px; color:var(--c-text-3); font-size:.58rem; line-height:1.55; }.tone-card { background:linear-gradient(145deg,var(--c-primary-soft),var(--ld-bg-card)); }.tone-card> :deep(svg) { color:var(--c-primary); font-size:1.15rem; }.tone-card p { margin:10px 0 0; color:var(--c-text-2); font-size:.66rem; line-height:1.75; }.tone-card>span { display:block; margin-top:8px; color:var(--c-text-3); font-size:.56rem; }
 .mode-fade-enter-active,.mode-fade-leave-active { transition:opacity .15s ease,transform .15s ease; }.mode-fade-enter-from { opacity:0; transform:translateY(4px); }.mode-fade-leave-to { opacity:0; transform:translateY(-4px); }.spinning { animation:spin .8s linear infinite; }@keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:900px) { .mode-hero { align-items:flex-start; flex-direction:column; }.mode-switch { width:100%; }.studio-grid { grid-template-columns:1fr; }.studio-rail { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media (max-width:640px) { .page-header { align-items:stretch; flex-direction:column; }.page-header> :last-child { align-self:flex-end; }.mode-hero { padding:23px 20px; border-radius:14px; }.mode-intro h2 { font-size:1.16rem; }.prompt-card { padding:18px 15px 15px; }.prompt-editor { min-height:220px; padding:14px; }.prompt-footer { align-items:stretch; flex-direction:column; }.prompt-tools>span { display:none; }.generate-button { justify-content:center; }.studio-rail { grid-template-columns:1fr; } }
+@media (max-width:640px) { .creator-toolbar { flex-basis:42px; }.page-title strong { font-size:.78rem; }.page-actions :deep(.ant-btn) { padding-inline:7px; }.creator-scroll { padding-top:10px; }.mode-hero { padding:23px 20px; border-radius:14px; }.mode-intro h2 { font-size:1.16rem; }.prompt-card { padding:18px 15px 15px; }.prompt-editor { min-height:220px; padding:14px; }.prompt-footer { align-items:stretch; flex-direction:column; }.prompt-tools>span { display:none; }.generate-button { justify-content:center; }.studio-rail { grid-template-columns:1fr; } }
 @media (prefers-reduced-motion:reduce) { .mode-fade-enter-active,.mode-fade-leave-active,.spinning { transition:none; animation:none; } }
 </style>

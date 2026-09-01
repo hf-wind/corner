@@ -5,7 +5,7 @@
     :class="{ dark: isDark, 'theme-refreshing': themeRefreshing }"
     @click.capture="onContentClick"
   >
-    <ClientOnly>
+    <BrowserOnly>
       <Transition name="markdown-ready" appear>
         <MdPreview
           v-if="editorReady"
@@ -22,7 +22,7 @@
           class="article-md-preview"
         />
       </Transition>
-    </ClientOnly>
+    </BrowserOnly>
     <ImageLightbox
       v-model="previewOpen"
       v-model:index="previewIndex"
@@ -35,13 +35,13 @@
 <script setup lang="ts">
 import { MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/preview.css";
-import ImageLightbox from "~/components/ImageLightbox.vue";
+import ImageLightbox from "@/components/ImageLightbox.vue";
 import {
   configureMarkdownPreview,
   markdownPreviewFeatures,
   normalizeMarkdownPreviewContent,
   type MarkdownPreviewFeatures,
-} from "~/utils/configureMarkdownPreview";
+} from "@/utils/configureMarkdownPreview";
 
 const props = withDefaults(
   defineProps<{

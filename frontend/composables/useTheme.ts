@@ -17,8 +17,8 @@ export function useTheme(): ThemeContext {
   const clientState = useClientState()
   const initialTheme = typeof window === 'undefined' ? 'auto' : String(clientState.get('site', 'theme', 'auto'))
   const initialResolved = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
-  const theme: Ref<string> = useState('theme', () => initialTheme)
-  const resolvedTheme = useState<'light' | 'dark'>('resolved-theme', () => initialResolved)
+  const theme: Ref<string> = useSharedState('theme', () => initialTheme)
+  const resolvedTheme = useSharedState<'light' | 'dark'>('resolved-theme', () => initialResolved)
 
   function applyTheme() {
     const mode = theme.value

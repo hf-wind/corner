@@ -121,7 +121,7 @@ const dialogLabel = computed(() => `${props.label}，第 ${safeIndex.value+1} �
 const imageStyle = computed(() => ({ transform:`scale(${scale.value})` }))
 
 watch(() => props.modelValue, open => {
-  if (!import.meta.client) return
+  if (!(typeof window !== 'undefined')) return
   document.body.classList.toggle('image-lightbox-open',open)
   if (open) { previousFocus=document.activeElement as HTMLElement|null; resetTransform(); nextTick(() => closeRef.value?.focus()) }
   else { previousFocus?.focus?.(); previousFocus=null }

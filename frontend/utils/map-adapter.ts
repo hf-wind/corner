@@ -1,4 +1,4 @@
-import type { MemoryMapCluster, MemoryMapItem } from '~/types/memory-map'
+import type { MemoryMapCluster, MemoryMapItem } from '@/types/memory-map'
 
 export type MapBounds = {
   west: number

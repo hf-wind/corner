@@ -72,7 +72,7 @@ const posterRef = ref<HTMLElement | null>(null)
 const exporting = ref(false)
 const copied = ref(false)
 
-const pageUrl = computed(() => (import.meta.client ? window.location.href : ''))
+const pageUrl = computed(() => ((typeof window !== 'undefined') ? window.location.href : ''))
 const qrUrl = computed(() =>
   `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=8&data=${encodeURIComponent(pageUrl.value || 'https://corner.ink')}`,
 )
@@ -140,12 +140,12 @@ async function copyImage() {
 }
 
 watch(() => props.open, (v) => {
-  if (!import.meta.client) return
+  if (!(typeof window !== 'undefined')) return
   document.body.style.overflow = v ? 'hidden' : ''
 })
 
 onUnmounted(() => {
-  if (import.meta.client) document.body.style.overflow = ''
+  if ((typeof window !== 'undefined')) document.body.style.overflow = ''
 })
 </script>
 

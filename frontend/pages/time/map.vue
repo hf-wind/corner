@@ -241,13 +241,13 @@ import {
   type MapBounds,
   type MapInitialView,
   wgs84ToGcj02,
-} from "~/utils/map-adapter";
+} from "@/utils/map-adapter";
 import type {
   MapMemoryType,
   MemoryMapCluster,
   MemoryMapItem,
   MemoryMapResult,
-} from "~/types/memory-map";
+} from "@/types/memory-map";
 
 const api = useApi();
 const route = useRoute();

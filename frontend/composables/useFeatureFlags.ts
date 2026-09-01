@@ -7,10 +7,10 @@ let circleLoadPromise: Promise<void> | null = null;
 let changelogLoadPromise: Promise<void> | null = null;
 
 export function useFeatureFlags() {
-  const circleEnabled = useState("feature-circle-enabled", () => true);
-  const circleLoaded = useState("feature-circle-loaded", () => false);
-  const changelogEnabled = useState("feature-changelog-enabled", () => true);
-  const changelogLoaded = useState("feature-changelog-loaded", () => false);
+  const circleEnabled = useSharedState("feature-circle-enabled", () => true);
+  const circleLoaded = useSharedState("feature-circle-loaded", () => false);
+  const changelogEnabled = useSharedState("feature-changelog-enabled", () => true);
+  const changelogLoaded = useSharedState("feature-changelog-loaded", () => false);
   async function loadCircleFeature() {
     if (circleLoaded.value) return;
     if (circleLoadPromise) return circleLoadPromise;

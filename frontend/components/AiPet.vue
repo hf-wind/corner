@@ -236,9 +236,9 @@
 
 <script setup lang="ts">
 import MarkdownIt from "markdown-it";
-import petMeta from "~/assets/dram/pet.json";
-import dramAvatarImg from "~/assets/images/dram-avatar.processed.png";
-import { aiCardImage, cleanAiExcerpt, cleanAiTitle } from "~/utils/aiContent";
+import petMeta from "@/assets/dram/pet.json";
+import dramAvatarImg from "@/assets/images/dram-avatar.processed.png";
+import { aiCardImage, cleanAiExcerpt, cleanAiTitle } from "@/utils/aiContent";
 const spriteUrl = "/dram/spritesheet.webp";
 
 const markdown = new MarkdownIt({

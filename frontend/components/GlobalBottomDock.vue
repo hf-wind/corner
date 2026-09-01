@@ -25,9 +25,9 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
-import { useBottomDockState } from "~/composables/useBottomDockState";
+import { useBottomDockState } from "@/composables/useBottomDockState";
 
-const MusicCapsule = defineAsyncComponent(() => import("~/components/MusicCapsule.vue"));
+const MusicCapsule = defineAsyncComponent(() => import("@/components/MusicCapsule.vue"));
 
 const {
   activeBottomDock,

@@ -140,11 +140,9 @@
 
 <script setup lang="ts">
 import { Empty } from 'ant-design-vue'
-import avatarFallback from '~/assets/images/avatar.jpg'
-import type { AboutFact, AboutNote, AboutProfile, AboutSkill, AboutSocialLink, AboutTimelineItem } from '~/types/about'
-import { createAboutProfile, normalizeAboutProfile } from '~/types/about'
-
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
+import avatarFallback from '@/assets/images/avatar.jpg'
+import type { AboutFact, AboutNote, AboutProfile, AboutSkill, AboutSocialLink, AboutTimelineItem } from '@/types/about'
+import { createAboutProfile, normalizeAboutProfile } from '@/types/about'
 
 const api = useApi()
 const toast = useToast()

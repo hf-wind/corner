@@ -12,27 +12,6 @@
           metric-label="次更新"
         />
 
-        <section class="release-ledger" aria-label="更新来源与统计">
-          <div class="ledger-source">
-            <span class="repository-label">
-              <Icon name="ph:github-logo-bold" />
-              {{ data.repository.owner }}/{{ data.repository.name }}
-            </span>
-            <span :class="data.sourceStatus">
-              <i />{{ data.sourceLabel || "等待同步" }}
-            </span>
-          </div>
-          <div class="ledger-metrics">
-            <span
-              ><b>{{ pad(data.itemCount) }}</b> 项变更</span
-            >
-            <span v-if="data.fetchedAt">
-              <Icon name="ph:clock-counter-clockwise-bold" />
-              {{ formatSyncTime(data.fetchedAt) }}
-            </span>
-          </div>
-        </section>
-
         <Transition name="page-arrive" mode="out-in">
           <div
             v-if="error && !ready"
@@ -50,17 +29,22 @@
           </div>
 
           <section
-            v-else
+            v-else-if="ready"
             key="content"
             class="release-section"
             aria-labelledby="release-title"
           >
             <header class="section-head">
-              <div>
-                <span>LATEST SHIPPED</span>
+              <div class="section-heading-copy">
+                <span>WIND TRAIL / SHIPPED RECORDS</span>
                 <h2 id="release-title">近期抵达</h2>
+                <p>每一次提交都在这里留下可回看的轨迹。</p>
               </div>
-              <p>按推送归档，完整保留每一项改动。</p>
+              <div class="release-ledger" aria-label="更新来源与统计">
+                <span class="ledger-source"><Icon name="ph:git-branch-bold" />{{ data.sourceLabel || "等待同步" }}</span>
+                <span class="ledger-metric"><b>{{ pad(data.itemCount) }}</b> 项变更</span>
+                <span v-if="data.fetchedAt" class="ledger-metric"><Icon name="ph:clock-counter-clockwise-bold" />{{ formatSyncTime(data.fetchedAt) }}</span>
+              </div>
             </header>
 
             <div v-if="error" class="inline-error">
@@ -124,17 +108,6 @@
               </article>
             </div>
 
-            <div v-else class="empty-release">
-              <span class="empty-mark"><Icon name="ph:git-commit-bold" /></span>
-              <div>
-                <small>SYNC QUEUE / 00</small>
-                <h3>第一条更新还在路上</h3>
-                <p>代码仓库完成同步后，这里会自动留下记录。</p>
-              </div>
-              <span class="empty-status" :class="data.sourceStatus">
-                <i />{{ data.sourceLabel || "等待首次同步" }}
-              </span>
-            </div>
           </section>
         </Transition>
 
@@ -155,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ChangelogResponse } from "~/types/changelog";
+import type { ChangelogResponse } from "@/types/changelog";
 
 const api = useApi();
 const scrollRef = ref<HTMLElement | null>(null);
@@ -171,7 +144,7 @@ const data = reactive<ChangelogResponse>({
     "风过无声，循迹可寻。每一次改变，都在时间里留下属于自己的印记，那些细微的更迭与变化，也终将成为一路走来不可忽略的痕迹。",
   repository: { owner: "", name: "", branch: "main", url: "" },
   releases: [],
-  page: 1,
+      page: 1,
   totalPages: 1,
   total: 0,
   itemCount: 0,
@@ -187,7 +160,7 @@ async function load(nextPage = page.value) {
   try {
     const result = await api.get<ChangelogResponse>("/changelog", {
       page: nextPage,
-      limit: 30,
+      limit: 10,
     });
     Object.assign(data, result);
     page.value = result.page;
@@ -274,87 +247,39 @@ useHead({
 
 .release-ledger {
   display: flex;
-  min-height: 46px;
+  min-height: 34px;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin: -8px 8px 0;
-  padding: 0 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  max-width: 48%;
+  padding: 7px 0 0;
   color: var(--c-text-3);
   font-size: 0.54rem;
 }
 
 .ledger-source,
-.ledger-metrics,
-.ledger-source a,
-.ledger-source span,
-.ledger-metrics span {
+.ledger-metric {
   display: flex;
   align-items: center;
-}
-
-.ledger-source,
-.ledger-metrics {
-  min-width: 0;
-  gap: 14px;
-}
-
-.ledger-source a,
-.ledger-source span,
-.ledger-metrics span {
   gap: 5px;
   white-space: nowrap;
 }
 
-.ledger-source a {
+.ledger-source {
   overflow: hidden;
-  color: var(--c-text-2);
-  text-decoration: none;
-  text-overflow: ellipsis;
-  transition: color 0.2s ease;
-}
-
-.ledger-source a:hover,
-.page-footer a:hover,
-.change-list a:hover {
   color: var(--c-primary);
+  text-overflow: ellipsis;
 }
 
-.ledger-source i,
-.empty-status i {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: #a88748;
-}
-
-.ledger-source .connected i,
-.empty-status.connected i {
-  background: #2f8b69;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #2f8b69 12%, transparent);
-}
-
-.ledger-source .fallback i,
-.ledger-source .stale i,
-.empty-status.fallback i,
-.empty-status.stale i {
-  background: var(--c-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 11%, transparent);
-}
-
-.ledger-metrics {
-  justify-content: flex-end;
-}
-
-.ledger-metrics b {
+.ledger-metric b {
   color: var(--c-text-2);
   font: 700 0.6rem var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .release-section {
-  padding: 25px 8px 10px;
+  padding: 28px 8px 10px;
 }
 
 .section-head {
@@ -362,7 +287,9 @@ useHead({
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin: 0 0 15px 82px;
+  margin: 0 0 18px 104px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
 .section-head span {
@@ -371,16 +298,18 @@ useHead({
 }
 
 .section-head h2 {
-  margin: 4px 0 0;
+  margin: 5px 0 0;
   color: var(--c-text);
-  font-size: 1.12rem;
+  font-size: 1.28rem;
   line-height: 1.3;
 }
 
-.section-head > p {
+.section-heading-copy > p {
   margin: 0;
-  color: var(--c-text-3);
-  font-size: 0.58rem;
+  margin-top: 5px;
+  color: var(--c-text-2);
+  font-size: 0.62rem;
+  line-height: 1.6;
 }
 
 .release-stream {
@@ -399,8 +328,8 @@ useHead({
 
 .release-entry {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 22px;
   animation: release-arrive 0.68s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--entry-delay);
 }
@@ -408,14 +337,15 @@ useHead({
 .release-date {
   position: relative;
   display: flex;
-  justify-content: flex-end;
-  padding-top: 16px;
+  justify-content: center;
+  padding-top: 18px;
+  padding-right: 10px;
 }
 
 .release-date::after {
   position: absolute;
   top: 0;
-  right: -15px;
+  right: -12px;
   bottom: 0;
   width: 1px;
   background: linear-gradient(
@@ -435,7 +365,7 @@ useHead({
   position: absolute;
   z-index: 1;
   top: 25px;
-  right: -18px;
+  right: -15px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -457,28 +387,29 @@ useHead({
 
 .release-date time {
   display: grid;
-  grid-template-columns: auto auto;
+  justify-items: center;
   align-content: start;
-  align-items: baseline;
-  gap: 0 4px;
-  text-align: right;
+  gap: 2px;
+  text-align: center;
 }
 
 .release-date strong {
   color: var(--c-text);
-  font: 740 1.02rem var(--font-mono);
+  font: 760 1.42rem/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .release-date span {
-  color: var(--c-text-2);
-  font-size: 0.55rem;
+  color: var(--c-primary);
+  font-size: 0.57rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .release-date small {
-  grid-column: 1 / -1;
   color: var(--c-text-3);
-  font: 0.45rem var(--font-mono);
+  font: 0.5rem var(--font-mono);
 }
 
 .release-body {
@@ -848,20 +779,18 @@ useHead({
   }
 
   .release-ledger {
-    min-height: 42px;
-    margin-inline: 14px;
-    padding-inline: 4px;
+    width: 100%;
+    max-width: none;
+    min-height: 30px;
+    justify-content: flex-start;
+    padding-top: 8px;
   }
 
   .ledger-source {
     overflow: hidden;
   }
 
-  .ledger-source span {
-    display: none;
-  }
-
-  .ledger-metrics span:last-child {
+  .ledger-metric:last-child {
     display: none;
   }
 
@@ -873,48 +802,48 @@ useHead({
     align-items: flex-start;
     flex-direction: column;
     gap: 3px;
-    margin: 0 0 12px 49px;
+    margin: 0 0 14px 82px;
   }
 
-  .section-head > p {
+  .section-heading-copy > p {
     line-height: 1.5;
   }
 
   .release-entry {
-    grid-template-columns: 38px minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 14px;
   }
 
   .release-date {
-    padding-top: 14px;
+    justify-content: center;
+    padding-top: 16px;
+    padding-right: 7px;
   }
 
   .release-date::after {
-    right: -11px;
+    right: -8px;
   }
 
   .release-date > i {
-    top: 23px;
-    right: -14px;
+    top: 25px;
+    right: -11px;
   }
 
   .release-date time {
-    display: flex;
-    align-items: flex-end;
-    flex-direction: column;
-    gap: 0;
+    justify-items: center;
   }
 
   .release-date strong {
-    font-size: 0.88rem;
+    font-size: 1.16rem;
   }
 
   .release-date span {
-    font-size: 0.48rem;
+    font-size: 0.52rem;
   }
 
   .release-date small {
-    display: none;
+    display: block;
+    font-size: 0.45rem;
   }
 
   .release-body {
@@ -959,21 +888,7 @@ useHead({
     justify-self: start;
   }
 
-  .inline-error,
-  .empty-release {
-    margin-left: 48px;
-  }
-
-  .empty-release {
-    grid-template-columns: 34px minmax(0, 1fr);
-    min-height: 96px;
-    padding: 13px;
-  }
-
-  .empty-status {
-    grid-column: 2;
-    justify-self: start;
-  }
+  .inline-error { margin-left: 82px; }
 
   .page-footer {
     align-items: flex-start;

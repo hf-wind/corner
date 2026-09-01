@@ -319,7 +319,7 @@
 </template>
 
 <script setup lang="ts">
-import { useBottomDockState } from "~/composables/useBottomDockState";
+import { useBottomDockState } from "@/composables/useBottomDockState";
 
 const emit = defineEmits<{
   (event: "ready", payload: { visible: boolean }): void;

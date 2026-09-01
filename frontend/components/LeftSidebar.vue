@@ -178,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { useFeatureFlags } from "~/composables/useFeatureFlags";
+import { useFeatureFlags } from "@/composables/useFeatureFlags";
 
 const props = withDefaults(
   defineProps<{

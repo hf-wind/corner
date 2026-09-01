@@ -12,6 +12,7 @@ import {
   SetVisitorNicknameDto,
   TrackVisitorEventsDto,
 } from './dto/create-visitor-message.dto';
+import { SelectConstellationKnowledgeDto } from './dto/constellation-knowledge.dto';
 
 @Controller('visitor')
 export class VisitorController {
@@ -168,6 +169,27 @@ export class VisitorController {
     return this.visitorService.recentVisits();
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('constellation/knowledge')
+  @HttpCode(200)
+  selectConstellationKnowledge(
+    @Req() req: { ip: string; user?: { id?: string }; headers: Record<string, string | string[] | undefined> },
+    @Headers('x-visitor-id') visitorId: string,
+    @Body() dto: SelectConstellationKnowledgeDto,
+  ) {
+    const visitorIdHash = this.visitorService.resolveVisitorId({
+      headers: { 'x-visitor-id': visitorId },
+      ip: req.ip,
+    });
+    return this.visitorService.selectConstellationKnowledge(
+      { headers: req.headers, ip: req.ip },
+      visitorIdHash,
+      req.user?.id ?? null,
+      dto.planetId,
+      dto.knowledge,
+    );
+  }
+
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   @Get('admin/stats')
@@ -222,6 +244,21 @@ export class VisitorController {
       keyword,
       banned,
       type,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @Get('admin/constellation-knowledge')
+  adminConstellationKnowledge(
+    @Query('planetId') planetId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.visitorService.adminConstellationKnowledge({
+      planetId,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });

@@ -126,7 +126,7 @@ function autoComponentsPlugin(): Plugin {
           const file = localComponents.get(localName);
           if (!file) continue;
           const projectPath = file.slice(root.length).replace(/\\/g, "/");
-          statement = `import ${localName} from '~/${projectPath}'`;
+          statement = `import ${localName} from '@/${projectPath}'`;
         }
         const hasBinding = [
           new RegExp(`\\bimport\\s+${localName}\\b`),
@@ -182,11 +182,10 @@ export default defineConfig(({ mode }) => {
           })),
           { name: "useHead", from: "@unhead/vue" },
           ...[
-            "useState",
-            "useRuntimeConfig",
-            "navigateTo",
-            "definePageMeta",
-          ].map((name) => ({ name, from: "~/compat/runtime" })),
+            "useSharedState",
+            "useAppConfig",
+            "routerNavigate",
+          ].map((name) => ({ name, from: "@/runtime/spaRuntime" })),
         ],
         dirs: ["./composables", "./utils"],
         dts: false,
@@ -195,13 +194,8 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
-        "~": root,
         "@": root,
       },
-    },
-    define: {
-      "import.meta.client": "true",
-      "import.meta.server": "false",
     },
     server: {
       host: "0.0.0.0",

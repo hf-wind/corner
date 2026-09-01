@@ -8,7 +8,7 @@ export type ConfirmOptions = {
 
 export type ConfirmState = Required<ConfirmOptions> & { id: number }
 
-const state = useState<ConfirmState | null>('light-confirm-state', () => null)
+const state = useSharedState<ConfirmState | null>('light-confirm-state', () => null)
 let resolver: ((value: boolean) => void) | null = null
 let sequence = 0
 

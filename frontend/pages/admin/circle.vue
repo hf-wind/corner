@@ -89,7 +89,7 @@
 
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
+
 type Subscription = {
   key: string
   name: string

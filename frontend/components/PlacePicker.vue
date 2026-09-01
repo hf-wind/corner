@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Place, PlaceCandidate } from '~/types/place'
+import type { Place, PlaceCandidate } from '@/types/place'
 
 const props = defineProps<{ modelValue: Place | null }>()
 const emit = defineEmits<{

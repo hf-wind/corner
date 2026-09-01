@@ -32,7 +32,7 @@
             </button>
           </div>
           <div class="editor-field editor-field-grow">
-            <client-only>
+            <browser-only>
               <MdEditor
                 v-if="editorReady"
                 v-model="form.content"
@@ -45,7 +45,7 @@
                 @save="save"
                 class="md-editor"
               />
-            </client-only>
+            </browser-only>
           </div>
         </div>
 
@@ -231,11 +231,9 @@ import {
   PictureOutlined,
   UploadOutlined,
 } from "@ant-design/icons-vue";
-import { ensureSlug } from "~/utils/postMeta";
-import type { Place } from "~/types/place";
-import { configureMarkdownEditor } from "~/utils/configureMarkdownEditor";
-
-definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
+import { ensureSlug } from "@/utils/postMeta";
+import type { Place } from "@/types/place";
+import { configureMarkdownEditor } from "@/utils/configureMarkdownEditor";
 
 const api = useApi();
 const toast = useToast();
@@ -681,8 +679,8 @@ async function persistPost(confirmExactLocation: boolean) {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 100%;
-  height: max(100%, 100dvh);
+  min-height: 100vh;
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -690,7 +688,10 @@ async function persistPost(confirmExactLocation: boolean) {
   display: flex;
   flex-direction: column;
   flex: 1;
+  height: 100vh;
+  max-height: 100vh;
   min-height: 0;
+  overflow: hidden;
 }
 
 .table-spin :deep(.ant-spin-container) {
@@ -703,16 +704,17 @@ async function persistPost(confirmExactLocation: boolean) {
 .editor-layout {
   display: flex;
   flex: 1;
-  height: 100%;
+  height: 100vh;
+  max-height: 100vh;
   min-height: 0;
   overflow: hidden;
 }
 
 @media (max-width: 900px) {
-  .editor-page { height: auto; min-height: 100%; overflow: visible; }
-  .editor-layout { height: auto; min-height: calc(100dvh - 112px); overflow: visible; }
-  .editor-main { overflow: visible; padding-right: 0; }
-  .editor-sidebar { width: 100%; height: auto; max-height: none; overflow: visible; }
+  .editor-page { height: 100vh; min-height: 100vh; overflow: hidden; }
+  .editor-layout { height: 100vh; max-height: 100vh; min-height: 0; flex-direction: column; overflow: hidden; }
+  .editor-main { flex: 1 1 auto; min-height: 0; overflow: hidden; padding-right: 0; }
+  .editor-sidebar { width: 100%; height: 100vh; max-height: 100vh; flex: 0 0 auto; overflow-y: auto; }
 }
 
 .editor-main {
@@ -723,6 +725,8 @@ async function persistPost(confirmExactLocation: boolean) {
   gap: 12px;
   min-width: 0;
   min-height: 0;
+  height: 100vh;
+  max-height: 100vh;
   padding-right: 16px;
   overflow: hidden;
 }
@@ -730,7 +734,8 @@ async function persistPost(confirmExactLocation: boolean) {
 .editor-sidebar {
   width: 300px;
   flex-shrink: 0;
-  height: 100%;
+  height: 100vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -738,9 +743,11 @@ async function persistPost(confirmExactLocation: boolean) {
 }
 
 .editor-field-grow {
-  flex: 1;
+  flex: 0 0 100vh;
+  height: 100vh;
   min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .gen-excerpt-btn {

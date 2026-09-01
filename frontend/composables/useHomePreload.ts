@@ -12,7 +12,7 @@ type HomePreloadState = {
 let preloadPromise: Promise<void> | null = null;
 
 export function useHomePreload() {
-  const state = useState<HomePreloadState>("home-preload", () => ({
+  const state = useSharedState<HomePreloadState>("home-preload", () => ({
     articles: null,
     featured: null,
     stats: null,

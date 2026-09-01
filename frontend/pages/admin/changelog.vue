@@ -239,9 +239,7 @@ import type {
   ChangelogAdminResponse,
   ChangelogConfig,
   ChangelogRelease,
-} from "~/types/changelog";
-
-definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
+} from "@/types/changelog";
 
 const api = useApi();
 const toast = useToast();

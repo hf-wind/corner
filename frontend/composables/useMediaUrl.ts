@@ -1,5 +1,5 @@
 export function useMediaUrl() {
-  const config = useRuntimeConfig();
+  const config = useAppConfig();
   const imageBase = computed(() => {
     const apiBase = String(config.public.apiBase || "").replace(/\/$/, "");
     // In development /api is proxied by Vite, while production uses the same

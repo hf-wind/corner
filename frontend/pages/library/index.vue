@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LibraryItem, LibraryType } from '~/types/library'
+import type { LibraryItem, LibraryType } from '@/types/library'
 type FilterType = 'all' | LibraryType
 const api = useApi()
 const route = useRoute()

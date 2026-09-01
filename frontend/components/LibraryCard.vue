@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LibraryItem } from '~/types/library'
+import type { LibraryItem } from '@/types/library'
 const props = defineProps<{ item: LibraryItem }>()
 const { mediaUrl } = useMediaUrl()
 const creator = computed(() => props.item.type === 'book'

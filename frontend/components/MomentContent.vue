@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import MarkdownIt from 'markdown-it'
-import { renderInlineEmoji } from '~/utils/commentContent'
+import { renderInlineEmoji } from '@/utils/commentContent'
 
 const props = defineProps<{
   content?: string

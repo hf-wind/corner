@@ -149,8 +149,8 @@
 </template>
 
 <script setup lang="ts">
-import avatarFallback from '~/assets/images/avatar.jpg'
-import { normalizeAboutProfile } from '~/types/about'
+import avatarFallback from '@/assets/images/avatar.jpg'
+import { normalizeAboutProfile } from '@/types/about'
 
 const api = useApi()
 const { mediaUrl } = useMediaUrl()

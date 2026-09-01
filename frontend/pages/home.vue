@@ -95,12 +95,12 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, onActivated, onDeactivated } from "vue";
-import { useBottomDockState } from "~/composables/useBottomDockState";
-import { importWithRetry } from "~/utils/lazyImport";
+import { useBottomDockState } from "@/composables/useBottomDockState";
+import { importWithRetry } from "@/utils/lazyImport";
 
 const FeaturedSwiper = defineAsyncComponent(() =>
   importWithRetry(
-    () => import("~/components/FeaturedSwiper.vue"),
+    () => import("@/components/FeaturedSwiper.vue"),
     2,
     180,
     "featured-swiper",
@@ -108,13 +108,13 @@ const FeaturedSwiper = defineAsyncComponent(() =>
 );
 const HomeSidebar = defineAsyncComponent(() =>
   importWithRetry(
-    () => import("~/components/HomeSidebar.vue"),
+    () => import("@/components/HomeSidebar.vue"),
     2,
     180,
     "home-sidebar",
   ),
 );
-import SectionHead from "~/components/SectionHead.vue";
+import SectionHead from "@/components/SectionHead.vue";
 const api = useApi();
 const { state: homePreload } = useHomePreload();
 const articles = ref<any[]>(

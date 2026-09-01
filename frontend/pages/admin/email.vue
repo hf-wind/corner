@@ -136,7 +136,6 @@
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
 import { defineAsyncComponent } from 'vue'
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()

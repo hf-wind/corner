@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { renderCommentContent } from '~/utils/commentContent'
+import { renderCommentContent } from '@/utils/commentContent'
 
 const props = withDefaults(defineProps<{
   submitting?: boolean

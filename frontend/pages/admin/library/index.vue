@@ -69,9 +69,8 @@
 
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
-import type { LibraryItem } from '~/types/library'
+import type { LibraryItem } from '@/types/library'
 
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 const api = useApi()
 const toast = useToast()
 const router = useRouter()

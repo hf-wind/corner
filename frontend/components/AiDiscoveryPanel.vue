@@ -143,8 +143,8 @@
 
 <script setup lang="ts">
 import MarkdownIt from "markdown-it";
-import type { AiContentCard } from "~/utils/aiContent";
-import { aiCardImage, cleanAiExcerpt, cleanAiTitle } from "~/utils/aiContent";
+import type { AiContentCard } from "@/utils/aiContent";
+import { aiCardImage, cleanAiExcerpt, cleanAiTitle } from "@/utils/aiContent";
 
 const api = useApi();
 const { mediaUrl } = useMediaUrl();

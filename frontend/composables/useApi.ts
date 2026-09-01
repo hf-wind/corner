@@ -35,7 +35,7 @@ function requestHeaders(path: string): Record<string, string> {
 }
 
 function base() {
-  const config = useRuntimeConfig();
+  const config = useAppConfig();
   return config.public.apiBase as string;
 }
 

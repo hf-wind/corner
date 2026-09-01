@@ -63,11 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { useSupabase } from '~/composables/useSupabase'
-
-definePageMeta({
-  layout: false
-})
+import { useSupabase } from '@/composables/useSupabase'
 
 const route = useRoute()
 const router = useRouter()
@@ -122,9 +118,28 @@ async function completeLogin() {
   completing.value = true
   try {
     const { turnstileToken, ...githubUser } = pendingGithubUser.value
-    const response = await api.post('/auth/github', { githubUser, turnstileToken })
-    if (!response?.access_token || !response?.user) throw new Error('本站登录凭据无效，请重新尝试')
-    setSession(response.access_token, response.user)
+    const response = await api.post<any>('/auth/github', { githubUser, turnstileToken })
+    // The API client normally unwraps { code, data }, but keep the callback
+    // correct when a proxy or an older deployment returns that envelope.
+    const result = response?.data && typeof response.data === 'object'
+      ? response.data
+      : response
+    const accessToken = String(result?.access_token || result?.accessToken || '').trim()
+    const nextUser = result?.user
+    if (!accessToken || !nextUser?.id || !nextUser?.username) {
+      throw new Error('本站登录凭据无效，请重新尝试')
+    }
+    setSession(accessToken, {
+      id: String(nextUser.id),
+      username: String(nextUser.username),
+      email: nextUser.email ? String(nextUser.email) : undefined,
+      avatar: nextUser.avatar ? String(nextUser.avatar) : null,
+      role: nextUser.role ? String(nextUser.role) : 'user',
+    })
+    // Confirm the exact JWT written by this page can authenticate against the
+    // site before navigating away. This prevents a false-success redirect.
+    const profile = await api.get<any>('/auth/profile')
+    if (!profile?.id) throw new Error('本站未确认登录状态，请重试')
     useClientState().removeSession('githubTurnstileToken')
     const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'

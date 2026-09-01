@@ -66,7 +66,6 @@
 
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
 
 const api = useApi()
 const toast = useToast()
@@ -138,7 +137,7 @@ async function handleClick(item: any) {
 function goToLinkedPage() {
   const link = detail.item?.link
   detail.open = false
-  if (link) void navigateTo(link)
+  if (link) void routerNavigate(link)
 }
 
 function notificationTypeLabel(type: string) {

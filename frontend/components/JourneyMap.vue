@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { AmapAdapter } from '~/utils/map-adapter'
+import { AmapAdapter } from '@/utils/map-adapter'
 const props = defineProps<{ stops: any[] }>()
 const mapEl = ref<HTMLElement>(); const error = ref(''); let adapter: AmapAdapter | null = null
 const points = computed(() => props.stops.flatMap((stop:any) => Number.isFinite(Number(stop.publicLocation?.longitude)) && Number.isFinite(Number(stop.publicLocation?.latitude)) ? [{ longitude:Number(stop.publicLocation.longitude), latitude:Number(stop.publicLocation.latitude), stop }] : []))

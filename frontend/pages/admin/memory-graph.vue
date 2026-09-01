@@ -49,7 +49,7 @@
             <header><Icon name="ph:planet-bold" /><strong>{{ planet.id }}</strong></header>
             <label><span>名称</span><a-input v-model:value="planet.name" /></label>
             <label><span>特点</span><a-input v-model:value="planet.feature" /></label>
-            <label class="wide"><span>解析 / 科普（每行一条）</span><a-textarea :value="(planet.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 10 }" @change="updatePlanetKnowledge(planet, $event)" /></label>
+            <label class="wide"><span>解析 / 科普（每行一条，共 30 条）<b>{{ planet.knowledge?.length || 0 }}/30</b></span><a-textarea :value="(planet.knowledge || []).join('\n')" :auto-size="{ minRows: 8, maxRows: 30 }" @change="updatePlanetKnowledge(planet, $event)" /></label>
           </article>
         </div>
         <div class="special-body-settings">
@@ -57,7 +57,7 @@
             <header><Icon :name="body.id === 'sun' ? 'ph:sun-bold' : 'ph:circle-half-tilt-bold'" /><strong>{{ body.id === 'sun' ? '太阳' : '黑洞' }}</strong></header>
             <label><span>标题</span><a-input v-model:value="body.title" /></label>
             <label><span>状态</span><a-input v-model:value="body.status" /></label>
-            <label><span>解析 / 科普（每行一条）</span><a-textarea :value="(body.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 10 }" @change="updatePlanetKnowledge(body, $event)" /></label>
+            <label><span>解析 / 科普（每行一条，共 30 条）<b>{{ body.knowledge?.length || 0 }}/30</b></span><a-textarea :value="(body.knowledge || []).join('\n')" :auto-size="{ minRows: 8, maxRows: 30 }" @change="updatePlanetKnowledge(body, $event)" /></label>
           </article>
         </div>
       </section>
@@ -77,7 +77,8 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
+import { SOLAR_KNOWLEDGE, SPECIAL_KNOWLEDGE } from '@/utils/constellationKnowledge'
+
 
 const api = useApi()
 const toast = useToast()
@@ -90,11 +91,45 @@ const settingsSaving = ref(false)
 const defaultSolarPlanets = [
   ['mercury', '水星', '撞击坑与铁质核心'], ['venus', '金星', '硫酸云带与温室效应'], ['mars', '火星', '铁锈地表与极冠'],
   ['jupiter', '木星', '大红斑与条带云系'], ['saturn', '土星', '冰尘星环与卡西尼缝'], ['uranus', '天王星', '甲烷冰层与极端倾角'], ['neptune', '海王星', '深蓝色大气与暗斑'],
-].map(([id, name, feature]) => ({ id, name, feature, description: `${name}的前台解析内容待维护。`, knowledge: [`${name}的核心观测特征是${feature}。`] }))
+].map(([id, name, feature]) => ({ id, name, feature, description: `${name}的前台解析内容待维护。`, knowledge: [...(SOLAR_KNOWLEDGE[id] || [`${name}的核心观测特征是${feature}。`])] }))
 const defaultSpecialBodies = [
-  { id: 'sun', title: '太阳', status: '日球层遥测在线', knowledge: ['太阳是一颗光谱型 G2V 的主序星。', '太阳能量主要来自核心的氢聚变。', '太阳风会影响行星际空间环境。'] },
-  { id: 'black-hole', title: '玄渊 X-1', status: '吸积盘稳定', knowledge: ['黑洞的事件视界是光无法逃逸的边界。', '黑洞本身不发光，吸积盘物质摩擦会产生辐射。', '强引力会使经过附近的光线发生弯曲。'] },
+  { id: 'sun', title: '太阳', status: '日球层遥测在线', knowledge: [...SPECIAL_KNOWLEDGE.sun] },
+  { id: 'black-hole', title: '玄渊 X-1', status: '吸积盘稳定', knowledge: [...SPECIAL_KNOWLEDGE['black-hole']] },
 ]
+function mergedKnowledge(value: unknown, fallback: string[]) {
+  const custom = Array.isArray(value) ? value.map(item => String(item).trim()).filter(Boolean) : []
+  return [...custom, ...fallback.filter(item => !custom.includes(item))].slice(0, 30)
+}
+function normalizeSolarPlanets(value: unknown) {
+  const configured = Array.isArray(value) ? value : []
+  const byId = new Map(configured.map((item: any) => [String(item?.id || ''), item]))
+  return defaultSolarPlanets.map((fallback: any) => {
+    const item = byId.get(fallback.id) || {}
+    return {
+      ...fallback,
+      ...item,
+      id: fallback.id,
+      name: String(item.name || fallback.name),
+      feature: String(item.feature || fallback.feature),
+      knowledge: mergedKnowledge(item.knowledge, fallback.knowledge),
+    }
+  })
+}
+function normalizeSpecialBodies(value: unknown) {
+  const configured = Array.isArray(value) ? value : []
+  const byId = new Map(configured.map((item: any) => [String(item?.id || ''), item]))
+  return defaultSpecialBodies.map((fallback: any) => {
+    const item = byId.get(fallback.id) || {}
+    return {
+      ...fallback,
+      ...item,
+      id: fallback.id,
+      title: String(item.title || fallback.title),
+      status: String(item.status || fallback.status),
+      knowledge: mergedKnowledge(item.knowledge, fallback.knowledge),
+    }
+  })
+}
 const sceneSettings = reactive<any>({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarSystemPlanetCount: 7, solarOrbitScale: 1, solarPlanets: defaultSolarPlanets, specialBodies: defaultSpecialBodies })
 const health = reactive<any>({
   totals: { nodes: 0, memories: 0, journeys: 0, relations: 0 },
@@ -136,12 +171,13 @@ async function load() {
     Object.assign(health, healthResult)
     if (sceneResult && typeof sceneResult === 'object') {
       Object.assign(sceneSettings, sceneResult)
-      sceneSettings.solarPlanets = Array.isArray(sceneResult.solarPlanets) && sceneResult.solarPlanets.length
-        ? sceneResult.solarPlanets.map((item: any) => ({ ...item }))
-        : defaultSolarPlanets.map(item => ({ ...item }))
-      sceneSettings.specialBodies = Array.isArray(sceneResult.specialBodies) && sceneResult.specialBodies.length
-        ? sceneResult.specialBodies.map((item: any) => ({ ...item, knowledge: Array.isArray(item.knowledge) ? item.knowledge : [] }))
-        : defaultSpecialBodies.map(item => ({ ...item, knowledge: [...item.knowledge] }))
+      sceneSettings.solarSystemPlanetCount = Number(sceneSettings.solarSystemPlanetCount) || 7
+      sceneSettings.solarOrbitScale = Number(sceneSettings.solarOrbitScale) || 1
+      sceneSettings.nonContentStarCount = Number(sceneSettings.nonContentStarCount) || 2400
+      sceneSettings.ringGap = Number(sceneSettings.ringGap) || 34
+      sceneSettings.movementSpeed = Number(sceneSettings.movementSpeed) || 1
+      sceneSettings.solarPlanets = normalizeSolarPlanets(sceneResult.solarPlanets)
+      sceneSettings.specialBodies = normalizeSpecialBodies(sceneResult.specialBodies)
     }
   } catch (exception: any) {
     error.value = exception?.message || '读取星图状态失败'
@@ -153,7 +189,14 @@ async function load() {
 async function saveSceneSettings() {
   settingsSaving.value = true
   try {
-    await api.put('/settings', { key: 'constellation_config', value: { ...sceneSettings } })
+    const value = {
+      ...sceneSettings,
+      solarPlanets: normalizeSolarPlanets(sceneSettings.solarPlanets),
+      specialBodies: normalizeSpecialBodies(sceneSettings.specialBodies),
+    }
+    sceneSettings.solarPlanets = value.solarPlanets
+    sceneSettings.specialBodies = value.specialBodies
+    await api.put('/settings', { key: 'constellation_config', value })
     toast.success('星图配置已保存')
   } catch (exception: any) {
     toast.error(exception?.message || '星图配置保存失败')
@@ -182,7 +225,7 @@ function openIssue(issue: any) {
 
 function updatePlanetKnowledge(planet: any, event: Event) {
   const value = (event.target as HTMLTextAreaElement)?.value || ''
-  planet.knowledge = value.split(/\r?\n/).map(item => item.trim()).filter(Boolean).slice(0, 60)
+  planet.knowledge = value.split(/\r?\n/).map(item => item.trim()).filter(Boolean).slice(0, 30)
 }
 
 function typeText(type: string) {
@@ -197,7 +240,9 @@ useHead({ title: '时光星图' })
 </script>
 
 <style scoped>
-.constellation-admin { display:flex; width:min(1160px,100%); flex-direction:column; gap:20px; margin:0 auto; padding-bottom:36px; }
+.constellation-admin { display:flex; width:min(1160px,100%); min-height:100%; flex-direction:column; gap:20px; margin:0 auto; padding-bottom:36px; }
+.constellation-admin > :deep(.ant-spin) { display:block; }
+.constellation-admin :deep(.ant-spin-container) { display:flex; flex-direction:column; gap:20px; }
 .page-header { display:flex; align-items:center; justify-content:space-between; gap:18px; }
 .title-block { display:flex; align-items:center; gap:12px; }.title-icon { display:grid; width:46px; height:46px; border:1px solid color-mix(in srgb,var(--c-primary) 28%,var(--border)); border-radius:12px; background:var(--c-primary-soft); color:var(--c-primary); font-size:1.25rem; place-items:center; }
 .title-block small,.section-head small,.automation-card div>small { color:var(--c-primary); font-size:.54rem; letter-spacing:.15em; }.title-block h1 { margin:2px 0 0; color:var(--c-text); font-size:1.38rem; }.title-block p { margin:4px 0 0; color:var(--c-text-3); font-size:.7rem; }
@@ -209,11 +254,13 @@ useHead({ title: '时光星图' })
 .health-section { display:flex; flex-direction:column; gap:11px; }.section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }.section-head h2 { margin:3px 0 0; color:var(--c-text); font-size:1rem; }.section-head>span { color:var(--c-text-3); font-size:.67rem; }.section-intro { margin:-5px 0 0; color:var(--c-text-3); font-size:.59rem; }
 .health-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }.health-grid article { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:10px; padding:13px; border:1px solid color-mix(in srgb,#d48655 24%,var(--border)); border-radius:9px; background:var(--ld-bg-card); }.health-grid article>span { display:grid; width:36px; height:36px; border-radius:8px; background:color-mix(in srgb,#d48655 10%,var(--c-bg-2)); color:#c77748; place-items:center; }.health-grid article>div { display:flex; min-width:0; flex-direction:column; }.health-grid strong { color:var(--c-text); font-size:.7rem; }.health-grid p { margin:3px 0 0; color:var(--c-text-3); font-size:.56rem; }.health-grid button { display:inline-flex; align-items:center; gap:6px; border:0; background:none; color:var(--c-primary); cursor:pointer; font:inherit; font-size:.59rem; }.health-grid article.clear { border-color:var(--border); }.health-grid article.clear>span { background:color-mix(in srgb,#45a87b 9%,var(--c-bg-2)); color:#45a87b; }.clear-icon { color:#45a87b; }
 .constellation-settings{display:flex;flex-direction:column;gap:11px;padding-top:4px;border-top:1px solid var(--border)}.scene-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--ld-bg-card)}.scene-settings-grid label{display:flex;min-width:0;flex-direction:column;gap:7px;color:var(--c-text-2);font-size:.64rem}.scene-settings-grid .ant-slider{margin:8px 0 2px}.scene-settings-grid output{color:var(--c-primary);font-size:.62rem}
-.planet-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.planet-settings-grid article{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px;border:1px solid var(--border);border-radius:9px;background:var(--ld-bg-card)}.planet-settings-grid article header,.planet-settings-grid label.wide{grid-column:1/-1}.planet-settings-grid article header{display:flex;align-items:center;gap:7px;color:var(--c-primary);font-size:.66rem}.planet-settings-grid article header strong{text-transform:uppercase;letter-spacing:.08em}.planet-settings-grid label{display:flex;min-width:0;flex-direction:column;gap:5px;color:var(--c-text-2);font-size:.58rem}.planet-settings-grid :deep(.ant-input),.planet-settings-grid :deep(textarea){font-size:.65rem}
+.planet-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.planet-settings-grid article{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px;border:1px solid var(--border);border-radius:9px;background:var(--ld-bg-card)}.planet-settings-grid article header,.planet-settings-grid label.wide{grid-column:1/-1}.planet-settings-grid article header{display:flex;align-items:center;gap:7px;color:var(--c-primary);font-size:.66rem}.planet-settings-grid article header strong{text-transform:uppercase;letter-spacing:.08em}.planet-settings-grid label{display:flex;min-width:0;flex-direction:column;gap:5px;color:var(--c-text-2);font-size:.58rem}.planet-settings-grid label>span,.special-body-settings label>span{display:flex;align-items:center;justify-content:space-between;gap:8px}.planet-settings-grid label b,.special-body-settings label b{color:var(--c-primary);font-size:.55rem;font-weight:500}.planet-settings-grid :deep(.ant-input),.planet-settings-grid :deep(textarea){font-size:.65rem}
+.special-body-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.special-body-settings article{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px;border:1px solid color-mix(in srgb,var(--c-primary) 24%,var(--border));border-radius:9px;background:var(--ld-bg-card)}.special-body-settings article header{display:flex;grid-column:1/-1;align-items:center;gap:7px;color:var(--c-primary);font-size:.66rem}.special-body-settings article header strong{text-transform:uppercase;letter-spacing:.08em}.special-body-settings label{display:flex;min-width:0;flex-direction:column;gap:5px;color:var(--c-text-2);font-size:.58rem}.special-body-settings label:last-child{grid-column:1/-1}.special-body-settings :deep(.ant-input),.special-body-settings :deep(textarea){font-size:.65rem}
 .recovery-panel { border-block:1px solid var(--border); }.recovery-panel summary { display:flex; align-items:center; justify-content:space-between; padding:14px 2px; color:var(--c-text); cursor:pointer; list-style:none; }.recovery-panel summary>span { display:grid; grid-template-columns:20px 1fr; align-items:center; gap:2px 7px; }.recovery-panel summary>span>svg { grid-row:1/3; color:var(--c-text-3); }.recovery-panel summary b { font-size:.7rem; }.recovery-panel summary small { color:var(--c-text-3); font-size:.55rem; }.recovery-panel[open] summary>svg { transform:rotate(180deg); }.recovery-panel>div { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 2px 14px; }.recovery-panel p { margin:0; color:var(--c-text-3); font-size:.59rem; }
 .issue-list { display:grid; gap:7px; }.issue-list>a { display:grid; grid-template-columns:34px 1fr 18px; align-items:center; gap:9px; padding:9px; border:1px solid var(--border); border-radius:8px; color:var(--c-text); text-decoration:none; }.issue-list>a>span { display:grid; width:34px; height:34px; border-radius:7px; background:var(--c-primary-soft); color:var(--c-primary); place-items:center; }.issue-list div { display:flex; min-width:0; flex-direction:column; }.issue-list small { color:var(--c-text-3); font-size:.54rem; }.issue-list strong { overflow:hidden; font-size:.66rem; text-overflow:ellipsis; white-space:nowrap; }
 @keyframes orbit { to { transform:rotate(360deg); } }
 @media(max-width:900px) { .metrics { grid-template-columns:repeat(2,1fr); }.health-grid { grid-template-columns:1fr; }.scene-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.planet-settings-grid{grid-template-columns:1fr} }
+@media(max-width:900px) { .special-body-settings{grid-template-columns:1fr} }
 @media(max-width:700px){.scene-settings-grid,.planet-settings-grid{grid-template-columns:1fr}.planet-settings-grid article{grid-template-columns:1fr}.planet-settings-grid article header,.planet-settings-grid label.wide{grid-column:auto}}
 @media(max-width:620px) { .page-header { align-items:flex-start; flex-direction:column; }.automation-card { grid-template-columns:48px 1fr; }.sync-time { grid-column:1/-1; }.metrics { grid-template-columns:1fr 1fr; }.recovery-panel>div { align-items:flex-start; flex-direction:column; } }
 @media(prefers-reduced-motion:reduce) { .automation-card::after { animation:none; } }

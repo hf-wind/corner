@@ -48,7 +48,7 @@
 
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
-definePageMeta({layout:'admin',middleware:'auth',ssr:false})
+
 const api=useApi(),toast=useToast(),router=useRouter(),{openItems}=useMediaLibrary();const tab=ref('journeys'),loading=ref(true),saving=ref(false),aiLoading=ref(false),journeyModal=ref(false),storyModal=ref(false),aiDialog=ref(false);const journeys=ref<any[]>([]),stories=ref<any[]>([]),placeOptions=ref<any[]>([]),nodeOptions=ref<any[]>([]);let dragIndex=-1
 const keywordInput=ref(''),keyword=ref(''),routePage=ref(1),routePageSize=10
 const routeColumns=[{title:'名称',key:'title',minWidth:280},{title:'状态',key:'status',width:100},{title:'内容',key:'count',width:90},{title:'更新时间',key:'updatedAt',width:120},{title:'操作',key:'actions',width:230,fixed:'right' as const}]

@@ -152,7 +152,7 @@ async function readItem(item: any) {
   }
   panelOpen.value = false
   const targetPath = item.type === 'guestbook' ? '/admin/messages' : (item.link || '/admin/messages')
-  navigateTo({ path: targetPath, query: { notification: item.id } })
+  routerNavigate({ path: targetPath, query: { notification: item.id } })
 }
 
 function formatTime(date: string) {

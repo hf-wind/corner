@@ -4,9 +4,9 @@ const DEFAULT_SITE_DESCRIPTION = '听风于隅，漫写人间'
 let loadPromise: Promise<void> | null = null
 
 export function useSiteSettings() {
-  const siteTitle = useState('site-title', () => DEFAULT_SITE_TITLE)
-  const siteDescription = useState('site-description', () => DEFAULT_SITE_DESCRIPTION)
-  const loaded = useState('site-settings-loaded', () => false)
+  const siteTitle = useSharedState('site-title', () => DEFAULT_SITE_TITLE)
+  const siteDescription = useSharedState('site-description', () => DEFAULT_SITE_DESCRIPTION)
+  const loaded = useSharedState('site-settings-loaded', () => false)
 
   async function loadSiteSettings() {
     if (loaded.value) return

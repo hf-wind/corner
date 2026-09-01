@@ -6,7 +6,7 @@
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
@@ -401,6 +401,109 @@ export class VisitorService {
     }));
     if (rows.length) await this.prisma.visitorEvent.createMany({ data: rows });
     return { ok: true, accepted: rows.length };
+  }
+
+  async selectConstellationKnowledge(
+    req: VisitorRequest,
+    visitorIdHash: string,
+    userId: string | null,
+    planetId: string,
+    knowledge: string[],
+  ) {
+    const cleanPlanetId = planetId.trim().slice(0, 40);
+    const items = [...new Set(
+      (Array.isArray(knowledge) ? knowledge : [])
+        .map((item) => String(item).trim())
+        .filter(Boolean),
+    )].slice(0, 30);
+    if (!cleanPlanetId || !items.length) {
+      throw new BadRequestException('缺少有效的星体科普内容');
+    }
+
+    let effectiveHash = visitorIdHash;
+    if (userId) {
+      const bound = await this.prisma.visitorProfile.findFirst({
+        where: { userId },
+        select: { visitorIdHash: true, isBanned: true },
+      });
+      if (bound?.visitorIdHash) effectiveHash = bound.visitorIdHash;
+      if (bound?.isBanned) return { ok: false, reason: 'banned' };
+    }
+
+    const profile = await this.prisma.visitorProfile.upsert({
+      where: { visitorIdHash: effectiveHash },
+      update: { ...(userId ? { userId } : {}), lastSeenAt: new Date() },
+      create: {
+        visitorIdHash: effectiveHash,
+        userId: userId || undefined,
+        nickname: '',
+        ipHash: this.ipHash(req),
+      },
+      select: { isBanned: true },
+    });
+    if (profile.isBanned) return { ok: false, reason: 'banned' };
+
+    const existing = await this.prisma.constellationKnowledgeSelection.findUnique({
+      where: {
+        visitorIdHash_planetId: {
+          visitorIdHash: effectiveHash,
+          planetId: cleanPlanetId,
+        },
+      },
+    });
+    if (existing) {
+      return {
+        ok: true,
+        reused: true,
+        planetId: existing.planetId,
+        index: existing.knowledgeIndex,
+        total: items.length,
+        knowledge: existing.knowledgeText,
+        selectedAt: existing.createdAt,
+      };
+    }
+
+    const index = randomInt(items.length);
+    try {
+      const created = await this.prisma.constellationKnowledgeSelection.create({
+        data: {
+          visitorIdHash: effectiveHash,
+          userId,
+          planetId: cleanPlanetId,
+          knowledgeIndex: index,
+          knowledgeText: items[index],
+        },
+      });
+      return {
+        ok: true,
+        reused: false,
+        planetId: created.planetId,
+        index: created.knowledgeIndex,
+        total: items.length,
+        knowledge: created.knowledgeText,
+        selectedAt: created.createdAt,
+      };
+    } catch (error: any) {
+      if (error?.code !== 'P2002') throw error;
+      const raced = await this.prisma.constellationKnowledgeSelection.findUnique({
+        where: {
+          visitorIdHash_planetId: {
+            visitorIdHash: effectiveHash,
+            planetId: cleanPlanetId,
+          },
+        },
+      });
+      if (!raced) throw error;
+      return {
+        ok: true,
+        reused: true,
+        planetId: raced.planetId,
+        index: raced.knowledgeIndex,
+        total: items.length,
+        knowledge: raced.knowledgeText,
+        selectedAt: raced.createdAt,
+      };
+    }
   }
 
   private async createMessage(
@@ -1337,6 +1440,62 @@ export class VisitorService {
       chain: m.type === 'bottle' ? chains.get(m.chainId ?? m.id) || [] : [],
     }));
     return { items: decorated, total, page, pageSize };
+  }
+
+  async adminConstellationKnowledge(query: {
+    planetId?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const where: Record<string, unknown> = {};
+    if (query.planetId?.trim()) where.planetId = query.planetId.trim().slice(0, 40);
+    const page = Math.max(1, Number(query.page) || 1);
+    const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 10));
+    const [items, total] = await Promise.all([
+      this.prisma.constellationKnowledgeSelection.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.constellationKnowledgeSelection.count({ where }),
+    ]);
+    const hashes = [...new Set(items.map((item) => item.visitorIdHash))];
+    const userIds = [...new Set(items.map((item) => item.userId).filter(Boolean) as string[])];
+    const [profiles, users] = await Promise.all([
+      hashes.length
+        ? this.prisma.visitorProfile.findMany({
+            where: { visitorIdHash: { in: hashes } },
+            select: { visitorIdHash: true, nickname: true, email: true, userId: true },
+          })
+        : [],
+      userIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, username: true, email: true },
+          })
+        : [],
+    ]);
+    const profileMap = new Map(profiles.map((profile) => [profile.visitorIdHash, profile]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    return {
+      items: items.map((item) => {
+        const profile = profileMap.get(item.visitorIdHash);
+        const account = item.userId ? userMap.get(item.userId) ?? null : null;
+        return {
+          ...item,
+          visitor: {
+            id: item.visitorIdHash.slice(0, 12),
+            nickname: profile?.nickname || null,
+            email: profile?.email || null,
+          },
+          account,
+        };
+      }),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async reviewMessage(

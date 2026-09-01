@@ -15,10 +15,9 @@ declare global {
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useHead: typeof import('@unhead/vue').useHead
-  const definePageMeta: typeof import('./compat/runtime').definePageMeta
-  const navigateTo: typeof import('./compat/runtime').navigateTo
-  const useRuntimeConfig: typeof import('./compat/runtime').useRuntimeConfig
-  const useState: typeof import('./compat/runtime').useState
+  const routerNavigate: typeof import('./runtime/spaRuntime').routerNavigate
+  const useAppConfig: typeof import('./runtime/spaRuntime').useAppConfig
+  const useSharedState: typeof import('./runtime/spaRuntime').useSharedState
   const useApi: typeof import('./composables/useApi').useApi
   const useAuth: typeof import('./composables/useAuth').useAuth
   const useIconPicker: typeof import('./composables/useIconPicker').useIconPicker

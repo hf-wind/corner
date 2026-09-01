@@ -44,7 +44,7 @@ const narrative = reactive({ kind: "weekly", theme: "" });
 const narrativeResult = ref<any>();
 
 function openStyleSettings() {
-  navigateTo({ path: "/admin/ai", query: { tab: "style" } });
+  routerNavigate({ path: "/admin/ai", query: { tab: "style" } });
 }
 
 async function rebuildStyle() {

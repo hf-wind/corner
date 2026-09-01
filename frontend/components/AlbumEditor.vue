@@ -107,8 +107,8 @@
 <script setup lang="ts">
 import dayjs, { type Dayjs } from 'dayjs'
 import { Modal } from 'ant-design-vue'
-import type { AlbumItem } from '~/types/album'
-import type { Place } from '~/types/place'
+import type { AlbumItem } from '@/types/album'
+import type { Place } from '@/types/place'
 
 const props = defineProps<{ id?: string }>()
 const api = useApi()

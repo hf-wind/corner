@@ -1,7 +1,7 @@
 <template>
-  <ClientOnly v-if="route.meta.layout !== false">
+  <BrowserOnly v-if="route.meta.layout !== false">
     <GlobalBottomDock />
-  </ClientOnly>
+  </BrowserOnly>
   <component :is="activeLayout">
     <RouterView v-slot="{ Component, route: viewRoute }">
       <Transition

@@ -200,9 +200,6 @@
                 <span>{{ activeDiscovery.catalog }}</span>
               </div>
               <p>{{ activeDiscovery.description }}</p>
-              <ul v-if="activeDiscovery.knowledge?.length" class="discovery-knowledge">
-                <li v-for="(fact, index) in activeDiscovery.knowledge.slice(0, 30)" :key="`${activeDiscovery.id}-${index}`">{{ fact }}</li>
-              </ul>
               <div class="telemetry-grid">
                 <div
                   v-for="metric in activeTelemetry.metrics"
@@ -220,6 +217,16 @@
                 <strong>{{ discoveryResult || activeTelemetry.report }}</strong>
                 <span>{{ activeTelemetry.basis }}</span>
               </div>
+              <Transition name="knowledge-reveal">
+                <section v-if="activeKnowledge" class="telemetry-knowledge" aria-live="polite">
+                  <header>
+                    <span><Icon name="ph:book-open-text-bold" /> 行星知识</span>
+                    <small>{{ activeKnowledge.reused ? "已从访客档案恢复" : "本次遥测已归档" }}</small>
+                  </header>
+                  <p>{{ activeKnowledge.knowledge }}</p>
+                  <footer><i />{{ activeDiscovery.title }} · 第 {{ activeKnowledge.index + 1 }} / {{ activeKnowledge.total }} 条</footer>
+                </section>
+              </Transition>
               <div
                 class="discovery-commands"
                 :aria-label="`${activeDiscovery.title}指令`"
@@ -243,7 +250,8 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: "welcome" });
+import { SOLAR_KNOWLEDGE, SPECIAL_KNOWLEDGE } from '@/utils/constellationKnowledge'
+
 
 type GraphNode = {
   id: string;
@@ -312,6 +320,7 @@ type Discovery = {
   signalLabel: string;
   icon: string;
   commands: { id: DiscoveryCommandId; label: string; icon: string }[];
+  knowledge?: string[];
 };
 
 type DiscoveryTelemetry = {
@@ -333,11 +342,10 @@ type SolarPlanetSpec = {
   feature: string;
   knowledge?: string[];
   commands: { id: DiscoveryCommandId; label: string; icon: string }[];
-  knowledge?: string[];
 };
 
 const DEFAULT_SOLAR_PLANETS: SolarPlanetSpec[] = [
-  { id: "mercury", name: "水星", catalog: "MERCURY · 类地行星", status: "昼夜温差极端", description: "距离太阳最近的行星，布满撞击坑，没有真正的大气层，缓慢的自转让一昼夜接近两个水星年。", distance: "0.39 AU", period: "87.97 日", temperature: "−173 至 427 °C", feature: "撞击坑与铁质核心", commands: [{ id: "frost", label: "冻结外框", icon: "ph:snowflake-bold" }, { id: "soil", label: "采集土质", icon: "ph:flask-bold" }] },
+  { id: "mercury", name: "水星", catalog: "MERCURY · 类地行星", status: "昼夜温差极端", description: "距离太阳最近的行星，布满撞击坑，没有真正的大气层，缓慢的自转让一昼夜接近两个水星年。", distance: "0.39 AU", period: "87.97 日", temperature: "−173 至 427 °C", feature: "撞击坑与铁质核心", knowledge: SOLAR_KNOWLEDGE.mercury, commands: [{ id: "frost", label: "冻结外框", icon: "ph:snowflake-bold" }, { id: "soil", label: "采集土质", icon: "ph:flask-bold" }] },
   { id: "venus", name: "金星", catalog: "VENUS · 类地行星", status: "厚重云层覆盖", description: "被二氧化碳大气和硫酸云层包裹的高温世界，逆向自转，表面气压约为地球的九十倍。", distance: "0.72 AU", period: "224.70 日", temperature: "约 464 °C", feature: "硫酸云带与温室效应", commands: [{ id: "cloud", label: "解析云层", icon: "ph:cloud-fog-bold" }, { id: "sample", label: "读取光谱", icon: "ph:wave-sine-bold" }] },
   { id: "mars", name: "火星", catalog: "MARS · 类地行星", status: "尘暴季节活跃", description: "红色来自含铁矿物氧化物，稀薄大气中可见极冠、古老河谷与全球性沙尘暴的痕迹。", distance: "1.52 AU", period: "686.98 日", temperature: "平均 −63 °C", feature: "铁锈地表与极冠", commands: [{ id: "soil", label: "采集土质", icon: "ph:flask-bold" }, { id: "dust", label: "追踪尘暴", icon: "ph:wind-bold" }] },
   { id: "jupiter", name: "木星", catalog: "JUPITER · 气态巨行星", status: "大气带高速流动", description: "太阳系最大的行星，氢氦大气形成明暗条带，大红斑是持续数百年的巨大反气旋风暴。", distance: "5.20 AU", period: "11.86 年", temperature: "云顶约 −110 °C", feature: "大红斑与条带云系", commands: [{ id: "storm", label: "追踪大红斑", icon: "ph:wind-bold" }, { id: "sample", label: "采集云层谱", icon: "ph:wave-sine-bold" }] },
@@ -350,6 +358,7 @@ const api = useApi();
 const route = useRoute();
 const router = useRouter();
 const { mediaUrl } = useMediaUrl();
+const { visitorId } = useVisitor();
 const { navigate } = useCosmicNavigation();
 const { selectMemory, clearMemory } = useMemorySelection();
 const { state: homePreload, preloadHomeContent } = useHomePreload();
@@ -372,6 +381,8 @@ const activeDiscoveryId = ref<DiscoveryId | "">("");
 const discoveryResult = ref("");
 const discoverySequence = ref(0);
 const activeCommandId = ref<DiscoveryCommandId | "">("");
+const activeKnowledge = ref<{ knowledge: string; index: number; total: number; reused: boolean } | null>(null);
+const knowledgeLoading = ref(false);
 const telemetryNow = ref(new Date());
 const neighbors = ref<GraphRelation[]>([]);
 const neighborsLoading = ref(false);
@@ -406,6 +417,15 @@ const solarPlanetSpecs = reactive<SolarPlanetSpec[]>([
   { id: "uranus", name: "天王星", catalog: "URANUS · 冰巨行星", status: "横躺姿态运行", description: "自转轴几乎平行于轨道面，甲烷让它呈现青绿色，季节变化会持续数十年。", distance: "19.2 AU", period: "84.02 年", temperature: "约 −195 °C", feature: "甲烷冰层与极端倾角", commands: [{ id: "tilt", label: "校准横躺姿态", icon: "ph:compass-bold" }, { id: "sample", label: "读取甲烷谱", icon: "ph:wave-sine-bold" }] },
   { id: "neptune", name: "海王星", catalog: "NEPTUNE · 冰巨行星", status: "超音速风暴活跃", description: "距离太阳最远的主行星，深蓝色大气中存在太阳系最快的行星风和不断消散、重现的暗斑。", distance: "30.1 AU", period: "164.79 年", temperature: "约 −200 °C", feature: "深蓝色大气与暗斑", commands: [{ id: "storm", label: "测量超音速风", icon: "ph:wind-bold" }, { id: "darkspot", label: "锁定暗斑", icon: "ph:crosshair-bold" }] },
 ]);
+
+function mergedKnowledge(value: unknown, fallback: string[]) {
+  const custom = Array.isArray(value) ? value.map(item => String(item).trim()).filter(Boolean) : [];
+  return [...custom, ...fallback.filter(item => !custom.includes(item))].slice(0, 30);
+}
+
+for (const spec of solarPlanetSpecs) {
+  spec.knowledge = [...(SOLAR_KNOWLEDGE[spec.id] || [])];
+}
 
 const discoveries: Discovery[] = [
   {
@@ -506,6 +526,16 @@ const discoveries: Discovery[] = [
     commands: spec.commands,
   })),
 ];
+
+for (const discovery of discoveries) {
+  if (discovery.id === 'sun' || discovery.id === 'black-hole') {
+    discovery.knowledge = [...(SPECIAL_KNOWLEDGE[discovery.id] || [])];
+    discovery.commands = [
+      { id: 'sample', label: `解析${discovery.title}特征`, icon: 'ph:flask-bold' },
+      { id: 'orbit', label: '聚焦查看星体特征', icon: 'ph:crosshair-bold' },
+    ];
+  }
+}
 
 const solarReports = [
   "核心区质子－质子链 I 分支保持主导，四个质子最终转化为一个氦-4 核，并以中微子与伽马光子带走能量。",
@@ -848,6 +878,7 @@ function handleDiscovery(id: DiscoveryId) {
   immersiveMode.value = false;
   discoveryResult.value = "";
   activeCommandId.value = "";
+  activeKnowledge.value = null;
   discoverySequence.value += 1;
   void router.replace({ query: {} });
 }
@@ -856,6 +887,7 @@ function clearDiscovery() {
   if (!activeDiscoveryId.value || discoveryClosing.value) return;
   discoveryClosing.value = true;
   activeCommandId.value = "";
+  activeKnowledge.value = null;
   if (sceneRef.value) sceneRef.value.resetView();
   else handleFocusCleared();
 }
@@ -865,16 +897,39 @@ function handleFocusCleared() {
   activeDiscoveryId.value = "";
   discoveryResult.value = "";
   activeCommandId.value = "";
+  activeKnowledge.value = null;
   discoveryClosing.value = false;
   immersiveMode.value = false;
 }
 
-function runDiscoveryCommand(commandId: DiscoveryCommandId) {
+async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
   const discovery = activeDiscovery.value;
   if (!discovery) return;
   activeCommandId.value = commandId;
   discoverySequence.value += 1;
   telemetryNow.value = new Date();
+  if (commandId === discovery.commands[0]?.id && discovery.knowledge?.length && !activeKnowledge.value && !knowledgeLoading.value) {
+    knowledgeLoading.value = true;
+    try {
+      visitorId();
+      const result = await api.post<any>("/visitor/constellation/knowledge", {
+        planetId: discovery.id,
+        knowledge: discovery.knowledge,
+      });
+      if (activeDiscoveryId.value === discovery.id && result?.ok && result.knowledge) {
+        activeKnowledge.value = {
+          knowledge: String(result.knowledge),
+          index: Math.max(0, Number(result.index) || 0),
+          total: Math.max(1, Number(result.total) || discovery.knowledge.length),
+          reused: Boolean(result.reused),
+        };
+      }
+    } catch {
+      // The telemetry result remains usable when the audit endpoint is temporarily unavailable.
+    } finally {
+      knowledgeLoading.value = false;
+    }
+  }
   if (commandId === "pulse") {
     discoveryResult.value = `星核脉冲已穿过 ${graph.nodes.length} 枚记忆坐标，云层正在回应最近一次书写。`;
     sceneRef.value?.triggerDiscoveryEffect("planet");
@@ -1070,7 +1125,7 @@ async function loadSceneSettings() {
         const target = solarPlanetSpecs.find(candidate => candidate.id === fallback.id);
         if (target) {
           Object.assign(target, fallback, item || {});
-          if (!target.knowledge?.length) target.knowledge = [`${target.name}的核心观测特征是${target.feature}。`, target.description];
+          target.knowledge = mergedKnowledge(target.knowledge, SOLAR_KNOWLEDGE[target.id] || [`${target.name}的核心观测特征是${target.feature}。`, target.description]);
         }
       }
       sceneSettings.solarPlanets = solarPlanetSpecs.map(item => ({ ...item }));
@@ -1087,6 +1142,21 @@ async function loadSceneSettings() {
             { id: 'orbit', label: '聚焦查看星球特征', icon: 'ph:crosshair-bold' },
           ],
         });
+      }
+      const configuredSpecialBodies = Array.isArray(result.specialBodies) ? result.specialBodies : [];
+      for (const discovery of discoveries) {
+        if (discovery.id !== 'sun' && discovery.id !== 'black-hole') continue;
+        const configured = configuredSpecialBodies.find((item: any) => String(item?.id || '') === discovery.id);
+        const fallback = SPECIAL_KNOWLEDGE[discovery.id] || [];
+        if (configured) {
+          Object.assign(discovery, {
+            title: configured.title || discovery.title,
+            status: configured.status || discovery.status,
+            knowledge: mergedKnowledge(configured.knowledge, fallback),
+          });
+        } else {
+          discovery.knowledge = [...fallback];
+        }
       }
     }
   } catch {
@@ -1949,6 +2019,64 @@ useHead({ title: "时光星图" });
   font-size: 0.59rem;
   line-height: 1.55;
 }
+.telemetry-knowledge {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 13px 14px 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--discovery-accent) 24%, var(--border));
+  border-radius: 9px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--discovery-accent) 10%, transparent), color-mix(in srgb, var(--c-bg-1) 90%, transparent));
+}
+.telemetry-knowledge::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--discovery-accent);
+  content: "";
+}
+.telemetry-knowledge header,
+.telemetry-knowledge footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.telemetry-knowledge header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text);
+  font-size: 0.58rem;
+  font-weight: 650;
+}
+.telemetry-knowledge header span :deep(svg) { color: var(--discovery-accent); }
+.telemetry-knowledge header small,
+.telemetry-knowledge footer {
+  color: var(--c-text-3);
+  font-size: 0.47rem;
+}
+.telemetry-knowledge p {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: 0.66rem;
+  line-height: 1.75;
+}
+.telemetry-knowledge footer { justify-content: flex-start; gap: 6px; }
+.telemetry-knowledge footer i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--discovery-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--discovery-accent) 65%, transparent);
+}
+.knowledge-reveal-enter-active,
+.knowledge-reveal-leave-active { transition: opacity .3s ease, transform .3s cubic-bezier(.16, 1, .3, 1); }
+.knowledge-reveal-enter-from,
+.knowledge-reveal-leave-to { opacity: 0; transform: translateY(8px); }
 .telemetry-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

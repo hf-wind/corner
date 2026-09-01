@@ -23,8 +23,8 @@
 </template>
 
 <script setup lang="ts">
-import { useComments } from '~/composables/useComments'
-import { focusSearchHighlight } from '~/composables/useSearchHighlight'
+import { useComments } from '@/composables/useComments'
+import { focusSearchHighlight } from '@/composables/useSearchHighlight'
 
 const props = defineProps<{
   momentId: string

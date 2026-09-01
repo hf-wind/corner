@@ -19,7 +19,7 @@ export function getDisplayImageUrl(
     url.searchParams.set('q', String(quality))
     return url.toString()
   } catch {
-    if (source.startsWith('~/')) return source
+    if (source.startsWith('@/')) return source
     return useMediaUrl().mediaUrl(source)
   }
 }

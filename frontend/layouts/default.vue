@@ -28,14 +28,14 @@
       <slot />
     </div>
     <SearchModal :visible="showSearch" @close="showSearch = false" />
-    <ClientOnly
+    <BrowserOnly
       ><AiPet v-if="showContextAi" mode="context" :article="pageContext"
-    /></ClientOnly>
+    /></BrowserOnly>
   </div>
 </template>
 
 <script setup lang="ts">
-import { focusSearchHighlight } from "~/composables/useSearchHighlight";
+import { focusSearchHighlight } from "@/composables/useSearchHighlight";
 
 const showSearch = ref(false);
 const mobileNavOpen = ref(false);

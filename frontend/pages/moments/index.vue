@@ -117,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { extractMomentImages } from "~/utils/moment";
+import { extractMomentImages } from "@/utils/moment";
 
 const api = useApi();
 const route = useRoute();

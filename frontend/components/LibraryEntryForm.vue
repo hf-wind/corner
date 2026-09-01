@@ -158,8 +158,8 @@
 
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
-import type { LibraryItem, LibraryType } from '~/types/library'
-import type { Place } from '~/types/place'
+import type { LibraryItem, LibraryType } from '@/types/library'
+import type { Place } from '@/types/place'
 
 const props = defineProps<{ item?: LibraryItem | null }>()
 const api = useApi()

@@ -164,7 +164,7 @@ const loading = ref(false);
 const clock = ref(Date.now());
 const brokenImages = reactive(new Set<string>());
 const brokenAvatars = reactive(new Set<string>());
-const cache = useState("circle-feed-cache", () => ({
+const cache = useSharedState("circle-feed-cache", () => ({
   items: [] as CircleItem[],
   page: 1,
   totalPages: 1,
@@ -192,7 +192,7 @@ const sourceCount = computed(
 );
 const fetchedAt = computed(() => cache.value.fetchedAt);
 const config = computed(() => cache.value.config);
-const activeSection = useState<SectionKey>(
+const activeSection = useSharedState<SectionKey>(
   "circle-active-section",
   () => "all",
 );

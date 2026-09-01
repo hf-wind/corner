@@ -121,8 +121,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
 
-definePageMeta({ layout: "welcome" });
-
 type GraphNode = {
   id: string;
   type: string;
@@ -135,7 +133,7 @@ type GraphNode = {
 
 const api = useApi();
 const TimeConstellationScene = defineAsyncComponent(
-  () => import("~/components/TimeConstellationScene.vue"),
+  () => import("@/components/TimeConstellationScene.vue"),
 );
 const { mediaUrl } = useMediaUrl();
 const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings();
@@ -251,9 +249,9 @@ onMounted(async () => {
   const settingsRequest = loadSiteSettings();
   const homeRequest = Promise.allSettled([
     preloadHomeContent(),
-    import("~/pages/home.vue"),
-    import("~/components/FeaturedSwiper.vue"),
-    import("~/components/HomeSidebar.vue"),
+    import("@/pages/home.vue"),
+    import("@/components/FeaturedSwiper.vue"),
+    import("@/components/HomeSidebar.vue"),
   ]);
   const graphRequest = Promise.allSettled([
     api.get<any>(

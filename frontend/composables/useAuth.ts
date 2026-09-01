@@ -24,8 +24,8 @@ function storedUser(): AuthUser | null {
 }
 
 export function useAuth() {
-  const user = useState<AuthUser | null>('auth-user', storedUser)
-  const token = useState<string | null>('auth-token', storedToken)
+  const user = useSharedState<AuthUser | null>('auth-user', storedUser)
+  const token = useSharedState<string | null>('auth-token', storedToken)
 
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => {

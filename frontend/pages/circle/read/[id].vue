@@ -140,7 +140,7 @@ const readingProgress = ref(0);
 const progressDragging = ref(false);
 let progressDragFrame: number | null = null;
 let pendingDragProgress: number | null = null;
-const feedCache = useState<any>("circle-feed-cache");
+const feedCache = useSharedState<any>("circle-feed-cache");
 const itemId = computed(() => String(route.query.id || route.params.id || ""));
 const sectionLabel = computed(() => {
   if (item.value?.source?.kind === "friend") return "友链";

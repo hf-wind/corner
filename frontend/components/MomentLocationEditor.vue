@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Place } from '~/types/place'
+import type { Place } from '@/types/place'
 
 const props = withDefaults(defineProps<{
   happenedAt: string

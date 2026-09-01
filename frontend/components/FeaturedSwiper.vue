@@ -66,8 +66,8 @@ import {
 import "swiper/css";
 import "swiper/css/effect-creative";
 import "swiper/css/pagination";
-import SectionHead from "~/components/SectionHead.vue";
-import { getDisplayImageUrl } from "~/utils/imagePerformance";
+import SectionHead from "@/components/SectionHead.vue";
+import { getDisplayImageUrl } from "@/utils/imagePerformance";
 
 const api = useApi();
 const { state: homePreload } = useHomePreload();

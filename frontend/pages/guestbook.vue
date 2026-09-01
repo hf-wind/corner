@@ -620,7 +620,7 @@
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
-import { useVisitor } from "~/composables/useVisitor";
+import { useVisitor } from "@/composables/useVisitor";
 
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
@@ -949,7 +949,7 @@ async function handleAuthenticated() {
 
 function toProfile() {
   const { panelHome } = useAuth();
-  navigateTo(panelHome());
+  routerNavigate(panelHome());
 }
 
 async function refreshMe() {

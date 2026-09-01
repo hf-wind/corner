@@ -788,8 +788,6 @@
 import { Modal } from "ant-design-vue";
 import { defineAsyncComponent } from "vue";
 
-definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
-
 const api = useApi();
 const BackupsPage = defineAsyncComponent(() => import("./backups.vue"));
 const InfoPage = defineAsyncComponent(() => import("./info.vue"));

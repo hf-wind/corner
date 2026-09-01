@@ -77,10 +77,8 @@
 </template>
 
 <script setup lang="ts">
-import avatarImg from '~/assets/images/avatar.jpg'
-import { getDisplayImageUrl } from '~/utils/imagePerformance'
-
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
+import avatarImg from '@/assets/images/avatar.jpg'
+import { getDisplayImageUrl } from '@/utils/imagePerformance'
 
 const api = useApi()
 const route = useRoute()

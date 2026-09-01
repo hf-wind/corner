@@ -63,8 +63,8 @@ const { siteTitle } = useSiteSettings()
 
 const copiedFull = ref(false)
 const copiedLink = ref(false)
-const pageUrl = computed(() => (import.meta.client ? window.location.href : ''))
-const canNativeShare = computed(() => import.meta.client && typeof navigator.share === 'function')
+const pageUrl = computed(() => ((typeof window !== 'undefined') ? window.location.href : ''))
+const canNativeShare = computed(() => (typeof window !== 'undefined') && typeof navigator.share === 'function')
 
 const shareText = computed(() => {
   const title = props.article.title || '未命名文章'
@@ -103,12 +103,12 @@ async function nativeShare() {
 }
 
 watch(() => props.open, (v) => {
-  if (!import.meta.client) return
+  if (!(typeof window !== 'undefined')) return
   document.body.style.overflow = v ? 'hidden' : ''
 })
 
 onUnmounted(() => {
-  if (import.meta.client) document.body.style.overflow = ''
+  if ((typeof window !== 'undefined')) document.body.style.overflow = ''
 })
 </script>
 

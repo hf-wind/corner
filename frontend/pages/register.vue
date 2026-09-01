@@ -119,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: false });
+
 const api = useApi();
 const router = useRouter();
 const route = useRoute();

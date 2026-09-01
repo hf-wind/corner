@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { useBottomDockState } from "~/composables/useBottomDockState";
+import { useBottomDockState } from "@/composables/useBottomDockState";
 
 const props = withDefaults(
   defineProps<{

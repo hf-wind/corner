@@ -43,8 +43,8 @@
 </template>
 
 <script setup lang="ts">
-import avatarFallback from '~/assets/images/avatar.jpg'
-import { getDisplayImageUrl } from '~/utils/imagePerformance'
+import avatarFallback from '@/assets/images/avatar.jpg'
+import { getDisplayImageUrl } from '@/utils/imagePerformance'
 
 interface Author {
   name: string
@@ -84,7 +84,7 @@ let articlePrefetched = false
 function prefetchArticle() {
   if (articlePrefetched) return
   articlePrefetched = true
-  void import("~/pages/article/[slug].vue")
+  void import("@/pages/article/[slug].vue")
 }
 </script>
 

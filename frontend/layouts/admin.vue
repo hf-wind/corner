@@ -30,7 +30,7 @@
           @toggle-collapse="toggleSidebar"
         />
       </div>
-      <div class="admin-main">
+      <div class="admin-main" :class="{ 'editor-main-shell': isEditorRoute }">
         <slot />
         <GlobalMediaLibrary />
         <GlobalIconPicker />
@@ -53,6 +53,7 @@ const isMobile = ref(false);
 const effectiveCollapsed = computed(
   () => !isMobile.value && sidebarCollapsed.value,
 );
+const isEditorRoute = computed(() => /^\/admin\/(?:posts|moments)\/(?:new|create)(?:\/|$)/.test(route.path));
 let mobileQuery: MediaQueryList | null = null;
 let syncMobile: (() => void) | null = null;
 let previousBodyOverflow = "";
@@ -175,6 +176,14 @@ onUnmounted(() => {
   max-height: 100dvh;
 }
 
+.admin-main.editor-main-shell {
+  padding: 0;
+}
+
+.admin-main.editor-main-shell > :first-child {
+  overflow: hidden;
+}
+
 .admin-main > :first-child {
   width: 100%;
   min-height: 0;
@@ -281,6 +290,10 @@ onUnmounted(() => {
       max(20px, env(safe-area-inset-bottom))
       max(12px, env(safe-area-inset-left));
     overflow-x: hidden;
+  }
+
+  .admin-main.editor-main-shell {
+    padding: 0;
   }
 }
 

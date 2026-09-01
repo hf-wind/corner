@@ -185,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LibraryItem } from "~/types/library";
+import type { LibraryItem } from "@/types/library";
 const api = useApi();
 const route = useRoute();
 const { mediaUrl } = useMediaUrl();

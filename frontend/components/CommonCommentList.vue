@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Comment } from '~/types/article'
+import type { Comment } from '@/types/article'
 
 const props = defineProps<{
   comments: Comment[]

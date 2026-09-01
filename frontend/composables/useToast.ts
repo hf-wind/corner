@@ -12,7 +12,7 @@ const timers = new Map<number, ReturnType<typeof setTimeout>>()
 const removalTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
 export function useToast() {
-  const toasts = useState<ToastItem[]>('global-toasts', () => [])
+  const toasts = useSharedState<ToastItem[]>('global-toasts', () => [])
 
   function add(type: ToastType, message: string, duration = 3000) {
     const id = ++counter

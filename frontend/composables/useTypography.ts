@@ -19,7 +19,7 @@ export const fontPresetOptions: FontPresetOption[] = [
 const WENKAI_STYLESHEET_ID = 'font-wenkai-stylesheet'
 
 export function useTypography() {
-  const fontPreset: Ref<FontPresetId> = useState('font-preset', () => 'system-rounded')
+  const fontPreset: Ref<FontPresetId> = useSharedState('font-preset', () => 'system-rounded')
 
   function isFontPreset(value: string | null): value is FontPresetId {
     return fontPresetOptions.some(option => option.id === value)

@@ -3,7 +3,7 @@ import {
   createWebHistory,
   type RouteRecordRaw,
 } from "vue-router";
-import { setCompatRouter } from "./compat/runtime";
+import { setSpaRouter } from "./runtime/spaRuntime";
 import { useFeatureFlags } from "./composables/useFeatureFlags";
 import { importWithRetry } from "./utils/lazyImport";
 
@@ -284,6 +284,11 @@ const routes: RouteRecordRaw[] = [
     meta: adminMeta,
   },
   {
+    path: "/admin/moments/new",
+    component: lazyRoute(() => import("./pages/admin/moments/[slug].vue")),
+    meta: adminMeta,
+  },
+  {
     path: "/admin/moments/create",
     component: lazyRoute(() => import("./pages/admin/moments/create.vue")),
     meta: adminMeta,
@@ -301,6 +306,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/admin/posts",
     component: lazyRoute(() => import("./pages/admin/posts/index.vue")),
+    meta: adminMeta,
+  },
+  {
+    path: "/admin/posts/new",
+    component: lazyRoute(() => import("./pages/admin/posts/[slug].vue")),
     meta: adminMeta,
   },
   {
@@ -354,7 +364,7 @@ const router = createRouter({
   routes,
 });
 
-setCompatRouter(router);
+setSpaRouter(router);
 
 router.beforeEach(async (to) => {
   // Supabase may fall back to its Site URL when a redirect URL is not yet

@@ -111,7 +111,6 @@
 
 <script setup lang="ts">
 const { embedded = false } = defineProps<{ embedded?: boolean }>()
-definePageMeta({ layout: "admin", middleware: "auth", ssr: false });
 
 const api = useApi();
 const toast = useToast();

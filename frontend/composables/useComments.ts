@@ -1,6 +1,6 @@
-import type { Comment, Reply } from '~/types/article'
-import { renderCommentContent } from '~/utils/commentContent'
-import { useNotifications } from '~/composables/useNotifications'
+import type { Comment, Reply } from '@/types/article'
+import { renderCommentContent } from '@/utils/commentContent'
+import { useNotifications } from '@/composables/useNotifications'
 
 export interface UseCommentsOptions {
   apiBase: '/comments' | '/moment-comments'

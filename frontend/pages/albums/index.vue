@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Album } from "~/types/album";
+import type { Album } from "@/types/album";
 
 const api = useApi();
 const { mediaUrl } = useMediaUrl();

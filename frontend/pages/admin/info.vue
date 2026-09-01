@@ -15,7 +15,7 @@
 </template>
 <script setup lang="ts">
 const { embedded = false } = defineProps<{ embedded?: boolean }>()
-definePageMeta({layout:'admin',middleware:'auth',ssr:false})
+
 const api=useApi(); const loading=ref(true); const info=ref<any>({})
 const cards=computed(()=>[
   {label:'服务运行时间',value:info.value.uptime,icon:'ph:clock-countdown-bold',note:'当前后端进程'},

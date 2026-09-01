@@ -92,9 +92,9 @@
 </template>
 
 <script setup lang="ts">
-import { extractMomentImages, momentPreviewText, stripMomentImages } from '~/utils/moment'
+import { extractMomentImages, momentPreviewText, stripMomentImages } from '@/utils/moment'
 import ImageLightbox from './ImageLightbox.vue'
-import type { PublicLocation } from '~/types/place'
+import type { PublicLocation } from '@/types/place'
 
 const props = withDefaults(defineProps<{
   moment: { id: string; slug: string; title: string; content?: string; excerpt?: string; happenedAt?: string; publicLocation?: PublicLocation | null; publishedAt?: string; createdAt?: string; likeCount: number; commentCount: number; liked?: boolean }
@@ -167,7 +167,7 @@ function openPreview(index: number) {
 async function toggleLike() {
   if (!isLoggedIn.value) {
     toast.warning('登录后才能点赞瞬间')
-    return navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+    return routerNavigate({ path: '/login', query: { redirect: route.fullPath } })
   }
   try {
     const result = await api.post<any>(`/moments/${props.moment.slug}/like`)

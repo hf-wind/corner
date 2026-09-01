@@ -31,18 +31,18 @@
 
     <VisitorFootprints />
 
-    <ClientOnly>
+    <BrowserOnly>
       <div class="pet-dock" aria-label="AI 伙伴">
         <AiPet v-if="showPet" docked mode="home" />
       </div>
-    </ClientOnly>
+    </BrowserOnly>
   </div>
 </template>
 
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
 
-const AiPet = defineAsyncComponent(() => import("~/components/AiPet.vue"));
+const AiPet = defineAsyncComponent(() => import("@/components/AiPet.vue"));
 const api = useApi();
 const { state: homePreload } = useHomePreload();
 const loading = ref(homePreload.value.stats === null);

@@ -36,11 +36,11 @@ function queueNotificationFeedback(item: AppNotification) {
 
 export function useNotifications() {
   const api = useApi()
-  const config = useRuntimeConfig()
+  const config = useAppConfig()
   const { token, isLoggedIn } = useAuth()
-  const unreadCount = useState<number>('notifications-unread-count', () => 0)
-  const latestItems = useState<AppNotification[]>('notifications-latest-items', () => [])
-  const latestLoading = useState<boolean>('notifications-latest-loading', () => false)
+  const unreadCount = useSharedState<number>('notifications-unread-count', () => 0)
+  const latestItems = useSharedState<AppNotification[]>('notifications-latest-items', () => [])
+  const latestLoading = useSharedState<boolean>('notifications-latest-loading', () => false)
 
   function applyRealtimePayload(payload: NotificationEventPayload) {
     if (payload.type === 'unread-count') {

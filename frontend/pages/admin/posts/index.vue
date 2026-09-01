@@ -96,8 +96,6 @@
 import { Modal } from 'ant-design-vue'
 import dayjs, { type Dayjs } from 'dayjs'
 
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
-
 const api = useApi()
 const toast = useToast()
 const router = useRouter()

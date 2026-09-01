@@ -89,8 +89,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Comment, Reply } from '~/types/article'
-import { renderCommentContent } from '~/utils/commentContent'
+import type { Comment, Reply } from '@/types/article'
+import { renderCommentContent } from '@/utils/commentContent'
 
 interface ReplyTarget {
   commentId: string

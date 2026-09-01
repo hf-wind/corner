@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { getDisplayImageUrl } from '~/utils/imagePerformance'
+import { getDisplayImageUrl } from '@/utils/imagePerformance'
 const props = defineProps<{ article: { slug: string; title: string; cover?: string; excerpt?: string; date?: string; publishedAt?: string; tag?: string; tagIcon?: string; tagColor?: string } }>()
 const coverUrl = computed(() => getDisplayImageUrl(props.article.cover || '', 300, 190))
 const date = computed(() => (props.article.date || props.article.publishedAt || '').slice(0, 10))

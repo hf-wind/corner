@@ -250,14 +250,14 @@
         @toggle-immersive="toggleImmersive"
       >
         <template #pet>
-          <ClientOnly v-if="!isAdminPreview">
+          <BrowserOnly v-if="!isAdminPreview">
             <AsyncAiPet
               v-if="petMountReady"
               docked
               mode="article"
               :article="articleContext"
             />
-          </ClientOnly>
+          </BrowserOnly>
         </template>
       </AsyncArticleSidebar>
     </div>
@@ -277,27 +277,27 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
-import avatarImg from "~/assets/images/avatar.jpg";
-import dramExcerptImg from "~/assets/images/dram-excerpt.processed.png";
-import { getDisplayImageUrl } from "~/utils/imagePerformance";
-import { focusSearchHighlight } from "~/composables/useSearchHighlight";
+import avatarImg from "@/assets/images/avatar.jpg";
+import dramExcerptImg from "@/assets/images/dram-excerpt.processed.png";
+import { getDisplayImageUrl } from "@/utils/imagePerformance";
+import { focusSearchHighlight } from "@/composables/useSearchHighlight";
 
-const articleMarkdownModule = import("~/components/ArticleMarkdown.vue");
-const articleSidebarModule = import("~/components/ArticleSidebar.vue");
+const articleMarkdownModule = import("@/components/ArticleMarkdown.vue");
+const articleSidebarModule = import("@/components/ArticleSidebar.vue");
 const AsyncArticleMarkdown = defineAsyncComponent(() => articleMarkdownModule);
 const AsyncArticleSidebar = defineAsyncComponent(() => articleSidebarModule);
-const AsyncAiPet = defineAsyncComponent(() => import("~/components/AiPet.vue"));
+const AsyncAiPet = defineAsyncComponent(() => import("@/components/AiPet.vue"));
 const AsyncArticleComments = defineAsyncComponent(
-  () => import("~/components/ArticleComments.vue"),
+  () => import("@/components/ArticleComments.vue"),
 );
 const AsyncNewsletterBar = defineAsyncComponent(
-  () => import("~/components/NewsletterBar.vue"),
+  () => import("@/components/NewsletterBar.vue"),
 );
 const AsyncArticleShare = defineAsyncComponent(
-  () => import("~/components/ArticleShare.vue"),
+  () => import("@/components/ArticleShare.vue"),
 );
 const AsyncArticlePoster = defineAsyncComponent(
-  () => import("~/components/ArticlePoster.vue"),
+  () => import("@/components/ArticlePoster.vue"),
 );
 
 function coverUrl(source: string) {

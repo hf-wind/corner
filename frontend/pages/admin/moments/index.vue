@@ -61,8 +61,6 @@
 <script setup lang="ts">
 import { Modal } from 'ant-design-vue'
 
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
-
 const api = useApi()
 const toast = useToast()
 const loading = ref(true)
