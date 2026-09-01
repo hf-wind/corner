@@ -3,7 +3,7 @@ export interface ChangelogItem {
   text: string;
   original: string;
   author: string;
-  url: string;
+  url?: string;
 }
 
 export interface ChangelogRelease {
@@ -13,7 +13,7 @@ export interface ChangelogRelease {
   publishedAt: string;
   source: "git" | "manual";
   sourceLabel: string;
-  url: string;
+  url?: string;
   items: ChangelogItem[];
   translation: "ai" | "rules" | "manual";
   published?: boolean;

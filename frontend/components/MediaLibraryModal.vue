@@ -498,8 +498,8 @@ watch(visible, (v) => {
 }
 .media-card-preview-btn {
   position: absolute;
+  top: 6px;
   right: 34px;
-  bottom: 6px;
   display: grid;
   width: 28px;
   height: 28px;

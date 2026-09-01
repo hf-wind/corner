@@ -109,7 +109,7 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     ]
       .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
       .slice(0, 100);
-    const limit = Math.min(12, Math.max(4, Number(query.limit) || 6));
+    const limit = Math.min(30, Math.max(4, Number(query.limit) || 12));
     const totalPages = Math.max(1, Math.ceil(releases.length / limit));
     const page = Math.min(totalPages, Math.max(1, Number(query.page) || 1));
     const start = (page - 1) * limit;
@@ -239,7 +239,7 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       title:
         !storedTitle ||
         ['最近更新', '更新日志', '风隅更新手记'].includes(storedTitle)
-          ? '风迹'
+          ? '风迹墙'
           : storedTitle,
       subtitle:
         !storedSubtitle ||
@@ -259,7 +259,7 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       ),
       branch: this.branch(value.branch, process.env.CHANGELOG_BRANCH || 'main'),
       cacheTtl: Math.min(86400, Math.max(300, Number(value.cacheTtl) || 1800)),
-      maxGroups: Math.min(30, Math.max(4, Number(value.maxGroups) || 12)),
+      maxGroups: Math.min(30, Math.max(4, Number(value.maxGroups) === 12 ? 30 : Number(value.maxGroups) || 30)),
     };
   }
 
@@ -299,7 +299,7 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
           nextDelay = config.cacheTtl * 1000;
           if (config.enabled) await this.getAutomatic(config, true);
         } catch (error) {
-          this.logger.warn(`自动刷新风迹失败: ${this.errorMessage(error)}`);
+          this.logger.warn(`自动刷新风迹墙失败: ${this.errorMessage(error)}`);
         } finally {
           this.scheduleAutomaticRefresh(nextDelay);
         }
@@ -647,13 +647,13 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     if (!pending.length) return result;
 
     try {
-      const style = await this.ai.getSiteStyleInstruction('风迹');
+      const style = await this.ai.getSiteStyleInstruction('风迹墙');
       const response = await this.ai.chat(
         [
           {
             role: 'system',
             content: [
-              '你是「风迹」编辑。把 Git 提交整理成自然、克制、具体的中文，不夸大、不虚构。每次推送必须有一个概括标题、一句摘要，并保留全部提交为顺序列表。技术名词可以保留英文。只输出 JSON 数组。',
+              '你是「风迹墙」编辑。把 Git 提交整理成自然、克制、具体的中文，不夸大、不虚构。每次推送必须有一个概括标题、一句摘要，并保留全部提交为顺序列表。技术名词可以保留英文。只输出 JSON 数组。',
               style,
             ]
               .filter(Boolean)

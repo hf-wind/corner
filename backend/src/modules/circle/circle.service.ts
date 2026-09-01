@@ -25,7 +25,9 @@ const DEFAULT_SUBSCRIPTIONS: CircleSubscription[] = [
     origin: 'default',
   },
 ];
-const LEGACY_DEFAULT_RSS = new Set(['https://mrxwlb.com/feed', 'https://onojyun.com/feed', 'https://mobius.blog/feed', 'https://rsshub.app/zhihu/hot', 'https://sspai.com/feed']);
+// Explicit administrator entries are authoritative and must not be filtered
+// as legacy defaults on subsequent reads.
+const LEGACY_DEFAULT_RSS = new Set(['https://mrxwlb.com/feed', 'https://onojyun.com/feed', 'https://rsshub.app/zhihu/hot', 'https://sspai.com/feed']);
 
 export type CircleConfig = {
   enabled: boolean;

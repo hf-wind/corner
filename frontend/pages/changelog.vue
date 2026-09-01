@@ -14,15 +14,10 @@
 
         <section class="release-ledger" aria-label="更新来源与统计">
           <div class="ledger-source">
-            <a
-              v-if="data.repository.url"
-              :href="data.repository.url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <span class="repository-label">
               <Icon name="ph:github-logo-bold" />
               {{ data.repository.owner }}/{{ data.repository.name }}
-            </a>
+            </span>
             <span :class="data.sourceStatus">
               <i />{{ data.sourceLabel || "等待同步" }}
             </span>
@@ -39,17 +34,8 @@
         </section>
 
         <Transition name="page-arrive" mode="out-in">
-          <div v-if="loading && !ready" key="loading" class="dynamic-state">
-            <span class="state-mark"><Icon name="ph:wind-bold" /></span>
-            <div>
-              <strong>正在整理最近的更新</strong>
-              <p>同步仓库与中文更新摘要</p>
-            </div>
-            <span class="state-dots" aria-hidden="true"><i /><i /><i /></span>
-          </div>
-
           <div
-            v-else-if="error && !ready"
+            v-if="error && !ready"
             key="error"
             class="dynamic-state error"
           >
@@ -116,20 +102,7 @@
                         />
                         {{ release.sourceLabel }}
                       </span>
-                      <small v-if="release.translation === 'ai'"
-                        >中文整理</small
-                      >
                     </div>
-                    <a
-                      v-if="release.url"
-                      :href="release.url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="查看本次推送"
-                      aria-label="查看本次推送"
-                    >
-                      <Icon name="ph:arrow-up-right-bold" />
-                    </a>
                   </header>
 
                   <h3>{{ release.title }}</h3>
@@ -144,16 +117,7 @@
                     >
                       <span>{{ pad(itemIndex + 1) }}</span>
                       <p>{{ item.text }}</p>
-                      <a
-                        v-if="item.url"
-                        :href="item.url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        :title="`查看提交 ${shortSha(item.sha)}`"
-                      >
-                        {{ shortSha(item.sha) }}
-                        <Icon name="ph:arrow-up-right" />
-                      </a>
+                      <code>{{ shortSha(item.sha) }}</code>
                     </li>
                   </ol>
                 </div>
@@ -174,15 +138,9 @@
           </section>
         </Transition>
 
-        <footer v-if="data.repository.url" class="page-footer">
+        <footer class="page-footer">
           <span>WIND CORNER · CHANGELOG</span>
-          <a
-            :href="`${data.repository.url}/commits/${data.repository.branch}`"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            查看完整提交历史 <Icon name="ph:arrow-up-right-bold" />
-          </a>
+          <span>已展示仓库同步的完整推送记录</span>
         </footer>
       </div>
     </main>
@@ -208,7 +166,7 @@ const ready = ref(false);
 const error = ref("");
 const data = reactive<ChangelogResponse>({
   enabled: true,
-  title: "风迹",
+  title: "风迹墙",
   subtitle:
     "风过无声，循迹可寻。每一次改变，都在时间里留下属于自己的印记，那些细微的更迭与变化，也终将成为一路走来不可忽略的痕迹。",
   repository: { owner: "", name: "", branch: "main", url: "" },
@@ -229,7 +187,7 @@ async function load(nextPage = page.value) {
   try {
     const result = await api.get<ChangelogResponse>("/changelog", {
       page: nextPage,
-      limit: 10,
+      limit: 30,
     });
     Object.assign(data, result);
     page.value = result.page;
@@ -282,7 +240,7 @@ function formatSyncTime(value: string) {
 
 onMounted(() => load(1));
 useHead({
-  title: "风迹 · 风隅随笔",
+  title: "风迹墙 · 风隅随笔",
   meta: [
     {
       name: "description",
@@ -538,32 +496,10 @@ useHead({
     transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.release-body::before {
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  left: 0;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
-  background: linear-gradient(var(--c-primary), transparent 78%);
-  content: "";
-  opacity: 0.34;
-  transform: scaleY(0.38);
-  transform-origin: top;
-  transition:
-    opacity 0.28s ease,
-    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 .release-body:hover {
   background: color-mix(in srgb, var(--ld-bg-card) 95%, var(--c-primary-soft));
   box-shadow: 0 10px 26px color-mix(in srgb, var(--ld-shadow) 26%, transparent);
   transform: translateY(-2px);
-}
-
-.release-body:hover::before {
-  opacity: 0.72;
-  transform: scaleY(1);
 }
 
 .release-body > header {

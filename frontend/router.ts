@@ -31,6 +31,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/archive",
     component: lazyRoute(() => import("./pages/archive.vue")),
+    meta: { keepAlive: true },
   },
   {
     path: "/category",
@@ -53,10 +54,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/moments",
     component: lazyRoute(() => import("./pages/moments/index.vue")),
+    meta: { keepAlive: true },
   },
   {
     path: "/circle",
     component: lazyRoute(() => import("./pages/circle.vue")),
+    meta: { keepAlive: true },
   },
   {
     path: "/circle/read",

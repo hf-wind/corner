@@ -3,7 +3,7 @@
     <header class="admin-page-head changelog-head">
       <div>
         <span>RELEASE NOTES / SOURCES</span>
-        <h1>风迹</h1>
+        <h1>风迹墙</h1>
         <p>仓库记录会自动读取和整理，人工补记只负责补充提交信息没有说清的内容。</p>
       </div>
       <div class="head-actions">
@@ -115,7 +115,7 @@
               <span><Icon name="ph:git-branch-bold" /></span>
               <div>
                 <h2>自动记录预览</h2>
-                <p>以下内容只读，由仓库同步与中文整理生成。</p>
+                <p>以下内容只读，由仓库同步与提交信息整理生成。</p>
               </div>
               <small>{{ automaticItemCount }} 项改动</small>
             </header>
@@ -150,7 +150,7 @@
       <div v-show="activeTab === 'config'" class="config-tab-note">
         <a-alert type="info" show-icon message="风迹配置" description="维护公开入口、仓库来源与同步周期，保存后立即用于下一次同步。" />
         <section class="config-tab-form">
-          <div class="enable-setting"><div><strong>公开风迹</strong><small>关闭后前台菜单自动隐藏，已有记录仍会保留。</small></div><a-switch v-model:checked="config.enabled" /></div>
+          <div class="enable-setting"><div><strong>公开风迹墙</strong><small>关闭后前台菜单自动隐藏，已有记录仍会保留。</small></div><a-switch v-model:checked="config.enabled" /></div>
           <a-form layout="vertical" class="settings-form">
             <a-form-item label="页面标题"><a-input v-model:value="config.title" maxlength="80" /></a-form-item>
             <a-form-item label="页面描述"><a-textarea v-model:value="config.subtitle" :rows="3" maxlength="240" show-count /></a-form-item>
@@ -251,14 +251,14 @@ const saving = ref(false);
 const syncing = ref(false);
 const config = reactive<ChangelogConfig>({
   enabled: true,
-  title: "风迹",
+  title: "风迹墙",
   subtitle:
     "风过无声，循迹可寻。每一次改变，都在时间里留下属于自己的印记，那些细微的更迭与变化，也终将成为一路走来不可忽略的痕迹。",
   repositoryOwner: "hf-wind",
   repositoryName: "corner",
   branch: "main",
   cacheTtl: 1800,
-  maxGroups: 12,
+  maxGroups: 30,
 });
 const adminData = reactive<ChangelogAdminResponse>({
   config: { ...config },
@@ -437,7 +437,7 @@ function formatDate(value: string) {
 }
 
 onMounted(load);
-useHead({ title: "风迹管理" });
+useHead({ title: "风迹墙管理" });
 </script>
 
 <style scoped>

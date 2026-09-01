@@ -200,6 +200,9 @@
                 <span>{{ activeDiscovery.catalog }}</span>
               </div>
               <p>{{ activeDiscovery.description }}</p>
+              <ul v-if="activeDiscovery.knowledge?.length" class="discovery-knowledge">
+                <li v-for="(fact, index) in activeDiscovery.knowledge.slice(0, 30)" :key="`${activeDiscovery.id}-${index}`">{{ fact }}</li>
+              </ul>
               <div class="telemetry-grid">
                 <div
                   v-for="metric in activeTelemetry.metrics"
@@ -328,7 +331,9 @@ type SolarPlanetSpec = {
   period: string;
   temperature: string;
   feature: string;
+  knowledge?: string[];
   commands: { id: DiscoveryCommandId; label: string; icon: string }[];
+  knowledge?: string[];
 };
 
 const DEFAULT_SOLAR_PLANETS: SolarPlanetSpec[] = [
@@ -933,10 +938,12 @@ function runDiscoveryCommand(commandId: DiscoveryCommandId) {
     discoveryResult.value = `窄带信标 FY-${String(discoverySequence.value).padStart(4, "0")} 已发射，载频 1420.405 MHz，等待同频回执。`;
     sceneRef.value?.triggerDiscoveryEffect("satellite");
   } else if (commandId === "orbit") {
-    discoveryResult.value =
-      "轨道解算完成：听风一号已重新锁定晨昏面，姿态误差回落至 0.02°。";
-    sceneRef.value?.focusDiscovery("satellite");
-    sceneRef.value?.triggerDiscoveryEffect("satellite");
+    const solar = solarPlanetSpecs.find((item) => item.id === discovery.id);
+    discoveryResult.value = solar
+      ? `${solar.name}聚焦视角已锁定，正在展示${solar.feature}的程序化材质与表面纹理。`
+      : "轨道解算完成：听风一号已重新锁定晨昏面，姿态误差回落至 0.02°。";
+    sceneRef.value?.focusDiscovery(solar?.id || "satellite");
+    sceneRef.value?.triggerDiscoveryEffect(solar?.id || "satellite");
   } else if (commandId === "warp") {
     discoveryResult.value =
       "曲率航路已展开：风隅号正在穿越星图，尾随镜头将持续追踪跃迁航迹。";
@@ -1061,12 +1068,25 @@ async function loadSceneSettings() {
       for (const fallback of DEFAULT_SOLAR_PLANETS) {
         const item = configured.find((candidate: any) => candidate?.id === fallback.id);
         const target = solarPlanetSpecs.find(candidate => candidate.id === fallback.id);
-        if (item && target) Object.assign(target, fallback, item);
+        if (target) {
+          Object.assign(target, fallback, item || {});
+          if (!target.knowledge?.length) target.knowledge = [`${target.name}的核心观测特征是${target.feature}。`, target.description];
+        }
       }
       sceneSettings.solarPlanets = solarPlanetSpecs.map(item => ({ ...item }));
       for (const discovery of discoveries) {
         const spec = solarPlanetSpecs.find(item => item.id === discovery.id);
-        if (spec) Object.assign(discovery, { title: spec.name, status: spec.status, description: spec.description, catalog: spec.catalog, commands: spec.commands });
+        if (spec) Object.assign(discovery, {
+          title: spec.name,
+          status: spec.status,
+          description: spec.description,
+          catalog: spec.catalog,
+          knowledge: spec.knowledge,
+          commands: [
+            { id: 'sample', label: `解析${spec.name}特征`, icon: 'ph:flask-bold' },
+            { id: 'orbit', label: '聚焦查看星球特征', icon: 'ph:crosshair-bold' },
+          ],
+        });
       }
     }
   } catch {
@@ -1917,6 +1937,17 @@ useHead({ title: "时光星图" });
   color: var(--c-text-2);
   font-size: 0.68rem;
   line-height: 1.8;
+}
+.discovery-knowledge {
+  display: grid;
+  max-height: 150px;
+  gap: 5px;
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  overflow-y: auto;
+  color: var(--c-text-3);
+  font-size: 0.59rem;
+  line-height: 1.55;
 }
 .telemetry-grid {
   display: grid;

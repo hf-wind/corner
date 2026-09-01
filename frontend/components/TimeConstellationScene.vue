@@ -177,6 +177,8 @@ let cruiseHeight = OVERVIEW_HEIGHT_DESKTOP;
 let cruiseOrbitRadius = 218;
 let cruiseBobPhase = 0;
 let cruiseBlendStartedAt = 0;
+const cruiseResumePosition = new THREE.Vector3();
+const cruiseResumeTarget = new THREE.Vector3();
 let discoveryTourPhase = 0;
 let discoveryTourHeight = 0;
 let stationOrbitPhase = -0.72;
@@ -2923,6 +2925,9 @@ function onControlsEnd() {
     }
   }
   syncCruiseFromCamera();
+  cruiseResumePosition.copy(camera?.position || cruiseResumePosition);
+  cruiseResumeTarget.copy(controls?.target || cruiseResumeTarget);
+  cruiseBlendStartedAt = performance.now();
   cruisePausedUntil = performance.now() + 1600;
 }
 function onClick(event: PointerEvent) {
@@ -3462,13 +3467,23 @@ function applyCruiseCamera(now: number, delta: number) {
   const easedBlend = cruiseBlend * cruiseBlend * (3 - 2 * cruiseBlend);
   const target = sceneTarget();
   const bob = Math.sin(cruiseBobPhase) * (props.ambient ? 7 : 2.4) * easedBlend;
-  camera.position.set(
+  const nextPosition = new THREE.Vector3(
     target.x + Math.sin(ambientOrbitPhase) * cruiseOrbitRadius,
     target.y + cruiseHeight + bob,
     target.z + Math.cos(ambientOrbitPhase) * cruiseOrbitRadius,
   );
-  controls.target.copy(target);
-  camera.lookAt(target);
+  const blend = cruiseBlendStartedAt
+    ? THREE.MathUtils.clamp((now - cruiseBlendStartedAt) / 900, 0, 1)
+    : 1;
+  const eased = blend * blend * (3 - 2 * blend);
+  if (blend < 1) {
+    camera.position.lerpVectors(cruiseResumePosition, nextPosition, eased);
+    controls.target.lerpVectors(cruiseResumeTarget, target, eased);
+  } else {
+    camera.position.copy(nextPosition);
+    controls.target.copy(target);
+  }
+  camera.lookAt(controls.target);
 }
 
 function animate(now = performance.now()) {

@@ -49,7 +49,15 @@
             <header><Icon name="ph:planet-bold" /><strong>{{ planet.id }}</strong></header>
             <label><span>名称</span><a-input v-model:value="planet.name" /></label>
             <label><span>特点</span><a-input v-model:value="planet.feature" /></label>
-            <label class="wide"><span>解析 / 科普</span><a-textarea v-model:value="planet.description" :auto-size="{ minRows: 2, maxRows: 4 }" /></label>
+            <label class="wide"><span>解析 / 科普（每行一条）</span><a-textarea :value="(planet.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 10 }" @change="updatePlanetKnowledge(planet, $event)" /></label>
+          </article>
+        </div>
+        <div class="special-body-settings">
+          <article v-for="body in sceneSettings.specialBodies" :key="body.id">
+            <header><Icon :name="body.id === 'sun' ? 'ph:sun-bold' : 'ph:circle-half-tilt-bold'" /><strong>{{ body.id === 'sun' ? '太阳' : '黑洞' }}</strong></header>
+            <label><span>标题</span><a-input v-model:value="body.title" /></label>
+            <label><span>状态</span><a-input v-model:value="body.status" /></label>
+            <label><span>解析 / 科普（每行一条）</span><a-textarea :value="(body.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 10 }" @change="updatePlanetKnowledge(body, $event)" /></label>
           </article>
         </div>
       </section>
@@ -82,8 +90,12 @@ const settingsSaving = ref(false)
 const defaultSolarPlanets = [
   ['mercury', '水星', '撞击坑与铁质核心'], ['venus', '金星', '硫酸云带与温室效应'], ['mars', '火星', '铁锈地表与极冠'],
   ['jupiter', '木星', '大红斑与条带云系'], ['saturn', '土星', '冰尘星环与卡西尼缝'], ['uranus', '天王星', '甲烷冰层与极端倾角'], ['neptune', '海王星', '深蓝色大气与暗斑'],
-].map(([id, name, feature]) => ({ id, name, feature, description: `${name}的前台解析内容待维护。` }))
-const sceneSettings = reactive<any>({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarSystemPlanetCount: 7, solarOrbitScale: 1, solarPlanets: defaultSolarPlanets })
+].map(([id, name, feature]) => ({ id, name, feature, description: `${name}的前台解析内容待维护。`, knowledge: [`${name}的核心观测特征是${feature}。`] }))
+const defaultSpecialBodies = [
+  { id: 'sun', title: '太阳', status: '日球层遥测在线', knowledge: ['太阳是一颗光谱型 G2V 的主序星。', '太阳能量主要来自核心的氢聚变。', '太阳风会影响行星际空间环境。'] },
+  { id: 'black-hole', title: '玄渊 X-1', status: '吸积盘稳定', knowledge: ['黑洞的事件视界是光无法逃逸的边界。', '黑洞本身不发光，吸积盘物质摩擦会产生辐射。', '强引力会使经过附近的光线发生弯曲。'] },
+]
+const sceneSettings = reactive<any>({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarSystemPlanetCount: 7, solarOrbitScale: 1, solarPlanets: defaultSolarPlanets, specialBodies: defaultSpecialBodies })
 const health = reactive<any>({
   totals: { nodes: 0, memories: 0, journeys: 0, relations: 0 },
   automation: { status: 'running', lastBuiltAt: null },
@@ -127,6 +139,9 @@ async function load() {
       sceneSettings.solarPlanets = Array.isArray(sceneResult.solarPlanets) && sceneResult.solarPlanets.length
         ? sceneResult.solarPlanets.map((item: any) => ({ ...item }))
         : defaultSolarPlanets.map(item => ({ ...item }))
+      sceneSettings.specialBodies = Array.isArray(sceneResult.specialBodies) && sceneResult.specialBodies.length
+        ? sceneResult.specialBodies.map((item: any) => ({ ...item, knowledge: Array.isArray(item.knowledge) ? item.knowledge : [] }))
+        : defaultSpecialBodies.map(item => ({ ...item, knowledge: [...item.knowledge] }))
     }
   } catch (exception: any) {
     error.value = exception?.message || '读取星图状态失败'
@@ -163,6 +178,11 @@ async function rebuild() {
 function openIssue(issue: any) {
   activeIssue.value = issue
   issueOpen.value = true
+}
+
+function updatePlanetKnowledge(planet: any, event: Event) {
+  const value = (event.target as HTMLTextAreaElement)?.value || ''
+  planet.knowledge = value.split(/\r?\n/).map(item => item.trim()).filter(Boolean).slice(0, 60)
 }
 
 function typeText(type: string) {

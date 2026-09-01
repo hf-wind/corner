@@ -712,6 +712,15 @@ a {
   margin-bottom: 18px;
 }
 
+.admin-main :where(.editor-page, .moment-editor) .studio-header,
+.admin-main :where(.editor-page, .moment-editor) .admin-page-head {
+  position: relative;
+  top: auto;
+  padding-top: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
 /* Keep page actions available while long admin forms and tables are scrolled. */
 .admin-main
   :where(

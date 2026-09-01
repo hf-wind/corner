@@ -72,8 +72,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (response.status === 401) {
-    const { clearSession } = useAuth();
-    clearSession();
+    const { token, clearSession } = useAuth();
+    const requestToken = headers.get('Authorization')?.replace(/^Bearer\s+/i, '') || '';
+    // A stale request must not clear a newer session established by OAuth.
+    if (requestToken && requestToken === token.value) clearSession();
   }
 
   const text = response.status === 204 ? "" : await response.text();

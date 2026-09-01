@@ -20,13 +20,13 @@
           </div>
 
           <div class="ai-selection-tools">
-            <span>AI 选区</span
+            <span>AI 全文优化</span
             ><button
               v-for="item in aiActions"
               :key="item.action"
               type="button"
               :disabled="aiTransforming"
-              @click="transformSelection(item.action)"
+              @click="transformFullText"
             >
               <Icon :name="item.icon" />{{ item.label }}
             </button>
@@ -204,7 +204,7 @@
       title="AI 改写差异确认"
       width="860px"
       :confirm-loading="aiTransforming"
-      ok-text="应用到选区"
+      ok-text="应用到全文"
       cancel-text="取消"
       @ok="applyAiTransform"
     >
@@ -276,45 +276,35 @@ const aiTransforming = ref(false);
 const aiDiffOpen = ref(false);
 const aiOriginal = ref("");
 const aiOutput = ref("");
-const aiSelection = reactive({ start: 0, end: 0 });
 const aiActions = [
-  { action: "polish", label: "润色", icon: "ph:magic-wand-bold" },
-  {
-    action: "expand",
-    label: "扩写",
-    icon: "ph:arrows-out-line-horizontal-bold",
-  },
-  {
-    action: "compress",
-    label: "压缩",
-    icon: "ph:arrows-in-line-horizontal-bold",
-  },
   { action: "style", label: "文风优化", icon: "ph:signature-bold" },
 ] as const;
 
 const categoryTree = computed(() => buildTree(categories.value));
 
-async function transformSelection(
-  action: "polish" | "expand" | "compress" | "style",
-) {
-  const textarea = document.querySelector<HTMLTextAreaElement>(
-    ".md-editor textarea",
-  );
-  const start = textarea?.selectionStart ?? 0;
-  const end = textarea?.selectionEnd ?? 0;
-  const selected = start === end ? "" : form.value.content.slice(start, end);
-  if (!selected.trim()) {
-    toast.warning("请先在编辑器中选择一段文字");
+async function transformFullText() {
+  const selected = form.value.content.trim();
+  if (!selected) {
+    toast.warning("请先输入正文");
     return;
   }
+  const confirmed = await new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: "确认优化全文？",
+      content: "文风优化会把整篇正文发送给 AI，并生成待审核建议稿，不会自动覆盖原文。",
+      okText: "继续优化",
+      cancelText: "取消",
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
   aiTransforming.value = true;
   try {
     const result = await api.post<{ original: string; output: string }>(
       "/ai/write/transform",
-      { text: selected, action },
+      { text: selected, action: "style" },
     );
-    aiSelection.start = start;
-    aiSelection.end = end;
     aiOriginal.value = selected;
     aiOutput.value = result.output;
     aiDiffOpen.value = true;
@@ -326,10 +316,7 @@ async function transformSelection(
 }
 
 function applyAiTransform() {
-  form.value.content =
-    form.value.content.slice(0, aiSelection.start) +
-    aiOutput.value +
-    form.value.content.slice(aiSelection.end);
+  form.value.content = aiOutput.value;
   hasUnsaved = true;
   aiDiffOpen.value = false;
   toast.success("已应用 AI 建议");
@@ -694,7 +681,9 @@ async function persistPost(confirmExactLocation: boolean) {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
+  min-height: 100%;
+  height: max(100%, 100dvh);
+  overflow: hidden;
 }
 
 .table-spin {
@@ -717,6 +706,13 @@ async function persistPost(confirmExactLocation: boolean) {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .editor-page { height: auto; min-height: 100%; overflow: visible; }
+  .editor-layout { height: auto; min-height: calc(100dvh - 112px); overflow: visible; }
+  .editor-main { overflow: visible; padding-right: 0; }
+  .editor-sidebar { width: 100%; height: auto; max-height: none; overflow: visible; }
 }
 
 .editor-main {

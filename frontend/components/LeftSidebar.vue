@@ -242,7 +242,7 @@ const siteNav = [
   { to: "/albums", icon: "ph:images-square-bold", label: "相册" },
   { to: "/guestbook", icon: "ph:chat-circle-dots-bold", label: "时光留言" },
   { to: "/friends", icon: "ph:handshake-bold", label: "友链" },
-  { to: "/changelog", icon: "ph:git-commit-bold", label: "风迹" },
+  { to: "/changelog", icon: "ph:git-commit-bold", label: "风迹墙" },
   { to: "/about", icon: "ph:info-bold", label: "关于" },
 ];
 
@@ -268,7 +268,7 @@ const adminFullNav = [
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件功能" },
   { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情资源" },
   { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
-  { to: "/admin/changelog", icon: "ph:git-commit-bold", label: "风迹" },
+  { to: "/admin/changelog", icon: "ph:git-commit-bold", label: "风迹墙" },
   { to: "/admin/settings", icon: "ph:gear-bold", label: "站点设置" },
   { to: "/admin/profile", icon: "ph:user-bold", label: "我的信息" },
   { to: "/admin/messages", icon: "ph:bell-bold", label: "我的消息" },

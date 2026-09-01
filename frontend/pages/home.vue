@@ -80,6 +80,8 @@
           <button type="button" @click="openLegal('terms')">用户协议</button>
           <i aria-hidden="true" />
           <button type="button" @click="openLegal('privacy')">隐私政策</button>
+          <i aria-hidden="true" />
+          <button type="button" @click="openLegal('disclaimer')">免责声明</button>
         </span>
       </footer>
     </main>
@@ -123,7 +125,7 @@ const refreshing = ref(false);
 const page = ref(1);
 const totalPages = ref(homePreload.value.articles?.totalPages ?? 1);
 const legalOpen = ref(false);
-const legalTab = ref<"terms" | "privacy">("terms");
+const legalTab = ref<"terms" | "privacy" | "disclaimer">("terms");
 const homeReady = ref(false);
 const mainContentRef = ref<HTMLElement>();
 const recordsRef = ref<HTMLElement>();
@@ -134,7 +136,7 @@ let requestId = 0;
 let enterFrame = 0;
 let recordsObserver: IntersectionObserver | null = null;
 
-function openLegal(tab: "terms" | "privacy") {
+function openLegal(tab: "terms" | "privacy" | "disclaimer") {
   legalTab.value = tab;
   legalOpen.value = true;
 }

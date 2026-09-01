@@ -11,7 +11,7 @@ export function useProductionClientProtection(isAdmin: Ref<boolean>) {
 
   function onKeydown(event: KeyboardEvent) {
     if (isAdmin.value) return
-    const key = event.key.toLowerCase()
+    const key = String(event.key || '').toLowerCase()
     const blocked = event.key === 'F12'
       || (event.ctrlKey && event.shiftKey && ['i', 'j', 'c'].includes(key))
       || (event.ctrlKey && key === 'u')

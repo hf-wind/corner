@@ -3,6 +3,7 @@
     <a-tabs v-model:active-key="activeTab" class="legal-tabs">
       <a-tab-pane key="terms" tab="用户协议" />
       <a-tab-pane key="privacy" tab="隐私政策" />
+      <a-tab-pane key="disclaimer" tab="免责声明" />
     </a-tabs>
     <article v-if="activeTab === 'terms'" class="legal-content">
       <p class="legal-meta">更新日期：2026 年 8 月 20 日 · 生效日期：2026 年 8 月 20 日</p>
@@ -18,7 +19,7 @@
       <h3>十、协议更新、通知与终止</h3><p>我们可能根据法律、功能或安全需要更新本协议，并在本站公布更新版本；重大变更会通过站内提示、弹窗或其他合理方式告知。更新生效后继续使用即表示接受。你可以停止使用并申请注销；我们可在你严重违约、长期不活跃或法律要求时暂停或终止服务，已产生的权利义务不受影响。</p>
       <h3>十一、适用法律与联系</h3><p>本协议适用中华人民共和国法律。争议应先友好协商；无法解决的，依法向有管辖权的人民法院提起诉讼。账号、内容、侵权、未成年人保护或安全问题请联系 <a href="mailto:1833079849@qq.com">1833079849@qq.com</a>，请勿发送密码或完整证件号码。</p>
     </article>
-    <article v-else class="legal-content">
+    <article v-else-if="activeTab === 'privacy'" class="legal-content">
       <p class="legal-meta">更新日期：2026 年 8 月 20 日 · 生效日期：2026 年 8 月 20 日</p>
       <h3>一、我们处理的信息</h3><p>为提供服务，本站可能处理：注册邮箱、昵称、头像和个人简介；评论、留言、漂流瓶、点赞及 AI 会话内容；访问时间、页面、IP 的安全摘要、粗略地区、浏览器、操作系统、设备类型、访客标识、错误与安全日志；邮件发送状态和必要的系统操作记录。本站不主动要求身份证件、支付或精确定位信息。</p>
       <h3>二、运营者与处理原则</h3><p>本站由 corner.ink 运营。我们遵循合法、正当、必要、诚信、公开透明和目的限定原则，仅处理实现具体功能所需的信息，并尽量采用去标识化、汇总化和最小化方案。部分功能属于可选服务，你可以拒绝提供非必要信息而继续浏览公开内容。</p>
@@ -33,15 +34,25 @@
       <h3>十一、未成年人、跨境与政策更新</h3><p>未满 14 周岁的未成年人应在监护人同意和指导下使用，监护人可通过邮箱行使相关权利。第三方模型或基础设施可能在其披露的地区处理数据；发生跨境处理时，我们将依法履行告知、评估和必要保护义务。政策重大更新会通过站内提示、弹窗或其他合理方式告知。</p>
       <h3>十二、联系我们</h3><p>隐私咨询、权利请求、投诉或安全问题请发送至 <a href="mailto:1833079849@qq.com">1833079849@qq.com</a>。请说明相关账号、请求类型和必要核验信息，请勿在邮件中发送密码或完整证件号码。</p>
     </article>
+    <article v-else class="legal-content">
+      <p class="legal-meta">更新日期：2026 年 8 月 20 日 · 本声明是用户协议和隐私政策的组成部分</p>
+      <h3>一、内容与信息仅供一般参考</h3><p>本站文章、瞬间、时光星图、风讯角、风迹墙及其整理内容来自个人记录或公开来源，仅用于阅读、交流和一般信息参考，不构成医疗、法律、财务、投资、教育、旅行安全或其他专业建议。涉及健康、财产、出行和人身安全的决定，请咨询具备资质的专业人士并以权威资料为准。</p>
+      <h3>二、AI 输出与自动化结果</h3><p>AI 生成、摘要、改写、推荐、翻译和自动整理可能出现错误、遗漏、偏差或过时信息。你应在使用、发布或据此行动前独立核验；AI 不代表本站或任何专业机构的观点，本站不保证其准确性、完整性、适用性或持续可用性。</p>
+      <h3>三、星图和模拟内容</h3><p>太阳系、太阳、黑洞、轨道站、卫星与飞船部分为交互展示或叙事模拟。涉及真实天体的参数会尽量依据公开科学资料，但为渲染和交互进行的比例、材质、轨道、遥测和动画不等同于真实观测，不能作为科研、导航或安全决策依据。</p>
+      <h3>四、第三方服务与外部内容</h3><p>地图、天气、验证码、邮件、对象存储、统计、模型和登录服务可能由第三方提供；外部服务的可用性、内容、隐私处理和责任边界以其规则为准。本站不对第三方服务或用户主动访问的外部内容作保证。发现侵权、违法或安全问题，请联系本站处理。</p>
+      <h3>五、用户内容、媒体与位置</h3><p>用户发布、上传或公开的文字、图片、音视频、地点和链接由用户自行确认其真实性、合法性及授权范围。精确位置、照片元数据和个人信息可能暴露隐私，请在发布前谨慎检查；本站无法保证互联网环境下信息不会被截取、复制或传播。</p>
+      <h3>六、服务中断与责任范围</h3><p>本站会尽力维护服务，但可能因维护、升级、网络故障、供应商故障、攻击、监管要求、不可抗力或其他本站无法合理控制的原因中断、延迟、丢失或改变。除法律规定不得排除或限制的责任外，本站在法律允许范围内对间接损失、预期利益损失和因用户自身使用或第三方原因造成的损失不承担责任。</p>
+      <h3>七、举报、纠错与联系</h3><p>如发现内容错误、侵权、违法、未成年人风险或安全漏洞，请将具体页面、问题说明和必要证明发送至 <a href="mailto:1833079849@qq.com">1833079849@qq.com</a>。本站将在法律和实际能力范围内核查、纠正、屏蔽或删除相关内容。</p>
+    </article>
   </a-modal>
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{ modelValue:boolean; initialTab?:'terms'|'privacy' }>(), { initialTab:'terms' })
+const props = withDefaults(defineProps<{ modelValue:boolean; initialTab?:'terms'|'privacy'|'disclaimer' }>(), { initialTab:'terms' })
 const emit = defineEmits<{ 'update:modelValue':[value:boolean] }>()
 const visible = computed({ get:() => props.modelValue, set:value => emit('update:modelValue',value) })
-const activeTab = ref<'terms'|'privacy'>(props.initialTab)
-const title = computed(() => activeTab.value === 'terms' ? '用户协议' : '隐私政策')
+const activeTab = ref<'terms'|'privacy'|'disclaimer'>(props.initialTab)
+const title = computed(() => activeTab.value === 'terms' ? '用户协议' : activeTab.value === 'privacy' ? '隐私政策' : '免责声明')
 watch(() => props.initialTab, value => { activeTab.value=value })
 function close(){ emit('update:modelValue',false) }
 </script>

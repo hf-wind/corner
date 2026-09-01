@@ -47,8 +47,14 @@
       <div v-else class="callback-state callback-state--success">
         <span class="state-kicker">IDENTITY CONFIRMED</span>
         <h1>登录成功</h1>
-        <p>正在回到风隅随笔。</p>
+        <p>身份已经确认，点击下方按钮完成本站登录。</p>
         <div class="success-line"><Icon name="ph:check-bold" /><span>连接已建立</span></div>
+        <div class="callback-actions">
+          <button class="action-primary" type="button" :disabled="completing" @click="completeLogin">
+            <Icon :name="completing ? 'ph:spinner-gap-bold' : 'ph:arrow-right-bold'" />
+            {{ completing ? '正在进入' : '确认并进入风隅' }}
+          </button>
+        </div>
       </div>
 
       <footer class="callback-footer"><span>corner.ink</span><span>·</span><span>encrypted session</span></footer>
@@ -71,6 +77,8 @@ const api = useApi()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
+const completing = ref(false)
+const pendingGithubUser = ref<any | null>(null)
 
 const clearOAuthHash = () => {
   if (typeof window === 'undefined' || !window.location.hash) return
@@ -94,27 +102,38 @@ const handleCallback = async () => {
     
     const state = useClientState()
     const turnstileToken = String(state.getSession('githubTurnstileToken', ''))
-    const response = await api.post('/auth/github', {
-      githubUser: {
-        id: user.id,
-        email: user.email,
-        username: user.user_metadata?.user_name || user.user_metadata?.preferred_username,
-        avatar: user.user_metadata?.avatar_url
-      },
-      turnstileToken
-    })
-    
-    await setSession(response.access_token, response.user)
-
-    state.removeSession('githubTurnstileToken')
-    const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-    const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
-    await router.replace(redirect)
+    pendingGithubUser.value = {
+      id: user.id,
+      email: user.email,
+      username: user.user_metadata?.user_name || user.user_metadata?.preferred_username,
+      avatar: user.user_metadata?.avatar_url,
+      turnstileToken,
+    }
   } catch (err: any) {
     error.value = err.message || '登录失败，请重试'
   } finally {
     clearOAuthHash()
     loading.value = false
+  }
+}
+
+async function completeLogin() {
+  if (!pendingGithubUser.value || completing.value) return
+  completing.value = true
+  try {
+    const { turnstileToken, ...githubUser } = pendingGithubUser.value
+    const response = await api.post('/auth/github', { githubUser, turnstileToken })
+    if (!response?.access_token || !response?.user) throw new Error('本站登录凭据无效，请重新尝试')
+    setSession(response.access_token, response.user)
+    useClientState().removeSession('githubTurnstileToken')
+    const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+    const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
+    await router.replace(redirect)
+  } catch (err: any) {
+    error.value = err?.message || '本站登录未完成，请重试'
+    pendingGithubUser.value = null
+  } finally {
+    completing.value = false
   }
 }
 
