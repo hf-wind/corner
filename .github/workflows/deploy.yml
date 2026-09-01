@@ -108,6 +108,7 @@ jobs:
                 exit 0
               elif grep -qi '\[release:major\]' <<< "$messages"; then bump="major"
               elif grep -qi '\[release:minor\]' <<< "$messages"; then bump="minor"
+              elif (( patch >= 100 )); then bump="minor"
               else bump="patch"
               fi
             fi
