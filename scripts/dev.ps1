@@ -56,6 +56,14 @@ function Start-ManagedProcess {
   return $process
 }
 
+function Wait-ManagedProcess {
+  param([System.Diagnostics.Process]$Process)
+
+  $Process.WaitForExit()
+  $Process.Refresh()
+  return [int]$Process.ExitCode
+}
+
 function Stop-ProcessTree {
   param([int]$ProcessId)
 
@@ -220,17 +228,19 @@ try {
   if ($Init) {
     Write-Host 'Initializing the development database...'
     $initializer = Start-ManagedProcess -FilePath $npmPath -ArgumentList @('run', 'tunnel:init') -WorkingDirectory $backendRoot -StandardOutput $logFiles.initOut -StandardError $logFiles.initErr
-    $initializer.WaitForExit()
-    if ($initializer.ExitCode -ne 0) {
-      throw "Development database initialization failed.$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.initErr)"
+    $initializerExit = Wait-ManagedProcess -Process $initializer
+    if ($initializerExit -ne 0) {
+      throw "Development database initialization failed (exit=$initializerExit).$([Environment]::NewLine)--- stdout ---$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.initOut)$([Environment]::NewLine)--- stderr ---$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.initErr)"
     }
   }
 
-  if (-not $SkipSetup -and -not $Init) {
+  if (-not $Init) {
     Write-Host 'Checking development database migrations...'
     $migration = Start-ManagedProcess -FilePath $npmPath -ArgumentList @('run', 'prisma:migrate:deploy') -WorkingDirectory $backendRoot -StandardOutput $logFiles.initOut -StandardError $logFiles.initErr
-    $migration.WaitForExit()
-    if ($migration.ExitCode -ne 0) { throw "Development database migration check failed.$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.initErr)" }
+    $migrationExit = Wait-ManagedProcess -Process $migration
+    if ($migrationExit -ne 0) {
+      throw "Development database migration check failed (exit=$migrationExit).$([Environment]::NewLine)--- stdout ---$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.initOut)$([Environment]::NewLine)--- stderr ---$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.initErr)"
+    }
   }
 
   Write-Host 'Starting backend and frontend...'
