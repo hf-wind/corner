@@ -1,6 +1,6 @@
 <template>
   <div class="changelog-shell">
-    <main ref="scrollRef" class="changelog-scroll">
+    <main ref="scrollRef" class="changelog-scroll" :aria-busy="loading">
       <div class="changelog-page">
         <ContentPageHero
           eyebrow="CHANGELOG · 近期更新"
@@ -24,7 +24,7 @@
         </div>
 
         <section class="release-section" aria-labelledby="release-title">
-          <header class="changelog-welcome">
+          <header class="changelog-welcome friend-welcome">
             <div class="welcome-mark" aria-hidden="true"><Icon name="ph:wind-bold" /></div>
             <div class="welcome-copy">
               <span>WIND TRAIL / SHIPPED RECORDS</span>
@@ -128,6 +128,7 @@ const ready = ref(false);
 const error = ref("");
 const hasMore = ref(true);
 let observer: IntersectionObserver | null = null;
+let requestSequence = 0;
 const data = reactive<ChangelogResponse>({
   enabled: true,
   title: "风迹墙",
@@ -147,6 +148,7 @@ const data = reactive<ChangelogResponse>({
 async function load(nextPage = page.value) {
   if (!hasMore.value && nextPage !== 1) return;
   if (loading.value && nextPage !== 1) return;
+  const sequence = ++requestSequence;
   if (ready.value) updating.value = true;
   else loading.value = true;
   error.value = "";
@@ -155,6 +157,7 @@ async function load(nextPage = page.value) {
       page: nextPage,
       limit: 10,
     });
+    if (sequence !== requestSequence) return;
     const incoming = Array.isArray(result.releases) ? result.releases : [];
     if (nextPage === 1) data.releases = incoming;
     else {
@@ -171,10 +174,12 @@ async function load(nextPage = page.value) {
       });
     }
   } catch (cause: any) {
-    error.value = cause?.message || "请稍后再试";
+    if (sequence === requestSequence) error.value = cause?.message || "请稍后再试";
   } finally {
-    loading.value = false;
-    updating.value = false;
+    if (sequence === requestSequence) {
+      loading.value = false;
+      updating.value = false;
+    }
   }
 }
 
@@ -188,10 +193,12 @@ function shortSha(value: string) {
 
 function formatReleaseDate(value: string) {
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "未标日期";
   return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", year: "numeric" }).format(date).replace(/年|月/g, ".").replace("日", "");
 }
 
 function formatSyncTime(value: string) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return "刚刚";
   return new Intl.DateTimeFormat("zh-CN", {
     month: "numeric",
     day: "numeric",
@@ -201,11 +208,16 @@ function formatSyncTime(value: string) {
 }
 
 onMounted(() => {
-  load(1);
-  observer = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value) load(page.value + 1);
-  }, { root: scrollRef.value, rootMargin: "280px 0px", threshold: 0 });
-  if (loadMoreRef.value) observer.observe(loadMoreRef.value);
+  void load(1);
+  nextTick(() => {
+    if (!scrollRef.value || !loadMoreRef.value) return;
+    observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value) {
+        void load(page.value + 1);
+      }
+    }, { root: scrollRef.value, rootMargin: "280px 0px", threshold: 0 });
+    observer.observe(loadMoreRef.value);
+  });
 });
 onBeforeUnmount(() => observer?.disconnect());
 useHead({

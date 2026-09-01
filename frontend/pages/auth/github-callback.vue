@@ -68,7 +68,7 @@ import { useSupabase } from '@/composables/useSupabase'
 const route = useRoute()
 const router = useRouter()
 const { getUser } = useSupabase()
-const { setSession } = useAuth()
+const { setSession, refreshProfile } = useAuth()
 const api = useApi()
 
 const loading = ref(true)
@@ -136,6 +136,10 @@ async function completeLogin() {
       avatar: nextUser.avatar ? String(nextUser.avatar) : null,
       role: nextUser.role ? String(nextUser.role) : 'user',
     })
+    // Hydrate the shared auth store from the server before routing away. This
+    // closes the race where the callback redirects successfully but the next
+    // page still sees the pre-OAuth user snapshot.
+    await refreshProfile(true)
     // Confirm the exact JWT written by this page can authenticate against the
     // site before navigating away. This prevents a false-success redirect.
     const profile = await api.get<any>('/auth/profile')

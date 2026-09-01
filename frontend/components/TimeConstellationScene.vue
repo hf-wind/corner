@@ -173,6 +173,7 @@ let cruiseHeight = OVERVIEW_HEIGHT_DESKTOP;
 let cruiseOrbitRadius = 218;
 let cruiseBobPhase = 0;
 let cruiseBlendStartedAt = 0;
+let cruiseSettleTimer = 0;
 const cruiseResumePosition = new THREE.Vector3();
 const cruiseResumeTarget = new THREE.Vector3();
 let discoveryTourPhase = 0;
@@ -2908,6 +2909,10 @@ function syncCruiseFromCamera() {
 }
 
 function onControlsStart() {
+  if (cruiseSettleTimer) {
+    window.clearTimeout(cruiseSettleTimer);
+    cruiseSettleTimer = 0;
+  }
   cruisePausedUntil = Number.POSITIVE_INFINITY;
 }
 
@@ -2920,11 +2925,23 @@ function onControlsEnd() {
       focusedCameraTargetOffset.copy(controls.target).sub(target);
     }
   }
-  syncCruiseFromCamera();
-  cruiseResumePosition.copy(camera?.position || cruiseResumePosition);
-  cruiseResumeTarget.copy(controls?.target || cruiseResumeTarget);
-  cruiseBlendStartedAt = performance.now();
-  cruisePausedUntil = performance.now() + 1600;
+  // OrbitControls damping continues after the pointer is released. Sampling
+  // immediately here captures a transient pose and causes a visible snap when
+  // the cruise camera takes over. Let the damping settle, then establish the
+  // cruise baseline from the settled camera exactly once.
+  cruisePausedUntil = Number.POSITIVE_INFINITY;
+  cruiseBlendStartedAt = 0;
+  if (cruiseSettleTimer) window.clearTimeout(cruiseSettleTimer);
+  cruiseSettleTimer = window.setTimeout(() => {
+    cruiseSettleTimer = 0;
+    if (!camera || !controls || disposed) return;
+    controls.update(0);
+    syncCruiseFromCamera();
+    cruiseResumePosition.copy(camera.position);
+    cruiseResumeTarget.copy(controls.target);
+    cruiseBlendStartedAt = performance.now();
+    cruisePausedUntil = performance.now() + 900;
+  }, 180);
 }
 function onClick(event: PointerEvent) {
   if (props.ambient) return;
@@ -3930,6 +3947,8 @@ async function initialize() {
 
 function destroy() {
   cancelAnimationFrame(animationFrame);
+  if (cruiseSettleTimer) window.clearTimeout(cruiseSettleTimer);
+  cruiseSettleTimer = 0;
   resizeObserver?.disconnect();
   resizeObserver = null;
   host.value?.removeEventListener("pointermove", onPointerMove);

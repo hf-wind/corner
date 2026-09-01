@@ -7,6 +7,10 @@ export class RedisService implements OnModuleDestroy {
   readonly client: Redis;
   private available = true;
 
+  get isReady() {
+    return this.available && this.client.status === 'ready';
+  }
+
   constructor() {
     this.client = new Redis({
       host: process.env.REDIS_HOST || 'localhost',

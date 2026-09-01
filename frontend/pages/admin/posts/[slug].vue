@@ -399,9 +399,11 @@ onMounted(async () => {
       : api.get<any>(`/posts/${slug}/preview`).catch(() => null),
     api.get<any>("/categories").catch(() => []),
     api.get<any>("/tags").catch(() => []),
-    configureMarkdownEditor().then(() => {
-      editorReady.value = true;
-    }),
+    configureMarkdownEditor()
+      .catch(() => undefined)
+      .then(() => {
+        editorReady.value = true;
+      }),
   ]);
   categories.value = Array.isArray(catRes) ? catRes : [];
   tags.value = Array.isArray(tagRes) ? tagRes : [];
@@ -505,6 +507,7 @@ async function autoSave() {
 function toLocalDateTime(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
 }
@@ -724,6 +727,7 @@ async function persistPost(confirmExactLocation: boolean) {
   height: 100%;
   max-height: none;
   padding-right: 16px;
+  padding-bottom: 12px;
   overflow: hidden;
 }
 
@@ -757,6 +761,8 @@ async function persistPost(confirmExactLocation: boolean) {
   height: 100% !important;
   max-height: 100%;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: 10px;
 }
 
 .editor-field-grow :deep(.md-editor-content) {
@@ -770,9 +776,11 @@ async function persistPost(confirmExactLocation: boolean) {
   border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
   border-radius: 8px;
   background: var(--c-bg-1);
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
 }
+.title-input:focus { border-color: var(--c-primary); background: var(--c-bg); box-shadow: 0 0 0 3px var(--c-primary-soft); }
 
-.ai-selection-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 2px 2px; }
+.ai-selection-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 2px 2px 4px; }
 .ai-selection-tools > span { margin-right: 3px; color: var(--c-text-3); font-size: .56rem; letter-spacing: .08em; }
 .ai-selection-tools button { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--c-bg-1); color: var(--c-text-2); cursor: pointer; font: inherit; font-size: .58rem; transition: .2s ease; }
 .ai-selection-tools button:hover:not(:disabled) { border-color: var(--c-primary); background: var(--c-primary-soft); color: var(--c-primary); transform: translateY(-1px); }

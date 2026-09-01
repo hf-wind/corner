@@ -288,7 +288,7 @@ defineExpose({
 .moment-rich-editor :deep(.moment-rich-image) {
   position: relative;
   display: grid;
-  width: min(100%, 620px);
+  width: min(100%, 360px);
   margin: 12px 0;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -299,7 +299,7 @@ defineExpose({
 .moment-rich-editor :deep(.moment-rich-image img) {
   display: block;
   width: 100%;
-  max-height: 320px;
+  max-height: 220px;
   object-fit: contain;
   background: var(--c-bg-2);
 }

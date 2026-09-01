@@ -994,6 +994,12 @@ a {
   animation: admin-content-in 0.36s var(--ui-ease-out) both;
 }
 
+// Editor pages own their height and scroll model; a second page-level motion
+// pass causes the list-to-editor transition to visibly reflow.
+.admin-main.editor-main-shell > * {
+  animation: none;
+}
+
 @keyframes admin-content-in {
   from {
     opacity: 0;

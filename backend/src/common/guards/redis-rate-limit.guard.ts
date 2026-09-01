@@ -55,6 +55,7 @@ export class RedisRateLimitGuard implements CanActivate {
   }
 
   private async consume(request: Request, response: Response, rule: LimitRule) {
+    if (this.redis.isReady === false) return;
     const identity =
       rule.identity === 'email'
         ? createHash('sha256')

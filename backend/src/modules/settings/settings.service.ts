@@ -52,10 +52,66 @@ export class SettingsService {
   }
 
   async set(key: string, value: any) {
+    const normalized = key === 'constellation_config'
+      ? this.normalizeConstellationConfig(value)
+      : value;
     return this.prisma.setting.upsert({
       where: { key },
-      update: { value },
-      create: { key, value },
+      update: { value: normalized },
+      create: { key, value: normalized },
     });
+  }
+
+  private normalizeConstellationConfig(input: unknown) {
+    const source = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+    const text = (value: unknown, max: number, fallback = '') => {
+      const result = String(value ?? fallback).trim();
+      return result.slice(0, max);
+    };
+    const knowledge = (value: unknown) => Array.from(new Set(
+      (Array.isArray(value) ? value : [])
+        .map((item) => text(item, 2000))
+        .filter(Boolean),
+    )).slice(0, 30);
+    const number = (value: unknown, min: number, max: number, fallback: number) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+    };
+    const solarPlanets = (Array.isArray(source.solarPlanets) ? source.solarPlanets : [])
+      .map((item) => item && typeof item === 'object' ? item as Record<string, unknown> : null)
+      .filter((item): item is Record<string, unknown> => Boolean(item))
+      .map((item) => ({
+        id: text(item.id, 40),
+        name: text(item.name, 80),
+        catalog: text(item.catalog, 120),
+        status: text(item.status, 120),
+        description: text(item.description, 240),
+        distance: text(item.distance, 48),
+        period: text(item.period, 48),
+        temperature: text(item.temperature, 64),
+        feature: text(item.feature, 120),
+        knowledge: knowledge(item.knowledge),
+      }))
+      .filter((item) => item.id);
+    const specialBodies = (Array.isArray(source.specialBodies) ? source.specialBodies : [])
+      .map((item) => item && typeof item === 'object' ? item as Record<string, unknown> : null)
+      .filter((item): item is Record<string, unknown> => Boolean(item))
+      .map((item) => ({
+        id: text(item.id, 40),
+        title: text(item.title, 80),
+        status: text(item.status, 120),
+        description: text(item.description, 240),
+        knowledge: knowledge(item.knowledge),
+      }))
+      .filter((item) => item.id);
+    return {
+      nonContentStarCount: Math.round(number(source.nonContentStarCount, 200, 8000, 2400)),
+      ringGap: number(source.ringGap, 12, 100, 34),
+      movementSpeed: number(source.movementSpeed, 0.2, 3, 1),
+      solarSystemPlanetCount: Math.round(number(source.solarSystemPlanetCount, 1, 7, 7)),
+      solarOrbitScale: number(source.solarOrbitScale, 0.6, 1.8, 1),
+      solarPlanets,
+      specialBodies,
+    };
   }
 }
