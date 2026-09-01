@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "",
   "author": "",
   "private": true,
@@ -18,6 +18,7 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/prisma/build/index.js migrate dev",
+    "prisma:migrate:deploy": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/prisma/build/index.js migrate deploy",
     "prisma:seed": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "memory:rebuild": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs src/scripts/rebuild-memory-graph.ts",
     "tunnel:init": "node --env-file=../.env --env-file=.env.tunnel ./node_modules/prisma/build/index.js migrate deploy && node --env-file=../.env --env-file=.env.tunnel ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",

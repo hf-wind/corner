@@ -48,6 +48,7 @@
           <article v-for="planet in sceneSettings.solarPlanets" :key="planet.id">
             <header><Icon name="ph:planet-bold" /><strong>{{ planet.id }}</strong></header>
             <label><span>名称</span><a-input v-model:value="planet.name" /></label>
+            <label><span>简介（两行）</span><a-textarea v-model:value="planet.description" :rows="2" :maxlength="180" /></label>
             <label><span>特点</span><a-input v-model:value="planet.feature" /></label>
             <label class="wide"><span>解析 / 科普（每行一条，共 30 条）<b>{{ planet.knowledge?.length || 0 }}/30</b></span><a-textarea :value="(planet.knowledge || []).join('\n')" :auto-size="{ minRows: 8, maxRows: 30 }" @change="updatePlanetKnowledge(planet, $event)" /></label>
           </article>
@@ -56,6 +57,7 @@
           <article v-for="body in sceneSettings.specialBodies" :key="body.id">
             <header><Icon :name="body.id === 'sun' ? 'ph:sun-bold' : 'ph:circle-half-tilt-bold'" /><strong>{{ body.id === 'sun' ? '太阳' : '黑洞' }}</strong></header>
             <label><span>标题</span><a-input v-model:value="body.title" /></label>
+            <label><span>简介（两行）</span><a-textarea v-model:value="body.description" :rows="2" :maxlength="180" /></label>
             <label><span>状态</span><a-input v-model:value="body.status" /></label>
             <label><span>解析 / 科普（每行一条，共 30 条）<b>{{ body.knowledge?.length || 0 }}/30</b></span><a-textarea :value="(body.knowledge || []).join('\n')" :auto-size="{ minRows: 8, maxRows: 30 }" @change="updatePlanetKnowledge(body, $event)" /></label>
           </article>
@@ -91,10 +93,10 @@ const settingsSaving = ref(false)
 const defaultSolarPlanets = [
   ['mercury', '水星', '撞击坑与铁质核心'], ['venus', '金星', '硫酸云带与温室效应'], ['mars', '火星', '铁锈地表与极冠'],
   ['jupiter', '木星', '大红斑与条带云系'], ['saturn', '土星', '冰尘星环与卡西尼缝'], ['uranus', '天王星', '甲烷冰层与极端倾角'], ['neptune', '海王星', '深蓝色大气与暗斑'],
-].map(([id, name, feature]) => ({ id, name, feature, description: `${name}的前台解析内容待维护。`, knowledge: [...(SOLAR_KNOWLEDGE[id] || [`${name}的核心观测特征是${feature}。`])] }))
+].map(([id, name, feature]) => ({ id, name, feature, description: String((SOLAR_KNOWLEDGE[id] || [])[0] || `${name}以${feature}构成独特的表面风貌，观测数据会随遥测指令实时更新。`), knowledge: [...(SOLAR_KNOWLEDGE[id] || [`${name}的核心观测特征是${feature}。`])] }))
 const defaultSpecialBodies = [
-  { id: 'sun', title: '太阳', status: '日球层遥测在线', knowledge: [...SPECIAL_KNOWLEDGE.sun] },
-  { id: 'black-hole', title: '玄渊 X-1', status: '吸积盘稳定', knowledge: [...SPECIAL_KNOWLEDGE['black-hole']] },
+  { id: 'sun', title: '太阳', description: '太阳以稳定的核聚变为整个行星系统提供光与热，磁场活动塑造着日球层边界。', status: '日球层遥测在线', knowledge: [...SPECIAL_KNOWLEDGE.sun] },
+  { id: 'black-hole', title: '玄渊 X-1', description: '这是一个以吸积盘与引力透镜特征构建的超大质量黑洞模型，所有亮度均来自周围高温物质。', status: '吸积盘稳定', knowledge: [...SPECIAL_KNOWLEDGE['black-hole']] },
 ]
 function mergedKnowledge(value: unknown, fallback: string[]) {
   const custom = Array.isArray(value) ? value.map(item => String(item).trim()).filter(Boolean) : []
@@ -111,6 +113,7 @@ function normalizeSolarPlanets(value: unknown) {
       id: fallback.id,
       name: String(item.name || fallback.name),
       feature: String(item.feature || fallback.feature),
+      description: String(item.description || fallback.description),
       knowledge: mergedKnowledge(item.knowledge, fallback.knowledge),
     }
   })
@@ -126,6 +129,7 @@ function normalizeSpecialBodies(value: unknown) {
       id: fallback.id,
       title: String(item.title || fallback.title),
       status: String(item.status || fallback.status),
+      description: String(item.description || fallback.description),
       knowledge: mergedKnowledge(item.knowledge, fallback.knowledge),
     }
   })

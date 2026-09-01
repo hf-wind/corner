@@ -61,19 +61,22 @@
 
       <div class="admin-columns single-column">
         <div class="admin-side-column">
-          <section class="manual-panel">
-            <header class="panel-head manual-head">
+          <section class="manual-panel" :class="{ collapsed: !manualExpanded }">
+            <header class="panel-head manual-head" @click="manualExpanded = !manualExpanded">
               <span><Icon name="ph:note-pencil-bold" /></span>
               <div>
                 <h2>人工补记</h2>
                 <p>适合记录内容迁移、运营调整或无法公开的提交。</p>
               </div>
-              <button type="button" title="添加记录" @click="openCreate">
-                <Icon name="ph:plus-bold" />
-              </button>
+              <div class="manual-head-actions">
+                <button type="button" title="添加记录" @click.stop="openCreate"><Icon name="ph:plus-bold" /></button>
+                <button type="button" :title="manualExpanded ? '收起人工补记' : '展开人工补记'" @click.stop="manualExpanded = !manualExpanded">
+                  <Icon :name="manualExpanded ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" />
+                </button>
+              </div>
             </header>
 
-            <div v-if="adminData.manualEntries.length" class="manual-list">
+            <div v-if="manualExpanded && adminData.manualEntries.length" class="manual-list">
               <article
                 v-for="entry in adminData.manualEntries"
                 :key="entry.id"
@@ -102,7 +105,7 @@
                 </div>
               </article>
             </div>
-            <div v-else class="manual-empty">
+            <div v-else-if="manualExpanded" class="manual-empty">
               <Icon name="ph:note-blank-bold" />
               <strong>还没有人工补记</strong>
               <p>Git 记录会照常自动生成，无需重复录入。</p>
@@ -247,6 +250,7 @@ const loading = ref(true);
 const activeTab = ref<'stream' | 'config'>('stream');
 const saving = ref(false);
 const syncing = ref(false);
+const manualExpanded = ref(false);
 const config = reactive<ChangelogConfig>({
   enabled: true,
   title: "风迹墙",
@@ -601,6 +605,12 @@ useHead({ title: "风迹墙管理" });
   cursor: pointer;
   place-items: center;
 }
+
+.manual-head { cursor: pointer; }
+.manual-head-actions { display: flex; align-items: center; gap: 5px; }
+.manual-head-actions button { display: grid; width: 32px; height: 32px; border: 0; border-radius: 7px; background: var(--c-primary-soft); color: var(--c-primary); cursor: pointer; place-items: center; transition: transform .25s ease, background-color .2s ease; }
+.manual-head-actions button:hover { background: color-mix(in srgb, var(--c-primary-soft) 74%, var(--c-primary)); transform: translateY(-1px); }
+.manual-panel.collapsed { padding-bottom: 14px; }
 
 .enable-setting {
   display: flex;

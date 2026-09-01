@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { Modal } from 'ant-design-vue'
 type CreatorMode = 'article' | 'moment'
 const props = withDefaults(defineProps<{ initialMode?: CreatorMode }>(), { initialMode: 'article' })
 const api = useApi()
@@ -170,13 +171,26 @@ async function generate() {
 async function generateArticle(text:string) {
   const result=await api.post<any>('/ai/generate-article',{outline:text})
   useClientState().setSession('articleEditorDraft', result)
-  await router.push(`${editorPath('article')}?generated=1`)
+  await confirmGenerated('article')
 }
 
 async function generateMoment(text:string) {
   const result=await api.post<any>('/ai/polish-moment',{inspiration:text})
   useClientState().setSession('momentEditorDraft', { ...result, content: result.content || text })
-  await router.push(`${editorPath('moment')}?generated=1`)
+  await confirmGenerated('moment')
+}
+
+function confirmGenerated(target: CreatorMode) {
+  return new Promise<void>((resolve) => {
+    Modal.confirm({
+      title: '草稿已经准备好了',
+      content: '你可以继续进入编辑器完善内容，也可以先回到列表稍后处理。',
+      okText: '继续编辑',
+      cancelText: '返回列表',
+      onOk: async () => { await router.push(`${editorPath(target)}?generated=1`); resolve() },
+      onCancel: async () => { await router.push(target === 'article' ? '/admin/posts' : '/admin/moments'); resolve() },
+    })
+  })
 }
 </script>
 

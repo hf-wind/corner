@@ -9,10 +9,10 @@
           isSpaceRoute
             ? undefined
             : viewRoute.meta.layout === 'admin'
-              ? 'admin-page'
+              ? (isAdminEditorRoute(viewRoute.path) ? undefined : 'admin-page')
               : 'route-page'
         "
-        :mode="viewRoute.meta.layout === 'admin' ? 'out-in' : undefined"
+        :mode="viewRoute.meta.layout === 'admin' && !isAdminEditorRoute(viewRoute.path) ? 'out-in' : undefined"
       >
         <KeepAlive v-if="viewRoute.meta.keepAlive">
           <component :is="Component" :key="viewRoute.path" />
@@ -56,6 +56,9 @@ const route = useRoute();
 const isSpaceRoute = computed(
   () => route.path === "/" || route.path === "/time/constellation",
 );
+function isAdminEditorRoute(path: string) {
+  return /^\/admin\/(?:posts|moments)\/(?:new|create)(?:\/|$)/.test(path);
+}
 const clientProtection = useProductionClientProtection(isAdmin);
 
 readStorage();

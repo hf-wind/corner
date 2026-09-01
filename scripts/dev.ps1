@@ -226,6 +226,13 @@ try {
     }
   }
 
+  if (-not $SkipSetup -and -not $Init) {
+    Write-Host 'Checking development database migrations...'
+    $migration = Start-ManagedProcess -FilePath $npmPath -ArgumentList @('run', 'prisma:migrate:deploy') -WorkingDirectory $backendRoot -StandardOutput $logFiles.initOut -StandardError $logFiles.initErr
+    $migration.WaitForExit()
+    if ($migration.ExitCode -ne 0) { throw "Development database migration check failed.$([Environment]::NewLine)$(Get-LogTail -Path $logFiles.initErr)" }
+  }
+
   Write-Host 'Starting backend and frontend...'
   $backend = Start-ManagedProcess -FilePath $npmPath -ArgumentList @('run', 'start:dev:tunnel') -WorkingDirectory $backendRoot -StandardOutput $logFiles.backendOut -StandardError $logFiles.backendErr
   $frontend = Start-ManagedProcess -FilePath $npmPath -ArgumentList @('run', 'dev') -WorkingDirectory $frontendRoot -StandardOutput $logFiles.frontendOut -StandardError $logFiles.frontendErr

@@ -20,7 +20,7 @@
           </div>
 
           <div class="ai-selection-tools">
-            <span>AI 全文优化</span
+            <span>AI 辅助写作</span
             ><button
               v-for="item in aiActions"
               :key="item.action"
@@ -553,16 +553,12 @@ async function pickWallpaper() {
 }
 
 async function onUploadImg(files: File[], callback: (urls: string[]) => void) {
-  if (!postId.value) {
-    toast.error("文章信息尚未加载，请稍后重试");
-    return;
-  }
   try {
     const urls: string[] = [];
     for (const file of files) {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("folder", `article/${postId.value}`);
+      fd.append("folder", postId.value ? `article/${postId.value}` : "article/pending");
       const res = await api.upload<any>("/media/upload", fd);
       urls.push(res.path || "");
     }
@@ -679,8 +675,8 @@ async function persistPost(confirmExactLocation: boolean) {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 100vh;
-  height: 100vh;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -688,8 +684,8 @@ async function persistPost(confirmExactLocation: boolean) {
   display: flex;
   flex-direction: column;
   flex: 1;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  max-height: none;
   min-height: 0;
   overflow: hidden;
 }
@@ -704,17 +700,17 @@ async function persistPost(confirmExactLocation: boolean) {
 .editor-layout {
   display: flex;
   flex: 1;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  max-height: none;
   min-height: 0;
   overflow: hidden;
 }
 
 @media (max-width: 900px) {
-  .editor-page { height: 100vh; min-height: 100vh; overflow: hidden; }
-  .editor-layout { height: 100vh; max-height: 100vh; min-height: 0; flex-direction: column; overflow: hidden; }
-  .editor-main { flex: 1 1 auto; min-height: 0; overflow: hidden; padding-right: 0; }
-  .editor-sidebar { width: 100%; height: 100vh; max-height: 100vh; flex: 0 0 auto; overflow-y: auto; }
+  .editor-page { height: 100%; min-height: 0; overflow: auto; }
+  .editor-layout { height: auto; max-height: none; min-height: 0; flex-direction: column; overflow: visible; }
+  .editor-main { flex: 0 0 auto; min-height: min(72vh, 680px); overflow: visible; padding-right: 0; }
+  .editor-sidebar { width: 100%; height: auto; max-height: none; flex: 0 0 auto; overflow: visible; }
 }
 
 .editor-main {
@@ -725,8 +721,8 @@ async function persistPost(confirmExactLocation: boolean) {
   gap: 12px;
   min-width: 0;
   min-height: 0;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  max-height: none;
   padding-right: 16px;
   overflow: hidden;
 }
@@ -734,8 +730,8 @@ async function persistPost(confirmExactLocation: boolean) {
 .editor-sidebar {
   width: 300px;
   flex-shrink: 0;
-  height: 100vh;
-  max-height: 100vh;
+  height: auto;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -743,8 +739,8 @@ async function persistPost(confirmExactLocation: boolean) {
 }
 
 .editor-field-grow {
-  flex: 0 0 100vh;
-  height: 100vh;
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
   position: relative;
   overflow: hidden;
@@ -770,8 +766,16 @@ async function persistPost(confirmExactLocation: boolean) {
 .title-input {
   font-size: 1.15rem;
   font-weight: 600;
-  padding-left: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 8px;
+  background: var(--c-bg-1);
 }
+
+.ai-selection-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 2px 2px; }
+.ai-selection-tools > span { margin-right: 3px; color: var(--c-text-3); font-size: .56rem; letter-spacing: .08em; }
+.ai-selection-tools button { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--c-bg-1); color: var(--c-text-2); cursor: pointer; font: inherit; font-size: .58rem; transition: .2s ease; }
+.ai-selection-tools button:hover:not(:disabled) { border-color: var(--c-primary); background: var(--c-primary-soft); color: var(--c-primary); transform: translateY(-1px); }
 
 .meta-card {
   border-radius: 8px;

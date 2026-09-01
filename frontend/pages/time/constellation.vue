@@ -32,7 +32,7 @@
       />
       <Loading
         v-else
-        variant="space"
+        variant="welcome"
         fullscreen
         text="正在同步首页内容与时光轨道"
       />
@@ -121,14 +121,7 @@
               neighborsLoading ? "校准中" : `${neighbors.length} 条`
             }}</small>
           </h3>
-          <div
-            v-if="neighborsLoading"
-            class="relation-skeleton"
-            aria-live="polite"
-            aria-label="正在读取相连轨迹"
-          >
-            <i v-for="index in 3" :key="index" />
-          </div>
+          <p v-if="neighborsLoading" class="relations-empty" aria-live="polite">正在校准相连轨迹…</p>
           <template v-else-if="neighbors.length">
             <button
               v-for="relation in neighbors.slice(0, 3)"
@@ -1152,6 +1145,7 @@ async function loadSceneSettings() {
           Object.assign(discovery, {
             title: configured.title || discovery.title,
             status: configured.status || discovery.status,
+            description: configured.description || discovery.description,
             knowledge: mergedKnowledge(configured.knowledge, fallback),
           });
         } else {
@@ -1631,24 +1625,6 @@ useHead({ title: "时光星图" });
   margin-top: 19px;
   padding-top: 14px;
   border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-}
-.relation-skeleton {
-  display: grid;
-  gap: 5px;
-  padding-top: 6px;
-}
-.relation-skeleton i {
-  display: block;
-  height: 42px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
-  background: rgb(255 255 255 / 4%);
-  animation: relation-pulse 1.2s ease-in-out infinite alternate;
-}
-.relation-skeleton i:nth-child(2) {
-  animation-delay: -0.35s;
-}
-.relation-skeleton i:nth-child(3) {
-  animation-delay: -0.7s;
 }
 .relations-empty {
   display: grid;

@@ -8,16 +8,11 @@
           :description="data.subtitle"
           icon="ph:git-commit-bold"
           variant="archive"
-          :metric="!ready ? '··' : data.total"
+          :metric="data.total"
           metric-label="次更新"
         />
 
-        <Transition name="page-arrive" mode="out-in">
-          <div
-            v-if="error && !ready"
-            key="error"
-            class="dynamic-state error"
-          >
+        <div v-if="error && !data.releases.length" class="dynamic-state error">
             <span class="state-mark"><Icon name="ph:cloud-slash-bold" /></span>
             <div>
               <strong>更新记录暂时没有抵达</strong>
@@ -26,26 +21,23 @@
             <button type="button" @click="load(1)">
               <Icon name="ph:arrow-clockwise-bold" />重新读取
             </button>
-          </div>
+        </div>
 
-          <section
-            v-else-if="ready"
-            key="content"
-            class="release-section"
-            aria-labelledby="release-title"
-          >
-            <header class="section-head">
-              <div class="section-heading-copy">
-                <span>WIND TRAIL / SHIPPED RECORDS</span>
-                <h2 id="release-title">近期抵达</h2>
-                <p>每一次提交都在这里留下可回看的轨迹。</p>
+        <section class="release-section" aria-labelledby="release-title">
+          <header class="changelog-welcome">
+            <div class="welcome-mark" aria-hidden="true"><Icon name="ph:wind-bold" /></div>
+            <div class="welcome-copy">
+              <span>WIND TRAIL / SHIPPED RECORDS</span>
+              <h2 id="release-title">近期抵达</h2>
+              <p>每一次提交都在这里留下可回看的轨迹，欢迎沿着时间线回望风隅的变化。</p>
+              <div class="welcome-meta" aria-label="更新来源与统计">
+                <span><Icon name="ph:git-branch-bold" />{{ data.sourceLabel || "仓库同步中" }}</span>
+                <span><b>{{ data.total }}</b> 次更新</span>
+                <span><b>{{ data.itemCount }}</b> 项变更</span>
+                <span v-if="data.fetchedAt"><Icon name="ph:clock-counter-clockwise-bold" />{{ formatSyncTime(data.fetchedAt) }}</span>
               </div>
-              <div class="release-ledger" aria-label="更新来源与统计">
-                <span class="ledger-source"><Icon name="ph:git-branch-bold" />{{ data.sourceLabel || "等待同步" }}</span>
-                <span class="ledger-metric"><b>{{ pad(data.itemCount) }}</b> 项变更</span>
-                <span v-if="data.fetchedAt" class="ledger-metric"><Icon name="ph:clock-counter-clockwise-bold" />{{ formatSyncTime(data.fetchedAt) }}</span>
-              </div>
-            </header>
+            </div>
+          </header>
 
             <div v-if="error" class="inline-error">
               <Icon name="ph:warning-circle-bold" />
@@ -65,11 +57,7 @@
                 :style="{ '--entry-delay': `${releaseIndex * 55}ms` }"
               >
                 <aside class="release-date">
-                  <time :datetime="release.publishedAt">
-                    <strong>{{ dateParts(release.publishedAt).day }}</strong>
-                    <span>{{ dateParts(release.publishedAt).month }}</span>
-                    <small>{{ dateParts(release.publishedAt).year }}</small>
-                  </time>
+                  <time :datetime="release.publishedAt">{{ formatReleaseDate(release.publishedAt) }}</time>
                   <i aria-hidden="true" />
                 </aside>
 
@@ -107,9 +95,15 @@
                 </div>
               </article>
             </div>
-
-          </section>
-        </Transition>
+            <div v-else-if="!loading && !error" class="empty-release">
+              <span class="empty-mark"><Icon name="ph:wind-bold" /></span>
+              <div><h3>风还没有留下新的记录</h3><p>仓库同步完成后，最新变化会出现在这里。</p></div>
+            </div>
+            <div ref="loadMoreRef" class="load-more-sentinel" aria-live="polite">
+              <span v-if="loading && data.releases.length">继续读取时间线</span>
+              <span v-else-if="!hasMore && data.releases.length">已抵达时间线尽头</span>
+            </div>
+        </section>
 
         <footer class="page-footer">
           <span>WIND CORNER · CHANGELOG</span>
@@ -118,12 +112,6 @@
       </div>
     </main>
 
-    <FloatingPagination
-      v-if="ready && !error && data.totalPages > 1"
-      v-model="page"
-      :total="data.totalPages"
-      @change="changePage"
-    />
   </div>
 </template>
 
@@ -132,11 +120,14 @@ import type { ChangelogResponse } from "@/types/changelog";
 
 const api = useApi();
 const scrollRef = ref<HTMLElement | null>(null);
+const loadMoreRef = ref<HTMLElement | null>(null);
 const page = ref(1);
 const loading = ref(true);
 const updating = ref(false);
 const ready = ref(false);
 const error = ref("");
+const hasMore = ref(true);
+let observer: IntersectionObserver | null = null;
 const data = reactive<ChangelogResponse>({
   enabled: true,
   title: "风迹墙",
@@ -154,6 +145,8 @@ const data = reactive<ChangelogResponse>({
 });
 
 async function load(nextPage = page.value) {
+  if (!hasMore.value && nextPage !== 1) return;
+  if (loading.value && nextPage !== 1) return;
   if (ready.value) updating.value = true;
   else loading.value = true;
   error.value = "";
@@ -162,8 +155,15 @@ async function load(nextPage = page.value) {
       page: nextPage,
       limit: 10,
     });
-    Object.assign(data, result);
+    const incoming = Array.isArray(result.releases) ? result.releases : [];
+    if (nextPage === 1) data.releases = incoming;
+    else {
+      const known = new Set(data.releases.map((release) => release.id));
+      data.releases = [...data.releases, ...incoming.filter((release) => !known.has(release.id))];
+    }
+    Object.assign(data, { ...result, releases: data.releases });
     page.value = result.page;
+    hasMore.value = result.page < result.totalPages;
     await nextTick();
     if (!ready.value) {
       requestAnimationFrame(() => {
@@ -178,13 +178,6 @@ async function load(nextPage = page.value) {
   }
 }
 
-async function changePage(nextPage: number) {
-  updating.value = true;
-  await new Promise<void>((resolve) => window.setTimeout(resolve, 160));
-  await load(nextPage);
-  scrollRef.value?.scrollTo({ top: 0, behavior: "smooth" });
-}
-
 function pad(value: number) {
   return String(value || 0).padStart(2, "0");
 }
@@ -193,13 +186,9 @@ function shortSha(value: string) {
   return String(value || "").slice(0, 7);
 }
 
-function dateParts(value: string) {
+function formatReleaseDate(value: string) {
   const date = new Date(value);
-  return {
-    day: new Intl.DateTimeFormat("zh-CN", { day: "2-digit" }).format(date),
-    month: new Intl.DateTimeFormat("zh-CN", { month: "short" }).format(date),
-    year: new Intl.DateTimeFormat("zh-CN", { year: "numeric" }).format(date),
-  };
+  return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", year: "numeric" }).format(date).replace(/年|月/g, ".").replace("日", "");
 }
 
 function formatSyncTime(value: string) {
@@ -211,7 +200,14 @@ function formatSyncTime(value: string) {
   }).format(new Date(value));
 }
 
-onMounted(() => load(1));
+onMounted(() => {
+  load(1);
+  observer = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value) load(page.value + 1);
+  }, { root: scrollRef.value, rootMargin: "280px 0px", threshold: 0 });
+  if (loadMoreRef.value) observer.observe(loadMoreRef.value);
+});
+onBeforeUnmount(() => observer?.disconnect());
 useHead({
   title: "风迹墙 · 风隅随笔",
   meta: [
@@ -281,6 +277,68 @@ useHead({
 .release-section {
   padding: 28px 8px 10px;
 }
+
+.changelog-welcome {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 17px;
+  align-items: center;
+  margin: 0 0 22px;
+  padding: 20px 22px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ld-bg-card) 94%, var(--c-primary-soft)), var(--ld-bg-card));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--ld-shadow) 24%, transparent);
+}
+
+.changelog-welcome::after {
+  position: absolute;
+  top: -90px;
+  right: 8%;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 13%, transparent), transparent 70%);
+  content: "";
+  pointer-events: none;
+}
+
+.welcome-mark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--c-primary-soft) 80%, var(--ld-bg-card));
+  color: var(--c-primary);
+  font-size: 1.5rem;
+  place-items: center;
+  animation: welcome-float 4.5s ease-in-out infinite;
+}
+
+.welcome-copy { position: relative; z-index: 1; min-width: 0; }
+.welcome-copy > span { color: var(--c-primary); font: 700 .49rem var(--font-mono); letter-spacing: .14em; }
+.welcome-copy h2 { margin: 5px 0 5px; color: var(--c-text); font-size: 1.25rem; }
+.welcome-copy > p { margin: 0; color: var(--c-text-2); font-size: .63rem; line-height: 1.65; }
+.welcome-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 14px; margin-top: 11px; color: var(--c-text-3); font-size: .52rem; }
+.welcome-meta span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.welcome-meta b { color: var(--c-text-2); font: 700 .58rem var(--font-mono); }
+
+.load-more-sentinel {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-3);
+  font: .5rem var(--font-mono);
+  letter-spacing: .08em;
+}
+
+@keyframes welcome-float { 50% { transform: translateY(-4px) rotate(3deg); } }
 
 .section-head {
   display: flex;
@@ -386,30 +444,18 @@ useHead({
 }
 
 .release-date time {
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 2px;
-  text-align: center;
-}
-
-.release-date strong {
-  color: var(--c-text);
-  font: 760 1.42rem/1 var(--font-mono);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c-bg-1) 68%, transparent);
+  color: var(--c-text-2);
+  font: 650 .56rem var(--font-mono);
   font-variant-numeric: tabular-nums;
-}
-
-.release-date span {
-  color: var(--c-primary);
-  font-size: 0.57rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.release-date small {
-  color: var(--c-text-3);
-  font: 0.5rem var(--font-mono);
+  white-space: nowrap;
 }
 
 .release-body {
@@ -798,6 +844,12 @@ useHead({
     padding: 21px 14px 8px;
   }
 
+  .changelog-welcome { grid-template-columns: 1fr; gap: 10px; margin-bottom: 17px; padding: 17px 15px; }
+  .welcome-mark { width: 42px; height: 42px; border-radius: 12px; font-size: 1.1rem; }
+  .welcome-copy h2 { font-size: 1.05rem; }
+  .welcome-copy > p { font-size: .6rem; }
+  .welcome-meta { gap: 6px 11px; }
+
   .section-head {
     align-items: flex-start;
     flex-direction: column;
@@ -829,22 +881,7 @@ useHead({
     right: -11px;
   }
 
-  .release-date time {
-    justify-items: center;
-  }
-
-  .release-date strong {
-    font-size: 1.16rem;
-  }
-
-  .release-date span {
-    font-size: 0.52rem;
-  }
-
-  .release-date small {
-    display: block;
-    font-size: 0.45rem;
-  }
+  .release-date time { min-width: 62px; padding-inline: 4px; font-size: .49rem; }
 
   .release-body {
     margin-bottom: 7px;

@@ -5,10 +5,6 @@
     :class="{ 'is-ready': ready, 'is-ambient': ambient }"
   >
     <div ref="host" class="scene-host" />
-    <div v-if="!ready && !failed" class="scene-awakening" aria-live="polite">
-      <span class="awakening-core"><i /><i /><i /></span>
-      <small>记忆正在沿时间轨道点亮</small>
-    </div>
     <div ref="tooltip" class="scene-tooltip" aria-hidden="true" />
   </div>
 </template>
@@ -2309,12 +2305,12 @@ function addCosmicBodies() {
   }
 }
 
-function solarPlanetTexture(name: string) {
+function solarPlanetTexture(id: string) {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 256;
   const context = canvas.getContext("2d")!;
-  const random = randomFrom(hash(`solar-surface:${name}`));
+  const random = randomFrom(hash(`solar-surface:${id}`));
   const fill = (color: string) => {
     context.fillStyle = color;
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -2325,7 +2321,7 @@ function solarPlanetTexture(name: string) {
     context.fillRect(0, y, canvas.width, height);
     context.globalAlpha = 1;
   };
-  if (name === "水星") {
+  if (id === "mercury") {
     fill("#6f706d");
     for (let i = 0; i < 100; i++) {
       const radius = 2 + random() * 12;
@@ -2334,13 +2330,13 @@ function solarPlanetTexture(name: string) {
       context.fillStyle = i % 3 ? "rgba(35,35,34,.25)" : "rgba(210,207,195,.28)";
       context.fill();
     }
-  } else if (name === "金星") {
+  } else if (id === "venus") {
     fill("#d8b87d");
     for (let i = 0; i < 34; i++) band(i % 2 ? "#f0d9a1" : "#b98d5f", random() * canvas.height, 3 + random() * 13, 0.24);
     context.globalCompositeOperation = "screen";
     for (let i = 0; i < 26; i++) band("#fff0bf", random() * canvas.height, 1 + random() * 5, 0.16);
     context.globalCompositeOperation = "source-over";
-  } else if (name === "地球") {
+  } else if (id === "earth") {
     fill("#1a4d87");
     for (let i = 0; i < 22; i++) {
       context.beginPath();
@@ -2355,7 +2351,7 @@ function solarPlanetTexture(name: string) {
     context.globalCompositeOperation = "source-over";
     band("#eaf6ff", 0, 18, 0.72);
     band("#eaf6ff", 238, 18, 0.72);
-  } else if (name === "火星") {
+  } else if (id === "mars") {
     fill("#a34f35");
     for (let i = 0; i < 48; i++) band(i % 2 ? "#c86b45" : "#713327", random() * canvas.height, 2 + random() * 10, 0.24);
     for (let i = 0; i < 24; i++) {
@@ -2366,7 +2362,7 @@ function solarPlanetTexture(name: string) {
     }
     band("#e4d6c5", 0, 14, 0.7);
     band("#e4d6c5", 242, 14, 0.7);
-  } else if (name === "木星") {
+  } else if (id === "jupiter") {
     fill("#d3a77a");
     const bands = ["#e6c79d", "#a96f4f", "#f0d9ad", "#b77b59", "#e1bb88", "#8d5c4b", "#f1d5a4"];
     bands.forEach((color, index) => band(color, index * 38, 30 + (index % 2) * 8, 0.92));
@@ -2376,10 +2372,10 @@ function solarPlanetTexture(name: string) {
     context.fill();
     context.strokeStyle = "rgba(255,220,170,.38)";
     context.stroke();
-  } else if (name === "土星") {
+  } else if (id === "saturn") {
     fill("#cbb383");
     for (let i = 0; i < 17; i++) band(i % 2 ? "#e6d2a7" : "#a99069", i * 16, 10 + random() * 7, 0.78);
-  } else if (name === "天王星") {
+  } else if (id === "uranus") {
     fill("#83c4cf");
     for (let i = 0; i < 20; i++) band("#c8f1ef", random() * canvas.height, 2 + random() * 6, 0.12);
   } else {
@@ -2427,7 +2423,7 @@ function addSolarSystem() {
     body.userData.spin = 0.012 + index * 0.002;
     const material = track(new THREE.MeshStandardMaterial({
       color,
-      map: solarPlanetTexture(name),
+      map: solarPlanetTexture(discoveryId),
       roughness: index === 4 ? 0.72 : 0.84,
       metalness: 0.02,
       emissive: color,
@@ -2447,7 +2443,7 @@ function addSolarSystem() {
     glow.scale.set(radius * 3.8 * orbitScale, radius * 3.8 * orbitScale, 1);
     glow.userData.baseScale = glow.scale.x;
     body.add(glow);
-    if (name === "土星") {
+    if (discoveryId === "saturn") {
       const rings = new THREE.Group();
       rings.name = "saturn-rings";
       for (const [inner, outer, opacity, tint] of [
@@ -2469,7 +2465,7 @@ function addSolarSystem() {
     system.add(body);
     solarSystemBodies.push(body);
     registerDiscovery(discoveryIds[index], `${name} · 太阳系行星`, body, radius * 2.2);
-    const orbit = new THREE.Mesh(track(new THREE.TorusGeometry(orbitRadius, 0.035, 4, lowQuality ? 72 : 120, Math.PI * 1.28)), track(new THREE.MeshBasicMaterial({ color: 0x6d87a6, transparent: true, opacity: 0.08, depthWrite: false })));
+    const orbit = new THREE.Mesh(track(new THREE.TorusGeometry(orbitRadius * orbitScale, 0.035 * orbitScale, 4, lowQuality ? 72 : 120, Math.PI * 1.28)), track(new THREE.MeshBasicMaterial({ color: 0x6d87a6, transparent: true, opacity: 0.08, depthWrite: false })));
     orbit.rotation.set(Math.PI / 2 + index * 0.08, 0, -0.48 + index * 0.52);
     system.add(orbit);
   });
@@ -3491,6 +3487,8 @@ function animate(now = performance.now()) {
   animationFrame = requestAnimationFrame(animate);
   const delta = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0;
   elapsed += delta;
+  // OrbitControls first absorbs pointer inertia; cruise camera then takes over from the settled pose.
+  controls.update(delta);
   if (!reducedMotion.value) {
     const effectAge = discoveryEffect
       ? (now - discoveryEffectStartedAt) / 1000
@@ -3784,7 +3782,6 @@ function animate(now = performance.now()) {
     updateDiscoveryTour(delta);
     updateFocusedDiscoveryCamera(delta);
   }
-  controls.update(delta);
   if (sun && camera && focusedDiscoveryId !== "sun") {
     const viewOffset = (sun.userData.viewOffset as THREE.Vector3)
       .clone()
@@ -4036,55 +4033,6 @@ defineExpose({
   opacity: 1;
   transform: scale(1);
 }
-.scene-awakening {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 20px;
-  background: #05090c;
-  color: #b9ad95;
-  pointer-events: none;
-}
-.awakening-core {
-  position: relative;
-  display: grid;
-  width: 72px;
-  height: 72px;
-  border: 1px solid rgb(221 173 91/0.42);
-  border-radius: 50%;
-  place-items: center;
-  animation: awakening-turn 6s linear infinite;
-}
-.awakening-core::before {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: #e1b362;
-  box-shadow: 0 0 28px #d89a45;
-  content: "";
-}
-.awakening-core i {
-  position: absolute;
-  inset: 8px;
-  border: 1px solid rgb(203 177 127/0.3);
-  border-radius: 50%;
-  transform: rotate(62deg);
-}
-.awakening-core i:nth-child(2) {
-  inset: -9px;
-  transform: rotate(-28deg);
-}
-.awakening-core i:nth-child(3) {
-  inset: 24px -14px;
-  transform: rotate(18deg);
-}
-.scene-awakening small {
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-}
 .scene-tooltip {
   position: fixed;
   z-index: 20;
@@ -4106,11 +4054,6 @@ defineExpose({
 .scene-tooltip.visible {
   opacity: 1;
   transform: none;
-}
-@keyframes awakening-turn {
-  to {
-    transform: rotate(360deg);
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .constellation-scene :deep(canvas),
