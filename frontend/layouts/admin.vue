@@ -174,6 +174,7 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   max-height: 100dvh;
+  transition: padding 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .admin-main.editor-main-shell {

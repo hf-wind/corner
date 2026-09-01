@@ -56,13 +56,11 @@
             <div
               ref="contentRef"
               class="feed-content"
-              @load.capture="onContentImageLoad"
-              @error.capture="onContentImageError"
             >
-              <div
+              <MarkdownBase
                 v-if="item.contentFormat === 'html' && item.contentHtml"
-                class="rss-html"
-                v-html="item.contentHtml"
+                mode="html"
+                :content="item.contentHtml"
               />
               <div v-else class="rss-text">
                 {{ item.content || item.summary || "该订阅源未提供正文内容。" }}
@@ -125,6 +123,7 @@
 
 <script setup lang="ts">
 import { onBeforeRouteLeave } from "vue-router";
+import MarkdownBase from "@/components/MarkdownBase.vue";
 
 const api = useApi();
 const route = useRoute();
@@ -198,35 +197,11 @@ function onScroll() {
     Math.max(0, (host.scrollTop / max) * 100),
   );
 }
-function hideContentImage(image: HTMLImageElement) {
-  image.hidden = true;
-  image.setAttribute("aria-hidden", "true");
-  const container = image.closest("figure, p");
-  if (!(container instanceof HTMLElement) || container.textContent?.trim())
-    return;
-  if (
-    Array.from(container.querySelectorAll("img")).every(
-      (candidate) => candidate.hidden,
-    )
-  )
-    container.hidden = true;
-}
 function onCoverLoad(event: Event) {
   const image = event.target;
   if (!(image instanceof HTMLImageElement)) return;
   if (image.naturalWidth < 96 || image.naturalHeight < 64)
     coverBroken.value = true;
-}
-function onContentImageLoad(event: Event) {
-  const image = event.target;
-  if (!(image instanceof HTMLImageElement)) return;
-  if (image.naturalWidth <= 48 && image.naturalHeight <= 48)
-    hideContentImage(image);
-}
-function onContentImageError(event: Event) {
-  const image = event.target;
-  if (!(image instanceof HTMLImageElement)) return;
-  hideContentImage(image);
 }
 function setReadingProgress(progress: number) {
   const host = mainRef.value;
@@ -460,82 +435,6 @@ useHead(() => ({
   font-size: 0.82rem;
   line-height: 2;
   white-space: pre-wrap;
-}
-.rss-html {
-  color: var(--c-text-2);
-  font-size: 0.82rem;
-  line-height: 2;
-}
-.rss-html :deep(p) {
-  margin: 0 0 1.15em;
-}
-.rss-html :deep(h2),
-.rss-html :deep(h3),
-.rss-html :deep(h4) {
-  margin: 1.8em 0 0.65em;
-  color: var(--c-text);
-  font-family: var(--font-system-rounded);
-  line-height: 1.35;
-}
-.rss-html :deep(h2) {
-  font-size: 1.35rem;
-}
-.rss-html :deep(h3) {
-  font-size: 1.12rem;
-}
-.rss-html :deep(a) {
-  color: var(--c-primary);
-  text-decoration-color: color-mix(in srgb, var(--c-primary) 35%, transparent);
-  text-underline-offset: 3px;
-}
-.rss-html :deep(img) {
-  display: block;
-  width: auto;
-  max-width: 100%;
-  height: auto;
-  max-height: 680px;
-  margin: 20px auto;
-  border-radius: 7px;
-  object-fit: contain;
-}
-.rss-html :deep(blockquote) {
-  margin: 1.4em 0;
-  padding: 2px 0 2px 17px;
-  border-left: 2px solid var(--c-primary);
-  color: var(--c-text-2);
-}
-.rss-html :deep(pre) {
-  overflow-x: auto;
-  padding: 15px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--c-bg-2);
-  font-size: 0.72rem;
-  line-height: 1.7;
-}
-.rss-html :deep(code) {
-  font-family: var(--font-mono);
-}
-.rss-html :deep(hr) {
-  height: 1px;
-  margin: 2em 0;
-  border: 0;
-  background: var(--border);
-}
-.rss-html :deep(ul),
-.rss-html :deep(ol) {
-  padding-left: 1.5em;
-}
-.rss-html :deep(table) {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  border-collapse: collapse;
-}
-.rss-html :deep(th),
-.rss-html :deep(td) {
-  padding: 7px 10px;
-  border: 1px solid var(--border);
 }
 .feed-footer {
   display: flex;

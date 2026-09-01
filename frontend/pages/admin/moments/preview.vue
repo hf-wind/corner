@@ -1,38 +1,40 @@
 <template>
-  <div class="moment-preview-page">
-    <header class="preview-header">
-      <AppLink to="/admin/moments"><Icon name="ph:arrow-left-bold" /> 返回列表</AppLink>
-      <a-button v-if="moment.slug" type="primary" @click="router.push(`/admin/moments/${moment.slug}`)"><Icon name="ph:pencil-simple-bold" /> 继续编辑</a-button>
-    </header>
+  <div class="page-layout moment-preview-layout">
+    <main class="moment-preview-main">
+      <Loading v-if="loading" fullscreen title="加载中…" text="正在加载瞬间预览" />
 
-    <a-spin :spinning="loading">
-      <article v-if="moment.title" class="preview-card">
-        <div class="preview-meta"><span><Icon name="ph:clock-bold" />{{ dateText }}</span><span v-if="moment.place"><Icon name="ph:map-pin-bold" />{{ moment.place.name }}</span><span v-if="moment.place"><Icon name="ph:shield-check-bold" />{{ privacyText }}</span></div>
-        <h1>{{ moment.title }}</h1>
-        <div v-if="moment.excerpt" class="preview-excerpt"><span>摘要</span><p>{{ moment.excerpt }}</p></div>
-        <MomentContent :content="moment.content" />
-      </article>
-      <a-empty v-else-if="!loading" description="瞬间不存在" />
-    </a-spin>
+      <template v-else-if="moment.id">
+        <AppLink to="/admin/moments" class="back-btn">
+          <Icon name="ph:arrow-left-bold" />
+          返回列表
+        </AppLink>
+
+        <div class="moment-preview-shell">
+          <MomentCard :moment="moment" />
+        </div>
+      </template>
+
+      <a-empty v-else description="瞬间不存在" />
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
-
 const api = useApi()
 const route = useRoute()
-const router = useRouter()
 const loading = ref(true)
 const moment = ref<any>({})
+
 const slug = computed(() => String(route.query.slug || ''))
-const dateText = computed(() => String(moment.value.happenedAt || moment.value.updatedAt || moment.value.createdAt || '').slice(0, 16).replace('T', ' '))
-const privacyText = computed(() => ({ private: '地点私密', blurred: '模糊公开', public: '精确公开' } as Record<string, string>)[moment.value.locationVisibility] || '地点私密')
 
 async function load() {
   loading.value = true
-  try { moment.value = slug.value ? await api.get(`/moments/${slug.value}/preview`) : {} }
-  catch { moment.value = {} }
-  finally { loading.value = false }
+  try {
+    moment.value = slug.value ? await api.get(`/moments/${slug.value}/preview`) : {}
+  } catch {
+    moment.value = {}
+  }
+  loading.value = false
 }
 
 onMounted(load)
@@ -40,14 +42,46 @@ watch(slug, load)
 </script>
 
 <style scoped>
-.moment-preview-page { width:min(800px,100%); padding:8px 0 28px; }
-.preview-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
-.preview-header a { display:inline-flex; align-items:center; gap:6px; color:var(--c-text-2); text-decoration:none; font-size:.82rem; }
-.preview-card { padding:28px; border:1px solid var(--border); border-radius:8px; background:var(--ld-bg-card); }
-.preview-meta { display:flex; flex-wrap:wrap; align-items:center; gap:7px 14px; color:var(--c-text-3); font-size:.78rem; }.preview-meta span { display:inline-flex; align-items:center; gap:5px; }
-.preview-card h1 { margin:14px 0 0; color:var(--c-text); font-size:1.7rem; }
-.preview-excerpt { margin:18px 0; padding:14px 16px; border-left:3px solid var(--c-primary); background:var(--c-primary-soft); }
-.preview-excerpt span { color:var(--c-primary); font-size:.72rem; letter-spacing:.1em; }
-.preview-excerpt p { margin:6px 0 0; color:var(--c-text-2); line-height:1.8; }
-@media (max-width:640px) { .preview-card { padding:20px; } }
+.page-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.moment-preview-main {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+  min-width: 0;
+  width: min(640px, 100%);
+  margin: 0 auto;
+  scrollbar-gutter: stable;
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--c-text-2);
+  text-decoration: none;
+  margin-bottom: 22px;
+  transition: color 0.2s;
+}
+
+.back-btn:hover {
+  color: var(--c-primary);
+}
+
+.moment-preview-shell {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .moment-preview-main {
+    padding: 18px 14px;
+  }
+}
 </style>

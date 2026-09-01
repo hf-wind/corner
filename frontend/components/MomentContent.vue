@@ -1,10 +1,11 @@
 <template>
-  <div class="moment-content" v-html="html" />
+  <div class="moment-content md-moment" v-html="html" />
 </template>
 
 <script setup lang="ts">
 import MarkdownIt from 'markdown-it'
 import { renderInlineEmoji } from '@/utils/commentContent'
+import '@/assets/styles/moment-markdown.css'
 
 const props = defineProps<{
   content?: string
@@ -48,28 +49,7 @@ const html = computed(() => {
 
 <style scoped>
 .moment-content {
-  color: var(--c-text-2);
-  font-size: 0.98rem;
-  line-height: 1.9;
-}
-
-.moment-content :deep(p) {
-  margin: 0;
-}
-
-.moment-content :deep(p + p) {
-  margin-top: 14px;
-}
-
-.moment-content :deep(img) {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  margin-top: 16px;
-  border-radius: 18px;
-  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
-  box-shadow: 0 18px 38px color-mix(in srgb, #000 10%, transparent);
-  object-fit: cover;
+  min-width: 0;
 }
 
 .moment-content :deep(.moment-inline-emoji) {
@@ -81,18 +61,5 @@ const html = computed(() => {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-}
-
-.moment-content :deep(a) {
-  color: var(--c-primary);
-  text-decoration: none;
-}
-
-.moment-content :deep(blockquote) {
-  margin: 16px 0 0;
-  padding: 12px 14px;
-  border-left: 3px solid var(--c-primary);
-  border-radius: 0 14px 14px 0;
-  background: color-mix(in srgb, var(--c-primary) 8%, transparent);
 }
 </style>

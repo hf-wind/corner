@@ -1,7 +1,7 @@
 <template>
   <div class="moment-editor admin-page-shell">
     <a-spin :spinning="loading">
-      <template v-if="!loading && !isEdit">
+      <template v-if="!loading && false">
         <header class="editor-toolbar">
           <strong>写下一条瞬间</strong>
           <a-button size="small" @click="router.push('/admin/moments')"><Icon name="ph:arrow-left-bold" /> 返回</a-button>
@@ -131,7 +131,7 @@ const editorRef = ref<{
   insertText: (text: string) => void
   insertToken: (token: string) => void
 } | null>(null)
-const isCreate = computed(() => props.slug === 'new')
+const isCreate = computed(() => !props.slug || props.slug === 'new')
 const loading = ref(Boolean(props.slug && !isCreate.value))
 const creating = ref(false)
 const saving = ref(false)
@@ -168,12 +168,11 @@ function applyStarter(text: string) {
 }
 
 function currentText() {
-  return isEdit.value ? form.content : inspiration.value
+  return form.content
 }
 
 function setCurrentText(value: string) {
-  if (isEdit.value) form.content = value
-  else inspiration.value = value
+  form.content = value
 }
 
 function insertAtCursor(token: string) {
@@ -418,4 +417,5 @@ onMounted(() => {
 @keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:900px) { .moment-editor { height:100%; min-height:0; max-height:none; overflow:auto; } .create-layout, .edit-layout { grid-template-columns:1fr; min-height:0; overflow:visible; } .writing-surface { min-height:560px; overflow:visible; } .edit-input { min-height:360px; } .prompt-rail { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } .prompt-rail h2, .prompt-rail > .surface-kicker { grid-column:1 / -1; } .prompt-rail button { border:1px solid var(--border); border-radius:6px; padding:10px; } }
 @media (max-width:640px) { .editor-toolbar { flex-basis:42px; }.header-actions { gap:4px; }.header-actions :deep(.ant-btn) { padding-inline:7px; }.surface-actions { align-items:stretch; flex-direction:column; } .quick-create-shell { margin-top:20px; padding:18px 16px 14px; border-radius:12px; } .quick-input { min-height:180px; padding:18px 1px; font-size:.92rem; } .quick-footer { align-items:stretch; flex-direction:column; } .quick-footer .composer-tools > span { display:none; } .quick-footer > :last-child { align-self:flex-end; } .writing-surface, .prompt-rail, .edit-rail { padding:16px; } .prompt-rail { grid-template-columns:1fr; } .prompt-rail h2, .prompt-rail > .surface-kicker { grid-column:auto; } .edit-input { min-height:300px; } }
+@media (min-width:901px) { .moment-editor { height:100dvh; max-height:100dvh; overflow:hidden; }.moment-editor :deep(.ant-spin-container) { height:100%; }.editor-toolbar { flex-basis:52px; padding-inline:2px; }.edit-layout { width:100%; }.writing-surface { padding:20px; }.edit-rail { max-height:calc(100dvh - 72px); }.edit-input { min-height:0; }.quick-create-shell { max-height:calc(100dvh - 110px); overflow:auto; } }
 </style>

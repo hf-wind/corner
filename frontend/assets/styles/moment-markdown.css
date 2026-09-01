@@ -1,0 +1,457 @@
+/*
+ * moment-markdown.css
+ * Moment-specific preview styles for md-editor-v3.
+ * Warmer, softer visual language compared to the article theme.
+ *
+ * Imported by: MarkdownBase.vue (when variant="moment"), AdminMarkdownEditor.vue
+ */
+
+/* ── CSS Variables Override ── */
+.md-base-preview.md-moment,
+.md-moment .md-base-preview,
+.md-moment .md-editor-preview,
+.admin-md-editor.md-moment :deep(.md-editor-preview) {
+  --md-bk-color: transparent;
+  --md-bk-color-outstand: var(--c-bg-2);
+  --md-bk-color-hover: var(--c-bg-2);
+  --md-bk-color-block: var(--c-bg-1);
+  --md-bk-color-code: var(--code-bg);
+  --md-border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  --md-color: var(--c-text-2);
+  --md-color-secondary: var(--c-text-3);
+  --md-primary-color: var(--c-primary);
+}
+
+/* ── Base Typography ── */
+.md-moment .md-base-preview,
+.md-moment .md-editor-preview {
+  background: transparent !important;
+  background-color: transparent !important;
+  font-family: var(--font-rounded);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.9;
+  color: var(--c-text-2);
+  text-wrap: pretty;
+  word-break: break-word;
+}
+
+/* ── Headings — clean, no decorative badges/pills/dots ── */
+.md-moment .md-base-preview h1,
+.md-moment .md-editor-preview h1,
+.md-moment .md-base-preview h2,
+.md-moment .md-editor-preview h2,
+.md-moment .md-base-preview h3,
+.md-moment .md-editor-preview h3,
+.md-moment .md-base-preview h4,
+.md-moment .md-editor-preview h4,
+.md-moment .md-base-preview h5,
+.md-moment .md-editor-preview h5,
+.md-moment .md-base-preview h6,
+.md-moment .md-editor-preview h6 {
+  scroll-margin-top: 24px;
+  color: var(--c-text);
+  font-family: var(--font-system-rounded);
+  font-weight: 680;
+  line-height: 1.4;
+  letter-spacing: 0;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.md-moment .md-base-preview h1,
+.md-moment .md-editor-preview h1 {
+  counter-reset: none;
+  margin: 2rem 0 1rem;
+  padding-left: 0;
+  border: 0;
+  font-size: 1.5rem;
+}
+
+.md-moment .md-base-preview h1::before,
+.md-moment .md-editor-preview h1::before {
+  display: none;
+}
+
+.md-moment .md-base-preview h2,
+.md-moment .md-editor-preview h2 {
+  counter-reset: none;
+  margin: 1.8rem 0 0.8rem;
+  padding-left: 0;
+  border: 0;
+  font-size: 1.25rem;
+}
+
+.md-moment .md-base-preview h2::before,
+.md-moment .md-editor-preview h2::before {
+  display: none;
+}
+
+.md-moment .md-base-preview h3,
+.md-moment .md-editor-preview h3 {
+  counter-reset: none;
+  margin: 1.5rem 0 0.65rem;
+  padding-left: 0;
+  font-size: 1.08rem;
+}
+
+.md-moment .md-base-preview h3::before,
+.md-moment .md-editor-preview h3::before {
+  display: none;
+}
+
+.md-moment .md-base-preview h4,
+.md-moment .md-editor-preview h4 {
+  margin: 1.35rem 0 0.6rem;
+  padding-left: 0;
+  font-size: 1rem;
+}
+
+.md-moment .md-base-preview h4::before,
+.md-moment .md-editor-preview h4::before {
+  display: none;
+}
+
+.md-moment .md-base-preview h5,
+.md-moment .md-editor-preview h5,
+.md-moment .md-base-preview h6,
+.md-moment .md-editor-preview h6 {
+  margin: 1.25rem 0 0.55rem;
+  padding-left: 10px;
+  border-left: 3px solid color-mix(in srgb, var(--c-primary) 40%, var(--border));
+  color: var(--c-text-2);
+  font-size: 0.92rem;
+}
+
+.md-moment .md-base-preview h6,
+.md-moment .md-editor-preview h6 {
+  border-left-style: dotted;
+  font-size: 0.86rem;
+}
+
+/* ── Paragraphs ── */
+.md-moment .md-base-preview p,
+.md-moment .md-editor-preview p {
+  margin: 1em 0;
+  line-height: inherit;
+  text-indent: 0;
+  word-spacing: 0;
+}
+
+/* ── Strong ── */
+.md-moment .md-base-preview strong,
+.md-moment .md-editor-preview strong {
+  color: var(--c-text);
+  font-weight: 700;
+}
+
+/* ── Selection ── */
+.md-moment .md-base-preview ::selection,
+.md-moment .md-editor-preview ::selection {
+  background: color-mix(in srgb, var(--c-primary) 24%, transparent);
+}
+
+/* ── Links — clean, no gradient underline ── */
+.md-moment .md-base-preview a,
+.md-moment .md-editor-preview a {
+  color: var(--c-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.18s ease;
+}
+
+.md-moment .md-base-preview a:hover,
+.md-moment .md-editor-preview a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Blockquote — right-rounded, very light primary bg ── */
+.md-moment .md-base-preview blockquote,
+.md-moment .md-editor-preview blockquote {
+  position: relative;
+  margin: 1.2rem 0;
+  padding: 14px 16px 14px 18px;
+  border: 0;
+  border-left: 3px solid var(--c-primary);
+  border-radius: 0 14px 14px 0;
+  background: color-mix(in srgb, var(--c-primary) 6%, transparent);
+  color: var(--c-text-2);
+}
+
+.md-moment .md-base-preview blockquote::before,
+.md-moment .md-editor-preview blockquote::before {
+  display: none;
+}
+
+.md-moment .md-base-preview blockquote p:first-child,
+.md-moment .md-editor-preview blockquote p:first-child {
+  margin-top: 0;
+}
+
+.md-moment .md-base-preview blockquote p:last-child,
+.md-moment .md-editor-preview blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Lists ── */
+.md-moment .md-base-preview ul,
+.md-moment .md-base-preview ol,
+.md-moment .md-editor-preview ul,
+.md-moment .md-editor-preview ol {
+  margin: 1em 0;
+  padding-left: 1.55em;
+  line-height: 1.82;
+}
+
+.md-moment .md-base-preview li,
+.md-moment .md-editor-preview li {
+  margin: 0.42em 0;
+  padding-left: 0.2em;
+}
+
+.md-moment .md-base-preview li::marker,
+.md-moment .md-editor-preview li::marker {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  font-weight: 700;
+}
+
+.md-moment .md-base-preview input[type="checkbox"],
+.md-moment .md-editor-preview input[type="checkbox"] {
+  accent-color: var(--c-primary);
+}
+
+/* ── Inline Code ── */
+.md-moment .md-base-preview code:not(pre code),
+.md-moment .md-editor-preview code:not(pre code) {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 0.12em;
+  padding: 0.15em 0.4em;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 14%, var(--border));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--c-primary-soft) 36%, var(--code-bg));
+  color: color-mix(in srgb, var(--c-primary) 72%, var(--c-text));
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* ── Mark ── */
+.md-moment .md-base-preview mark,
+.md-moment .md-editor-preview mark {
+  padding: 0.08em 0.26em;
+  border-radius: 3px;
+  background: color-mix(in srgb, #f6c453 36%, transparent);
+  color: inherit;
+}
+
+/* ── Images — 18px round, soft shadow ── */
+.md-moment .md-base-preview img,
+.md-moment .md-editor-preview img {
+  display: block;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 18px;
+  box-shadow: 0 18px 38px color-mix(in srgb, #000 10%, transparent);
+  cursor: zoom-in;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
+}
+
+@media (hover: hover) {
+  .md-moment .md-base-preview img:hover,
+  .md-moment .md-editor-preview img:hover {
+    box-shadow: 0 22px 44px color-mix(in srgb, #000 14%, transparent);
+    transform: translateY(-2px);
+  }
+}
+
+.md-moment .md-base-preview figcaption,
+.md-moment .md-editor-preview figcaption {
+  margin-top: 8px;
+  color: var(--c-text-3);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+/* ── Code Blocks ── */
+.md-moment .md-base-preview .md-editor-code,
+.md-moment .md-editor-preview .md-editor-code {
+  font-family: var(--font-mono);
+  margin: 1.4rem 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 8px;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ld-shadow) 55%, transparent);
+}
+
+.md-moment .md-base-preview pre,
+.md-moment .md-editor-preview pre {
+  margin: 0 !important;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+}
+
+/* ── Tables ── */
+.md-moment .md-base-preview table,
+.md-moment .md-editor-preview table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 1.4rem 0;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 7px 20px color-mix(in srgb, var(--ld-shadow) 48%, transparent);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.md-moment .md-base-preview table th,
+.md-moment .md-editor-preview table th {
+  background: color-mix(in srgb, var(--c-primary-soft) 48%, var(--c-bg-1));
+  color: var(--c-text-1);
+  font-weight: 680;
+  text-align: left;
+}
+
+.md-moment .md-base-preview table th,
+.md-moment .md-base-preview table td,
+.md-moment .md-editor-preview table th,
+.md-moment .md-editor-preview table td {
+  padding: 0.65em 0.9em;
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.md-moment .md-base-preview table tr:nth-child(2n),
+.md-moment .md-editor-preview table tr:nth-child(2n) {
+  background: color-mix(in srgb, var(--c-bg-1) 72%, transparent);
+}
+
+/* ── Horizontal Rule ── */
+.md-moment .md-base-preview hr,
+.md-moment .md-editor-preview hr {
+  height: 1px;
+  margin: 2.2rem 0;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--c-primary) 28%, var(--border)) 20%,
+    color-mix(in srgb, var(--c-primary) 28%, var(--border)) 80%,
+    transparent
+  );
+}
+
+/* ── Overflow ── */
+.md-moment .md-base-preview,
+.md-moment .md-editor-preview {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.md-moment .md-base-preview img,
+.md-moment .md-base-preview video,
+.md-moment .md-base-preview iframe,
+.md-moment .md-editor-preview img,
+.md-moment .md-editor-preview video,
+.md-moment .md-editor-preview iframe {
+  max-width: 100%;
+}
+
+.md-moment .md-base-preview pre,
+.md-moment .md-base-preview .md-editor-code,
+.md-moment .md-editor-preview pre,
+.md-moment .md-editor-preview .md-editor-code {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.md-moment .md-base-preview table,
+.md-moment .md-editor-preview table {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* ── Mermaid ── */
+.md-moment .md-base-preview .md-editor-mermaid > svg,
+.md-moment .md-editor-preview .md-editor-mermaid > svg {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100%;
+  max-height: min(76dvh, 720px);
+  margin: 0 auto;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .md-moment .md-base-preview,
+  .md-moment .md-editor-preview {
+    font-size: 0.9rem;
+    line-height: 1.88;
+    text-wrap: wrap;
+  }
+
+  .md-moment .md-base-preview h1,
+  .md-moment .md-editor-preview h1 {
+    font-size: 1.35rem;
+    margin-top: 1.8rem;
+  }
+
+  .md-moment .md-base-preview h2,
+  .md-moment .md-editor-preview h2 {
+    font-size: 1.15rem;
+    margin-top: 1.6rem;
+  }
+
+  .md-moment .md-base-preview h3,
+  .md-moment .md-editor-preview h3 {
+    font-size: 1.02rem;
+  }
+
+  .md-moment .md-base-preview blockquote,
+  .md-moment .md-editor-preview blockquote {
+    margin-right: 0;
+    margin-left: 0;
+    border-radius: 0 10px 10px 0;
+    padding: 12px 12px 12px 14px;
+  }
+
+  .md-moment .md-base-preview ul,
+  .md-moment .md-base-preview ol,
+  .md-moment .md-editor-preview ul,
+  .md-moment .md-editor-preview ol {
+    padding-left: 1.3em;
+  }
+
+  .md-moment .md-base-preview pre,
+  .md-moment .md-base-preview .md-editor-code,
+  .md-moment .md-base-preview img,
+  .md-moment .md-base-preview table,
+  .md-moment .md-editor-preview pre,
+  .md-moment .md-editor-preview .md-editor-code,
+  .md-moment .md-editor-preview img,
+  .md-moment .md-editor-preview table {
+    border-radius: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-moment .md-base-preview img,
+  .md-moment .md-base-preview a,
+  .md-moment .md-editor-preview img,
+  .md-moment .md-editor-preview a {
+    transition: none;
+  }
+}

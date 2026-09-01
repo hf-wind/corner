@@ -102,6 +102,10 @@ function configureHighlight() {
 function configureMermaid() {
   if (mermaidInitialization) return mermaidInitialization;
   mermaidInitialization = import("mermaid").then((mermaid) => {
+    mermaid.default.initialize({
+      startOnLoad: false,
+      theme: 'default',
+    });
     config({
       editorExtensions: {
         mermaid: { instance: mermaid.default, enableZoom: true },

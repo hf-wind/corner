@@ -1,7 +1,4 @@
 <template>
-  <AdminAiCreator initial-mode="moment" />
+  <AdminContentCreator mode="moment" />
 </template>
-
-<script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: 'auth', ssr: false })
-</script>
+<script setup></script>
