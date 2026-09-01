@@ -452,14 +452,23 @@ export class VisitorService {
       },
     });
     if (existing) {
+      const index =
+        (Math.max(0, existing.knowledgeIndex) + 1) % items.length;
+      const updated = await this.prisma.constellationKnowledgeSelection.update({
+        where: { id: existing.id },
+        data: {
+          knowledgeIndex: index,
+          knowledgeText: items[index],
+        },
+      });
       return {
         ok: true,
-        reused: true,
-        planetId: existing.planetId,
-        index: existing.knowledgeIndex,
+        reused: false,
+        planetId: updated.planetId,
+        index: updated.knowledgeIndex,
         total: items.length,
-        knowledge: existing.knowledgeText,
-        selectedAt: existing.createdAt,
+        knowledge: updated.knowledgeText,
+        selectedAt: updated.updatedAt,
       };
     }
 

@@ -1505,6 +1505,128 @@ export class AiService {
     };
   }
 
+  async analyzeContent(title: string, content: string) {
+    const text = String(content || '').trim();
+    if (text.length < 50) {
+      throw new BadRequestException('内容过短，至少需要 50 字才能分析');
+    }
+
+    const cfg = await this.getConfig();
+    if (!(await this.canUseModel(cfg, cfg.ai_article_model_config_id))) {
+      throw new ServiceUnavailableException('AI 未配置或已关闭');
+    }
+
+    const [categories, tags] = await Promise.all([
+      this.prisma.category.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+          color: true,
+          _count: { select: { posts: true } },
+        },
+        take: 200,
+      }),
+      this.prisma.tag.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+          color: true,
+          _count: { select: { posts: true } },
+        },
+        take: 300,
+      }),
+    ]);
+
+    const taxonomyCandidates = (rows: typeof categories | typeof tags) =>
+      rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        icon: row.icon,
+        color: row.color,
+        posts: (row as any)._count?.posts ?? 0,
+      }));
+
+    try {
+      const metaText = await this.chat(
+        [
+          {
+            role: 'system',
+            content: cfg.ai_article_meta_prompt,
+          },
+          {
+            role: 'user',
+            content: [
+              `标题：${title || '无'}`,
+              `正文：\n${text.slice(0, 6000)}`,
+              `已有分类清单（含各分类已收录文章数 posts，优先复用语义贴切的）：${JSON.stringify(taxonomyCandidates(categories))}`,
+              `已有标签清单（含各标签已收录文章数 posts）：${JSON.stringify(taxonomyCandidates(tags))}`,
+            ].join('\n'),
+          },
+        ],
+        {
+          modelConfigId: cfg.ai_article_model_config_id,
+          model: cfg.ai_article_model || cfg.ai_model,
+          temperature: 0.4,
+          maxTokens: 512,
+          thinking: 'disabled',
+        },
+      );
+
+      const meta = this.parseJsonObject(metaText);
+      let slug = this.normalizeMetaSlug(String(meta?.slug || ''), title);
+      let categoryId: string | undefined;
+      let categoryName = '';
+      let tagIds: string[] = [];
+      let tagNames: string[] = [];
+
+      const categorySuggestion = this.normalizeTaxonomySuggestion(
+        meta?.category,
+        String(meta?.categoryName || '').trim(),
+        { icon: meta?.categoryIcon, color: meta?.categoryColor },
+      );
+      const rawTags = Array.isArray(meta?.tags)
+        ? meta.tags
+        : Array.isArray(meta?.tagNames)
+          ? meta.tagNames
+          : [];
+
+      if (categorySuggestion) {
+        const cat = await this.ensureCategoryByName(categorySuggestion);
+        if (cat) {
+          categoryId = cat.id;
+          categoryName = cat.name;
+        }
+      }
+      if (rawTags.length) {
+        const ensured = await this.ensureTagsByNames(rawTags);
+        tagIds = ensured.map((t) => t.id);
+        tagNames = ensured.map((t) => t.name);
+      }
+
+      const summary = await this.summarize(title, text);
+
+      return {
+        slug,
+        excerpt: summary.excerpt,
+        category: categoryId ? { id: categoryId, name: categoryName } : null,
+        tags: tagNames.map((name, i) => ({ id: tagIds[i], name })),
+      };
+    } catch (e) {
+      this.logger.warn(`analyzeContent fallback: ${e}`);
+      return {
+        slug: this.normalizeMetaSlug('', title),
+        excerpt: this.localExcerpt(title, text, 120),
+        category: null,
+        tags: [],
+      };
+    }
+  }
+
   async moderateComment(
     content: string,
     postTitle?: string,

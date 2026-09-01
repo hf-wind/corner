@@ -330,8 +330,10 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
         ? this.buildSnapshotFromPost(existing)
         : null);
 
+    const uniqueTagIds = tagIds ? [...new Set(tagIds)] : null;
+
     const updated = await this.prisma.$transaction(async (tx) => {
-      if (tagIds) {
+      if (uniqueTagIds) {
         await tx.postTag.deleteMany({ where: { postId: existing.id } });
       }
 
@@ -341,8 +343,8 @@ export class PostService implements OnModuleInit, OnModuleDestroy {
           ...data,
           ...spacetime,
           ...(nextSlug ? { slug: nextSlug } : {}),
-          tags: tagIds
-            ? { create: tagIds.map((tagId) => ({ tagId })) }
+          tags: uniqueTagIds
+            ? { create: uniqueTagIds.map((tagId) => ({ tagId })) }
             : undefined,
         },
         select: postAdminSelect,

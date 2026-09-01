@@ -22,6 +22,7 @@ import {
   AiPrivateQueryDto,
   AiWriteTransformDto,
 } from './dto/ai-native.dto';
+import { AnalyzeContentDto } from './dto/analyze-content.dto';
 import { SummarizeDto } from './dto/summarize.dto';
 import { ChatDto } from './dto/chat.dto';
 import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
@@ -74,6 +75,13 @@ export class AiController {
   generateArticle(@Body() dto: GenerateArticleDto, @Req() req: Request) {
     const userId = (req.user as any)?.id;
     return this.ai.generateArticle(dto.outline, userId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('analyze-content')
+  analyzeContent(@Body() dto: AnalyzeContentDto) {
+    return this.ai.analyzeContent(dto.title || '', dto.content || '');
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
