@@ -255,7 +255,6 @@ const adminFullNav = [
   { to: "/admin/library", icon: "ph:books-bold", label: "书影" },
   { to: "/admin/albums", icon: "ph:images-square-bold", label: "相册" },
   { to: "/admin/memory-graph", icon: "ph:planet-bold", label: "时光星图" },
-  { to: "/admin/journeys", icon: "ph:path-bold", label: "故事航线" },
   { to: "/admin/categories", icon: "ph:folder-open-bold", label: "分类管理" },
   { to: "/admin/tags", icon: "ph:tag-bold", label: "标签管理" },
   { to: "/admin/friends", icon: "ph:handshake-bold", label: "友链管理" },
@@ -338,7 +337,6 @@ const navGroups = computed<NavGroup[]>(() => {
           "/admin/library",
           "/admin/albums",
           "/admin/memory-graph",
-          "/admin/journeys",
         ]),
       },
       {

@@ -174,17 +174,17 @@
               >
             </header>
             <div
-              v-if="activeDiscovery.id === 'spacecraft'"
+              v-if="activeDiscovery.id === 'spacecraft' || activeDiscovery.id === 'scoutcraft'"
               class="immersive-actions"
-              aria-label="风隅号追航指令"
+              :aria-label="`${activeDiscovery.title}漫游指令`"
             >
               <button
                 type="button"
                 :class="{ active: activeCommandId === 'warp' }"
                 @click="runDiscoveryCommand('warp')"
               >
-                <Icon name="ph:lightning-bold" /><span>曲率跃迁</span
-                ><small>WARP</small>
+                <Icon name="ph:lightning-bold" /><span>{{ activeDiscovery.id === 'scoutcraft' ? '星际漫游' : '曲率跃迁' }}</span
+                ><small>{{ activeDiscovery.id === 'scoutcraft' ? 'CRUISE' : 'WARP' }}</small>
               </button>
             </div>
             <div class="discovery-details">
@@ -210,16 +210,18 @@
                 <strong>{{ discoveryResult || activeTelemetry.report }}</strong>
                 <span>{{ activeTelemetry.basis }}</span>
               </div>
-              <Transition name="knowledge-reveal">
-                <section v-if="activeKnowledge" class="telemetry-knowledge" aria-live="polite">
-                  <header>
-                    <span><Icon name="ph:book-open-text-bold" /> 行星知识</span>
-                    <small>{{ activeKnowledge.reused ? "已从访客档案恢复" : "本次遥测已归档" }}</small>
-                  </header>
-                  <p>{{ activeKnowledge.knowledge }}</p>
-                  <footer><i />{{ activeDiscovery.title }} · 第 {{ activeKnowledge.index + 1 }} / {{ activeKnowledge.total }} 条</footer>
-                </section>
-              </Transition>
+              <div class="knowledge-slot" :class="{ 'has-content': activeKnowledge }">
+                <Transition name="knowledge-reveal" mode="out-in">
+                  <section v-if="activeKnowledge" :key="activeKnowledge.revision" class="telemetry-knowledge" aria-live="polite">
+                    <header>
+                      <span><Icon name="ph:book-open-text-bold" /> 行星知识</span>
+                      <small>配置档案</small>
+                    </header>
+                    <p>{{ activeKnowledge.knowledge }}</p>
+                    <footer><i />{{ activeDiscovery.title }} · 已同步</footer>
+                  </section>
+                </Transition>
+              </div>
               <div
                 class="discovery-commands"
                 :aria-label="`${activeDiscovery.title}指令`"
@@ -282,7 +284,10 @@ type DiscoveryId =
   | "black-hole"
   | "station"
   | "satellite"
-  | "spacecraft";
+  | "satellite-aurora"
+  | "satellite-relay"
+  | "spacecraft"
+  | "scoutcraft";
 type DiscoveryCommandId =
   | "pulse"
   | "latest"
@@ -324,7 +329,7 @@ type DiscoveryTelemetry = {
 };
 
 type SolarPlanetSpec = {
-  id: Exclude<DiscoveryId, "planet" | "sun" | "black-hole" | "station" | "satellite" | "spacecraft">;
+  id: Exclude<DiscoveryId, "planet" | "sun" | "black-hole" | "station" | "satellite" | "satellite-aurora" | "satellite-relay" | "spacecraft" | "scoutcraft">;
   name: string;
   catalog: string;
   status: string;
@@ -374,8 +379,9 @@ const activeDiscoveryId = ref<DiscoveryId | "">("");
 const discoveryResult = ref("");
 const discoverySequence = ref(0);
 const activeCommandId = ref<DiscoveryCommandId | "">("");
-const activeKnowledge = ref<{ knowledge: string; index: number; total: number; reused: boolean } | null>(null);
+const activeKnowledge = ref<{ knowledge: string; index: number; total: number; reused: boolean; revision: number } | null>(null);
 const knowledgeLoading = ref(false);
+let knowledgeRequestSequence = 0;
 const telemetryNow = ref(new Date());
 const neighbors = ref<GraphRelation[]>([]);
 const neighborsLoading = ref(false);
@@ -493,10 +499,40 @@ const discoveries: Discovery[] = [
     ],
   },
   {
+    id: "satellite-aurora",
+    title: "极光观测卫星",
+    catalog: "AURORA-02 · 极光成像卫星",
+    kicker: "POLAR OBSERVATORY · 05",
+    status: "极区扫描进行中",
+    description:
+      "面向极光与高层大气的专用观测平台，使用宽视场成像器记录磁暴期间的带电粒子沉降。",
+    signalLabel: "极区成像链路",
+    icon: "ph:aperture-bold",
+    commands: [
+      { id: "scan", label: "扫描极光弧", icon: "ph:scan-bold" },
+      { id: "signal", label: "校准成像链", icon: "ph:wave-sine-bold" },
+    ],
+  },
+  {
+    id: "satellite-relay",
+    title: "潮汐中继卫星",
+    catalog: "TRIDENT-03 · 深空中继卫星",
+    kicker: "DEEP SPACE RELAY · 06",
+    status: "跨轨链路稳定",
+    description:
+      "搭载定向高增益天线的深空中继节点，为远端记忆坐标提供低延迟转发与时间同步。",
+    signalLabel: "深空中继状态",
+    icon: "ph:broadcast-bold",
+    commands: [
+      { id: "signal", label: "发射中继脉冲", icon: "ph:broadcast-bold" },
+      { id: "scan", label: "扫描远端节点", icon: "ph:scan-bold" },
+    ],
+  },
+  {
     id: "spacecraft",
     title: "风隅号",
     catalog: "FY-01 · 深空巡航舰",
-    kicker: "WIND CORNER FLIGHT · 05",
+    kicker: "WIND CORNER FLIGHT · 07",
     status: "三联离子驱动在线",
     description:
       "以陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰。聚焦会持续跟随航迹，追航将在舰尾上方保持第三人称伴飞。",
@@ -507,11 +543,26 @@ const discoveries: Discovery[] = [
       { id: "warp", label: "曲率跃迁", icon: "ph:lightning-bold" },
     ],
   },
+  {
+    id: "scoutcraft",
+    title: "棱镜号",
+    catalog: "PRISM-07 · 航道测绘艇",
+    kicker: "PRISMATIC EXPLORER · 08",
+    status: "脉冲星导航解算中",
+    description:
+      "一艘为星际航道测绘而生的高速探测艇。棱镜座舱将星光、引力波和脉冲星信号叠合为航向解，进入漫游模式即可从驾驶舱穿过星图。",
+    signalLabel: "棱镜导航简报",
+    icon: "ph:shooting-star-bold",
+    commands: [
+      { id: "bridge", label: "进入驾驶舱", icon: "ph:steering-wheel-bold" },
+      { id: "warp", label: "启动星际漫游", icon: "ph:rocket-launch-bold" },
+    ],
+  },
   ...solarPlanetSpecs.map((spec, index) => ({
     id: spec.id,
     title: spec.name,
     catalog: spec.catalog,
-    kicker: `SOLAR SYSTEM · ${String(index + 2).padStart(2, "0")}`,
+    kicker: `SOLAR SYSTEM · ${String(index + 8).padStart(2, "0")}`,
     status: spec.status,
     description: spec.description,
     signalLabel: "行星表面遥测",
@@ -752,16 +803,24 @@ function buildDiscoveryTelemetry(
       ],
     };
   }
-  if (id === "satellite") {
-    const days = daysSince("2024-10-24T06:32:00+08:00", now);
+  if (id === "satellite" || id === "satellite-aurora" || id === "satellite-relay") {
+    const launch = id === "satellite-aurora"
+      ? "2025-06-18T04:20:00+08:00"
+      : id === "satellite-relay"
+        ? "2026-01-08T22:14:00+08:00"
+        : "2024-10-24T06:32:00+08:00";
+    const days = daysSince(launch, now);
+    const satelliteName = id === "satellite-aurora" ? "极光二号" : id === "satellite-relay" ? "三叉戟三号" : "听风一号";
+    const satelliteType = id === "satellite-aurora" ? "极光成像" : id === "satellite-relay" ? "深空中继" : "光学通信";
+    const altitude = id === "satellite-aurora" ? "824 km" : id === "satellite-relay" ? "1,240 km" : "612 km";
     return {
-      report: `听风一号正通过降交点晨昏轨道，星敏感器已锁定。第 ${Math.floor(days * 14.72)} 圈遥测帧完整，下一通信窗口约 ${7 + Math.abs(minuteSeed % 14)} 分钟后开启。`,
+      report: `${satelliteName}正运行于${satelliteType}任务轨道，星敏感器已锁定。第 ${Math.floor(days * (id === "satellite-relay" ? 11.32 : 14.72))} 圈遥测帧完整，下一通信窗口约 ${7 + Math.abs(minuteSeed % 14)} 分钟后开启。`,
       sampleTime,
-      basis: "按 612 km 太阳同步圆轨道与每日约 14.72 圈的工程模型生成",
+      basis: "按各卫星任务轨道、姿态控制与链路模型生成，数值用于星图交互展示",
       metrics: [
-        { label: "卫星类型", value: "光学通信" },
+        { label: "卫星类型", value: satelliteType },
         { label: "在轨时间", value: `${days} 天` },
-        { label: "轨道高度", value: "612 km" },
+        { label: "轨道高度", value: altitude },
         {
           label: "链路时延",
           value: `${(4.1 + Math.sin(hours) * 0.6).toFixed(1)} ms`,
@@ -786,6 +845,30 @@ function buildDiscoveryTelemetry(
         {
           label: "航向误差",
           value: `${Math.abs(Math.sin(hours * 1.3) * 0.06).toFixed(3)}°`,
+        },
+      ],
+    };
+  }
+  if (id === "scoutcraft") {
+    const days = daysSince("2026-07-09T11:08:00+08:00", now);
+    return {
+      report: `棱镜号正在执行 PRISM-07 第 ${days} 航日航道测绘。三组脉冲星校时解已收敛，驾驶舱航向投影持续修正下一段星际走廊。`,
+      sampleTime,
+      basis:
+        "棱镜号为科幻叙事载具；导航、脉冲星与航道数据用于星图交互展示，不代表真实飞行数据",
+      metrics: [
+        { label: "任务航日", value: `D+${days}` },
+        {
+          label: "导航信标",
+          value: `${3 + Math.abs(minuteSeed % 4)} 颗锁定`,
+        },
+        {
+          label: "航道置信度",
+          value: `${(98.7 + Math.sin(hours * 0.9) * 0.5).toFixed(1)}%`,
+        },
+        {
+          label: "座舱视差",
+          value: `${(0.014 + Math.abs(Math.sin(hours)) * 0.008).toFixed(3)}°`,
         },
       ],
     };
@@ -831,6 +914,7 @@ async function loadGraph() {
 }
 
 async function selectNode(node: GraphNode, syncUrl = true) {
+  knowledgeRequestSequence += 1;
   const sequence = ++neighborRequestSequence;
   activeDiscoveryId.value = "";
   discoveryResult.value = "";
@@ -860,6 +944,7 @@ function handleSceneSelect(node: GraphNode) {
 }
 
 function handleDiscovery(id: DiscoveryId) {
+  knowledgeRequestSequence += 1;
   neighborRequestSequence += 1;
   returnDiscoveryId.value = "";
   selected.value = null;
@@ -878,6 +963,7 @@ function handleDiscovery(id: DiscoveryId) {
 
 function clearDiscovery() {
   if (!activeDiscoveryId.value || discoveryClosing.value) return;
+  knowledgeRequestSequence += 1;
   discoveryClosing.value = true;
   activeCommandId.value = "";
   activeKnowledge.value = null;
@@ -886,6 +972,7 @@ function clearDiscovery() {
 }
 
 function handleFocusCleared() {
+  knowledgeRequestSequence += 1;
   returnDiscoveryId.value = "";
   activeDiscoveryId.value = "";
   discoveryResult.value = "";
@@ -901,7 +988,8 @@ async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
   activeCommandId.value = commandId;
   discoverySequence.value += 1;
   telemetryNow.value = new Date();
-  if (commandId === discovery.commands[0]?.id && discovery.knowledge?.length && !activeKnowledge.value && !knowledgeLoading.value) {
+  if (commandId === discovery.commands[0]?.id && discovery.knowledge?.length) {
+    const sequence = ++knowledgeRequestSequence;
     knowledgeLoading.value = true;
     try {
       visitorId();
@@ -909,18 +997,19 @@ async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
         planetId: discovery.id,
         knowledge: discovery.knowledge,
       });
-      if (activeDiscoveryId.value === discovery.id && result?.ok && result.knowledge) {
+      if (sequence === knowledgeRequestSequence && activeDiscoveryId.value === discovery.id && result?.ok && result.knowledge) {
         activeKnowledge.value = {
           knowledge: String(result.knowledge),
           index: Math.max(0, Number(result.index) || 0),
           total: Math.max(1, Number(result.total) || discovery.knowledge.length),
           reused: Boolean(result.reused),
+          revision: sequence,
         };
       }
     } catch {
       // The telemetry result remains usable when the audit endpoint is temporarily unavailable.
     } finally {
-      knowledgeLoading.value = false;
+      if (sequence === knowledgeRequestSequence) knowledgeLoading.value = false;
     }
   }
   if (commandId === "pulse") {
@@ -962,7 +1051,8 @@ async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
     discoveryResult.value = solar
       ? `${solar.name}表面扫描完成：${solar.feature}信号清晰，未发现异常遮挡。`
       : "光子环扫描完成：近侧亮弧存在 17.2° 偏振偏移，远侧回波在 0.84 秒后抵达。";
-    sceneRef.value?.triggerDiscoveryEffect(solar?.id || "black-hole");
+    const scanTarget = solar?.id || (activeDiscoveryId.value === "satellite-aurora" || activeDiscoveryId.value === "satellite-relay" ? activeDiscoveryId.value : "black-hole");
+    sceneRef.value?.triggerDiscoveryEffect(scanTarget);
   } else if (commandId === "latest") {
     const latest = latestNode.value;
     if (latest) {
@@ -976,15 +1066,20 @@ async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
       "环站巡航已接管视角：正沿桁架、实验舱与太阳翼外缘飞行。";
     sceneRef.value?.startDiscoveryTour("station");
   } else if (commandId === "bridge") {
-    discoveryResult.value =
-      "第三人称追航已启动：镜头保持在舰尾上方，平滑跟随风隅号姿态与完整航线。";
-    sceneRef.value?.startDiscoveryTour("spacecraft");
+    const cockpit = discovery.id === "scoutcraft";
+    discoveryResult.value = cockpit
+      ? "驾驶舱漫游已接管视角：棱镜导航窗正将星光与脉冲星信号叠合为前方航道。"
+      : "第三人称追航已启动：镜头保持在舰尾上方，平滑跟随风隅号姿态与完整航线。";
+    sceneRef.value?.startDiscoveryTour(cockpit ? "scoutcraft" : "spacecraft");
   } else if (commandId === "log") {
     discoveryResult.value = sample(stationLogs, discoverySequence.value);
     sceneRef.value?.triggerDiscoveryEffect("station");
   } else if (commandId === "signal") {
     discoveryResult.value = `窄带信标 FY-${String(discoverySequence.value).padStart(4, "0")} 已发射，载频 1420.405 MHz，等待同频回执。`;
-    sceneRef.value?.triggerDiscoveryEffect("satellite");
+    const satelliteId = activeDiscoveryId.value === "satellite-aurora" || activeDiscoveryId.value === "satellite-relay"
+      ? activeDiscoveryId.value
+      : "satellite";
+    sceneRef.value?.triggerDiscoveryEffect(satelliteId);
   } else if (commandId === "orbit") {
     const solar = solarPlanetSpecs.find((item) => item.id === discovery.id);
     discoveryResult.value = solar
@@ -993,10 +1088,13 @@ async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
     sceneRef.value?.focusDiscovery(solar?.id || "satellite");
     sceneRef.value?.triggerDiscoveryEffect(solar?.id || "satellite");
   } else if (commandId === "warp") {
-    discoveryResult.value =
-      "曲率航路已展开：风隅号正在穿越星图，尾随镜头将持续追踪跃迁航迹。";
-    if (!immersiveMode.value) sceneRef.value?.startDiscoveryTour("spacecraft");
-    sceneRef.value?.triggerDiscoveryEffect("spacecraft");
+    const cockpit = discovery.id === "scoutcraft";
+    discoveryResult.value = cockpit
+      ? "星际漫游已启动：棱镜号正在沿导航走廊穿越星图，驾驶舱将持续指向前方脉冲星。"
+      : "曲率航路已展开：风隅号正在穿越星图，尾随镜头将持续追踪跃迁航迹。";
+    const craftId = cockpit ? "scoutcraft" : "spacecraft";
+    if (!immersiveMode.value) sceneRef.value?.startDiscoveryTour(craftId);
+    sceneRef.value?.triggerDiscoveryEffect(craftId);
   } else {
     discoveryResult.value = "";
     sceneRef.value?.triggerDiscoveryEffect(discovery.id);
@@ -1024,6 +1122,7 @@ function resetScene() {
 }
 
 async function clearSelected() {
+  knowledgeRequestSequence += 1;
   neighborRequestSequence += 1;
   const returnTo = returnDiscoveryId.value;
   selected.value = null;
@@ -1467,6 +1566,7 @@ useHead({ title: "时光星图" });
   overflow-anchor: none;
   overflow-x: hidden;
   overflow-y: auto;
+  scroll-behavior: smooth;
   padding: 25px 25px 23px 30px;
   border: 1px solid color-mix(in srgb, var(--c-primary) 28%, var(--border));
   border-radius: 8px;
@@ -1700,6 +1800,7 @@ useHead({ title: "时光星图" });
   padding: 24px;
   overflow-x: hidden;
   overflow-y: auto;
+  scroll-behavior: smooth;
   border: 1px solid color-mix(in srgb, var(--c-primary) 30%, var(--border));
   border-radius: 8px;
   background: var(--space-surface);
@@ -1797,7 +1898,8 @@ useHead({ title: "时光星图" });
     opacity 0.24s ease,
     transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.discovery-popup.is-immersive.discovery-spacecraft {
+.discovery-popup.is-immersive.discovery-spacecraft,
+.discovery-popup.is-immersive.discovery-scoutcraft {
   width: min(330px, calc(100vw - 44px));
   height: 114px;
 }
@@ -1995,9 +2097,14 @@ useHead({ title: "时光星图" });
   font-size: 0.59rem;
   line-height: 1.55;
 }
+.knowledge-slot.has-content {
+  min-height: 156px;
+}
 .telemetry-knowledge {
   position: relative;
   display: flex;
+  min-height: 156px;
+  box-sizing: border-box;
   flex-direction: column;
   gap: 9px;
   margin-top: 16px;
@@ -2037,6 +2144,8 @@ useHead({ title: "时光星图" });
 }
 .telemetry-knowledge p {
   margin: 0;
+  max-height: 82px;
+  overflow-y: auto;
   color: var(--c-text-2);
   font-size: 0.66rem;
   line-height: 1.75;
@@ -2250,7 +2359,8 @@ useHead({ title: "时光星图" });
     height: 54px;
     padding: 10px 12px;
   }
-  .discovery-popup.is-immersive.discovery-spacecraft {
+  .discovery-popup.is-immersive.discovery-spacecraft,
+  .discovery-popup.is-immersive.discovery-scoutcraft {
     height: 110px;
   }
   .discovery-title {

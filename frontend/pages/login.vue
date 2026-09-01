@@ -104,7 +104,7 @@
         </Transition>
       </div>
       <TurnstileWidget ref="turnstileWidget" v-model="turnstileToken" />
-      <template v-if="supabaseEnabled">
+      <template v-if="showGitHubLogin">
         <div class="auth-divider">
           <span>或</span>
         </div>
@@ -135,6 +135,7 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const { signInWithGitHub, enabled: supabaseEnabled } = useSupabase();
+const showGitHubLogin = import.meta.env.PROD && supabaseEnabled;
 const loginType = ref<"password" | "code">("password");
 const email = ref("");
 const password = ref("");

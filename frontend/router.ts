@@ -204,11 +204,6 @@ const routes: RouteRecordRaw[] = [
     meta: adminMeta,
   },
   {
-    path: "/admin/journeys",
-    component: lazyRoute(() => import("./pages/admin/journeys.vue")),
-    meta: adminMeta,
-  },
-  {
     path: "/admin/library",
     component: lazyRoute(() => import("./pages/admin/library/index.vue")),
     meta: adminMeta,

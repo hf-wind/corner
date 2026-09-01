@@ -63,7 +63,10 @@ type DiscoveryId =
   | "black-hole"
   | "station"
   | "satellite"
-  | "spacecraft";
+  | "satellite-aurora"
+  | "satellite-relay"
+  | "spacecraft"
+  | "scoutcraft";
 
 type SceneHit =
   | { kind: "memory"; node: MemoryNode; label: string }
@@ -140,7 +143,10 @@ let sun: THREE.Group | null = null;
 let blackHole: THREE.Group | null = null;
 let spaceStation: THREE.Group | null = null;
 let satellite: THREE.Group | null = null;
+let satelliteAurora: THREE.Group | null = null;
+let satelliteRelay: THREE.Group | null = null;
 let spacecraft: THREE.Group | null = null;
+let scoutcraft: THREE.Group | null = null;
 let meteor: THREE.Sprite | null = null;
 let meteorComa: THREE.Sprite | null = null;
 let meteorTrail: THREE.Line | null = null;
@@ -173,15 +179,27 @@ let cruiseHeight = OVERVIEW_HEIGHT_DESKTOP;
 let cruiseOrbitRadius = 218;
 let cruiseBobPhase = 0;
 let cruiseBlendStartedAt = 0;
-let cruiseSettleTimer = 0;
 const cruiseResumePosition = new THREE.Vector3();
 const cruiseResumeTarget = new THREE.Vector3();
+let cruiseSettling = false;
+let cruiseSettleStableFrames = 0;
+const cruiseSettleLastPosition = new THREE.Vector3();
+const cruiseSettleLastTarget = new THREE.Vector3();
+const CRUISE_SETTLE_POSITION_EPSILON = 0.015;
+const CRUISE_SETTLE_TARGET_EPSILON = 0.015;
+const CRUISE_SETTLE_STABLE_FRAMES = 5;
 let discoveryTourPhase = 0;
 let discoveryTourHeight = 0;
 let stationOrbitPhase = -0.72;
 let satelliteOrbitPhase = -2.28;
+let satelliteAuroraOrbitPhase = 1.18;
+let satelliteRelayOrbitPhase = -0.42;
 let spacecraftCruisePhase = -0.56;
+let scoutcraftCruisePhase = 0.18;
 let cameraFlightTrackingId: DiscoveryId | "" = "";
+let smoothZoomDistance = 0;
+let smoothZoomTargetDistance = 0;
+let lastWheelAt = 0;
 const focusedCameraPositionOffset = new THREE.Vector3();
 const focusedCameraTargetOffset = new THREE.Vector3();
 const narrativeCameraPosition = new THREE.Vector3();
@@ -203,8 +221,28 @@ const spacecraftFlightPath = new THREE.CatmullRomCurve3(
   "catmullrom",
   0.42,
 );
+const scoutcraftFlightPath = new THREE.CatmullRomCurve3(
+  [
+    new THREE.Vector3(-228, 86, -104),
+    new THREE.Vector3(-96, 116, -232),
+    new THREE.Vector3(104, 92, -218),
+    new THREE.Vector3(244, 54, -58),
+    new THREE.Vector3(178, 104, 142),
+    new THREE.Vector3(-42, 122, 218),
+    new THREE.Vector3(-218, 72, 94),
+  ],
+  true,
+  "catmullrom",
+  0.36,
+);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2(2, 2);
+let pointerActive = false;
+let suppressNextClick = false;
+let pointerDragged = false;
+let pointerDownX = 0;
+let pointerDownY = 0;
+const POINTER_DRAG_THRESHOLD = 6;
 const nodeObjects = new Map<string, THREE.Object3D>();
 const nodePositions = new Map<string, THREE.Vector3>();
 const nodeLookup = new Map<string, MemoryNode>();
@@ -1197,7 +1235,7 @@ function addSun() {
     0.28,
     -1,
   ).normalize();
-  sun.position.set(mobile ? 32 : 112, mobile ? 92 : 64, -132);
+  sun.position.set(mobile ? 46 : 142, mobile ? 108 : 76, -182);
   const surface = new THREE.Mesh(
     track(
       new THREE.SphereGeometry(7.8, lowQuality ? 18 : 30, lowQuality ? 12 : 20),
@@ -1269,7 +1307,7 @@ function addBlackHole() {
     0.22,
     -1,
   ).normalize();
-  blackHole.position.set(-112, 64, -164);
+  blackHole.position.set(-152, 76, -228);
   blackHole.rotation.set(0.04, -0.16, -0.08);
   blackHole.scale.setScalar(1.12);
   const eventHorizon = new THREE.Mesh(
@@ -1390,6 +1428,96 @@ function stationOrbitPosition(phase: number, target = new THREE.Vector3()) {
   );
 }
 
+const AUTOPILOT_COLLIDERS: DiscoveryId[] = [
+  "planet",
+  "sun",
+  "black-hole",
+  "mercury",
+  "venus",
+  "mars",
+  "jupiter",
+  "saturn",
+  "uranus",
+  "neptune",
+  "station",
+  "spacecraft",
+  "scoutcraft",
+];
+const AUTOPILOT_SOLVER_PASSES = 36;
+const AUTOPILOT_SAFETY_BUFFER = 0.35;
+
+function autopilotCollisionRadius(id: DiscoveryId) {
+  if (id === "sun") return 62;
+  if (id === "black-hole") return 58;
+  if (id === "planet") return 28;
+  if (id === "station") return 24;
+  if (id === "spacecraft") return 22;
+  if (id === "scoutcraft") return 18;
+  if (id === "jupiter" || id === "saturn") return 16;
+  return 12;
+}
+
+// The correction is solved from the desired path position, so it remains
+// continuous and cannot push a craft through a protected celestial body.
+function safeAutopilotPosition(
+  desired: THREE.Vector3,
+  selfId: DiscoveryId,
+  clearance: number,
+) {
+  const safe = desired.clone();
+  for (let pass = 0; pass < AUTOPILOT_SOLVER_PASSES; pass += 1) {
+    let corrected = false;
+    for (const id of AUTOPILOT_COLLIDERS) {
+      if (id === selfId) continue;
+      const object = discoveryObjects.get(id);
+      if (!object) continue;
+      const center = object.getWorldPosition(new THREE.Vector3());
+      const minimumDistance =
+        clearance + autopilotCollisionRadius(id) + AUTOPILOT_SAFETY_BUFFER;
+      const distance = safe.distanceTo(center);
+      if (distance >= minimumDistance) continue;
+      const direction = safe.sub(center);
+      if (direction.lengthSq() < 0.0001) {
+        direction.set(Math.cos(elapsed + clearance), 0.34, Math.sin(elapsed + clearance));
+      }
+      safe.copy(center).addScaledVector(direction.normalize(), minimumDistance);
+      corrected = true;
+    }
+    if (!corrected) break;
+  }
+  return safe;
+}
+
+function syncSmoothZoomFromCamera() {
+  if (!camera || !controls) return;
+  const distance = camera.position.distanceTo(controls.target);
+  smoothZoomDistance = distance;
+  smoothZoomTargetDistance = distance;
+}
+
+function onWheel(event: WheelEvent) {
+  if (props.ambient || cameraFlight || !camera || !controls) return;
+  event.preventDefault();
+  const now = performance.now();
+  introInterrupted = true;
+  introCompleted = true;
+  camera.fov = 48;
+  camera.updateProjectionMatrix();
+  if (now - lastWheelAt > 160) syncSmoothZoomFromCamera();
+  lastWheelAt = now;
+  const delta = Math.max(-120, Math.min(120, event.deltaY));
+  smoothZoomTargetDistance = THREE.MathUtils.clamp(
+    smoothZoomTargetDistance * Math.exp(delta * 0.00125),
+    controls.minDistance,
+    controls.maxDistance,
+  );
+  cruiseSettling = true;
+  cruiseSettleStableFrames = 0;
+  cruiseSettleLastPosition.copy(camera.position);
+  cruiseSettleLastTarget.copy(controls.target);
+  cruisePausedUntil = Number.POSITIVE_INFINITY;
+}
+
 function addSpaceStation() {
   if (!scene) return;
   spaceStation = new THREE.Group();
@@ -1495,25 +1623,44 @@ function addSpaceStation() {
     }
   }
 
-  for (const [x, y, z, scale] of [
-    [-4.8, 4.2, 0, 1],
-    [4.8, -4.2, 0, 0.86],
-    [0, 0, 4.4, 0.72],
+  const habitatModule = track(
+    new THREE.MeshStandardMaterial({
+      color: 0x748d9e,
+      roughness: 0.42,
+      metalness: 0.62,
+      emissive: 0x142b38,
+      emissiveIntensity: 0.28,
+    }),
+  );
+  const habitatWindow = track(
+    new THREE.MeshBasicMaterial({
+      color: 0xb9f3ff,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  for (const [angle, scale] of [
+    [-0.18, 1],
+    [Math.PI / 2 - 0.18, 0.92],
+    [Math.PI - 0.18, 0.96],
+    [Math.PI * 1.5 - 0.18, 0.9],
   ] as const) {
     const module = new THREE.Mesh(
-      track(new THREE.SphereGeometry(2.15 * scale, lowQuality ? 14 : 24, lowQuality ? 10 : 16)),
-      hull,
+      track(new THREE.CapsuleGeometry(1.42 * scale, 4.6 * scale, lowQuality ? 4 : 7, lowQuality ? 10 : 16)),
+      habitatModule,
     );
-    module.scale.set(1.34, 0.82, 0.82);
-    module.position.set(x, y, z);
+    module.rotation.z = angle;
+    module.position.set(Math.cos(angle) * 5.9, Math.sin(angle) * 5.9, 0);
     spaceStation.add(module);
-    const moduleWindow = new THREE.Mesh(
-      track(new THREE.TorusGeometry(1.66 * scale, 0.1 * scale, 6, lowQuality ? 28 : 56)),
-      windowMaterial,
+    const window = new THREE.Mesh(
+      track(new THREE.TorusGeometry(1.02 * scale, 0.12 * scale, 6, lowQuality ? 24 : 48)),
+      habitatWindow,
     );
-    moduleWindow.rotation.y = Math.PI / 2;
-    moduleWindow.position.set(x + (x > 0 ? 2.8 : -2.8) * scale, y, z);
-    spaceStation.add(moduleWindow);
+    window.rotation.set(0, Math.PI / 2, angle);
+    window.position.set(Math.cos(angle) * 7.1, Math.sin(angle) * 7.1, 0);
+    spaceStation.add(window);
   }
   const antenna = new THREE.Mesh(
     track(new THREE.CylinderGeometry(0.08, 0.08, 7, 6)),
@@ -1521,23 +1668,22 @@ function addSpaceStation() {
   );
   antenna.position.y = 5.8;
   spaceStation.add(antenna);
-  const dish = new THREE.Mesh(
-    track(
-      new THREE.SphereGeometry(
-        2.1,
-        lowQuality ? 12 : 20,
-        7,
-        0,
-        Math.PI * 2,
-        0,
-        Math.PI / 2,
-      ),
-    ),
-    hull,
-  );
-  dish.position.y = 9;
-  dish.rotation.x = Math.PI;
-  spaceStation.add(dish);
+  for (const side of [-1, 1]) {
+    const dockingArm = new THREE.Mesh(
+      track(new THREE.CylinderGeometry(0.34, 0.48, 5.8, lowQuality ? 8 : 14)),
+      darkHull,
+    );
+    dockingArm.rotation.z = Math.PI / 2;
+    dockingArm.position.x = side * 8.8;
+    spaceStation.add(dockingArm);
+    const dockingPort = new THREE.Mesh(
+      track(new THREE.TorusGeometry(1.2, 0.22, 7, lowQuality ? 28 : 56)),
+      windowMaterial,
+    );
+    dockingPort.rotation.y = Math.PI / 2;
+    dockingPort.position.x = side * 12;
+    spaceStation.add(dockingPort);
+  }
 
   for (const [x, y, z] of [
     [-6.6, 0, 0],
@@ -1679,6 +1825,178 @@ function addSatellite() {
   scene.add(satellite);
 }
 
+function addAuroraSatellite() {
+  if (!scene) return;
+  satelliteAurora = new THREE.Group();
+  satelliteAurora.name = "aurora-observation-satellite";
+  satelliteAurora.position.set(36, 68, -164);
+  satelliteAurora.rotation.set(0.32, -0.6, 0.18);
+  const hull = track(new THREE.MeshStandardMaterial({
+    color: 0x172e46,
+    roughness: 0.3,
+    metalness: 0.84,
+    emissive: 0x123b58,
+    emissiveIntensity: 0.5,
+  }));
+  const trim = track(new THREE.MeshBasicMaterial({
+    color: 0x7ff5ff,
+    transparent: true,
+    opacity: 0.86,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  }));
+  const solar = track(new THREE.MeshStandardMaterial({
+    color: 0x2d6b92,
+    roughness: 0.26,
+    metalness: 0.58,
+    emissive: 0x194f77,
+    emissiveIntensity: 0.72,
+    side: THREE.DoubleSide,
+  }));
+  const coreBody = new THREE.Mesh(
+    track(new THREE.IcosahedronGeometry(3.6, lowQuality ? 1 : 2)),
+    hull,
+  );
+  satelliteAurora.add(coreBody);
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(
+      track(new THREE.BoxGeometry(11.5, 0.14, 3.8)),
+      solar,
+    );
+    wing.position.x = side * 8.1;
+    wing.rotation.z = side * 0.08;
+    satelliteAurora.add(wing);
+    const edge = new THREE.Mesh(
+      track(new THREE.BoxGeometry(11.2, 0.09, 0.12)),
+      trim,
+    );
+    edge.position.set(side * 8.1, 0.12, 1.88);
+    satelliteAurora.add(edge);
+  }
+  const sensorMast = new THREE.Mesh(
+    track(new THREE.CylinderGeometry(0.16, 0.16, 6.6, 8)),
+    hull,
+  );
+  sensorMast.position.y = 4.4;
+  satelliteAurora.add(sensorMast);
+  const sensor = new THREE.Mesh(
+    track(new THREE.SphereGeometry(1.22, lowQuality ? 10 : 18, lowQuality ? 8 : 12)),
+    trim,
+  );
+  sensor.position.y = 7.6;
+  satelliteAurora.add(sensor);
+  for (const radius of [5.2, 6.8]) {
+    const ring = new THREE.Mesh(
+      track(new THREE.TorusGeometry(radius, 0.075, 5, lowQuality ? 32 : 64)),
+      trim,
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.name = "aurora-signal-ring";
+    satelliteAurora.add(ring);
+  }
+  registerDiscovery("satellite-aurora", "极光观测卫星 · AURORA-02", satelliteAurora, 10);
+  scene.add(satelliteAurora);
+}
+
+function addRelaySatellite() {
+  if (!scene) return;
+  satelliteRelay = new THREE.Group();
+  satelliteRelay.name = "tidal-relay-satellite";
+  satelliteRelay.position.set(148, -18, -94);
+  satelliteRelay.rotation.set(-0.24, 0.7, -0.28);
+  const hull = track(new THREE.MeshStandardMaterial({
+    color: 0x9e7541,
+    roughness: 0.38,
+    metalness: 0.74,
+    emissive: 0x3a2110,
+    emissiveIntensity: 0.32,
+  }));
+  const darkHull = track(new THREE.MeshStandardMaterial({
+    color: 0x222a36,
+    roughness: 0.46,
+    metalness: 0.7,
+  }));
+  const panel = track(new THREE.MeshStandardMaterial({
+    color: 0x6b3e2b,
+    roughness: 0.44,
+    metalness: 0.42,
+    emissive: 0x3c1c1a,
+    emissiveIntensity: 0.46,
+    side: THREE.DoubleSide,
+  }));
+  const signal = track(new THREE.MeshBasicMaterial({
+    color: 0xffc875,
+    transparent: true,
+    opacity: 0.78,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  }));
+  const drum = new THREE.Mesh(
+    track(new THREE.CylinderGeometry(2.8, 2.8, 5.8, lowQuality ? 10 : 18)),
+    hull,
+  );
+  drum.rotation.z = Math.PI / 2;
+  satelliteRelay.add(drum);
+  const collar = new THREE.Mesh(
+    track(new THREE.TorusGeometry(3.1, 0.22, 6, lowQuality ? 32 : 64)),
+    signal,
+  );
+  collar.rotation.y = Math.PI / 2;
+  satelliteRelay.add(collar);
+  for (const side of [-1, 1]) {
+    const boom = new THREE.Mesh(
+      track(new THREE.BoxGeometry(9.6, 0.24, 0.24)),
+      darkHull,
+    );
+    boom.position.x = side * 7.3;
+    satelliteRelay.add(boom);
+    const wing = new THREE.Mesh(
+      track(new THREE.BoxGeometry(7.8, 0.12, 3.2)),
+      panel,
+    );
+    wing.position.x = side * 12.4;
+    wing.rotation.y = side * 0.12;
+    satelliteRelay.add(wing);
+  }
+  const mast = new THREE.Mesh(
+    track(new THREE.CylinderGeometry(0.13, 0.13, 6.8, 7)),
+    darkHull,
+  );
+  mast.position.y = 4.2;
+  satelliteRelay.add(mast);
+  const dish = new THREE.Mesh(
+    track(new THREE.SphereGeometry(2.35, lowQuality ? 12 : 20, 8, 0, Math.PI * 2, 0, Math.PI / 2)),
+    signal,
+  );
+  dish.position.set(0, 7.1, 0);
+  dish.rotation.x = Math.PI;
+  satelliteRelay.add(dish);
+  const beacon = new THREE.Sprite(track(new THREE.SpriteMaterial({
+    map: glowTexture("#ffc875"),
+    color: 0xffc875,
+    transparent: true,
+    opacity: 0.96,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  })));
+  beacon.name = "relay-beacon";
+  beacon.position.set(0, 8.9, 2.6);
+  beacon.scale.set(6.6, 6.6, 1);
+  beacon.renderOrder = 7;
+  satelliteRelay.add(beacon);
+  const beaconCore = new THREE.Mesh(
+    track(new THREE.SphereGeometry(0.48, lowQuality ? 8 : 14, lowQuality ? 6 : 10)),
+    track(new THREE.MeshBasicMaterial({ color: 0xffefc2 })),
+  );
+  beaconCore.name = "relay-beacon-core";
+  beaconCore.position.copy(beacon.position);
+  beaconCore.renderOrder = 8;
+  satelliteRelay.add(beaconCore);
+  registerDiscovery("satellite-relay", "潮汐中继卫星 · TRIDENT-03", satelliteRelay, 11);
+  scene.add(satelliteRelay);
+}
+
 function enginePlumeMaterial(inner: boolean, phase: number) {
   const material = track(
     new THREE.ShaderMaterial({
@@ -1738,7 +2056,11 @@ function addSpacecraft() {
   if (!scene) return;
   spacecraft = new THREE.Group();
   spacecraft.name = "wind-corner-starship";
-  spacecraft.position.set(92, 18, -42);
+  spacecraft.position.copy(
+    spacecraftFlightPath.getPointAt(
+      (((spacecraftCruisePhase / (Math.PI * 2)) % 1) + 1) % 1,
+    ),
+  );
   const ceramic = track(
     new THREE.MeshStandardMaterial({
       color: 0xd9e2e8,
@@ -2143,6 +2465,121 @@ function addSpacecraft() {
   spacecraft.scale.setScalar(lowQuality ? 0.62 : 0.8);
   registerDiscovery("spacecraft", "风隅号 · FY-01", spacecraft, 10);
   scene.add(spacecraft);
+}
+
+function addScoutcraft() {
+  if (!scene) return;
+  scoutcraft = new THREE.Group();
+  scoutcraft.name = "prism-scoutcraft";
+  scoutcraft.position.copy(scoutcraftFlightPath.getPointAt(0.18));
+
+  const hull = track(new THREE.MeshStandardMaterial({
+    color: 0x4e5966,
+    roughness: 0.22,
+    metalness: 0.9,
+    emissive: 0x111b25,
+    emissiveIntensity: 0.3,
+  }));
+  const shell = track(new THREE.MeshStandardMaterial({
+    color: 0xb7a39a,
+    roughness: 0.28,
+    metalness: 0.78,
+    emissive: 0x35241c,
+    emissiveIntensity: 0.26,
+  }));
+  const glass = track(new THREE.MeshStandardMaterial({
+    color: 0xf2a36e,
+    roughness: 0.08,
+    metalness: 0.62,
+    emissive: 0xa54820,
+    emissiveIntensity: 0.9,
+    transparent: true,
+    opacity: 0.82,
+  }));
+  const signal = track(new THREE.MeshBasicMaterial({
+    color: 0xffc78a,
+    transparent: true,
+    opacity: 0.82,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  }));
+  const body = new THREE.Mesh(
+    track(new THREE.OctahedronGeometry(5.6, lowQuality ? 0 : 1)),
+    hull,
+  );
+  body.scale.set(1.65, 0.52, 0.72);
+  body.rotation.z = Math.PI / 2;
+  scoutcraft.add(body);
+  const cockpitFrame = new THREE.Mesh(
+    track(new THREE.SphereGeometry(3.4, lowQuality ? 12 : 24, lowQuality ? 8 : 16)),
+    shell,
+  );
+  cockpitFrame.position.set(4.4, 1.05, 0);
+  cockpitFrame.scale.set(1.25, 0.52, 0.8);
+  scoutcraft.add(cockpitFrame);
+  const cockpit = new THREE.Mesh(
+    track(new THREE.SphereGeometry(3.08, lowQuality ? 12 : 24, lowQuality ? 8 : 16)),
+    glass,
+  );
+  cockpit.position.set(4.7, 1.22, 0);
+  cockpit.scale.set(1.16, 0.48, 0.7);
+  scoutcraft.add(cockpit);
+  const nose = new THREE.Mesh(
+    track(new THREE.ConeGeometry(2.25, 8.6, lowQuality ? 10 : 22)),
+    shell,
+  );
+  nose.position.x = 11.2;
+  nose.rotation.z = -Math.PI / 2;
+  scoutcraft.add(nose);
+  const antenna = new THREE.Mesh(
+    track(new THREE.CylinderGeometry(0.12, 0.12, 7.6, 8)),
+    hull,
+  );
+  antenna.position.set(-1.2, 5.1, 0);
+  antenna.rotation.z = -0.24;
+  scoutcraft.add(antenna);
+  const scanner = new THREE.Mesh(
+    track(new THREE.TorusGeometry(4.2, 0.1, 6, lowQuality ? 34 : 72)),
+    signal,
+  );
+  scanner.name = "scoutcraft-scan-ring";
+  scanner.position.set(-2.1, 0, 0);
+  scanner.rotation.y = Math.PI / 2;
+  scoutcraft.add(scanner);
+  for (const side of [-1, 1]) {
+    const fin = new THREE.Mesh(
+      track(new THREE.BoxGeometry(8.6, 0.14, 2.5)),
+      shell,
+    );
+    fin.position.set(-2.8, -0.3, side * 5.1);
+    fin.rotation.y = side * -0.32;
+    scoutcraft.add(fin);
+    const finLight = new THREE.Mesh(
+      track(new THREE.BoxGeometry(5.2, 0.08, 0.14)),
+      signal,
+    );
+    finLight.position.set(-3.5, 0, side * 6.16);
+    finLight.rotation.y = side * -0.32;
+    scoutcraft.add(finLight);
+    const engine = new THREE.Sprite(track(new THREE.SpriteMaterial({
+      map: glowTexture("#ff965b"),
+      color: 0xffbd79,
+      transparent: true,
+      opacity: 0.94,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })));
+    engine.name = "scoutcraft-engine-glow";
+    engine.position.set(-10.6, 0, side * 2.25);
+    engine.scale.set(4.2, 4.2, 1);
+    scoutcraft.add(engine);
+  }
+  const cockpitLight = new THREE.PointLight(0xffbc7c, 28, 38, 1.8);
+  cockpitLight.position.set(5, 3.2, 0);
+  scoutcraft.add(cockpitLight);
+  scoutcraft.scale.setScalar(lowQuality ? 0.56 : 0.74);
+  registerDiscovery("scoutcraft", "棱镜号 · PRISM-07", scoutcraft, 10);
+  scene.add(scoutcraft);
 }
 
 function addOrbit(radius: number, year: number | null) {
@@ -2769,7 +3206,10 @@ function clearSceneContent() {
   blackHole = null;
   spaceStation = null;
   satellite = null;
+  satelliteAurora = null;
+  satelliteRelay = null;
   spacecraft = null;
+  scoutcraft = null;
   meteor = null;
   meteorComa = null;
   meteorTrail = null;
@@ -2785,7 +3225,10 @@ function buildScene() {
   addBlackHole();
   addSpaceStation();
   addSatellite();
+  addAuroraSatellite();
+  addRelaySatellite();
   addSpacecraft();
+  addScoutcraft();
   addCore();
   addSolarSystem();
   addNebulae();
@@ -2867,6 +3310,11 @@ function hitScene(): SceneHit | null {
 }
 
 function onPointerMove(event: PointerEvent) {
+  if (pointerActive && !pointerDragged) {
+    const dx = event.clientX - pointerDownX;
+    const dy = event.clientY - pointerDownY;
+    if (Math.hypot(dx, dy) >= POINTER_DRAG_THRESHOLD) pointerDragged = true;
+  }
   if (discoveryTourId) {
     if (host.value) host.value.style.cursor = "default";
     tooltip.value?.classList.remove("visible");
@@ -2889,14 +3337,36 @@ function onPointerMove(event: PointerEvent) {
   }
 }
 
-function onPointerDown() {
+function onPointerDown(event: PointerEvent) {
   if (props.ambient || cameraFlight) return;
+  pointerActive = true;
+  pointerDragged = false;
+  pointerDownX = event.clientX;
+  pointerDownY = event.clientY;
+  suppressNextClick = false;
   introInterrupted = true;
   introCompleted = true;
-  if (camera) {
+  if (camera && controls) {
     camera.fov = 48;
     camera.updateProjectionMatrix();
+    lastWheelAt = 0;
+    syncSmoothZoomFromCamera();
+    syncCruiseFromCamera();
+    cruiseResumePosition.copy(camera.position);
+    cruiseResumeTarget.copy(controls.target);
+    cruiseSettling = true;
+    cruiseSettleStableFrames = 0;
+    cruiseSettleLastPosition.copy(camera.position);
+    cruiseSettleLastTarget.copy(controls.target);
+    cruisePausedUntil = Number.POSITIVE_INFINITY;
   }
+}
+
+function onPointerUp() {
+  if (!pointerActive) return;
+  suppressNextClick = pointerDragged;
+  pointerActive = false;
+  pointerDragged = false;
 }
 
 function syncCruiseFromCamera() {
@@ -2909,10 +3379,8 @@ function syncCruiseFromCamera() {
 }
 
 function onControlsStart() {
-  if (cruiseSettleTimer) {
-    window.clearTimeout(cruiseSettleTimer);
-    cruiseSettleTimer = 0;
-  }
+  cruiseSettling = false;
+  cruiseSettleStableFrames = 0;
   cruisePausedUntil = Number.POSITIVE_INFINITY;
 }
 
@@ -2925,26 +3393,53 @@ function onControlsEnd() {
       focusedCameraTargetOffset.copy(controls.target).sub(target);
     }
   }
-  // OrbitControls damping continues after the pointer is released. Sampling
-  // immediately here captures a transient pose and causes a visible snap when
-  // the cruise camera takes over. Let the damping settle, then establish the
-  // cruise baseline from the settled camera exactly once.
-  cruisePausedUntil = Number.POSITIVE_INFINITY;
-  cruiseBlendStartedAt = 0;
-  if (cruiseSettleTimer) window.clearTimeout(cruiseSettleTimer);
-  cruiseSettleTimer = window.setTimeout(() => {
-    cruiseSettleTimer = 0;
-    if (!camera || !controls || disposed) return;
-    controls.update(0);
-    syncCruiseFromCamera();
-    cruiseResumePosition.copy(camera.position);
-    cruiseResumeTarget.copy(controls.target);
-    cruiseBlendStartedAt = performance.now();
-    cruisePausedUntil = performance.now() + 900;
-  }, 180);
+  if (camera && controls) {
+    cruiseSettling = true;
+    cruiseSettleStableFrames = 0;
+    cruiseSettleLastPosition.copy(camera.position);
+    cruiseSettleLastTarget.copy(controls.target);
+    cruiseBlendStartedAt = 0;
+    cruisePausedUntil = Number.POSITIVE_INFINITY;
+  }
+}
+
+function updateCruiseSettle(now: number) {
+  if (!cruiseSettling || !camera || !controls) return;
+  if (cameraFlight || discoveryTourId || props.selectedId || focusedDiscoveryId) {
+    cruiseSettling = false;
+    cruiseSettleStableFrames = 0;
+    return;
+  }
+  const positionDelta = camera.position.distanceTo(cruiseSettleLastPosition);
+  const targetDelta = controls.target.distanceTo(cruiseSettleLastTarget);
+  cruiseSettleLastPosition.copy(camera.position);
+  cruiseSettleLastTarget.copy(controls.target);
+  if (
+    positionDelta <= CRUISE_SETTLE_POSITION_EPSILON &&
+    targetDelta <= CRUISE_SETTLE_TARGET_EPSILON
+  )
+    cruiseSettleStableFrames += 1;
+  else cruiseSettleStableFrames = 0;
+  if (cruiseSettleStableFrames < CRUISE_SETTLE_STABLE_FRAMES) return;
+  cruiseSettling = false;
+  syncCruiseFromCamera();
+  cruiseResumePosition.copy(camera.position);
+  cruiseResumeTarget.copy(controls.target);
+  cruiseBlendStartedAt = now;
+  cruisePausedUntil = now;
+  if (overviewSnapshot) {
+    overviewSnapshot = {
+      position: camera.position.clone(),
+      target: controls.target.clone(),
+    };
+  }
 }
 function onClick(event: PointerEvent) {
   if (props.ambient) return;
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
   pointerPosition(event);
   const hit = hitScene();
   if (hit?.kind === "memory") emit("select", hit.node);
@@ -3038,6 +3533,8 @@ function applyIntroCamera(now: number) {
     cruiseOrbitRadius = radius;
     cruiseHeight = mobile ? OVERVIEW_HEIGHT_MOBILE : OVERVIEW_HEIGHT_DESKTOP;
     cruiseBobPhase = 0;
+    cruiseResumePosition.copy(camera.position);
+    cruiseResumeTarget.copy(target);
     cruiseBlendStartedAt = now;
     cruisePausedUntil = 0;
   }
@@ -3103,6 +3600,8 @@ function focusDiscovery(id: DiscoveryId, distanceMultiplier = 1) {
           ? 90
           : id === "spacecraft"
             ? 96
+            : id === "scoutcraft"
+              ? 74
             : id === "planet"
               ? 76
               : 68
@@ -3143,7 +3642,7 @@ function triggerDiscoveryEffect(id: DiscoveryId) {
 }
 
 function startDiscoveryTour(id: DiscoveryId) {
-  if (id !== "station" && id !== "spacecraft") return;
+  if (id !== "station" && id !== "spacecraft" && id !== "scoutcraft") return;
   if (!camera || !controls) return;
   const object = discoveryObjects.get(id);
   if (!object) return;
@@ -3209,6 +3708,20 @@ function discoveryTourPose(id: DiscoveryId): CameraSnapshot | null {
         .normalize(),
     };
   }
+  if (id === "scoutcraft" && scoutcraft) {
+    return {
+      // 棱镜号的舰桥位于舰首上方，视线沿本地 +X 延伸，形成驾驶舱漫游视角。
+      position: target
+        .clone()
+        .add(new THREE.Vector3(4.8, 1.55, 0).applyQuaternion(scoutcraft.quaternion)),
+      target: target
+        .clone()
+        .add(new THREE.Vector3(46, 1.2, 0).applyQuaternion(scoutcraft.quaternion)),
+      up: new THREE.Vector3(0, 1, 0)
+        .applyQuaternion(scoutcraft.quaternion)
+        .normalize(),
+    };
+  }
   return null;
 }
 
@@ -3219,9 +3732,10 @@ function updateDiscoveryTour(delta: number) {
   }
   const pose = discoveryTourPose(discoveryTourId);
   if (!pose) return;
-  const positionDamping = discoveryTourId === "spacecraft" ? 3.15 : 1.9;
-  const targetDamping = discoveryTourId === "spacecraft" ? 4.2 : 2.5;
-  const upDamping = discoveryTourId === "spacecraft" ? 2.4 : 3.2;
+  const craftTour = discoveryTourId === "spacecraft" || discoveryTourId === "scoutcraft";
+  const positionDamping = craftTour ? 3.15 : 1.9;
+  const targetDamping = craftTour ? 4.2 : 2.5;
+  const upDamping = craftTour ? 2.4 : 3.2;
   camera.position.lerp(pose.position, 1 - Math.exp(-delta * positionDamping));
   controls.target.lerp(pose.target, 1 - Math.exp(-delta * targetDamping));
   camera.up
@@ -3242,7 +3756,11 @@ function updateFocusedDiscoveryCamera(delta: number) {
     !focusedDiscoveryId
   )
     return;
-  if (focusedDiscoveryId !== "spacecraft" && focusedDiscoveryId !== "station")
+  if (
+    focusedDiscoveryId !== "spacecraft" &&
+    focusedDiscoveryId !== "scoutcraft" &&
+    focusedDiscoveryId !== "station"
+  )
     return;
   const object = discoveryObjects.get(focusedDiscoveryId);
   if (!object) return;
@@ -3301,7 +3819,12 @@ function updateCameraFlight(now: number) {
   if (pendingDiscoveryTourId) activateDiscoveryTour(pendingDiscoveryTourId);
   else controls.enabled = !props.ambient;
   syncCruiseFromCamera();
+  cruiseResumePosition.copy(camera.position);
+  cruiseResumeTarget.copy(controls.target);
+  cruiseBlendStartedAt = now;
   cruisePausedUntil = now;
+  cruiseSettling = false;
+  cruiseSettleStableFrames = 0;
   if (completion === "reset") {
     focusRestoreSnapshot = null;
     overviewSnapshot = null;
@@ -3443,7 +3966,7 @@ function applyCruiseCamera(now: number, delta: number) {
     focusedDiscoveryId
   )
     return;
-  if (!props.ambient && now < cruisePausedUntil) return;
+  if (!props.ambient && (cruiseSettling || now < cruisePausedUntil)) return;
   if (props.ambient && props.narrativeProgress >= 0) {
     const mobile = window.innerWidth < 720;
     const phase = narrativeValue(NARRATIVE_PHASES, props.narrativeProgress);
@@ -3474,9 +3997,10 @@ function applyCruiseCamera(now: number, delta: number) {
   }
   ambientOrbitPhase -= delta * CRUISE_ANGULAR_SPEED;
   cruiseBobPhase += delta * 0.18;
-  const cruiseBlend = cruiseBlendStartedAt
-    ? Math.min(1, (now - cruiseBlendStartedAt) / 900)
-    : 1;
+  const blendReady = !!cruiseBlendStartedAt && now >= cruisePausedUntil;
+  const cruiseBlend = blendReady
+    ? Math.min(1, (now - cruisePausedUntil) / 1600)
+    : cruiseBlendStartedAt ? 1 : 0;
   const easedBlend = cruiseBlend * cruiseBlend * (3 - 2 * cruiseBlend);
   const target = sceneTarget();
   const bob = Math.sin(cruiseBobPhase) * (props.ambient ? 7 : 2.4) * easedBlend;
@@ -3485,9 +4009,9 @@ function applyCruiseCamera(now: number, delta: number) {
     target.y + cruiseHeight + bob,
     target.z + Math.cos(ambientOrbitPhase) * cruiseOrbitRadius,
   );
-  const blend = cruiseBlendStartedAt
-    ? THREE.MathUtils.clamp((now - cruiseBlendStartedAt) / 900, 0, 1)
-    : 1;
+  const blend = blendReady
+    ? THREE.MathUtils.clamp((now - cruisePausedUntil) / 1600, 0, 1)
+    : cruiseBlendStartedAt ? 1 : 0;
   const eased = blend * blend * (3 - 2 * blend);
   if (blend < 1) {
     camera.position.lerpVectors(cruiseResumePosition, nextPosition, eased);
@@ -3504,8 +4028,22 @@ function animate(now = performance.now()) {
   animationFrame = requestAnimationFrame(animate);
   const delta = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0;
   elapsed += delta;
-  // OrbitControls first absorbs pointer inertia; cruise camera then takes over from the settled pose.
-  controls.update(delta);
+    // OrbitControls first absorbs pointer inertia; cruise starts only after that pose settles.
+    controls.update(delta);
+    if (!cameraFlight && !focusedDiscoveryId && smoothZoomDistance > 0) {
+      smoothZoomDistance = THREE.MathUtils.lerp(
+        smoothZoomDistance,
+        smoothZoomTargetDistance,
+        1 - Math.exp(-delta * 10),
+      );
+      const offset = camera.position.clone().sub(controls.target);
+      if (offset.lengthSq() > 0.0001) {
+        camera.position.copy(
+          controls.target.clone().add(offset.normalize().multiplyScalar(smoothZoomDistance)),
+        );
+      }
+    }
+  updateCruiseSettle(now);
   if (!reducedMotion.value) {
     const effectAge = discoveryEffect
       ? (now - discoveryEffectStartedAt) / 1000
@@ -3573,7 +4111,9 @@ function animate(now = performance.now()) {
     }
     if (spaceStation) {
       stationOrbitPhase -= (delta * Math.PI * 2) / 86;
-      spaceStation.position.copy(stationOrbitPosition(stationOrbitPhase));
+      spaceStation.position.copy(
+        safeAutopilotPosition(stationOrbitPosition(stationOrbitPhase), "station", 16),
+      );
       spaceStation.rotation.set(
         0.18 + Math.sin(stationOrbitPhase * 1.7) * 0.04,
         -stationOrbitPhase + Math.PI / 2,
@@ -3604,17 +4144,64 @@ function animate(now = performance.now()) {
         child.scale.setScalar(ringScale);
       });
     }
+    if (satelliteAurora) {
+      if (focusedDiscoveryId !== "satellite-aurora") {
+        satelliteAuroraOrbitPhase += delta * 0.022;
+        satelliteAurora.position.set(
+          Math.cos(satelliteAuroraOrbitPhase) * 108,
+          54 + Math.sin(satelliteAuroraOrbitPhase * 2.4) * 11,
+          Math.sin(satelliteAuroraOrbitPhase) * 82 - 64,
+        );
+      }
+      satelliteAurora.rotation.y -= delta * 0.08;
+      satelliteAurora.traverse((child) => {
+        if (child.name !== "aurora-signal-ring") return;
+        const ringScale =
+          1 +
+          Math.sin(elapsed * 1.9) * 0.08 +
+          (discoveryEffect === "satellite-aurora" ? effectPulse * 0.5 : 0);
+        child.scale.setScalar(ringScale);
+      });
+    }
+    if (satelliteRelay) {
+      if (focusedDiscoveryId !== "satellite-relay") {
+        satelliteRelayOrbitPhase -= delta * 0.018;
+        satelliteRelay.position.set(
+          122 + Math.cos(satelliteRelayOrbitPhase) * 74,
+          -16 + Math.sin(satelliteRelayOrbitPhase * 2.8) * 14,
+          -36 + Math.sin(satelliteRelayOrbitPhase) * 58,
+        );
+      }
+      satelliteRelay.rotation.y += delta * 0.06;
+      const beacon = satelliteRelay.getObjectByName("relay-beacon") as THREE.Sprite | undefined;
+      if (beacon) {
+        const pulse =
+          1 +
+          Math.sin(elapsed * 2.2) * 0.1 +
+          (discoveryEffect === "satellite-relay" ? effectPulse * 0.56 : 0);
+        beacon.scale.setScalar(6.6 * pulse);
+        (beacon.material as THREE.SpriteMaterial).opacity = 0.84 + Math.sin(elapsed * 2.2) * 0.12;
+      }
+      const beaconCore = satelliteRelay.getObjectByName("relay-beacon-core");
+      if (beaconCore) {
+        beaconCore.scale.setScalar(0.9 + Math.sin(elapsed * 2.2) * 0.16);
+      }
+    }
     if (spacecraft) {
       const launchAge = elapsed - spacecraftLaunchAt;
       if (spacecraftLaunchActive && launchAge >= 0 && launchAge < 4.2) {
         const progress = Math.min(1, launchAge / 4.2);
         const eased = progress * progress * (3 - 2 * progress);
         spacecraft.position.copy(
-          new THREE.QuadraticBezierCurve3(
-            spacecraftLaunchFrom,
-            spacecraftLaunchControl,
-            spacecraftLaunchTo,
-          ).getPoint(eased),
+          safeAutopilotPosition(
+            new THREE.QuadraticBezierCurve3(
+              spacecraftLaunchFrom,
+              spacecraftLaunchControl,
+              spacecraftLaunchTo,
+            ).getPoint(eased),
+            "spacecraft",
+            18,
+          ),
         );
         const tangent = new THREE.QuadraticBezierCurve3(
           spacecraftLaunchFrom,
@@ -3633,7 +4220,7 @@ function animate(now = performance.now()) {
         const pathTangent = spacecraftFlightPath
           .getTangentAt(pathProgress)
           .normalize();
-        spacecraft.position.copy(pathPosition);
+         spacecraft.position.copy(pathPosition);
         spacecraft.rotation.set(
           Math.asin(THREE.MathUtils.clamp(pathTangent.y, -0.8, 0.8)) * 0.5,
           -Math.atan2(pathTangent.z, pathTangent.x),
@@ -3696,6 +4283,28 @@ function animate(now = performance.now()) {
               ? effectPulse
               : 0;
       }
+    }
+    if (scoutcraft) {
+      scoutcraftCruisePhase -= (delta * Math.PI * 2) / 56;
+      const pathProgress =
+        (((scoutcraftCruisePhase / (Math.PI * 2)) % 1) + 1) % 1;
+      const pathPosition = scoutcraftFlightPath.getPointAt(pathProgress);
+      const pathTangent = scoutcraftFlightPath.getTangentAt(pathProgress).normalize();
+      scoutcraft.position.copy(pathPosition);
+      scoutcraft.rotation.set(
+        Math.asin(THREE.MathUtils.clamp(pathTangent.y, -0.8, 0.8)) * 0.42,
+        -Math.atan2(pathTangent.z, pathTangent.x),
+        Math.sin(pathProgress * Math.PI * 2) * 0.16,
+      );
+      scoutcraft.traverse((child) => {
+        if (child.name === "scoutcraft-scan-ring") {
+          child.rotation.z += delta * (0.9 + (discoveryEffect === "scoutcraft" ? effectPulse * 3.2 : 0));
+          child.scale.setScalar(1 + Math.sin(elapsed * 2.8) * 0.06);
+        } else if (child.name === "scoutcraft-engine-glow") {
+          const pulse = 1 + Math.sin(elapsed * 16 + child.position.z) * 0.12;
+          child.scale.setScalar((4.2 + (discoveryTourId === "scoutcraft" ? 1.8 : 0)) * pulse);
+        }
+      });
     }
     starLayers.forEach((stars, index) => {
       const movementSpeed = Math.max(0.2, Math.min(3, Number(props.sceneSettings.movementSpeed) || 1));
@@ -3799,50 +4408,11 @@ function animate(now = performance.now()) {
     updateDiscoveryTour(delta);
     updateFocusedDiscoveryCamera(delta);
   }
-  if (sun && camera && focusedDiscoveryId !== "sun") {
-    const viewOffset = (sun.userData.viewOffset as THREE.Vector3)
-      .clone()
-      .multiplyScalar(320)
-      .applyQuaternion(camera.quaternion);
-    const anchoredPosition = camera.position.clone().add(viewOffset);
-    if (resettingDiscoveryId === "sun" && sunResetActive && cameraFlight) {
-      const progress = cameraFlight.duration
-        ? Math.min(1, (now - cameraFlight.startedAt) / cameraFlight.duration)
-        : 1;
-      const eased =
-        progress * progress * progress * (progress * (progress * 6 - 15) + 10);
-      sun.position.lerpVectors(sunResetFrom, anchoredPosition, eased);
-    } else {
-      sun.position.copy(anchoredPosition);
-      sunResetActive = false;
-    }
-  }
-  if (blackHole && camera && focusedDiscoveryId !== "black-hole") {
-    const viewOffset = (blackHole.userData.viewOffset as THREE.Vector3)
-      .clone()
-      .multiplyScalar(370)
-      .applyQuaternion(camera.quaternion);
-    const anchoredPosition = camera.position.clone().add(viewOffset);
-    if (
-      resettingDiscoveryId === "black-hole" &&
-      blackHoleResetActive &&
-      cameraFlight
-    ) {
-      const progress = cameraFlight.duration
-        ? Math.min(1, (now - cameraFlight.startedAt) / cameraFlight.duration)
-        : 1;
-      const eased =
-        progress * progress * progress * (progress * (progress * 6 - 15) + 10);
-      blackHole.position.lerpVectors(
-        blackHoleResetFrom,
-        anchoredPosition,
-        eased,
-      );
-    } else {
-      blackHole.position.copy(anchoredPosition);
-      blackHoleResetActive = false;
-    }
-  }
+  // Discovery bodies stay in the world. Previously they were re-positioned
+  // against the camera every frame, which could put a giant sun/black hole in
+  // front of the welcome copy during the intro and route transition.
+  if (sun) sunResetActive = false;
+  if (blackHole) blackHoleResetActive = false;
   renderer.render(scene, camera);
   lastFrame = now;
 }
@@ -3890,7 +4460,8 @@ async function initialize() {
     controls.maxDistance = 480;
     controls.autoRotate = false;
     controls.enableRotate = !props.ambient;
-    controls.enableZoom = !props.ambient;
+    // Zoom is handled below so wheel input eases toward a target distance.
+    controls.enableZoom = false;
     controls.enabled = !props.ambient;
     introStartedAt = 0;
     introInterrupted = skipIntro;
@@ -3928,10 +4499,14 @@ async function initialize() {
     resizeObserver.observe(host.value);
     host.value.addEventListener("pointermove", onPointerMove);
     host.value.addEventListener("pointerdown", onPointerDown);
+    host.value.addEventListener("pointerup", onPointerUp);
+    host.value.addEventListener("pointercancel", onPointerUp);
     host.value.addEventListener("click", onClick);
+    renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
     controls.addEventListener("start", onControlsStart);
     controls.addEventListener("end", onControlsEnd);
     lastFrame = 0;
+    syncSmoothZoomFromCamera();
     resize();
     renderer.render(scene, camera);
     introStartedAt = performance.now() + Math.max(0, props.introDelayMs);
@@ -3947,13 +4522,14 @@ async function initialize() {
 
 function destroy() {
   cancelAnimationFrame(animationFrame);
-  if (cruiseSettleTimer) window.clearTimeout(cruiseSettleTimer);
-  cruiseSettleTimer = 0;
   resizeObserver?.disconnect();
   resizeObserver = null;
   host.value?.removeEventListener("pointermove", onPointerMove);
   host.value?.removeEventListener("pointerdown", onPointerDown);
+  host.value?.removeEventListener("pointerup", onPointerUp);
+  host.value?.removeEventListener("pointercancel", onPointerUp);
   host.value?.removeEventListener("click", onClick);
+  renderer?.domElement.removeEventListener("wheel", onWheel);
   controls?.removeEventListener("start", onControlsStart);
   controls?.removeEventListener("end", onControlsEnd);
   controls?.dispose();
