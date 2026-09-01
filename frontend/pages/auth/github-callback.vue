@@ -68,7 +68,7 @@ import { useSupabase } from '@/composables/useSupabase'
 const route = useRoute()
 const router = useRouter()
 const { getUser } = useSupabase()
-const { setSession, refreshProfile } = useAuth()
+const { setSession } = useAuth()
 const api = useApi()
 
 const loading = ref(true)
@@ -118,6 +118,9 @@ async function completeLogin() {
   completing.value = true
   try {
     const { turnstileToken, ...githubUser } = pendingGithubUser.value
+    // Turnstile responses are single-use. Never leave the token available for
+    // a later attempt after this request has started.
+    useClientState().removeSession('githubTurnstileToken')
     const response = await api.post<any>('/auth/github', { githubUser, turnstileToken })
     // The API client normally unwraps { code, data }, but keep the callback
     // correct when a proxy or an older deployment returns that envelope.
@@ -136,15 +139,6 @@ async function completeLogin() {
       avatar: nextUser.avatar ? String(nextUser.avatar) : null,
       role: nextUser.role ? String(nextUser.role) : 'user',
     })
-    // Hydrate the shared auth store from the server before routing away. This
-    // closes the race where the callback redirects successfully but the next
-    // page still sees the pre-OAuth user snapshot.
-    await refreshProfile(true)
-    // Confirm the exact JWT written by this page can authenticate against the
-    // site before navigating away. This prevents a false-success redirect.
-    const profile = await api.get<any>('/auth/profile')
-    if (!profile?.id) throw new Error('本站未确认登录状态，请重试')
-    useClientState().removeSession('githubTurnstileToken')
     const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
     await router.replace(redirect)
@@ -157,7 +151,10 @@ async function completeLogin() {
 }
 
 const retry = () => {
-  handleCallback()
+  useClientState().removeSession('githubTurnstileToken')
+  const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
+  router.replace({ path: '/login', query: { redirect } })
 }
 
 const goToLogin = () => {
