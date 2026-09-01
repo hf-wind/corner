@@ -101,7 +101,7 @@ jobs:
             version="${latest#v}"
             IFS=. read -r major minor patch <<< "$version"
             bump="$REQUESTED_BUMP"
-            messages="$(git log --format=%B "$latest"..HEAD)"
+            messages="$(git log -1 --format=%B HEAD)"
             if [[ "$bump" == "auto" ]]; then
               if grep -qi '\[skip release\]' <<< "$messages"; then
                 echo "Release skipped by commit directive"

@@ -4,6 +4,21 @@ set -Eeuo pipefail
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
 
+run_with_retries() {
+  local max_attempts="$1"
+  shift
+  local attempt=1
+
+  until "$@"; do
+    if (( attempt >= max_attempts )); then
+      return 1
+    fi
+    echo "Command failed (attempt ${attempt}/${max_attempts}); retrying in 3 seconds: $*" >&2
+    sleep 3
+    ((attempt++))
+  done
+}
+
 # The backend image intentionally has no checkout metadata. Export the current
 # history so the changelog can still show real commits in production.
 bash ./scripts/export-git-log.sh
@@ -26,8 +41,8 @@ if [[ -x scripts/backup.sh ]] && docker compose ps --status running postgres | g
 fi
 
 docker compose config --quiet
-docker compose build --pull
-docker compose up -d --remove-orphans --wait
+run_with_retries 3 docker compose build --pull
+run_with_retries 3 docker compose up -d --remove-orphans --wait
 # A Git checkout replaces Caddyfile's inode, so recreate the container to refresh
 # the read-only single-file bind mount after validating the new configuration.
 docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile
