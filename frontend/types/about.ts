@@ -7,6 +7,17 @@ export interface AboutSocialLink {
 export interface AboutSkill {
   name: string
   description: string
+  url: string
+}
+
+export interface AboutSectionTitles {
+  introduction: string
+  notes: string
+  activity: string
+  skills: string
+  facts: string
+  timeline: string
+  values: string
 }
 
 export interface AboutTimelineItem {
@@ -36,6 +47,9 @@ export interface AboutProfile {
   location: string
   availability: string
   introduction: string
+  values: string
+  heroTags: string[]
+  sectionTitles: AboutSectionTitles
   notes: AboutNote[]
   socialLinks: AboutSocialLink[]
   skills: AboutSkill[]
@@ -54,22 +68,33 @@ export function createAboutProfile(): AboutProfile {
     location: '中国 · 绍兴',
     availability: '所学尚浅，仍在慢慢做事',
     introduction: '余籍青海，少习计算机之术，科班出身。癸卯年入某市电信实习，从软件开发之事；甲辰七月转正，遂以此为业。技未敢言精，不过逢题拆题，遇坑填坑，日拱一卒而已。\n\n性喜安静，亦不拒热闹。知世间能者甚众，故不敢以所会自矜；偶有所成，多赖前人之路、同伴之助。所愿不过把手边之事做稳，把不懂之处弄明白，得闲时留几行真话。',
+    values: '我不太在意一个人世俗意义上的成功。钱很重要，它能让人生活得体面，也能换来选择的余地，但我不认为钱本身就是生活的意义。\n\n把手边的事做稳，把不懂的地方弄明白，保持诚实，也给生活留一点不被效率占满的空间。',
+    heroTags: ['Vue', 'TypeScript', 'Docker', '骑行', '阅读', 'AI 协作'],
+    sectionTitles: {
+      introduction: '小记其人',
+      notes: '几页闲话',
+      activity: '此刻在做什么',
+      skills: '平日所做',
+      facts: '小档案',
+      timeline: '来路拾记',
+      values: '价值观',
+    },
     notes: [
       { title: '平日所习', subtitle: 'ABOUT THE WORK', icon: 'ph:code-bold', content: '前端、后端与部署运维都略有涉猎，也在学习如何让 AI 成为可靠的协作者。做过 App、小程序、PC 端、数据驾驶舱及数字孪生联动。它们不是履历墙，只是我用来解决问题的一只工具箱。' },
       { title: '闲时所好', subtitle: 'OFF THE CLOCK', icon: 'ph:bicycle-bold', content: '喜欢骑车、看书、看电影，也爱没有目的地四处走走。与生活对线时胜率一般，幸好一顿好吃的、一阵晚风，或一次不爆红的部署，通常都能让血条慢慢回来。' },
-      { title: '此间缘起', subtitle: 'WHY THIS CORNER', icon: 'ph:wind-bold', content: '“风隅随笔”不是作品陈列柜，更像一张靠窗的旧书桌。这里收技术所得、书影所感与日常微末；不追赶喧哗，也不急着下结论。若偶然能给来客一点用处或片刻共鸣，便已足够。' },
+      { title: '此间缘起', subtitle: 'WHY THIS CORNER', icon: 'ph:wind-bold', content: '"风隅随笔"不是作品陈列柜，更像一张靠窗的旧书桌。这里收技术所得、书影所感与日常微末；不追赶喧哗，也不急着下结论。若偶然能给来客一点用处或片刻共鸣，便已足够。' },
     ],
     socialLinks: [
       { label: 'Email', url: 'mailto:hello@corner.ink', icon: 'ph:envelope-simple-bold' },
       { label: 'RSS', url: '/rss.xml', icon: 'ph:rss-bold' },
     ],
     skills: [
-      { name: '界面与交互', description: '把页面、状态与细节慢慢收拾妥当，希望功能不止能用，也能让人用得舒服。' },
-      { name: '服务与数据', description: '写接口、理数据、补边界；能力有限，便多做验证，让服务尽量清楚可靠。' },
-      { name: '部署与照看', description: '接触 Linux、Docker、反向代理与 CI/CD，也愿意对上线后的运行负责。' },
-      { name: 'AI 与自动化', description: '尝试模型接入和工作流，但不把判断交出去，结果仍需人工检查与承担。' },
-      { name: '跨端与大屏', description: '做过 App、小程序、PC 端与数据驾驶舱，在不同屏幕上解决具体问题。' },
-      { name: '场景与孪生', description: '参与 UE 与前端联动，让虚拟场景听懂真实数据；仍有许多地方要继续学。' },
+      { name: '界面与交互', description: '把页面、状态与细节慢慢收拾妥当，希望功能不止能用，也能让人用得舒服。', url: '' },
+      { name: '服务与数据', description: '写接口、理数据、补边界；能力有限，便多做验证，让服务尽量清楚可靠。', url: '' },
+      { name: '部署与照看', description: '接触 Linux、Docker、反向代理与 CI/CD，也愿意对上线后的运行负责。', url: '' },
+      { name: 'AI 与自动化', description: '尝试模型接入和工作流，但不把判断交出去，结果仍需人工检查与承担。', url: '' },
+      { name: '跨端与大屏', description: '做过 App、小程序、PC 端与数据驾驶舱，在不同屏幕上解决具体问题。', url: '' },
+      { name: '场景与孪生', description: '参与 UE 与前端联动，让虚拟场景听懂真实数据；仍有许多地方要继续学。', url: '' },
     ],
     timeline: [
       { year: '大学', title: '与人同做一件事', description: '在青协写策划、张罗活动，慢慢懂得彼此搭手的分量。' },
@@ -97,6 +122,22 @@ export function normalizeAboutProfile(value: unknown): AboutProfile {
   const location = source.location === '中国 · 青海' ? defaults.location : source.location
   const availability = source.availability === '普通人，慢慢写，认真过日子' ? defaults.availability : source.availability
 
+  const rawFacts = Array.isArray(source.facts) ? source.facts.filter(isFact) : defaults.facts
+  const legacyValues = rawFacts.find((item) => item.label.trim() === '价值观')?.value || ''
+  const normalizedValues = typeof source.values === 'string' && source.values.trim()
+    ? source.values.trim()
+    : legacyValues
+  const normalizedHeroTags = Array.isArray(source.heroTags)
+    ? source.heroTags.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map((item) => item.trim()).slice(0, 16)
+    : defaults.heroTags
+  const sourceTitles = source.sectionTitles && typeof source.sectionTitles === 'object'
+    ? source.sectionTitles as Partial<AboutSectionTitles>
+    : {}
+  const sectionTitles = Object.fromEntries(Object.entries(defaults.sectionTitles).map(([key, fallback]) => {
+    const value = sourceTitles[key as keyof AboutSectionTitles]
+    return [key, typeof value === 'string' && value.trim() ? value.trim().slice(0, 30) : fallback]
+  })) as AboutSectionTitles
+
   return {
     ...defaults,
     ...source,
@@ -104,14 +145,18 @@ export function normalizeAboutProfile(value: unknown): AboutProfile {
     role: typeof role === 'string' ? role : defaults.role,
     location: typeof location === 'string' ? location : defaults.location,
     availability: typeof availability === 'string' ? availability : defaults.availability,
+    values: normalizedValues,
+    heroTags: normalizedHeroTags.length ? normalizedHeroTags : defaults.heroTags,
+    sectionTitles,
     socialLinks: Array.isArray(source.socialLinks) ? source.socialLinks.filter(isSocialLink) : defaults.socialLinks,
     notes: Array.isArray(source.notes) ? source.notes.filter(isNote) : defaults.notes,
     skills: Array.isArray(source.skills) ? source.skills.filter(isSkill).map((item) => ({
       name: item.name,
       description: typeof item.description === 'string' ? item.description : '',
+      url: typeof item.url === 'string' ? item.url : '',
     })) : defaults.skills,
     timeline: Array.isArray(source.timeline) ? source.timeline.filter(isTimelineItem) : defaults.timeline,
-    facts: Array.isArray(source.facts) ? source.facts.filter(isFact) : defaults.facts,
+    facts: rawFacts.filter((item) => item.label.trim() !== '价值观'),
     tools: Array.isArray(source.tools) ? source.tools.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())) : defaults.tools,
   }
 }

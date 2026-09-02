@@ -40,6 +40,9 @@ const aboutProfile = {
   role: '生于青海，现居绍兴',
   motto: '听风于隅，漫写人间',
   introduction: '余籍青海，少习计算机之术，科班出身。癸卯年入某市电信实习，从软件开发之事；甲辰七月转正，遂以此为业。技未敢言精，不过逢题拆题，遇坑填坑，日拱一卒而已。\n\n性喜安静，亦不拒热闹。知世间能者甚众，故不敢以所会自矜；偶有所成，多赖前人之路、同伴之助。所愿不过把手边之事做稳，把不懂之处弄明白，得闲时留几行真话。',
+  values: '我不太在意一个人世俗意义上的成功。钱很重要，它能让人生活得体面，也能换来选择的余地，但我不认为钱本身就是生活的意义。\n\n把手边的事做稳，把不懂的地方弄明白，保持诚实，也给生活留一点不被效率占满的空间。',
+  heroTags: ['Vue', 'TypeScript', 'Docker', '骑行', '阅读', 'AI 协作'],
+  sectionTitles: { introduction: '小记其人', notes: '几页闲话', activity: '此刻在做什么', skills: '平日所做', facts: '小档案', timeline: '来路拾记', values: '价值观' },
   notes: [
     { title: '平日所习', subtitle: 'ABOUT THE WORK', icon: 'ph:code-bold', content: '前端、后端与部署运维都略有涉猎，也在学习如何让 AI 成为可靠的协作者。做过 App、小程序、PC 端、数据驾驶舱及数字孪生联动。它们不是履历墙，只是我用来解决问题的一只工具箱。' },
     { title: '闲时所好', subtitle: 'OFF THE CLOCK', icon: 'ph:bicycle-bold', content: '喜欢骑车、看书、看电影，也爱没有目的地四处走走。与生活对线时胜率一般，幸好一顿好吃的、一阵晚风，或一次不爆红的部署，通常都能让血条慢慢回来。' },
@@ -57,12 +60,12 @@ const aboutProfile = {
     { label: '闲时', value: '骑行 / 到处溜达' },
   ],
   skills: [
-    { name: '界面与交互', description: '把页面、状态与细节慢慢收拾妥当，希望功能不止能用，也能让人用得舒服。' },
-    { name: '服务与数据', description: '写接口、理数据、补边界；能力有限，便多做验证，让服务尽量清楚可靠。' },
-    { name: '部署与照看', description: '接触 Linux、Docker、反向代理与 CI/CD，也愿意对上线后的运行负责。' },
-    { name: 'AI 与自动化', description: '尝试模型接入和工作流，但不把判断交出去，结果仍需人工检查与承担。' },
-    { name: '跨端与大屏', description: '做过 App、小程序、PC 端与数据驾驶舱，在不同屏幕上解决具体问题。' },
-    { name: '场景与孪生', description: '参与 UE 与前端联动，让虚拟场景听懂真实数据；仍有许多地方要继续学。' },
+    { name: '界面与交互', description: '把页面、状态与细节慢慢收拾妥当，希望功能不止能用，也能让人用得舒服。', url: '' },
+    { name: '服务与数据', description: '写接口、理数据、补边界；能力有限，便多做验证，让服务尽量清楚可靠。', url: '' },
+    { name: '部署与照看', description: '接触 Linux、Docker、反向代理与 CI/CD，也愿意对上线后的运行负责。', url: '' },
+    { name: 'AI 与自动化', description: '尝试模型接入和工作流，但不把判断交出去，结果仍需人工检查与承担。', url: '' },
+    { name: '跨端与大屏', description: '做过 App、小程序、PC 端与数据驾驶舱，在不同屏幕上解决具体问题。', url: '' },
+    { name: '场景与孪生', description: '参与 UE 与前端联动，让虚拟场景听懂真实数据；仍有许多地方要继续学。', url: '' },
   ],
   tools: ['前端页面', '后端接口', 'Docker', 'CI/CD', 'AI 协作', '数据可视化', 'UE 联动', '骑车', '看书', '发呆'],
   timeline: [
