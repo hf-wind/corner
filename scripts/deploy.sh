@@ -33,8 +33,10 @@ sudo -n install -m 0644 deploy/systemd/corner-backup.service /etc/systemd/system
 sudo -n install -m 0644 deploy/systemd/corner-backup.timer /etc/systemd/system/corner-backup.timer
 sudo -n install -m 0644 deploy/systemd/corner-backup-control.service /etc/systemd/system/corner-backup-control.service
 sudo -n install -m 0644 deploy/systemd/corner-backup-control.path /etc/systemd/system/corner-backup-control.path
+sudo -n install -m 0644 deploy/systemd/corner-docker-cleanup.service /etc/systemd/system/corner-docker-cleanup.service
+sudo -n install -m 0644 deploy/systemd/corner-docker-cleanup.timer /etc/systemd/system/corner-docker-cleanup.timer
 sudo -n systemctl daemon-reload
-sudo -n systemctl enable --now corner-backup.timer corner-backup-control.path
+sudo -n systemctl enable --now corner-backup.timer corner-backup-control.path corner-docker-cleanup.timer
 
 if [[ -x scripts/backup.sh ]] && docker compose ps --status running postgres | grep -q postgres; then
   SKIP_BACKUP_EMAIL=1 ./scripts/backup.sh
@@ -59,10 +61,7 @@ curl --fail --silent --show-error \
   https://corner.ink/api/health >/dev/null
 
 # BuildKit keeps layers and npm cache outside the project (usually /var/lib/docker).
-# Reclaim old build artifacts after a successful rollout while retaining recent
-# layers for faster rollback and never touching application volumes.
-docker builder prune --all --force --filter 'until=168h' >/dev/null 2>&1 || true
-docker image prune --all --force --filter 'until=168h' >/dev/null 2>&1 || true
-docker container prune --force --filter 'until=168h' >/dev/null 2>&1 || true
+# Reclaim stale build artifacts after a successful rollout. Never prune volumes.
+bash ./scripts/docker-cleanup.sh
 
 echo "Deployment completed: $(git rev-parse --short HEAD)"

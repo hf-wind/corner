@@ -1,7 +1,6 @@
 <template>
-  <div v-if="enabled" class="turnstile-slot" :class="{ unavailable: unavailable }">
+  <div v-if="enabled" class="turnstile-slot">
     <div ref="container"></div>
-    <span v-if="unavailable">人机验证暂不可用</span>
   </div>
 </template>
 
@@ -10,11 +9,13 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps<{ modelValue?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const toast = useToast()
 const container = ref<HTMLElement | null>(null)
 const unavailable = ref(false)
 const challengePending = ref(false)
 const rendering = ref(false)
 let widgetId: string | undefined
+let lastUnavailableNoticeAt = 0
 const bypassToken = 'local-development-bypass'
 const enabled = computed(() => {
   const configured = String(import.meta.env.VITE_TURNSTILE_ENABLED || '').trim().toLowerCase()
@@ -54,6 +55,13 @@ function loadScript(): Promise<void> {
   return window.__cornerTurnstileScript
 }
 
+function notifyUnavailable() {
+  const now = Date.now()
+  if (now - lastUnavailableNoticeAt < 1500) return
+  lastUnavailableNoticeAt = now
+  toast.error('人机验证暂不可用，请稍后重试')
+}
+
 async function renderWidget() {
   if (!enabled.value) {
     emit('update:modelValue', bypassToken)
@@ -62,6 +70,7 @@ async function renderWidget() {
   const sitekey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim()
   if (!sitekey || !container.value) {
     unavailable.value = true
+    notifyUnavailable()
     return
   }
   if (rendering.value) return
@@ -87,11 +96,14 @@ async function renderWidget() {
       'error-callback': () => {
         challengePending.value = false
         emit('update:modelValue', '')
-        unavailable.value = true
+        unavailable.value = false
+        notifyUnavailable()
+        if (widgetId && window.turnstile) window.turnstile.reset(widgetId)
       },
     })
   } catch {
     unavailable.value = true
+    notifyUnavailable()
   } finally {
     rendering.value = false
   }
@@ -99,7 +111,13 @@ async function renderWidget() {
 
 async function waitForToken(timeoutMs = 3500) {
   if (!enabled.value) return bypassToken
-  if (!widgetId && !rendering.value) void renderWidget()
+  if (unavailable.value) {
+    unavailable.value = false
+    if (widgetId && window.turnstile) window.turnstile.reset(widgetId)
+    else if (!rendering.value) void renderWidget()
+  } else if (!widgetId && !rendering.value) {
+    void renderWidget()
+  }
   const graceDeadline = Date.now() + 650
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -141,12 +159,5 @@ defineExpose({ reset, waitForToken })
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.turnstile-slot.unavailable {
-  border: 1px solid #ef4444;
-  border-radius: 6px;
-  color: #ef4444;
-  font-size: 0.78rem;
 }
 </style>

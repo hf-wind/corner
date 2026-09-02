@@ -98,6 +98,40 @@ describe('BackupService', () => {
     expect(inventory.assets.filter((asset) => asset.encrypted)).toHaveLength(1);
   });
 
+  it('keeps a deleted backup manifest visible while marking its resource unavailable', async () => {
+    await createBackup();
+    const manifestPath = join(backupRoot, '20260820T120000Z', 'manifest.json');
+    const archivePath = join(
+      backupRoot,
+      '20260820T120000Z',
+      'corner-backup-20260820T120000Z.tar.zst',
+    );
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    manifest.status = 'deleted';
+    manifest.deleted = true;
+    manifest.deletedAt = '2026-08-21T12:00:00Z';
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    await rm(archivePath);
+
+    const records = await service.list();
+
+    expect(records.items[0]).toEqual(
+      expect.objectContaining({
+        deleted: true,
+        deletedAt: '2026-08-21T12:00:00Z',
+        resourceExists: false,
+      }),
+    );
+    await expect(
+      service.requestRestore(
+        '20260820T120000Z',
+        'admin-id',
+        'r'.repeat(40),
+        'RESTORE 20260820T120000Z',
+      ),
+    ).rejects.toThrow('备份资源已删除');
+  });
+
   it('writes one backup request and rejects concurrent work', async () => {
     await service.requestBackup('admin-id');
     const request = JSON.parse(

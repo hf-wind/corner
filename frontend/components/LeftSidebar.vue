@@ -265,6 +265,7 @@ const adminFullNav = [
   { to: "/admin/visitor-content", icon: "ph:chat-circle-dots-bold", label: "留言与漂流瓶" },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件功能" },
+  { to: "/admin/logs", icon: "ph:terminal-window-bold", label: "系统日志" },
   { to: "/admin/emoji", icon: "ph:smiley-bold", label: "表情资源" },
   { to: "/admin/about", icon: "ph:identification-card-bold", label: "关于我" },
   { to: "/admin/changelog", icon: "ph:git-commit-bold", label: "风迹墙" },

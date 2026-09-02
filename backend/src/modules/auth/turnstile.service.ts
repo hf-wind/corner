@@ -60,7 +60,7 @@ export class TurnstileService {
       this.logger.warn(
         `Turnstile rejected request: ${(result['error-codes'] || []).join(',') || 'hostname mismatch'}`,
       );
-      throw new BadRequestException('人机验证失败，请刷新后重试');
+      throw new BadRequestException('人机验证失败，请重新完成验证');
     }
   }
 

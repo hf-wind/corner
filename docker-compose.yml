@@ -95,7 +95,6 @@ services:
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-风隅随笔}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-1833079849@qq.com}
       BACKUP_EMAIL_TO: ${BACKUP_NOTIFICATION_EMAIL_TO:-1833079849@qq.com}
-      BACKUP_ARCHIVE_EMAIL_TO: ${BACKUP_ARCHIVE_EMAIL_TO:-huifeng680@gmail.com}
       BACKUP_NOTIFICATION_EMAIL_TO: ${BACKUP_NOTIFICATION_EMAIL_TO:-1833079849@qq.com}
       BACKUP_RECOVERY_TOKEN: ${BACKUP_RECOVERY_TOKEN:-}
       BACKUP_MOUNT_ROOT: /app/backups
@@ -110,6 +109,7 @@ services:
       - ${DATA_ROOT:-./data}/uploads:/app/uploads
       - ${BACKUP_ROOT:-./backups}:/app/backups:ro
       - ${DATA_ROOT:-./data}/backup-control:/app/backup-control
+      - ${DATA_ROOT:-./data}/logs/backend:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health >/dev/null || exit 1"]
       interval: 10s

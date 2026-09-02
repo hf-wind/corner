@@ -19,7 +19,7 @@ postgres_user="${POSTGRES_USER:-corner}"
 data_root="${DATA_ROOT:-$project_dir/data}"
 backup_root="${BACKUP_ROOT:-$project_dir/backups}"
 retention_days="${BACKUP_RETENTION_DAYS:-14}"
-archive_email="${BACKUP_ARCHIVE_EMAIL_TO:-huifeng680@gmail.com}"
+log_retention_days="${BACKUP_LOG_RETENTION_DAYS:-90}"
 notification_email="${BACKUP_NOTIFICATION_EMAIL_TO:-1833079849@qq.com}"
 max_mail_mb="${BACKUP_EMAIL_MAX_MB:-20}"
 encryption_key="${BACKUP_ENCRYPTION_KEY:-}"
@@ -41,6 +41,10 @@ if [[ "$backup_root" == "/" || "$backup_root" == "/srv" || ${#backup_root} -lt 1
 fi
 if ! [[ "$retention_days" =~ ^[0-9]+$ ]] || (( retention_days < 1 )); then
   echo "BACKUP_RETENTION_DAYS must be a positive integer" >&2
+  exit 1
+fi
+if ! [[ "$log_retention_days" =~ ^[0-9]+$ ]] || (( log_retention_days < retention_days )); then
+  echo "BACKUP_LOG_RETENTION_DAYS must be at least BACKUP_RETENTION_DAYS" >&2
   exit 1
 fi
 if ! [[ "$max_mail_mb" =~ ^[0-9]+$ ]] || (( max_mail_mb < 1 )); then
@@ -241,9 +245,9 @@ Git 提交：$(cat "$staging/project/git-commit.txt")
 保留策略：$retention_days 天
 完整性校验：内部文件与外部归档 SHA256 均通过
 敏感资产：生产/开发环境变量、SSH 配置与密钥、Caddy 证书均已进入 AES-256 加密包
-归档邮箱：$archive_email（${archive_mail_status:-待发送}）
 通知邮箱：$notification_email（${notification_mail_status:-待发送}）
 附件策略：上限 ${max_mail_mb}MB，本次$attachment_policy
+发送说明：本次只发送一封通知邮件；归档超过上限时仅发送本报告，不会发送大附件。
 
 恢复敏感资产必须使用独立保管的 BACKUP_ENCRYPTION_KEY。后台恢复只处理数据库和上传文件，不会覆盖服务器 SSH、证书或系统配置。
 EOF
@@ -260,19 +264,12 @@ send_report() {
     backend node dist/scripts/send-backup-email.js "${args[@]}"
 }
 
-archive_mail_status="已跳过"
 notification_mail_status="已跳过"
 write_report
 if [[ "${SKIP_BACKUP_EMAIL:-0}" != "1" ]]; then
   archive_attachment=""
   if [[ "$attach_archive" == "true" ]]; then archive_attachment="$archive_name"; fi
-  if send_report "$archive_email" "$archive_attachment"; then
-    archive_mail_status="发送成功"
-  else
-    archive_mail_status="发送失败"
-  fi
-  write_report
-  if send_report "$notification_email"; then
+  if send_report "$notification_email" "$archive_attachment"; then
     notification_mail_status="发送成功"
   else
     notification_mail_status="发送失败"
@@ -287,8 +284,6 @@ jq -n \
   --argjson archiveBytes "$archive_bytes" \
   --arg sha256 "$(awk '{print $1}' "$destination/SHA256SUMS")" \
   --arg gitCommit "$(cat "$staging/project/git-commit.txt")" \
-  --arg archiveEmail "$archive_email" \
-  --arg archiveMailStatus "$archive_mail_status" \
   --arg notificationEmail "$notification_email" \
   --arg notificationMailStatus "$notification_mail_status" \
   --argjson attached "$attach_archive" \
@@ -302,6 +297,9 @@ jq -n \
     backupId: $backupId,
     createdAt: $createdAt,
     status: "completed",
+    deleted: false,
+    deletedAt: null,
+    resourceExists: true,
     archive: $archive,
     archiveBytes: $archiveBytes,
     sha256: $sha256,
@@ -322,14 +320,44 @@ jq -n \
       certificates: $hasCertificates
     },
     email: {
-      archive: { recipient: $archiveEmail, status: $archiveMailStatus, attached: $attached },
-      notification: { recipient: $notificationEmail, status: $notificationMailStatus },
+      notification: { recipient: $notificationEmail, status: $notificationMailStatus, attached: $attached },
       attachmentLimitMb: $mailLimitMb
     }
   }' > "$destination/manifest.json"
 
-find "$backup_root" -mindepth 1 -maxdepth 1 -type d \
-  -mmin "+$((retention_days * 1440))" -print -exec rm -rf -- {} +
+retire_backup() {
+  local directory="$1"
+  local manifest="$directory/manifest.json"
+  [[ -f "$manifest" ]] || return 0
+  if jq -e '(.deleted == true) or (.status == "deleted")' "$manifest" >/dev/null 2>&1; then
+    return 0
+  fi
+  local archive
+  archive="$(jq -r '.archive // empty' "$manifest" 2>/dev/null || true)"
+  if [[ -n "$archive" && "$archive" != */* ]]; then
+    rm -f -- "$directory/$archive"
+  fi
+  rm -f -- "$directory/SHA256SUMS" "$directory/backup-report.txt"
+  local temporary="$directory/manifest.json.tmp"
+  jq --arg deletedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '.status = "deleted" | .deleted = true | .deletedAt = $deletedAt | .resourceExists = false' \
+    "$manifest" > "$temporary"
+  mv -- "$temporary" "$manifest"
+  echo "Retired backup: $(basename "$directory")"
+}
+
+while IFS= read -r -d '' directory; do
+  retire_backup "$directory"
+done < <(find "$backup_root" -mindepth 1 -maxdepth 1 -type d \
+  ! -name '.staging-*' -mmin "+$((retention_days * 1440))" -print0)
+
+# Keep tombstone manifests long enough for the admin history, then remove them.
+while IFS= read -r -d '' directory; do
+  if jq -e '.deleted == true' "$directory/manifest.json" >/dev/null 2>&1; then
+    rm -rf -- "$directory"
+  fi
+done < <(find "$backup_root" -mindepth 1 -maxdepth 1 -type d \
+  ! -name '.staging-*' -mmin "+$((log_retention_days * 1440))" -print0)
 
 completed=1
 echo "$destination"

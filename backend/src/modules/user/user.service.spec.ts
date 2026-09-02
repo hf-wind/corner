@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { UserService } from './user.service';
 
 describe('UserService admin management', () => {
@@ -8,6 +8,7 @@ describe('UserService admin management', () => {
     const prisma = {
       user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
@@ -122,5 +123,34 @@ describe('UserService admin management', () => {
     });
     expect(prisma.commentLike.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } });
     expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+  });
+
+  it('rejects GitHub login for an inactive linked account', async () => {
+    const { service, prisma } = serviceWith();
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      githubId: 'github-1',
+      email: 'user@example.com',
+      isActive: false,
+    });
+
+    await expect(
+      service.findOrCreateGitHubUser({ id: 'github-1', email: 'user@example.com' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects GitHub linking for an inactive email account', async () => {
+    const { service, prisma } = serviceWith();
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      isActive: false,
+    });
+
+    await expect(
+      service.findOrCreateGitHubUser({ id: 'github-1', email: 'user@example.com' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

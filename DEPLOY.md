@@ -94,7 +94,7 @@ cd /srv/corner/app
 - `project/corner-source.bundle`：包含全部 refs 的 Git Bundle
 - `secrets/secrets.tar.enc`：AES-256-CBC + PBKDF2 加密的生产/开发 `.env`、SSH 目录和 Caddy TLS 状态
 
-敏感资产不会以明文进入邮件附件。完整归档不超过 `BACKUP_EMAIL_MAX_MB`（默认 20MB，低于 Gmail 25MB 附件上限）时发送到 `BACKUP_ARCHIVE_EMAIL_TO`，结果报告固定发送到 `BACKUP_NOTIFICATION_EMAIL_TO`。超过阈值时不会尝试发送必然被拒收的大附件，后台会明确记录“仅报告”。
+敏感资产不会以明文进入邮件附件。备份通知只发送到 `BACKUP_NOTIFICATION_EMAIL_TO`（默认 QQ 邮箱）；完整归档不超过 `BACKUP_EMAIL_MAX_MB`（默认 20MB）时随通知邮件附加归档，超过阈值时仅发送清晰的报告正文，不会发送大附件。
 
 建议通过系统定时器或 cron 每日执行，并将 `/srv/corner/backups` 再同步到对象存储或另一台机器。只保存在同一块系统盘不构成灾备。
 

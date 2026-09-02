@@ -14,6 +14,9 @@ type BackupManifest = {
   backupId: string;
   createdAt: string;
   status: string;
+  deleted?: boolean;
+  deletedAt?: string | null;
+  resourceExists?: boolean;
   archive: string;
   archiveBytes: number;
   sha256: string;
@@ -61,7 +64,9 @@ export class BackupService {
 
   async inventory() {
     const { items } = await this.list();
-    const latest = items[0];
+    const latest = items.find(
+      (item) => item.deleted !== true && item.resourceExists !== false,
+    );
     const managed = (key: string) => latest?.assets?.[key] === true;
     const encrypted = (key: string) =>
       Boolean(latest?.encryptedSecrets) && managed(key);
@@ -198,6 +203,9 @@ export class BackupService {
     this.verifyRecoveryToken(recoveryToken);
     const manifest = await this.readManifest(backupId);
     if (!manifest) throw new NotFoundException('备份不存在或清单损坏');
+    if (manifest.deleted || !manifest.resourceExists) {
+      throw new NotFoundException('备份资源已删除');
+    }
     await this.assertIdle();
     await this.writeRequest('restore.request', {
       action: 'restore',
@@ -233,15 +241,21 @@ export class BackupService {
     ) {
       return null;
     }
+    let resourceExists = false;
     try {
       const archive = await stat(
         join(this.backupRoot, backupId, value.archive),
       );
-      if (!archive.isFile()) return null;
+      resourceExists = archive.isFile();
     } catch {
-      return null;
+      resourceExists = false;
     }
-    return value as BackupManifest;
+    return {
+      ...(value as BackupManifest),
+      deleted: value.deleted === true || value.status === 'deleted',
+      deletedAt: value.deletedAt || null,
+      resourceExists,
+    };
   }
 
   private async readJson(path: string): Promise<any | null> {

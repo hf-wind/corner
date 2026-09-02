@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
@@ -215,12 +216,16 @@ export class UserService {
     const linkedUser = await this.prisma.user.findUnique({
       where: { githubId: providerId },
     });
-    if (linkedUser) return { user: linkedUser, action: 'existing_github' as const };
+    if (linkedUser) {
+      if (!linkedUser.isActive) throw new UnauthorizedException('账号已被禁用');
+      return { user: linkedUser, action: 'existing_github' as const };
+    }
 
     const emailUser = await this.prisma.user.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
     });
     if (emailUser) {
+      if (!emailUser.isActive) throw new UnauthorizedException('账号已被禁用');
       if (emailUser.githubId && emailUser.githubId !== providerId) {
         throw new BadRequestException('该系统账号已绑定其他 GitHub 账号');
       }

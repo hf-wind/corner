@@ -220,7 +220,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/logs",
-    redirect: "/admin/info",
+    component: lazyRoute(() => import("./pages/admin/logs.vue")),
     meta: adminMeta,
   },
   {

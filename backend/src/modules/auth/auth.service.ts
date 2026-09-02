@@ -147,6 +147,7 @@ export class AuthService {
 
   async githubLogin(githubUser: GitHubUser) {
     const { user, action } = await this.userService.findOrCreateGitHubUser(githubUser);
+    if (!user.isActive) throw new UnauthorizedException('账号已被禁用');
     
     const token = this.jwt.sign({
       sub: user.id,

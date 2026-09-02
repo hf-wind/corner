@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Corner Docker cleanup daily
+
+[Timer]
+OnCalendar=*-*-* 04:15:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

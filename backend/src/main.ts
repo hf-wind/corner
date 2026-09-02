@@ -6,9 +6,10 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { createRequestValidationPipe } from './common/validation/request-validation.pipe';
+import { FileLogger } from './common/logging/file-logger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: new FileLogger() });
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   app.setGlobalPrefix('api', {

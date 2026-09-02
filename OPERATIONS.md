@@ -31,7 +31,6 @@ EMAIL_FROM_ADDRESS=1833079849@qq.com
 
 BACKUP_ROOT=/srv/corner/backups
 BACKUP_RETENTION_DAYS=14
-BACKUP_ARCHIVE_EMAIL_TO=huifeng680@gmail.com
 BACKUP_NOTIFICATION_EMAIL_TO=1833079849@qq.com
 BACKUP_EMAIL_MAX_MB=20
 BACKUP_ENCRYPTION_KEY=至少32位的独立随机密钥
@@ -106,7 +105,7 @@ docker compose exec -T redis redis-cli -a "$REDIS_PASS" --scan --pattern 'corner
 
 ## 备份与恢复
 
-每天约北京时间 03:30 自动生成完整 `tar.zst` 迁移归档，超过 14 天的恢复点自动删除。归档邮箱用于保存不超过 20MB 的加密完整归档（Gmail 普通附件上限约 25MB）；管理员邮箱始终收到详细结果。超过阈值时仅发报告。环境变量、SSH 密钥和 TLS 证书只存在于归档内的加密包，不会明文发送。
+每天约北京时间 03:30 自动生成完整 `tar.zst` 迁移归档，超过 14 天的恢复点会删除归档大文件并保留清单 tombstone，供后台查询资源已删除状态；清单超过 90 天后彻底清理。备份通知只发送到 QQ 邮箱：归档不超过 20MB 时随邮件附加加密归档，超过阈值时仅发送报告正文，不发送大附件。环境变量、SSH 密钥和 TLS 证书只存在于归档内的加密包，不会明文发送。
 
 ```bash
 cd /srv/corner/app

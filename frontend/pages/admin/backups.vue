@@ -61,7 +61,7 @@
         :data-source="pagedBackups"
         :loading="loading"
         :pagination="false"
-        :scroll="{ x: 1180 }"
+        :scroll="{ x: 1320 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'backup'">
@@ -69,12 +69,10 @@
           </template>
           <template v-else-if="column.key === 'size'">{{ formatBytes(record.archiveBytes) }}</template>
           <template v-else-if="column.key === 'commit'"><code>{{ record.gitCommit?.slice(0, 10) || '—' }}</code></template>
-          <template v-else-if="column.key === 'integrity'"><a-tag color="green"><Icon name="ph:check-circle-bold" /> SHA256 通过</a-tag></template>
-          <template v-else-if="column.key === 'archiveEmail'">
-            <div class="mail-state"><strong>{{ record.email?.archive?.status || '未记录' }}</strong><small>{{ record.email?.archive?.recipient || '—' }}</small><span>{{ record.email?.archive?.attached ? '含归档附件' : '仅报告' }}</span></div>
-          </template>
+          <template v-else-if="column.key === 'integrity'"><a-tag :color="record.resourceExists === false ? 'default' : 'green'"><Icon :name="record.resourceExists === false ? 'ph:warning-bold' : 'ph:check-circle-bold'" />{{ record.resourceExists === false ? '资源已移除' : 'SHA256 通过' }}</a-tag></template>
+          <template v-else-if="column.key === 'resource'"><a-tag :color="record.deleted || record.resourceExists === false ? 'default' : 'green'"><Icon :name="record.deleted || record.resourceExists === false ? 'ph:archive-tray-bold' : 'ph:check-circle-bold'" />{{ record.deleted ? '已删除' : record.resourceExists === false ? '资源缺失' : '资源存在' }}</a-tag><small v-if="record.deletedAt" class="resource-deleted-at">{{ formatDate(record.deletedAt) }}</small></template>
           <template v-else-if="column.key === 'notificationEmail'">
-            <div class="mail-state"><strong>{{ record.email?.notification?.status || '未记录' }}</strong><small>{{ record.email?.notification?.recipient || '—' }}</small></div>
+            <div class="mail-state"><strong>{{ record.email?.notification?.status || '未记录' }}</strong><small>{{ record.email?.notification?.recipient || '—' }}</small><span>{{ record.email?.notification?.attached ? '含归档附件' : '仅报告' }}</span></div>
           </template>
           <template v-else-if="column.key === 'actions'">
             <div class="admin-row-actions">
@@ -92,9 +90,9 @@
         <div><span>恢复点</span><strong>{{ detail.item.backupId }}</strong></div>
         <div><span>创建时间</span><strong>{{ formatDate(detail.item.createdAt) }}</strong></div>
         <div><span>归档大小</span><strong>{{ formatBytes(detail.item.archiveBytes) }}</strong></div>
+        <div><span>资源状态</span><strong>{{ detail.item.deleted ? `已删除${detail.item.deletedAt ? ` · ${formatDate(detail.item.deletedAt)}` : ''}` : detail.item.resourceExists === false ? '资源缺失' : '资源存在' }}</strong></div>
         <div><span>Git 提交</span><code>{{ detail.item.gitCommit || '—' }}</code></div>
-        <div><span>归档邮件</span><strong>{{ detail.item.email?.archive?.status || '未记录' }} · {{ detail.item.email?.archive?.recipient || '—' }}</strong></div>
-        <div><span>管理员通知</span><strong>{{ detail.item.email?.notification?.status || '未记录' }} · {{ detail.item.email?.notification?.recipient || '—' }}</strong></div>
+        <div><span>QQ 通知邮件</span><strong>{{ detail.item.email?.notification?.status || '未记录' }} · {{ detail.item.email?.notification?.recipient || '—' }} · {{ detail.item.email?.notification?.attached ? '含归档附件' : '仅报告' }}</strong></div>
         <section><span>原始记录</span><pre>{{ JSON.stringify(detail.item, null, 2) }}</pre></section>
       </div>
     </a-modal>
@@ -131,15 +129,14 @@ const columns = [
   { title: "归档大小", key: "size", width: 100 },
   { title: "Git 提交", key: "commit", width: 110 },
   { title: "完整性", key: "integrity", width: 130 },
-  { title: "异地归档邮箱", key: "archiveEmail", width: 230 },
-  { title: "管理员通知", key: "notificationEmail", width: 220 },
+  { title: "QQ 通知邮件", key: "notificationEmail", width: 250 },
   { title: "操作", key: "actions", width: 130, fixed: "right" as const },
 ];
 
 const busy = computed(() => ["queued", "running"].includes(status.status));
-const totalBytes = computed(() => backups.value.reduce((sum, item) => sum + Number(item.archiveBytes || 0), 0));
+const totalBytes = computed(() => backups.value.filter(item => item.resourceExists !== false).reduce((sum, item) => sum + Number(item.archiveBytes || 0), 0));
 const managedCount = computed(() => inventory.assets.filter((item: any) => item.managed).length);
-const latestArchiveMail = computed(() => backups.value[0]?.email?.archive?.status || "暂无记录");
+const latestArchiveMail = computed(() => backups.value[0]?.email?.notification?.status || "暂无记录");
 const latestMailLimit = computed(() => backups.value[0]?.email?.attachmentLimitMb || 20);
 const statusTitle = computed(() => ({ idle: "备份服务就绪", queued: "任务等待执行", running: "宿主机正在执行", completed: "最近任务已完成", failed: "最近任务执行失败" }[status.status as string] || "备份服务状态"));
 const statusIcon = computed(() => ({ idle: "ph:check-circle-bold", queued: "ph:hourglass-medium-bold", running: "ph:spinner-gap-bold", completed: "ph:check-circle-bold", failed: "ph:warning-circle-bold" }[status.status as string] || "ph:info-bold"));

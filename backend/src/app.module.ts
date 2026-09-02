@@ -40,6 +40,7 @@ import { GeoModule } from './modules/geo/geo.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { CircleModule } from './modules/circle/circle.module';
 import { ChangelogModule } from './modules/changelog/changelog.module';
+import { LogsModule } from './modules/logs/logs.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { ChangelogModule } from './modules/changelog/changelog.module';
     BackupModule,
     CircleModule,
     ChangelogModule,
+    LogsModule,
   ],
   controllers: [AppController],
   providers: [
