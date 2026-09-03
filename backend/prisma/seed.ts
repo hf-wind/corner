@@ -43,6 +43,15 @@ const aboutProfile = {
   values: '我不太在意一个人世俗意义上的成功。钱很重要，它能让人生活得体面，也能换来选择的余地，但我不认为钱本身就是生活的意义。\n\n把手边的事做稳，把不懂的地方弄明白，保持诚实，也给生活留一点不被效率占满的空间。',
   heroTags: ['Vue', 'TypeScript', 'Docker', '骑行', '阅读', 'AI 协作'],
   sectionTitles: { introduction: '小记其人', notes: '几页闲话', activity: '此刻在做什么', skills: '平日所做', facts: '小档案', timeline: '来路拾记', values: '价值观' },
+  sectionDescriptions: {
+    introduction: '从哪里来，正在成为怎样的人，以及为什么在这里留下记录。',
+    notes: '关于工作、生活和这个小站的几页闲话。',
+    activity: '正在使用的工具，也是在持续练习的事情。',
+    skills: '把做过的项目和愿意继续打磨的能力，整理成几行。',
+    facts: '一些轻量、具体、不必过度解释的小档案。',
+    timeline: '没有既定路线，只有下一件想做好的事。',
+    values: '在效率之外，仍然愿意保留的判断与尺度。',
+  },
   notes: [
     { title: '平日所习', subtitle: 'ABOUT THE WORK', icon: 'ph:code-bold', content: '前端、后端与部署运维都略有涉猎，也在学习如何让 AI 成为可靠的协作者。做过 App、小程序、PC 端、数据驾驶舱及数字孪生联动。它们不是履历墙，只是我用来解决问题的一只工具箱。' },
     { title: '闲时所好', subtitle: 'OFF THE CLOCK', icon: 'ph:bicycle-bold', content: '喜欢骑车、看书、看电影，也爱没有目的地四处走走。与生活对线时胜率一般，幸好一顿好吃的、一阵晚风，或一次不爆红的部署，通常都能让血条慢慢回来。' },

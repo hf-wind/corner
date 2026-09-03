@@ -20,6 +20,16 @@ export interface AboutSectionTitles {
   values: string
 }
 
+export interface AboutSectionDescriptions {
+  introduction: string
+  notes: string
+  activity: string
+  skills: string
+  facts: string
+  timeline: string
+  values: string
+}
+
 export interface AboutTimelineItem {
   year: string
   title: string
@@ -50,6 +60,7 @@ export interface AboutProfile {
   values: string
   heroTags: string[]
   sectionTitles: AboutSectionTitles
+  sectionDescriptions: AboutSectionDescriptions
   notes: AboutNote[]
   socialLinks: AboutSocialLink[]
   skills: AboutSkill[]
@@ -78,6 +89,15 @@ export function createAboutProfile(): AboutProfile {
       facts: '小档案',
       timeline: '来路拾记',
       values: '价值观',
+    },
+    sectionDescriptions: {
+      introduction: '从哪里来，正在成为怎样的人，以及为什么在这里留下记录。',
+      notes: '关于工作、生活和这个小站的几页闲话。',
+      activity: '正在使用的工具，也是在持续练习的事情。',
+      skills: '把做过的项目和愿意继续打磨的能力，整理成几行。',
+      facts: '一些轻量、具体、不必过度解释的小档案。',
+      timeline: '没有既定路线，只有下一件想做好的事。',
+      values: '在效率之外，仍然愿意保留的判断与尺度。',
     },
     notes: [
       { title: '平日所习', subtitle: 'ABOUT THE WORK', icon: 'ph:code-bold', content: '前端、后端与部署运维都略有涉猎，也在学习如何让 AI 成为可靠的协作者。做过 App、小程序、PC 端、数据驾驶舱及数字孪生联动。它们不是履历墙，只是我用来解决问题的一只工具箱。' },
@@ -126,7 +146,7 @@ export function normalizeAboutProfile(value: unknown): AboutProfile {
   const legacyValues = rawFacts.find((item) => item.label.trim() === '价值观')?.value || ''
   const normalizedValues = typeof source.values === 'string' && source.values.trim()
     ? source.values.trim()
-    : legacyValues
+    : legacyValues || defaults.values
   const normalizedHeroTags = Array.isArray(source.heroTags)
     ? source.heroTags.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map((item) => item.trim()).slice(0, 16)
     : defaults.heroTags
@@ -137,6 +157,13 @@ export function normalizeAboutProfile(value: unknown): AboutProfile {
     const value = sourceTitles[key as keyof AboutSectionTitles]
     return [key, typeof value === 'string' && value.trim() ? value.trim().slice(0, 30) : fallback]
   })) as AboutSectionTitles
+  const sourceDescriptions = source.sectionDescriptions && typeof source.sectionDescriptions === 'object'
+    ? source.sectionDescriptions as Partial<AboutSectionDescriptions>
+    : {}
+  const sectionDescriptions = Object.fromEntries(Object.entries(defaults.sectionDescriptions).map(([key, fallback]) => {
+    const value = sourceDescriptions[key as keyof AboutSectionDescriptions]
+    return [key, typeof value === 'string' && value.trim() ? value.trim().slice(0, 180) : fallback]
+  })) as AboutSectionDescriptions
 
   return {
     ...defaults,
@@ -148,6 +175,7 @@ export function normalizeAboutProfile(value: unknown): AboutProfile {
     values: normalizedValues,
     heroTags: normalizedHeroTags.length ? normalizedHeroTags : defaults.heroTags,
     sectionTitles,
+    sectionDescriptions,
     socialLinks: Array.isArray(source.socialLinks) ? source.socialLinks.filter(isSocialLink) : defaults.socialLinks,
     notes: Array.isArray(source.notes) ? source.notes.filter(isNote) : defaults.notes,
     skills: Array.isArray(source.skills) ? source.skills.filter(isSkill).map((item) => ({

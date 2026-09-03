@@ -3818,6 +3818,10 @@ function updateCameraFlight(now: number) {
   cameraFlightTrackingId = "";
   if (pendingDiscoveryTourId) activateDiscoveryTour(pendingDiscoveryTourId);
   else controls.enabled = !props.ambient;
+  // The smooth zoom baseline belongs to the new pose. Without resyncing it,
+  // the first frame after a content focus re-applies the previous overview
+  // distance and visibly pulls the camera back from the selected memory.
+  syncSmoothZoomFromCamera();
   syncCruiseFromCamera();
   cruiseResumePosition.copy(camera.position);
   cruiseResumeTarget.copy(controls.target);
