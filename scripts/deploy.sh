@@ -43,7 +43,9 @@ if [[ -x scripts/backup.sh ]] && docker compose ps --status running postgres | g
 fi
 
 docker compose config --quiet
-run_with_retries 3 docker compose build --pull
+# Production hosts may not be able to reach Docker Hub reliably. Reuse cached
+# base images and let an explicit image refresh happen through host maintenance.
+run_with_retries 3 docker compose build
 run_with_retries 3 docker compose up -d --remove-orphans --wait
 # A Git checkout replaces Caddyfile's inode, so recreate the container to refresh
 # the read-only single-file bind mount after validating the new configuration.
