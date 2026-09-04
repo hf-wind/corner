@@ -47,6 +47,7 @@ export interface ChangelogResponse {
   fetchedAt: string;
   sourceStatus: "connected" | "fallback" | "stale" | "unavailable";
   sourceLabel: string;
+  translationPending: boolean;
 }
 
 export interface ChangelogAdminResponse {

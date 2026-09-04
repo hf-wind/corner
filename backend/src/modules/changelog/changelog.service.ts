@@ -73,6 +73,7 @@ type Snapshot = {
   fetchedAt: string;
   sourceStatus: 'connected' | 'fallback' | 'stale' | 'unavailable';
   sourceLabel: string;
+  translationPending: boolean;
   releases: ChangelogRelease[];
 };
 
@@ -143,6 +144,7 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       fetchedAt: snapshot.fetchedAt,
       sourceStatus: snapshot.sourceStatus,
       sourceLabel: snapshot.sourceLabel,
+      translationPending: snapshot.translationPending,
     };
   }
 
@@ -307,17 +309,26 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
 
   private async getAutomatic(config: ChangelogConfig, force = false) {
     const repository = this.repositoryKey(config);
-    const [state, count] = await Promise.all([
+    const [state, count, pendingCount] = await Promise.all([
       this.prisma.changelogSyncState.findUnique({
         where: { repository_branch: { repository, branch: config.branch } },
       }),
       this.prisma.changelogTranslation.count({
         where: { repository, branch: config.branch },
       }),
+      this.prisma.changelogTranslation.count({
+        where: {
+          repository,
+          branch: config.branch,
+          language: { in: ['en', 'mixed'] },
+          status: { in: ['pending', 'failed'] },
+        },
+      }),
     ]);
     const fresh =
       state && Date.now() - state.fetchedAt.getTime() < config.cacheTtl * 1000;
-    if (!force && fresh) return this.loadSnapshot(config, state);
+    if (!force && fresh && pendingCount === 0)
+      return this.loadSnapshot(config, state);
     if (!force && count > 0) {
       void this.runRefresh(config).catch((error) =>
         this.logger.warn(`后台刷新风迹墙失败: ${this.errorMessage(error)}`),
@@ -463,21 +474,25 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { committedAt: 'desc' },
     });
+    const displayableRows = rows.filter(
+      (row) => row.status === 'translated' || row.status === 'original',
+    );
+    const translationPending = rows.some(
+      (row) =>
+        (row.status === 'pending' || row.status === 'failed') &&
+        (row.language === 'en' || row.language === 'mixed'),
+    );
     return {
       fetchedAt: (state?.fetchedAt || new Date(0)).toISOString(),
       sourceStatus: (state?.sourceStatus || 'unavailable') as Snapshot['sourceStatus'],
       sourceLabel: state?.sourceLabel || '等待首次同步',
-      releases: rows.map((row) => {
-        const text = row.translatedMessage || this.ruleTranslate(row.originalMessage);
+      translationPending,
+      releases: displayableRows.map((row) => {
+        const text = row.translatedMessage || row.originalMessage;
         return {
           id: `git:${row.commitSha}`,
           title: text,
-          summary:
-            row.status === 'translated'
-              ? '提交说明已由百度翻译为中文。'
-              : row.status === 'original'
-                ? '原提交说明已是中文，无需翻译。'
-                : '翻译暂未完成，将在下次同步时自动重试。',
+          summary: '',
           publishedAt: row.committedAt.toISOString(),
           source: 'git',
           sourceLabel: 'Git 自动记录',

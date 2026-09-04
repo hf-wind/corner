@@ -1,6 +1,13 @@
 <template>
   <div class="changelog-shell">
-    <main ref="scrollRef" class="changelog-scroll" :aria-busy="loading">
+    <Loading
+      v-if="loading && !ready"
+      class="changelog-loading"
+      fullscreen
+      title="正在整理更新记录"
+      text="正在完成提交翻译，请稍候"
+    />
+    <main v-else ref="scrollRef" class="changelog-scroll" :aria-busy="loading">
       <div class="changelog-page">
         <ContentPageHero
           eyebrow="CHANGELOG · 近期更新"
@@ -145,7 +152,17 @@ const data = reactive<ChangelogResponse>({
   fetchedAt: "",
   sourceStatus: "unavailable",
   sourceLabel: "",
+  translationPending: false,
 });
+
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleTranslationRetry() {
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if (!ready.value) void load(1);
+  }, 2500);
+}
 
 async function load(nextPage = page.value) {
   if (loading.value && nextPage !== 1) return;
@@ -153,6 +170,7 @@ async function load(nextPage = page.value) {
   if (ready.value) updating.value = true;
   else loading.value = true;
   error.value = "";
+  let waitingForTranslation = false;
   try {
     const result = await api.get<ChangelogResponse>("/changelog", {
       page: nextPage,
@@ -160,6 +178,17 @@ async function load(nextPage = page.value) {
     });
     if (sequence !== requestSequence) return;
     const incoming = Array.isArray(result.releases) ? result.releases : [];
+    if (result.translationPending && !ready.value) {
+      Object.assign(data, { ...result, releases: [] });
+      page.value = result.page;
+      waitingForTranslation = true;
+      scheduleTranslationRetry();
+      return;
+    }
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = undefined;
+    }
     Object.assign(data, { ...result, releases: incoming });
     page.value = result.page;
     await nextTick();
@@ -172,8 +201,10 @@ async function load(nextPage = page.value) {
     if (sequence === requestSequence) error.value = cause?.message || "请稍后再试";
   } finally {
     if (sequence === requestSequence) {
-      loading.value = false;
-      updating.value = false;
+      if (!waitingForTranslation) {
+        loading.value = false;
+        updating.value = false;
+      }
     }
   }
 }
@@ -210,6 +241,9 @@ function formatSyncTime(value: string) {
 onMounted(() => {
   void load(1);
 });
+onUnmounted(() => {
+  if (retryTimer) clearTimeout(retryTimer);
+});
 useHead({
   title: "风迹墙 · 风隅随笔",
   meta: [
@@ -223,6 +257,7 @@ useHead({
 
 <style scoped>
 .changelog-shell {
+  position: relative;
   width: 100%;
   min-width: 0;
   height: 100%;

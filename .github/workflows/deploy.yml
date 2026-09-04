@@ -78,12 +78,14 @@ jobs:
           BAIDU_TRANSLATE_SECRET_KEY: ${{ secrets.BAIDU_TRANSLATE_SECRET_KEY }}
           CHANGELOG_GITHUB_TOKEN: ${{ secrets.CHANGELOG_GITHUB_TOKEN }}
         run: |
+          ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "flock -w 300 /tmp/corner-production-deploy.lock bash -lc 'cd \"$APP_PATH\" && for attempt in 1 2 3 4 5; do git fetch origin main && break; echo \"git fetch busy (attempt $attempt), retrying\" >&2; sleep 3; done && git checkout main && git merge --ff-only origin/main'"
           printf 'BAIDU_TRANSLATE_APP_ID=%s\nBAIDU_TRANSLATE_SECRET_KEY=%s\nCHANGELOG_GITHUB_TOKEN=%s\n' \
             "$BAIDU_TRANSLATE_APP_ID" "$BAIDU_TRANSLATE_SECRET_KEY" "$CHANGELOG_GITHUB_TOKEN" | \
             ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
               "cd \"$APP_PATH\" && bash ./scripts/update-deploy-secrets.sh"
           ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "flock -w 300 /tmp/corner-production-deploy.lock bash -lc 'cd \"$APP_PATH\" && for attempt in 1 2 3 4 5; do git fetch origin main && break; echo \"git fetch busy (attempt $attempt), retrying\" >&2; sleep 3; done && git checkout main && git merge --ff-only origin/main && ./scripts/deploy.sh'"
+            "flock -w 300 /tmp/corner-production-deploy.lock bash -lc 'cd \"$APP_PATH\" && ./scripts/deploy.sh'"
 
   release:
     needs: deploy

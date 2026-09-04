@@ -41,4 +41,52 @@ describe('ChangelogService runtime Git history', () => {
     expect((service as any).detectLanguage('fix circle feed')).toBe('en');
     expect((service as any).detectLanguage('修复 RSS 缓存')).toBe('mixed');
   });
+
+  it('hides untranslated commits and exposes a pending sync state', async () => {
+    const prisma = (service as any).prisma;
+    prisma.changelogTranslation = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'translated',
+          commitSha: 'a'.repeat(40),
+          originalMessage: 'fix: feed cache',
+          translatedMessage: '修复：订阅源缓存',
+          status: 'translated',
+          language: 'en',
+          author: 'hf-wind',
+          commitUrl: 'https://github.com/hf-wind/corner/commit/a',
+          committedAt: new Date('2026-09-01T00:00:00Z'),
+        },
+        {
+          id: 'pending',
+          commitSha: 'b'.repeat(40),
+          originalMessage: 'feat: pending translation',
+          translatedMessage: null,
+          status: 'pending',
+          language: 'en',
+          author: 'hf-wind',
+          commitUrl: 'https://github.com/hf-wind/corner/commit/b',
+          committedAt: new Date('2026-09-02T00:00:00Z'),
+        },
+      ]),
+    };
+
+    const snapshot = await (service as any).loadSnapshot(
+      {
+        repositoryOwner: 'hf-wind',
+        repositoryName: 'corner',
+        branch: 'main',
+      },
+      {
+        fetchedAt: new Date('2026-09-02T00:00:00Z'),
+        sourceStatus: 'connected',
+        sourceLabel: 'GitHub',
+      },
+    );
+
+    expect(snapshot.translationPending).toBe(true);
+    expect(snapshot.releases).toHaveLength(1);
+    expect(snapshot.releases[0].title).toBe('修复：订阅源缓存');
+    expect(snapshot.releases[0].summary).toBe('');
+  });
 });
