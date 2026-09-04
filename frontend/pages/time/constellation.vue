@@ -15,14 +15,14 @@
         :resolve-image="mediaUrl"
         :scene-settings="sceneSettings"
         :intro-delay-ms="180"
-        @ready="sceneReady = true"
-        @intro-ready="sceneIntroReady = true"
+        @ready="handleConstellationSceneReady"
+        @intro-ready="handleConstellationIntroReady"
         @select="handleSceneSelect"
         @discover="handleDiscovery"
         @clear="clearSelected"
         @focus-cleared="handleFocusCleared"
         @immersive-change="immersiveMode = $event"
-        @fallback="fallbackMode = true"
+        @fallback="handleConstellationFallback"
       />
       <MemoryGraph2D
         v-else-if="graphReady && fallbackMode && homePreload.ready && sceneSettingsReady"
@@ -31,12 +31,37 @@
         :selected-id="selected?.id"
         @select="handleSceneSelect"
       />
-      <Loading
-        v-else
-        variant="welcome"
-        fullscreen
-        text="正在同步首页内容与时光轨道"
-      />
+      <Transition name="constellation-entry">
+        <div
+          v-if="constellationLoaderVisible"
+          class="constellation-entry-loading"
+          role="status"
+          aria-live="polite"
+          :aria-label="`${constellationLoadingStage}，${constellationRoundedProgress}%`"
+        >
+          <div class="loading-window">
+            <header>
+              <span class="loading-brand">
+                <img src="/logo.png" alt="" width="32" height="32" />
+                <span
+                  ><strong>WIND CORNER</strong><small>CONSTELLATION SYSTEM</small></span
+                >
+              </span>
+              <b
+                >{{ String(constellationRoundedProgress).padStart(2, "0") }}<small>%</small></b
+              >
+            </header>
+            <div class="loading-track" aria-hidden="true">
+              <i :style="{ transform: `scaleX(${constellationDisplayProgress / 100})` }" />
+              <span :style="{ left: `${constellationDisplayProgress}%` }" />
+            </div>
+            <footer>
+              <span><i />{{ constellationLoadingStage }}</span>
+              <small>{{ constellationLoadingDetail }}</small>
+            </footer>
+          </div>
+        </div>
+      </Transition>
     </section>
 
     <header class="constellation-nav">
@@ -397,9 +422,22 @@ const graphReady = ref(false);
 const sceneSettingsReady = ref(false);
 const discoveryClosing = ref(false);
 const immersiveMode = ref(false);
+const constellationLoaderVisible = ref(true);
+const constellationDisplayProgress = ref(0);
+const constellationTargetProgress = ref(0);
+const constellationLoadingStage = ref("准备星图界面");
+const constellationLoadingDetail = ref("初始化视觉与交互资源");
+const constellationRoundedProgress = computed(() =>
+  Math.round(constellationDisplayProgress.value),
+);
 let requestSequence = 0;
 let neighborRequestSequence = 0;
 let telemetryTimer: ReturnType<typeof setInterval> | null = null;
+let constellationProgressFrame = 0;
+let constellationProgressUpdatedAt = 0;
+let constellationSceneTimeout = 0;
+let constellationCompletionStarted = false;
+let constellationDisposed = false;
 
 const typeOptions = [
   { value: "memory", label: "时光记忆", icon: "ph:planet-bold" },
@@ -883,7 +921,149 @@ function buildDiscoveryTelemetry(
   return empty;
 }
 
+function animateConstellationProgress(now: number) {
+  const elapsed = constellationProgressUpdatedAt
+    ? Math.min(64, now - constellationProgressUpdatedAt)
+    : 16;
+  constellationProgressUpdatedAt = now;
+  const distance =
+    constellationTargetProgress.value - constellationDisplayProgress.value;
+  const easing = 1 - Math.exp(-elapsed / 320);
+
+  if (distance > 0.04) {
+    constellationDisplayProgress.value = Math.min(
+      constellationTargetProgress.value,
+      constellationDisplayProgress.value + Math.max(distance * easing, elapsed * 0.006),
+    );
+    constellationProgressFrame = requestAnimationFrame(
+      animateConstellationProgress,
+    );
+    return;
+  }
+
+  constellationDisplayProgress.value = constellationTargetProgress.value;
+  constellationProgressFrame = 0;
+}
+
+function advanceConstellationProgress(
+  target: number,
+  stage: string,
+  detail: string,
+) {
+  constellationTargetProgress.value = Math.max(
+    constellationTargetProgress.value,
+    Math.min(100, target),
+  );
+  constellationLoadingStage.value = stage;
+  constellationLoadingDetail.value = detail;
+  if (!constellationProgressFrame) {
+    constellationProgressUpdatedAt = 0;
+    constellationProgressFrame = requestAnimationFrame(
+      animateConstellationProgress,
+    );
+  }
+}
+
+function syncConstellationProgress() {
+  if (constellationCompletionStarted) return;
+  let target = 8;
+  let stage = "准备星图界面";
+  let detail = "初始化视觉与交互资源";
+
+  if (graphReady.value) {
+    target = 30;
+    stage = "时光坐标已载入";
+    detail = "同步记忆轨道与关联数据";
+  }
+  if (sceneSettingsReady.value) {
+    target = 46;
+    stage = "星体参数已校准";
+    detail = "配置星图观测与互动信息";
+  }
+  if (homePreload.value.ready) {
+    target = 64;
+    stage = "时间轨道已接入";
+    detail = "准备星图首帧画面";
+  }
+  if (sceneReady.value) {
+    target = 84;
+    stage = "首帧已经就绪";
+    detail = "校准页面层级与进入状态";
+  }
+
+  advanceConstellationProgress(target, stage, detail);
+}
+
+function constellationNextPaint() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function waitForConstellationProgress(target: number) {
+  if (constellationDisplayProgress.value >= target)
+    return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(constellationDisplayProgress, (progress) => {
+      if (progress < target) return;
+      stop();
+      resolve();
+    });
+  });
+}
+
+async function completeConstellationLoading(stage: string, detail: string) {
+  if (constellationCompletionStarted) return;
+  constellationCompletionStarted = true;
+  await constellationNextPaint();
+  if (constellationDisposed) return;
+  advanceConstellationProgress(100, stage, detail);
+  await waitForConstellationProgress(99.9);
+  if (constellationDisposed) return;
+  await new Promise((resolve) => window.setTimeout(resolve, 460));
+  if (constellationDisposed) return;
+  constellationLoaderVisible.value = false;
+}
+
+function handleConstellationSceneReady() {
+  sceneReady.value = true;
+  syncConstellationProgress();
+}
+
+function handleConstellationIntroReady() {
+  sceneIntroReady.value = true;
+  void completeConstellationLoading("星图已经就绪", "一切准备就绪");
+}
+
+function handleConstellationFallback() {
+  window.clearTimeout(constellationSceneTimeout);
+  fallbackMode.value = true;
+  sceneReady.value = true;
+  sceneIntroReady.value = true;
+  void completeConstellationLoading("兼容星图已经就绪", "已切换到兼容观测画面");
+}
+
+watch(
+  () => [
+    graphReady.value,
+    sceneSettingsReady.value,
+    homePreload.value.ready,
+    sceneReady.value,
+    sceneIntroReady.value,
+  ],
+  syncConstellationProgress,
+);
+
 onMounted(() => {
+  constellationDisposed = false;
+  syncConstellationProgress();
+  constellationSceneTimeout = window.setTimeout(() => {
+    if (!constellationLoaderVisible.value || sceneIntroReady.value) return;
+    if (!sceneReady.value) fallbackMode.value = true;
+    sceneReady.value = true;
+    sceneIntroReady.value = true;
+    void completeConstellationLoading("星图已经就绪", "正在使用兼容观测画面");
+  }, 10_000);
   void loadGraph();
   void loadSceneSettings();
   void preloadHomeContent();
@@ -892,6 +1072,9 @@ onMounted(() => {
   }, 30_000);
 });
 onBeforeUnmount(() => {
+  constellationDisposed = true;
+  cancelAnimationFrame(constellationProgressFrame);
+  window.clearTimeout(constellationSceneTimeout);
   if (telemetryTimer) clearInterval(telemetryTimer);
 });
 
@@ -1284,6 +1467,8 @@ useHead({ title: "时光星图" });
   --space-text: #f4f7fb;
   --space-text-2: #bec7d1;
   --space-text-3: #8996a4;
+  --space-muted: rgb(221 235 255 / 64%);
+  --space-line: rgb(174 205 255 / 16%);
   --space-border: rgb(255 255 255 / 14%);
   --space-surface: rgb(7 14 27 / 88%);
   position: fixed;
@@ -1313,65 +1498,138 @@ useHead({ title: "时光星图" });
   height: 100%;
   min-height: 100%;
 }
-.constellation-loading {
+.constellation-entry-loading {
   position: absolute;
-  z-index: 5;
+  z-index: 20;
   inset: 0;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 18px;
   background: #030712;
-  color: var(--space-text-3);
-  pointer-events: none;
+  color: var(--space-muted);
 }
-.constellation-loading small {
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
+.loading-window {
+  width: min(330px, calc(100vw - 44px));
+  padding: 18px 19px 16px;
+  border: 1px solid color-mix(in srgb, var(--space-accent) 26%, transparent);
+  border-radius: 8px;
+  background: rgb(4 10 24 / 86%);
+  box-shadow:
+    0 20px 70px rgb(0 0 0 / 28%),
+    0 0 0 1px rgb(255 255 255 / 2%) inset;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
-.loading-orbit {
+.loading-window header,
+.loading-brand,
+.loading-window footer,
+.loading-window footer > span {
+  display: flex;
+  align-items: center;
+}
+.loading-window header {
+  justify-content: space-between;
+}
+.loading-brand {
+  gap: 10px;
+}
+.loading-brand img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.loading-brand > span {
+  display: grid;
+  gap: 2px;
+}
+.loading-brand strong {
+  color: var(--space-text);
+  font: 650 0.54rem var(--font-brand);
+}
+.loading-brand small,
+.loading-window footer small {
+  color: rgb(221 235 255 / 42%);
+  font: 0.39rem var(--font-mono);
+}
+.loading-window header > b {
+  min-width: 46px;
+  color: var(--space-text);
+  font: 500 1.05rem var(--font-mono);
+  text-align: right;
+}
+.loading-window header > b small {
+  margin-left: 2px;
+  color: var(--space-accent);
+  font-size: 0.46rem;
+}
+.loading-track {
   position: relative;
-  display: block;
-  width: 62px;
-  height: 62px;
-  border: 1px solid color-mix(in srgb, var(--space-accent) 42%, transparent);
-  border-radius: 50%;
-  animation: loading-spin 5s linear infinite;
+  height: 2px;
+  margin: 18px 0 13px;
+  background: rgb(174 205 255 / 12%);
 }
-.loading-orbit::before {
+.loading-track > i {
   position: absolute;
-  inset: 12px;
-  border: 1px solid color-mix(in srgb, var(--space-accent) 24%, transparent);
-  border-radius: 50%;
-  content: "";
-}
-.loading-orbit i {
-  position: absolute;
-  top: -4px;
-  left: 50%;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  inset: 0;
   background: var(--space-accent);
-  box-shadow: 0 0 16px var(--space-accent);
-  transform: translateX(-50%);
+  box-shadow: 0 0 14px var(--c-primary-soft);
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
 }
-.loading-orbit i:nth-child(2) {
+.loading-track > span {
+  position: absolute;
   top: 50%;
-  left: auto;
-  right: -4px;
-  background: var(--space-accent);
-  box-shadow: 0 0 12px var(--space-accent);
-  opacity: 0.65;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--space-accent);
+  border-radius: 50%;
+  background: #071022;
+  box-shadow: 0 0 0 3px var(--c-primary-soft);
+  transform: translate(-50%, -50%);
+  will-change: left;
 }
-.loading-orbit i:nth-child(3) {
-  top: auto;
-  right: auto;
-  bottom: -4px;
-  left: 22%;
-  background: var(--space-text);
-  box-shadow: 0 0 12px var(--space-accent);
-  opacity: 0.8;
+.loading-window footer {
+  justify-content: space-between;
+  gap: 16px;
+}
+.loading-window footer > span {
+  min-width: 0;
+  gap: 7px;
+  color: var(--space-muted);
+  font-size: 0.52rem;
+  white-space: nowrap;
+}
+.loading-window footer > span i {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--space-accent);
+  box-shadow: 0 0 0 3px var(--c-primary-soft);
+  animation: constellation-loading-pulse 1.5s ease-in-out infinite;
+}
+.loading-window footer > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.constellation-entry-leave-active {
+  transition:
+    opacity 0.86s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.86s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0.86s;
+}
+.constellation-entry-leave-to {
+  opacity: 0;
+  filter: blur(10px);
+  visibility: hidden;
+}
+@keyframes constellation-loading-pulse {
+  50% {
+    opacity: 0.48;
+    transform: scale(0.72);
+  }
 }
 .constellation-nav {
   position: absolute;
@@ -2400,10 +2658,12 @@ useHead({ title: "时光星图" });
   .discovery-content-leave-active,
   .discovery-details,
   .immersive-actions,
-  .loading-orbit,
-  .constellation-intro {
+  .constellation-entry-leave-active {
     opacity: 1;
     transform: none;
+  }
+  .loading-window footer > span i {
+    animation: none;
   }
 }
 </style>

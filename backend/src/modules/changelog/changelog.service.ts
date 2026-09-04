@@ -148,29 +148,36 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async admin() {
+  async admin(query: ListQuery = {}) {
     const config = await this.getConfig();
     const repository = this.repositoryKey(config);
-    const [snapshot, manualEntries, translations] = await Promise.all([
+    const [snapshot, manualEntries, translationTotal, translationGroups] = await Promise.all([
       this.getAutomatic(config),
       this.getManualEntries(),
-      this.prisma.changelogTranslation.findMany({
+      this.prisma.changelogTranslation.count({ where: { repository, branch: config.branch } }),
+      this.prisma.changelogTranslation.groupBy({
+        by: ['status'],
         where: { repository, branch: config.branch },
-        orderBy: { committedAt: 'desc' },
-        take: 200,
+        _count: { _all: true },
       }),
     ]);
-    const translationStats = translations.reduce(
-      (stats, row) => {
-        stats.total += 1;
-        if (row.status === 'translated') stats.translated += 1;
-        else if (row.status === 'original') stats.original += 1;
-        else if (row.status === 'failed') stats.failed += 1;
-        else stats.pending += 1;
-        return stats;
-      },
-      { total: 0, translated: 0, original: 0, pending: 0, failed: 0 },
-    );
+    const translationLimit = Math.min(50, Math.max(5, Number(query.limit) || 12));
+    const translationTotalPages = Math.max(1, Math.ceil(translationTotal / translationLimit));
+    const translationPage = Math.min(translationTotalPages, Math.max(1, Number(query.page) || 1));
+    const translations = await this.prisma.changelogTranslation.findMany({
+      where: { repository, branch: config.branch },
+      orderBy: { committedAt: 'desc' },
+      skip: (translationPage - 1) * translationLimit,
+      take: translationLimit,
+    });
+    const translationStats = { total: translationTotal, translated: 0, original: 0, pending: 0, failed: 0 };
+    for (const group of translationGroups) {
+      const count = group._count._all;
+      if (group.status === 'translated') translationStats.translated = count;
+      else if (group.status === 'original') translationStats.original = count;
+      else if (group.status === 'failed') translationStats.failed = count;
+      else translationStats.pending += count;
+    }
     return {
       config,
       manualEntries,
@@ -196,6 +203,9 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
         error: row.lastError || '',
         url: row.commitUrl,
       })),
+      translationsPage: translationPage,
+      translationsTotalPages: translationTotalPages,
+      translationsTotal: translationTotal,
     };
   }
 

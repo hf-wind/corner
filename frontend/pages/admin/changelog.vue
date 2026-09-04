@@ -173,6 +173,7 @@
             <em :class="`state-${item.status}`">{{ translationState(item.status) }}</em>
           </a>
           <div v-if="!adminData.translations.length" class="automatic-empty"><Icon name="ph:database-bold" />同步 Git 后会按提交 SHA 建立翻译缓存</div>
+          <AdminPagination v-else v-model:current="translationPage" :page-size="translationPageSize" :total="adminData.translationsTotal" :show-size-changer="false" @change="loadTranslations" />
         </section>
       </div>
       <div v-show="activeTab === 'config'" class="config-tab-note">
@@ -297,7 +298,12 @@ const adminData = reactive<ChangelogAdminResponse>({
   translationConfigured: false,
   translationStats: { total: 0, translated: 0, original: 0, pending: 0, failed: 0 },
   translations: [],
+  translationsPage: 1,
+  translationsTotalPages: 1,
+  translationsTotal: 0,
 });
+const translationPage = ref(1);
+const translationPageSize = 12;
 const dialog = reactive({
   open: false,
   editing: false,
@@ -331,13 +337,28 @@ const tokenStateLabel = computed(() => {
 async function load() {
   loading.value = true;
   try {
-    const result = await api.get<ChangelogAdminResponse>("/changelog/admin");
+    const result = await api.get<ChangelogAdminResponse>("/changelog/admin", { page: translationPage.value, limit: translationPageSize });
     Object.assign(adminData, result);
+    translationPage.value = result.translationsPage || translationPage.value;
     Object.assign(config, result.config);
   } catch (error: any) {
     toast.error(error?.message || "风迹配置加载失败");
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadTranslations(page = translationPage.value) {
+  translationPage.value = page;
+  try {
+    const result = await api.get<ChangelogAdminResponse>("/changelog/admin", { page, limit: translationPageSize });
+    adminData.translations = result.translations;
+    adminData.translationsPage = result.translationsPage;
+    adminData.translationsTotalPages = result.translationsTotalPages;
+    adminData.translationsTotal = result.translationsTotal;
+    adminData.translationStats = result.translationStats;
+  } catch (error: any) {
+    toast.error(error?.message || "翻译缓存加载失败");
   }
 }
 

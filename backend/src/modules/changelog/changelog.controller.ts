@@ -38,8 +38,11 @@ export class ChangelogController {
   @Get('admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  admin() {
-    return this.changelog.admin();
+  admin(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.changelog.admin({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Put('admin/config')

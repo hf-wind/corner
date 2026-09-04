@@ -44,7 +44,7 @@
           v-model="form.content"
           mode="edit"
           :theme="editorTheme"
-          :preview-theme="mode === 'moment' ? 'default' : 'smart-blue'"
+          preview-theme="default"
           :class="{ 'md-moment': mode === 'moment' }"
           @upload-img="onUploadImg"
           @save="handleSave"
@@ -289,7 +289,7 @@ function backToList() {
 
 function openPreview() {
   if (!currentSlug.value) return
-  const path = mode.value === 'article' ? `/admin/posts/preview?slug=${currentSlug.value}` : `/admin/moments/preview?slug=${currentSlug.value}`
+  const path = mode.value === 'article' ? `/article/${encodeURIComponent(currentSlug.value)}?preview=1` : `/admin/moments/preview?slug=${encodeURIComponent(currentSlug.value)}`
   window.open(path, '_blank')
 }
 

@@ -9,28 +9,94 @@
 /* ── CSS Variables Override (md-editor-v3) ── */
 .md-base-preview,
 .md-base-wrap .md-editor-preview,
-.admin-md-editor :deep(.md-editor-preview) {
-  --md-bk-color: transparent;
-  --md-bk-color-outstand: var(--c-bg-2);
-  --md-bk-color-hover: var(--c-bg-2);
-  --md-bk-color-block: var(--c-bg-1);
-  --md-bk-color-code: var(--code-bg);
-  --md-border-color: color-mix(in srgb, var(--border) 80%, transparent);
-  --md-color: var(--c-text);
-  --md-color-secondary: var(--c-text-2);
-  --md-primary-color: var(--c-primary);
+.admin-md-editor .md-editor-preview {
+  --md-bk-color: transparent !important;
+  --md-bk-color-outstand: var(--c-bg-2) !important;
+  --md-bk-color-hover: var(--c-bg-2) !important;
+  --md-bk-color-block: var(--c-bg-1) !important;
+  --md-bk-color-code: var(--code-bg) !important;
+  --md-border-color: color-mix(in srgb, var(--border) 80%, transparent) !important;
+  --md-color: var(--c-text) !important;
+  --md-color-secondary: var(--c-text-2) !important;
+  --md-primary-color: var(--c-primary) !important;
+  /* Keep md-editor-v3 theme variables aligned with the site palette. */
+  --md-theme-color: var(--c-text) !important;
+  --md-theme-color-reverse: var(--c-bg) !important;
+  --md-theme-color-hover: var(--c-bg-2) !important;
+  --md-theme-color-hover-inset: var(--c-bg-2) !important;
+  --md-theme-link-color: var(--c-primary) !important;
+  --md-theme-link-hover-color: var(--c-primary) !important;
+  --md-theme-border-color: var(--border) !important;
+  --md-theme-border-color-reverse: var(--border) !important;
+  --md-theme-border-color-inset: var(--border) !important;
+  --md-theme-bg-color: transparent !important;
+  --md-theme-bg-color-inset: var(--c-bg-2) !important;
+  --md-theme-code-copy-tips-color: var(--c-text) !important;
+  --md-theme-code-copy-tips-bg-color: var(--c-bg-2) !important;
+  --md-theme-code-active-color: var(--c-primary) !important;
+  --md-theme-heading-color: var(--c-text) !important;
+  --md-theme-heading-border: none !important;
+  --md-theme-heading-1-color: var(--c-text) !important;
+  --md-theme-heading-1-border: none !important;
+  --md-theme-heading-2-color: var(--c-text) !important;
+  --md-theme-heading-2-border: none !important;
+  --md-theme-heading-3-color: var(--c-text) !important;
+  --md-theme-heading-3-border: none !important;
+  --md-theme-heading-4-color: var(--c-text) !important;
+  --md-theme-heading-4-border: none !important;
+  --md-theme-heading-5-color: var(--c-text) !important;
+  --md-theme-heading-5-border: none !important;
+  --md-theme-heading-6-color: var(--c-text) !important;
+  --md-theme-heading-6-border: none !important;
+  --md-theme-quote-color: var(--c-text-2) !important;
+  --md-theme-quote-border: 3px solid var(--c-primary) !important;
+  --md-theme-quote-bg-color: transparent !important;
+  --md-theme-table-stripe-color: var(--c-bg-1) !important;
+  --md-theme-table-tr-bg-color: transparent !important;
+  --md-theme-table-td-border-color: var(--border) !important;
 }
 
 .md-base-preview,
-.md-base-wrap .md-editor-preview {
+.md-base-wrap .md-editor-preview,
+.admin-md-editor .md-editor-preview {
   background: transparent !important;
   background-color: transparent !important;
+  background-image: none !important;
 }
 
-.md-base-wrap .md-editor-preview-wrapper {
+/* md-editor-v3 themes add patterned surfaces on the theme class itself. */
+.md-base-wrap .md-editor-preview.default-theme,
+.md-base-wrap .md-editor-preview.github-theme,
+.md-base-wrap .md-editor-preview.vuepress-theme,
+.md-base-wrap .md-editor-preview.mk-cute-theme,
+.md-base-wrap .md-editor-preview.cyanosis-theme,
+.md-base-wrap .md-editor-preview.smart-blue-theme,
+.admin-md-editor .md-editor-preview.default-theme,
+.admin-md-editor .md-editor-preview.github-theme,
+.admin-md-editor .md-editor-preview.vuepress-theme,
+.admin-md-editor .md-editor-preview.mk-cute-theme,
+.admin-md-editor .md-editor-preview.cyanosis-theme,
+.admin-md-editor .md-editor-preview.smart-blue-theme {
+  background-image: none !important;
+  background-color: transparent !important;
+  color: var(--c-text) !important;
+}
+
+.md-base-wrap .md-editor-preview-wrapper,
+.admin-md-editor .md-editor-preview-wrapper {
   padding: 0;
   background: transparent !important;
   background-color: transparent !important;
+  background-image: none !important;
+}
+
+.admin-md-editor .md-editor-catalog-indicator {
+  background-color: var(--c-primary) !important;
+}
+
+.admin-md-editor .md-editor-catalog-link span:hover,
+.admin-md-editor .md-editor-catalog-active > span {
+  color: var(--c-primary) !important;
 }
 
 /* ── Base Typography ── */

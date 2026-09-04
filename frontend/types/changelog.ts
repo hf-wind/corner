@@ -79,4 +79,7 @@ export interface ChangelogAdminResponse {
     error: string;
     url: string;
   }>;
+  translationsPage: number;
+  translationsTotalPages: number;
+  translationsTotal: number;
 }

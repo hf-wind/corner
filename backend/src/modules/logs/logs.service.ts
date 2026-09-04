@@ -16,7 +16,7 @@ export class LogsService {
     }
     const level = query.level?.trim().toUpperCase();
     const search = query.search?.trim().toLowerCase();
-    const entries = chunks.join('').split(/\r?\n/).filter(Boolean).filter((line) =>
+    const entries = chunks.join('\n').split(/\r?\n/).filter(Boolean).filter((line) =>
       (!level || line.includes(`] ${level} `) || line.includes(`] ${level} [`)) &&
       (!search || line.toLowerCase().includes(search)),
     );

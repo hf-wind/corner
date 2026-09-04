@@ -90,3 +90,54 @@ describe('ChangelogService runtime Git history', () => {
     expect(snapshot.releases[0].summary).toBe('');
   });
 });
+
+describe('ChangelogService admin translation pagination', () => {
+  it('returns one cache page while keeping statistics global', async () => {
+    const rows = Array.from({ length: 12 }, (_, index) => ({
+      commitSha: String(index).padStart(40, '0'),
+      originalMessage: `commit ${index}`,
+      translatedMessage: `提交 ${index}`,
+      language: 'en',
+      status: 'translated',
+      translationService: 'baidu',
+      author: 'tester',
+      committedAt: new Date(`2026-09-${String(index + 1).padStart(2, '0')}T00:00:00Z`),
+      updatedAt: new Date('2026-09-04T00:00:00Z'),
+      lastError: null,
+      commitUrl: `https://example.test/${index}`,
+    }));
+    const prisma = {
+      changelogTranslation: {
+        count: jest.fn().mockResolvedValue(12),
+        groupBy: jest.fn().mockResolvedValue([
+          { status: 'translated', _count: { _all: 9 } },
+          { status: 'failed', _count: { _all: 3 } },
+        ]),
+        findMany: jest.fn().mockResolvedValue(rows.slice(5, 10)),
+      },
+    };
+    const translation = { configured: true };
+    const service = new ChangelogService({} as any, prisma as any, translation as any);
+    jest.spyOn(service as any, 'getConfig').mockResolvedValue({
+      enabled: true,
+      repositoryOwner: 'hf-wind',
+      repositoryName: 'corner',
+      branch: 'main',
+    });
+    jest.spyOn(service as any, 'getAutomatic').mockResolvedValue({
+      releases: [],
+      fetchedAt: '',
+      sourceStatus: 'connected',
+      sourceLabel: 'GitHub',
+    });
+    jest.spyOn(service as any, 'getManualEntries').mockResolvedValue([]);
+
+    const result = await service.admin({ page: 2, limit: 5 });
+
+    expect(prisma.changelogTranslation.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 5, take: 5 }));
+    expect(result.translations).toHaveLength(5);
+    expect(result.translationsPage).toBe(2);
+    expect(result.translationsTotalPages).toBe(3);
+    expect(result.translationStats).toEqual({ total: 12, translated: 9, original: 0, pending: 0, failed: 3 });
+  });
+});

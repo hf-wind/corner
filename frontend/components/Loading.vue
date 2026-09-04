@@ -1,13 +1,16 @@
 <template>
   <div class="ui-loading" :class="[`ui-loading--${variant}`, { 'is-inline': inline, 'is-fullscreen': fullscreen }]" role="status" aria-live="polite">
-    <div v-if="variant === 'welcome'" class="welcome-loading">
+    <slot v-if="$slots.default" />
+    <div v-if="variant === 'welcome' && !$slots.default" class="welcome-loading">
       <header><span><img src="/logo.png" alt="" width="30" height="30" /><b>WIND CORNER<small>WELCOME SYSTEM</small></b></span><strong>正在进入</strong></header>
       <div class="welcome-loading__track"><i /></div>
       <footer><span><i />{{ text || '正在同步首页内容与时光轨道' }}</span><small>请稍候</small></footer>
     </div>
-    <span class="ui-loading__orbit" aria-hidden="true"><i /><i /><i /></span>
-    <strong v-if="title">{{ title }}</strong>
-    <small v-if="text">{{ text }}</small>
+    <template v-if="!$slots.default">
+      <span class="ui-loading__orbit" aria-hidden="true"><i /><i /><i /></span>
+      <strong v-if="title">{{ title }}</strong>
+      <small v-if="text">{{ text }}</small>
+    </template>
   </div>
 </template>
 
@@ -26,6 +29,7 @@ withDefaults(defineProps<{
 .ui-loading.is-fullscreen { position: absolute; z-index: 20; inset: 0; width: 100%; height: 100%; min-height: 0; background: color-mix(in srgb, var(--c-bg) 72%, transparent); backdrop-filter: blur(10px); }
 .ui-loading--space.is-fullscreen { background: rgb(3 7 18 / 82%); }
 .ui-loading--welcome.is-fullscreen { background: var(--c-bg); }
+.ui-loading--space.is-fullscreen { background: radial-gradient(circle at 50% 46%, rgb(18 42 68 / 30%), rgb(3 7 18 / 96%) 62%); }
 .ui-loading--welcome > .ui-loading__orbit, .ui-loading--welcome > strong, .ui-loading--welcome > small { display: none; }
 .welcome-loading { width: min(420px, calc(100vw - 44px)); padding: 21px 22px 18px; border: 1px solid color-mix(in srgb, var(--border) 78%, var(--c-primary)); border-radius: 14px; background: color-mix(in srgb, var(--c-bg-1) 92%, transparent); box-shadow: 0 22px 58px color-mix(in srgb, var(--ld-shadow) 22%, transparent); text-align: left; }
 .welcome-loading header, .welcome-loading footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; }

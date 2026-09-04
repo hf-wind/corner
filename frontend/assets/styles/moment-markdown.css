@@ -10,7 +10,7 @@
 .md-base-preview.md-moment,
 .md-moment .md-base-preview,
 .md-moment .md-editor-preview,
-.admin-md-editor.md-moment :deep(.md-editor-preview) {
+.admin-md-editor.md-moment .md-editor-preview {
   --md-bk-color: transparent;
   --md-bk-color-outstand: var(--c-bg-2);
   --md-bk-color-hover: var(--c-bg-2);

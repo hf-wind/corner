@@ -14,7 +14,7 @@
             :model-value="previewContent"
             :theme="mdTheme"
             language="zh-CN"
-            :preview-theme="variant === 'moment' ? 'default' : 'smart-blue'"
+            preview-theme="default"
             code-theme="github"
             :no-highlight="!enabledFeatures.highlight"
             :no-mermaid="!enabledFeatures.mermaid"
@@ -287,7 +287,7 @@ function collectPreviewImages() {
   return Array.from(
     wrapperRef.value.querySelectorAll<HTMLImageElement>(selector),
   )
-    .filter((item) => Boolean(item.currentSrc || item.src))
+    .filter((item) => Boolean(item.currentSrc || item.src) && !item.alt.startsWith("moment-emoji:"))
     .map((item, index) => ({
       src: item.currentSrc || item.src,
       alt: item.alt || `图片 ${index + 1}`,
@@ -302,7 +302,7 @@ function onContentClick(event: MouseEvent) {
       ? ".md-editor-preview img"
       : ".md-base-html img";
   const image = (event.target as HTMLElement).closest<HTMLImageElement>(selector);
-  if (!image || !wrapperRef.value?.contains(image)) return;
+  if (!image || image.alt.startsWith("moment-emoji:") || !wrapperRef.value?.contains(image)) return;
 
   const images = collectPreviewImages();
   const index = images.findIndex(

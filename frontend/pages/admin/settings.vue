@@ -63,6 +63,7 @@
       <a-tab-pane key="music" tab="音乐播放器" />
       <a-tab-pane key="backups" tab="备份与恢复" />
       <a-tab-pane key="system" tab="系统信息" />
+      <a-tab-pane key="logs" tab="系统日志" />
     </a-tabs>
 
     <div v-show="tab === 'website'" class="tab-body">
@@ -781,6 +782,9 @@
     <div v-show="tab === 'system'" class="tab-body">
       <component :is="InfoPage" embedded />
     </div>
+    <div v-show="tab === 'logs'" class="tab-body">
+      <AdminLogTerminal :active="tab === 'logs'" compact />
+    </div>
   </div>
 </template>
 
@@ -796,7 +800,7 @@ const { updateSiteSetting } = useSiteSettings();
 const { openItems } = useMediaLibrary();
 const router = useRouter();
 const route = useRoute();
-const settingTabs = ["website", "basic", "email", "music", "backups", "system"];
+const settingTabs = ["website", "basic", "email", "music", "backups", "system", "logs"];
 const requestedTab = String(route.query.tab || "");
 const tab = ref(settingTabs.includes(requestedTab) ? requestedTab : "website");
 const healthLoading = ref(false);

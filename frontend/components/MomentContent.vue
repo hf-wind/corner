@@ -1,50 +1,26 @@
 <template>
-  <div class="moment-content md-moment" v-html="html" />
+  <div class="moment-content md-moment">
+    <MarkdownBase mode="preview" variant="moment" :content="markdownContent" :editor-id="editorId" />
+  </div>
 </template>
 
 <script setup lang="ts">
-import MarkdownIt from 'markdown-it'
-import { renderInlineEmoji } from '@/utils/commentContent'
-import '@/assets/styles/moment-markdown.css'
+import MarkdownBase from '@/components/MarkdownBase.vue'
 
 const props = defineProps<{
   content?: string
+  editorId?: string
 }>()
 
 const { mediaUrl } = useMediaUrl()
+const editorId = computed(() => props.editorId || "moment-content-preview")
 
-const md = new MarkdownIt({
-  html: false,
-  breaks: true,
-  linkify: true,
-})
-
-const html = computed(() => {
-  const emojis: Array<{ url: string; label: string }> = []
-  const tokenized = String(props.content || '').replace(
-    /\[\[emoji:([^\]|]+)(?:\|([^\]]*))?\]\]/g,
-    (_, url, label) => {
-      const index = emojis.push({
-        url: String(url || '').trim(),
-        label: String(label || 'emoji').trim(),
-      }) - 1
-      return `MOMENT_EMOJI_${index}`
-    },
-  )
-
-  const normalized = tokenized.replace(
-    /!\[([^\]]*)\]\(([^)]+)\)/g,
-    (_, alt, url) => `![${alt}](${mediaUrl(String(url || '').trim())})`,
-  )
-
-  return md
-    .render(normalized)
-    .replace(/MOMENT_EMOJI_(\d+)/g, (_, rawIndex) => {
-      const emoji = emojis[Number(rawIndex)]
-      if (!emoji?.url) return ''
-      return renderInlineEmoji(emoji.url, emoji.label, mediaUrl, 'moment-inline-emoji')
-    })
-})
+const markdownContent = computed(() => String(props.content || '')
+  .replace(/\[\[emoji:([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, url, label) => {
+    const source = mediaUrl(String(url || '').trim())
+    return `![moment-emoji:${String(label || '表情').trim()}](${source})`
+  })
+  .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => `![${alt}](${mediaUrl(String(url || '').trim())})`))
 </script>
 
 <style scoped>
@@ -52,7 +28,11 @@ const html = computed(() => {
   min-width: 0;
 }
 
-.moment-content :deep(.moment-inline-emoji) {
+.moment-content :deep(.md-base-wrap) {
+  min-width: 0;
+}
+
+.moment-content :deep(.md-editor-preview img[alt^="moment-emoji:"]) {
   display: inline-block;
   width: 2em;
   height: 2em;
@@ -61,5 +41,6 @@ const html = computed(() => {
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  cursor: default;
 }
 </style>

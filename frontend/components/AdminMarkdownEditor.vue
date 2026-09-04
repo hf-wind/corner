@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-md-editor" :class="[`mode-${mode}`, { dark: theme === 'dark' }]">
+  <div class="admin-md-editor md-base-wrap" :class="[`mode-${mode}`, { dark: theme === 'dark' }]">
     <template v-if="mode === 'edit'">
       <MdEditor
         ref="editorRef"
@@ -15,6 +15,7 @@
         :no-katex="noKatex"
         :placeholder="placeholder"
         :read-only="readOnly"
+        class="md-base-preview"
         @update:model-value="onUpdateValue"
         @on-save="onSave"
         @on-upload-img="onUploadImg"
@@ -32,6 +33,7 @@
         :no-mermaid="noMermaid"
         :no-echarts="noEcharts"
         :no-katex="noKatex"
+        class="md-base-preview"
         @on-html-changed="onHtmlChanged"
       />
     </template>
@@ -46,6 +48,7 @@
         :no-mermaid="noMermaid"
         :no-echarts="noEcharts"
         :no-katex="noKatex"
+        class="md-base-preview"
         @on-html-changed="onHtmlChanged"
       />
     </template>
@@ -78,7 +81,7 @@ export interface Props {
   noMermaid?: boolean
   noEcharts?: boolean
   noKatex?: boolean
-  previewTheme?: 'default' | 'github' | 'smart-blue' | 'vuepress' | 'mk-cute' | 'cyanosis'
+  previewTheme?: 'default' | 'github' | 'vuepress' | 'mk-cute' | 'cyanosis'
   codeTheme?: 'github' | 'atom' | 'a11y' | 'gradient' | 'kimbie' | 'paraiso' | 'qtcreator' | 'stackoverflow'
 }
 
@@ -92,7 +95,7 @@ const props = withDefaults(defineProps<Props>(), {
   noMermaid: false,
   noEcharts: false,
   noKatex: false,
-  previewTheme: 'smart-blue',
+  previewTheme: 'default',
   codeTheme: 'github'
 })
 
@@ -189,6 +192,18 @@ defineExpose({
 
 .admin-md-editor :deep(.md-editor-preview-wrapper) {
   padding: 16px 24px;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.admin-md-editor :deep(.md-editor-preview.default-theme),
+.admin-md-editor :deep(.md-editor-preview.github-theme),
+.admin-md-editor :deep(.md-editor-preview.vuepress-theme),
+.admin-md-editor :deep(.md-editor-preview.mk-cute-theme),
+.admin-md-editor :deep(.md-editor-preview.cyanosis-theme) {
+  background-image: none !important;
+  background-color: transparent !important;
+  color: var(--c-text) !important;
 }
 
 /* 深色模式适配 */

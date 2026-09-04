@@ -26,7 +26,7 @@
           <p>{{ summary }}</p>
         </aside>
 
-        <MomentContent v-if="bodyContent" class="moment-body" :content="bodyContent" />
+        <MomentContent v-if="bodyContent" class="moment-body" :content="bodyContent" :editor-id="`moment-${moment.id}-preview`" />
 
         <div v-if="images.length" class="moment-gallery" :class="`gallery-${Math.min(images.length, 4)}`">
           <button
