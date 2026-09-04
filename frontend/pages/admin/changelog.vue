@@ -21,6 +21,7 @@
 
     <a-tabs v-model:activeKey="activeTab" size="small" class="changelog-tabs">
       <a-tab-pane key="stream" tab="更新记录" />
+      <a-tab-pane key="translations" tab="翻译缓存" />
       <a-tab-pane key="config" tab="配置" />
     </a-tabs>
     <a-spin :spinning="loading">
@@ -150,6 +151,30 @@
         </div>
       </div>
       </div>
+      <div v-show="activeTab === 'translations'" class="translation-tab">
+        <section class="translation-overview">
+          <div>
+            <span><Icon name="ph:translate-bold" /></span>
+            <div><strong>百度翻译</strong><small>{{ adminData.translationConfigured ? "接口已配置" : "接口未配置" }}</small></div>
+          </div>
+          <dl>
+            <div><dt>缓存总数</dt><dd>{{ adminData.translationStats.total }}</dd></div>
+            <div><dt>已翻译</dt><dd>{{ adminData.translationStats.translated }}</dd></div>
+            <div><dt>原文中文</dt><dd>{{ adminData.translationStats.original }}</dd></div>
+            <div><dt>待处理 / 失败</dt><dd>{{ adminData.translationStats.pending }} / {{ adminData.translationStats.failed }}</dd></div>
+          </dl>
+        </section>
+        <section class="translation-list">
+          <header><span>提交</span><span>原始说明</span><span>中文说明</span><span>状态</span></header>
+          <a v-for="item in adminData.translations" :key="item.sha" :href="item.url" target="_blank" rel="noopener noreferrer">
+            <div><code>{{ item.sha.slice(0, 8) }}</code><small>{{ formatTime(item.committedAt) }} · {{ item.author }}</small></div>
+            <p>{{ item.original }}</p>
+            <p>{{ item.translated || item.error || "等待下次同步" }}</p>
+            <em :class="`state-${item.status}`">{{ translationState(item.status) }}</em>
+          </a>
+          <div v-if="!adminData.translations.length" class="automatic-empty"><Icon name="ph:database-bold" />同步 Git 后会按提交 SHA 建立翻译缓存</div>
+        </section>
+      </div>
       <div v-show="activeTab === 'config'" class="config-tab-note">
         <a-alert type="info" show-icon message="风迹配置" description="维护公开入口、仓库来源与同步周期，保存后立即用于下一次同步。" />
         <section class="config-tab-form">
@@ -158,7 +183,7 @@
             <a-form-item label="页面标题"><a-input v-model:value="config.title" maxlength="80" /></a-form-item>
             <a-form-item label="页面描述"><a-textarea v-model:value="config.subtitle" :rows="3" maxlength="240" show-count /></a-form-item>
             <div class="repository-fields"><a-form-item label="仓库所有者"><a-input v-model:value="config.repositoryOwner" /></a-form-item><a-form-item label="仓库名称"><a-input v-model:value="config.repositoryName" /></a-form-item><a-form-item label="分支"><a-input v-model:value="config.branch" /></a-form-item></div>
-            <div class="number-fields"><a-form-item label="缓存时间"><a-input-number v-model:value="config.cacheTtl" :min="300" :max="86400" addon-after="秒" /></a-form-item><a-form-item label="自动记录数量"><a-input-number v-model:value="config.maxGroups" :min="4" :max="30" addon-after="组" /></a-form-item></div>
+            <div class="number-fields"><a-form-item label="缓存时间"><a-input-number v-model:value="config.cacheTtl" :min="300" :max="86400" addon-after="秒" /></a-form-item></div>
             <a-button type="primary" :loading="saving" @click="saveConfig"><Icon name="ph:floppy-disk-bold" />保存设置</a-button>
           </a-form>
         </section>
@@ -247,7 +272,7 @@ import type {
 const api = useApi();
 const toast = useToast();
 const loading = ref(true);
-const activeTab = ref<'stream' | 'config'>('stream');
+const activeTab = ref<'stream' | 'translations' | 'config'>('stream');
 const saving = ref(false);
 const syncing = ref(false);
 const manualExpanded = ref(false);
@@ -260,7 +285,6 @@ const config = reactive<ChangelogConfig>({
   repositoryName: "corner",
   branch: "main",
   cacheTtl: 1800,
-  maxGroups: 30,
 });
 const adminData = reactive<ChangelogAdminResponse>({
   config: { ...config },
@@ -270,6 +294,9 @@ const adminData = reactive<ChangelogAdminResponse>({
   sourceStatus: "unavailable",
   sourceLabel: "",
   tokenConfigured: false,
+  translationConfigured: false,
+  translationStats: { total: 0, translated: 0, original: 0, pending: 0, failed: 0 },
+  translations: [],
 });
 const dialog = reactive({
   open: false,
@@ -436,6 +463,10 @@ function formatTime(value: string) {
 
 function formatDate(value: string) {
   return dayjs(value).format("YYYY.MM.DD");
+}
+
+function translationState(status: string) {
+  return ({ translated: "已翻译", original: "原文中文", pending: "待处理", failed: "失败" } as Record<string, string>)[status] || status;
 }
 
 onMounted(load);
@@ -841,6 +872,33 @@ useHead({ title: "风迹墙管理" });
   font-size: 0.6rem;
 }
 
+.translation-tab { display: grid; gap: 18px; margin-top: 18px; }
+.translation-overview,
+.translation-list { border: 1px solid var(--border); border-radius: 8px; background: var(--ld-bg-card); }
+.translation-overview { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); align-items: center; gap: 24px; padding: 18px 20px; }
+.translation-overview > div { display: flex; align-items: center; gap: 11px; }
+.translation-overview > div > span { display: grid; width: 40px; height: 40px; border-radius: 7px; background: var(--c-primary-soft); color: var(--c-primary); font-size: 1.05rem; place-items: center; }
+.translation-overview strong,
+.translation-overview small { display: block; }
+.translation-overview strong { color: var(--c-text); font-size: .72rem; }
+.translation-overview small { margin-top: 3px; color: var(--c-text-3); font-size: .56rem; }
+.translation-overview dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; }
+.translation-overview dl > div { padding: 2px 14px; border-left: 1px solid var(--border); }
+.translation-overview dt { color: var(--c-text-3); font-size: .54rem; }
+.translation-overview dd { margin: 5px 0 0; color: var(--c-text); font: 700 .78rem var(--font-mono); }
+.translation-list { padding: 8px 18px 18px; overflow-x: auto; }
+.translation-list > header,
+.translation-list > a { display: grid; grid-template-columns: 170px minmax(210px, 1fr) minmax(210px, 1fr) 74px; align-items: center; gap: 16px; min-width: 780px; }
+.translation-list > header { padding: 10px 8px; color: var(--c-text-3); font-size: .55rem; }
+.translation-list > a { min-height: 64px; padding: 10px 8px; border-top: 1px solid var(--border); color: inherit; text-decoration: none; }
+.translation-list > a:hover { background: var(--c-bg-2); }
+.translation-list code { color: var(--c-primary); font-size: .6rem; }
+.translation-list small { display: block; margin-top: 4px; color: var(--c-text-3); font-size: .49rem; }
+.translation-list p { margin: 0; color: var(--c-text-2); font-size: .61rem; line-height: 1.6; overflow-wrap: anywhere; }
+.translation-list em { justify-self: start; padding: 4px 7px; border-radius: 5px; background: var(--c-bg-2); color: var(--c-text-3); font-size: .52rem; font-style: normal; }
+.translation-list .state-translated { background: color-mix(in srgb, #2f8b69 12%, transparent); color: #2f8b69; }
+.translation-list .state-failed { background: color-mix(in srgb, #cf596b 10%, transparent); color: #cf596b; }
+
 .entry-meta-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 120px;
@@ -912,6 +970,9 @@ useHead({ title: "风迹墙管理" });
   .admin-columns {
     grid-template-columns: 1fr;
   }
+
+  .translation-overview { grid-template-columns: 1fr; }
+  .translation-overview dl > div:first-child { border-left: 0; }
 }
 
 @media (max-width: 640px) {
@@ -953,5 +1014,7 @@ useHead({ title: "风迹墙管理" });
   .entry-meta-fields {
     grid-template-columns: 1fr;
   }
+
+  .translation-overview dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 0; }
 }
 </style>

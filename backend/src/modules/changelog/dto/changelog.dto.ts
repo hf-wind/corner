@@ -53,11 +53,6 @@ export class UpdateChangelogConfigDto {
   @Max(86400)
   cacheTtl?: number;
 
-  @IsOptional()
-  @IsInt()
-  @Min(4)
-  @Max(30)
-  maxGroups?: number;
 }
 
 export class ChangelogManualItemDto {

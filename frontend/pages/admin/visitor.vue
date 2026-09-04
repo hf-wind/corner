@@ -29,7 +29,6 @@
 
     <a-tabs v-model:active-key="activeTab" class="visitor-tabs">
       <a-tab-pane v-if="isAccessPage" key="profiles" tab="身份档案" />
-      <a-tab-pane v-if="isAccessPage" key="knowledge" tab="星图科普" />
       <a-tab-pane v-if="contentOnly" key="messages" :tab="`留言${stats.pendingMessages ? `（${stats.pendingMessages} 待审）` : ''}`" />
       <a-tab-pane v-if="contentOnly" key="bottles" :tab="`漂流瓶${stats.pendingBottles ? `（${stats.pendingBottles} 待审）` : ''}`" />
     </a-tabs>
@@ -153,32 +152,6 @@
         </a-spin>
     </div>
 
-    <div v-if="activeTab === 'knowledge'" class="visitor-knowledge-pane">
-      <div class="table-toolbar">
-        <a-select v-model:value="knowledgeFilter.planetId" allow-clear placeholder="全部星体" style="width: 170px">
-          <a-select-option v-for="planet in constellationBodies" :key="planet.id" :value="planet.id">{{ planet.name }}</a-select-option>
-        </a-select>
-        <a-button type="primary" @click="loadKnowledge(1)"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
-        <a-button @click="resetKnowledgeFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
-        <span class="toolbar-spacer" />
-        <AdminRefreshButton :loading="loadingKnowledge" @click="loadKnowledge(knowledgePagination.current)" />
-      </div>
-      <a-spin :spinning="loadingKnowledge">
-        <div class="admin-table-shell">
-          <a-table :data-source="knowledgeSelections" :columns="knowledgeColumns" row-key="id" size="small" :pagination="false" :scroll="{ x: 920 }" :locale="{ emptyText: '暂无科普抽取记录' }">
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'visitor'"><span class="source-cell"><strong>{{ record.account?.username || record.visitor?.nickname || '未登记访客' }}</strong><small>{{ record.account?.email || record.visitor?.id || '-' }}</small></span></template>
-              <template v-else-if="column.key === 'planet'"><a-tag color="blue">{{ planetName(record.planetId) }}</a-tag></template>
-              <template v-else-if="column.key === 'knowledge'"><span class="knowledge-cell">{{ record.knowledgeText }}</span></template>
-              <template v-else-if="column.key === 'index'">第 {{ Number(record.knowledgeIndex) + 1 }} 条</template>
-              <template v-else-if="column.key === 'createdAt'">{{ formatTime(record.createdAt) }}</template>
-            </template>
-          </a-table>
-          <AdminPagination v-model:current="knowledgePagination.current" :page-size="knowledgePagination.pageSize" :total="knowledgePagination.total" :show-size-changer="false" @change="loadKnowledge" />
-        </div>
-      </a-spin>
-    </div>
-
     <a-modal v-model:open="profileDialog.open" title="访问身份档案" width="680px" :footer="null">
       <div v-if="profileDialog.record" class="detail-body">
         <div class="detail-row"><span class="detail-label">身份链路</span><a-tag :color="identityColor(profileDialog.record.identity)">{{ identityText(profileDialog.record.identity) }}</a-tag></div>
@@ -252,7 +225,7 @@ const contentType = computed<'message' | 'bottle'>(() => String(route.query.tab 
 const contentOnly = computed(() => !isAccessPage.value)
 const contentTitle = computed(() => contentType.value === 'bottle' ? '漂流瓶管理' : '留言管理')
 const initialTab = String(route.query.tab || '')
-const activeTab = ref(isAccessPage.value ? (['messages', 'bottles', 'knowledge'].includes(initialTab) ? initialTab : 'profiles') : (contentType.value === 'bottle' ? 'bottles' : 'messages'))
+const activeTab = ref(isAccessPage.value ? (['messages', 'bottles'].includes(initialTab) ? initialTab : 'profiles') : (contentType.value === 'bottle' ? 'bottles' : 'messages'))
 const loadingStats = ref(false)
 const stats = reactive({ visitors: 0, todayVisitors: 0, visits: 0, messages: 0, bottles: 0, pendingMessages: 0, pendingBottles: 0, identity: {}, contentReads: {}, ai: {} } as any)
 
@@ -287,22 +260,6 @@ const profileColumns = [
   { title: 'AI 会话', key: 'session', width: 100, fixed: 'right' as const },
   { title: '档案', key: 'profileDetail', width: 76, fixed: 'right' as const },
 ]
-const constellationBodies = [
-  { id: 'mercury', name: '水星' }, { id: 'venus', name: '金星' }, { id: 'mars', name: '火星' },
-  { id: 'jupiter', name: '木星' }, { id: 'saturn', name: '土星' }, { id: 'uranus', name: '天王星' },
-  { id: 'neptune', name: '海王星' }, { id: 'sun', name: '太阳' }, { id: 'black-hole', name: '黑洞' },
-]
-const loadingKnowledge = ref(false)
-const knowledgeSelections = ref<any[]>([])
-const knowledgeFilter = reactive({ planetId: '' })
-const knowledgePagination = reactive({ current: 1, pageSize: 10, total: 0 })
-const knowledgeColumns = [
-  { title: '访客', key: 'visitor', width: 180 },
-  { title: '星体', key: 'planet', width: 120 },
-  { title: '抽取项', key: 'index', width: 100 },
-  { title: '科普内容', key: 'knowledge', minWidth: 420 },
-  { title: '时间', key: 'createdAt', width: 160 },
-]
 function resetProfileFilters() { Object.assign(profileFilter, { keyword: '', type: '' }); void loadProfiles(1) }
 
 const rejectDialog = reactive({ open: false, record: null as any, reason: '' })
@@ -313,17 +270,14 @@ const profileDialog = reactive<any>({ open: false, record: null })
 onMounted(() => {
   void loadStats()
   if (activeTab.value === 'profiles') void loadProfiles(1)
-  else if (activeTab.value === 'knowledge') void loadKnowledge(1)
   else void loadMessages(1)
 })
 watch(contentOnly, (onlyContent) => {
-  activeTab.value = onlyContent ? (contentType.value === 'bottle' ? 'bottles' : 'messages') : (['messages', 'bottles', 'knowledge'].includes(String(route.query.tab || '')) ? String(route.query.tab) : 'profiles')
+  activeTab.value = onlyContent ? (contentType.value === 'bottle' ? 'bottles' : 'messages') : (['messages', 'bottles'].includes(String(route.query.tab || '')) ? String(route.query.tab) : 'profiles')
   if (activeTab.value === 'profiles') void loadProfiles(1)
-  else if (activeTab.value === 'knowledge') void loadKnowledge(1)
   else void loadMessages(1)
 })
 watch(activeTab, (key) => {
-  if (key === 'knowledge') { void loadKnowledge(1); return }
   if (key === 'messages' || key === 'bottles') {
     msgFilter.type = key === 'bottles' ? 'bottle' : 'message'
     void loadMessages(1)
@@ -456,23 +410,6 @@ async function loadProfiles(page: number) {
   } finally {
     loadingProfiles.value = false
   }
-}
-
-function planetName(id: string) { return constellationBodies.find((item) => item.id === id)?.name || id }
-function resetKnowledgeFilters() { knowledgeFilter.planetId = ''; void loadKnowledge(1) }
-async function loadKnowledge(page: number) {
-  loadingKnowledge.value = true
-  try {
-    const params: Record<string, any> = { page, pageSize: knowledgePagination.pageSize }
-    if (knowledgeFilter.planetId) params.planetId = knowledgeFilter.planetId
-    const res = await api.get<any>('/visitor/admin/constellation-knowledge', params)
-    knowledgeSelections.value = res?.items ?? []
-    knowledgePagination.total = res?.total ?? 0
-    knowledgePagination.current = page
-  } catch (e: any) {
-    knowledgeSelections.value = []
-    toast.error(e?.message || '加载星图科普记录失败')
-  } finally { loadingKnowledge.value = false }
 }
 
 function handleProfileChange(pag: any) {

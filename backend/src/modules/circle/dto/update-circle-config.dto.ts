@@ -75,7 +75,6 @@ export class UpdateCircleConfigDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(40)
   @ValidateNested({ each: true })
   @Type(() => CircleSubscriptionDto)
   subscriptions?: CircleSubscriptionDto[];

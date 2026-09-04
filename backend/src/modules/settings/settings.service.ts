@@ -72,7 +72,7 @@ export class SettingsService {
       (Array.isArray(value) ? value : [])
         .map((item) => text(item, 2000))
         .filter(Boolean),
-    )).slice(0, 30);
+    )).slice(0, 1000);
     const number = (value: unknown, min: number, max: number, fallback: number) => {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;

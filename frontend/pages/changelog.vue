@@ -99,9 +99,8 @@
               <span class="empty-mark"><Icon name="ph:wind-bold" /></span>
               <div><h3>风还没有留下新的记录</h3><p>仓库同步完成后，最新变化会出现在这里。</p></div>
             </div>
-            <div ref="loadMoreRef" class="load-more-sentinel" aria-live="polite">
-              <span v-if="loading && data.releases.length">继续读取时间线</span>
-              <span v-else-if="!hasMore && data.releases.length">已抵达时间线尽头</span>
+            <div class="load-more-sentinel" aria-live="polite">
+              <span v-if="loading && data.releases.length">正在读取时间线</span>
             </div>
         </section>
 
@@ -111,7 +110,13 @@
         </footer>
       </div>
     </main>
-
+    <FloatingPagination
+      v-model="page"
+      :total="data.totalPages"
+      :hidden="data.totalPages <= 1"
+      variant="changelog"
+      @change="changePage"
+    />
   </div>
 </template>
 
@@ -120,14 +125,11 @@ import type { ChangelogResponse } from "@/types/changelog";
 
 const api = useApi();
 const scrollRef = ref<HTMLElement | null>(null);
-const loadMoreRef = ref<HTMLElement | null>(null);
 const page = ref(1);
 const loading = ref(true);
 const updating = ref(false);
 const ready = ref(false);
 const error = ref("");
-const hasMore = ref(true);
-let observer: IntersectionObserver | null = null;
 let requestSequence = 0;
 const data = reactive<ChangelogResponse>({
   enabled: true,
@@ -146,7 +148,6 @@ const data = reactive<ChangelogResponse>({
 });
 
 async function load(nextPage = page.value) {
-  if (!hasMore.value && nextPage !== 1) return;
   if (loading.value && nextPage !== 1) return;
   const sequence = ++requestSequence;
   if (ready.value) updating.value = true;
@@ -159,14 +160,8 @@ async function load(nextPage = page.value) {
     });
     if (sequence !== requestSequence) return;
     const incoming = Array.isArray(result.releases) ? result.releases : [];
-    if (nextPage === 1) data.releases = incoming;
-    else {
-      const known = new Set(data.releases.map((release) => release.id));
-      data.releases = [...data.releases, ...incoming.filter((release) => !known.has(release.id))];
-    }
-    Object.assign(data, { ...result, releases: data.releases });
+    Object.assign(data, { ...result, releases: incoming });
     page.value = result.page;
-    hasMore.value = result.page < result.totalPages;
     await nextTick();
     if (!ready.value) {
       requestAnimationFrame(() => {
@@ -181,6 +176,11 @@ async function load(nextPage = page.value) {
       updating.value = false;
     }
   }
+}
+
+async function changePage(nextPage: number) {
+  await load(nextPage);
+  scrollRef.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function pad(value: number) {
@@ -209,17 +209,7 @@ function formatSyncTime(value: string) {
 
 onMounted(() => {
   void load(1);
-  nextTick(() => {
-    if (!scrollRef.value || !loadMoreRef.value) return;
-    observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value) {
-        void load(page.value + 1);
-      }
-    }, { root: scrollRef.value, rootMargin: "280px 0px", threshold: 0 });
-    observer.observe(loadMoreRef.value);
-  });
 });
-onBeforeUnmount(() => observer?.disconnect());
 useHead({
   title: "风迹墙 · 风隅随笔",
   meta: [

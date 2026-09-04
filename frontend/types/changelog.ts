@@ -15,7 +15,7 @@ export interface ChangelogRelease {
   sourceLabel: string;
   url?: string;
   items: ChangelogItem[];
-  translation: "ai" | "rules" | "manual";
+  translation: "baidu" | "original" | "rules" | "manual";
   published?: boolean;
 }
 
@@ -27,7 +27,6 @@ export interface ChangelogConfig {
   repositoryName: string;
   branch: string;
   cacheTtl: number;
-  maxGroups: number;
 }
 
 export interface ChangelogResponse {
@@ -58,4 +57,25 @@ export interface ChangelogAdminResponse {
   sourceStatus: ChangelogResponse["sourceStatus"];
   sourceLabel: string;
   tokenConfigured: boolean;
+  translationConfigured: boolean;
+  translationStats: {
+    total: number;
+    translated: number;
+    original: number;
+    pending: number;
+    failed: number;
+  };
+  translations: Array<{
+    sha: string;
+    original: string;
+    translated: string;
+    language: "zh" | "en" | "mixed";
+    status: "translated" | "original" | "pending" | "failed";
+    service: string;
+    author: string;
+    committedAt: string;
+    updatedAt: string;
+    error: string;
+    url: string;
+  }>;
 }

@@ -16,6 +16,7 @@
         :scene-settings="sceneSettings"
         :intro-delay-ms="180"
         @ready="sceneReady = true"
+        @intro-ready="sceneIntroReady = true"
         @select="handleSceneSelect"
         @discover="handleDiscovery"
         @clear="clearSelected"
@@ -210,18 +211,21 @@
                 <strong>{{ discoveryResult || activeTelemetry.report }}</strong>
                 <span>{{ activeTelemetry.basis }}</span>
               </div>
-              <div class="knowledge-slot" :class="{ 'has-content': activeKnowledge }">
+              <div class="knowledge-slot" :class="{ 'has-content': activeKnowledge || knowledgeLoading }">
                 <Transition name="knowledge-reveal" mode="out-in">
                   <section v-if="activeKnowledge" :key="activeKnowledge.revision" class="telemetry-knowledge" aria-live="polite">
                     <header>
-                      <span><Icon name="ph:book-open-text-bold" /> 行星知识</span>
-                      <small>配置档案</small>
+                      <span><Icon name="ph:book-open-text-bold" /> 星体科普</span>
+                      <small> {{ activeDiscovery.title }} · 已同步</small>
                     </header>
                     <p>{{ activeKnowledge.knowledge }}</p>
-                    <footer><i />{{ activeDiscovery.title }} · 已同步</footer>
                   </section>
                 </Transition>
               </div>
+              <button v-if="activeDiscovery.knowledge?.length" class="knowledge-refresh" type="button" :disabled="knowledgeLoading" @click="fetchKnowledge">
+                <Icon :name="knowledgeLoading ? 'ph:circle-notch-bold' : 'ph:book-open-text-bold'" :class="{ spinning: knowledgeLoading }" />
+                <span>{{ knowledgeLoading ? '正在换个说法…' : (activeKnowledge ? '换个说法' : '读取科普') }}</span>
+              </button>
               <div
                 class="discovery-commands"
                 :aria-label="`${activeDiscovery.title}指令`"
@@ -387,6 +391,7 @@ const neighbors = ref<GraphRelation[]>([]);
 const neighborsLoading = ref(false);
 const error = ref("");
 const sceneReady = ref(false);
+const sceneIntroReady = ref(false);
 const fallbackMode = ref(false);
 const graphReady = ref(false);
 const sceneSettingsReady = ref(false);
@@ -419,7 +424,7 @@ const solarPlanetSpecs = reactive<SolarPlanetSpec[]>([
 
 function mergedKnowledge(value: unknown, fallback: string[]) {
   const custom = Array.isArray(value) ? value.map(item => String(item).trim()).filter(Boolean) : [];
-  return [...custom, ...fallback.filter(item => !custom.includes(item))].slice(0, 30);
+  return [...custom, ...fallback.filter(item => !custom.includes(item))].slice(0, 1000);
 }
 
 for (const spec of solarPlanetSpecs) {
@@ -500,7 +505,7 @@ const discoveries: Discovery[] = [
   },
   {
     id: "satellite-aurora",
-    title: "极光观测卫星",
+    title: "逐光二号",
     catalog: "AURORA-02 · 极光成像卫星",
     kicker: "POLAR OBSERVATORY · 05",
     status: "极区扫描进行中",
@@ -515,7 +520,7 @@ const discoveries: Discovery[] = [
   },
   {
     id: "satellite-relay",
-    title: "潮汐中继卫星",
+    title: "潮声三号",
     catalog: "TRIDENT-03 · 深空中继卫星",
     kicker: "DEEP SPACE RELAY · 06",
     status: "跨轨链路稳定",
@@ -572,8 +577,10 @@ const discoveries: Discovery[] = [
 ];
 
 for (const discovery of discoveries) {
-  if (discovery.id === 'sun' || discovery.id === 'black-hole') {
+  if (SPECIAL_KNOWLEDGE[discovery.id]) {
     discovery.knowledge = [...(SPECIAL_KNOWLEDGE[discovery.id] || [])];
+  }
+  if (discovery.id === 'sun' || discovery.id === 'black-hole') {
     discovery.commands = [
       { id: 'sample', label: `解析${discovery.title}特征`, icon: 'ph:flask-bold' },
       { id: 'orbit', label: '聚焦查看星体特征', icon: 'ph:crosshair-bold' },
@@ -982,36 +989,38 @@ function handleFocusCleared() {
   immersiveMode.value = false;
 }
 
+async function fetchKnowledge() {
+  const discovery = activeDiscovery.value;
+  if (!discovery?.id || knowledgeLoading.value) return;
+  const sequence = ++knowledgeRequestSequence;
+  knowledgeLoading.value = true;
+  try {
+    visitorId();
+    const result = await api.post<any>("/visitor/constellation/knowledge", {
+      planetId: discovery.id,
+    });
+    if (sequence === knowledgeRequestSequence && activeDiscoveryId.value === discovery.id && result?.ok && result.knowledge) {
+      activeKnowledge.value = {
+        knowledge: String(result.knowledge),
+        index: Math.max(0, Number(result.index) || 0),
+        total: Math.max(1, Number(result.total) || 1),
+        reused: Boolean(result.reused),
+        revision: sequence,
+      };
+    }
+  } catch {
+    // 科普接口不可用时保留当前遥测面板。
+  } finally {
+    if (sequence === knowledgeRequestSequence) knowledgeLoading.value = false;
+  }
+}
+
 async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
   const discovery = activeDiscovery.value;
   if (!discovery) return;
   activeCommandId.value = commandId;
   discoverySequence.value += 1;
   telemetryNow.value = new Date();
-  if (commandId === discovery.commands[0]?.id && discovery.knowledge?.length) {
-    const sequence = ++knowledgeRequestSequence;
-    knowledgeLoading.value = true;
-    try {
-      visitorId();
-      const result = await api.post<any>("/visitor/constellation/knowledge", {
-        planetId: discovery.id,
-        knowledge: discovery.knowledge,
-      });
-      if (sequence === knowledgeRequestSequence && activeDiscoveryId.value === discovery.id && result?.ok && result.knowledge) {
-        activeKnowledge.value = {
-          knowledge: String(result.knowledge),
-          index: Math.max(0, Number(result.index) || 0),
-          total: Math.max(1, Number(result.total) || discovery.knowledge.length),
-          reused: Boolean(result.reused),
-          revision: sequence,
-        };
-      }
-    } catch {
-      // The telemetry result remains usable when the audit endpoint is temporarily unavailable.
-    } finally {
-      if (sequence === knowledgeRequestSequence) knowledgeLoading.value = false;
-    }
-  }
   if (commandId === "pulse") {
     discoveryResult.value = `星核脉冲已穿过 ${graph.nodes.length} 枚记忆坐标，云层正在回应最近一次书写。`;
     sceneRef.value?.triggerDiscoveryEffect("planet");
@@ -1216,7 +1225,17 @@ async function loadSceneSettings() {
         const item = configured.find((candidate: any) => candidate?.id === fallback.id);
         const target = solarPlanetSpecs.find(candidate => candidate.id === fallback.id);
         if (target) {
-          Object.assign(target, fallback, item || {});
+          const configuredItem = item || {};
+          Object.assign(target, fallback, configuredItem, {
+            name: String(configuredItem.name || fallback.name),
+            catalog: String(configuredItem.catalog || fallback.catalog),
+            status: String(configuredItem.status || fallback.status),
+            description: String(configuredItem.description || fallback.description),
+            distance: String(configuredItem.distance || fallback.distance),
+            period: String(configuredItem.period || fallback.period),
+            temperature: String(configuredItem.temperature || fallback.temperature),
+            feature: String(configuredItem.feature || fallback.feature),
+          });
           target.knowledge = mergedKnowledge(target.knowledge, SOLAR_KNOWLEDGE[target.id] || [`${target.name}的核心观测特征是${target.feature}。`, target.description]);
         }
       }
@@ -1229,17 +1248,14 @@ async function loadSceneSettings() {
           description: spec.description,
           catalog: spec.catalog,
           knowledge: spec.knowledge,
-          commands: [
-            { id: 'sample', label: `解析${spec.name}特征`, icon: 'ph:flask-bold' },
-            { id: 'orbit', label: '聚焦查看星球特征', icon: 'ph:crosshair-bold' },
-          ],
+          commands: spec.commands,
         });
       }
       const configuredSpecialBodies = Array.isArray(result.specialBodies) ? result.specialBodies : [];
       for (const discovery of discoveries) {
-        if (discovery.id !== 'sun' && discovery.id !== 'black-hole') continue;
         const configured = configuredSpecialBodies.find((item: any) => String(item?.id || '') === discovery.id);
-        const fallback = SPECIAL_KNOWLEDGE[discovery.id] || [];
+        const fallback = SPECIAL_KNOWLEDGE[discovery.id] || discovery.knowledge || [];
+        if (!configured && !fallback.length) continue;
         if (configured) {
           Object.assign(discovery, {
             title: configured.title || discovery.title,
@@ -2097,32 +2113,17 @@ useHead({ title: "时光星图" });
   font-size: 0.59rem;
   line-height: 1.55;
 }
-.knowledge-slot.has-content {
-  min-height: 156px;
-}
+.knowledge-slot { overflow: hidden; }
 .telemetry-knowledge {
-  position: relative;
   display: flex;
-  min-height: 156px;
   box-sizing: border-box;
   flex-direction: column;
   gap: 9px;
   margin-top: 16px;
-  padding: 13px 14px 12px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--discovery-accent) 24%, var(--border));
-  border-radius: 9px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--discovery-accent) 10%, transparent), color-mix(in srgb, var(--c-bg-1) 90%, transparent));
+  padding-top: 11px;
+  border-top: 1px solid color-mix(in srgb, var(--discovery-accent) 24%, transparent);
 }
-.telemetry-knowledge::before {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--discovery-accent);
-  content: "";
-}
-.telemetry-knowledge header,
-.telemetry-knowledge footer {
+.telemetry-knowledge header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2137,31 +2138,39 @@ useHead({ title: "时光星图" });
   font-weight: 650;
 }
 .telemetry-knowledge header span :deep(svg) { color: var(--discovery-accent); }
-.telemetry-knowledge header small,
-.telemetry-knowledge footer {
+.telemetry-knowledge header small {
   color: var(--c-text-3);
   font-size: 0.47rem;
 }
 .telemetry-knowledge p {
   margin: 0;
-  max-height: 82px;
-  overflow-y: auto;
   color: var(--c-text-2);
   font-size: 0.66rem;
   line-height: 1.75;
 }
-.telemetry-knowledge footer { justify-content: flex-start; gap: 6px; }
-.telemetry-knowledge footer i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--discovery-accent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--discovery-accent) 65%, transparent);
-}
 .knowledge-reveal-enter-active,
-.knowledge-reveal-leave-active { transition: opacity .3s ease, transform .3s cubic-bezier(.16, 1, .3, 1); }
+.knowledge-reveal-leave-active { transition: opacity .38s ease, transform .42s cubic-bezier(.16, 1, .3, 1), filter .38s ease; }
 .knowledge-reveal-enter-from,
-.knowledge-reveal-leave-to { opacity: 0; transform: translateY(8px); }
+.knowledge-reveal-leave-to { opacity: 0; filter: blur(3px); transform: translateY(8px); }
+.knowledge-refresh {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--discovery-accent) 36%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--discovery-accent) 9%, transparent);
+  color: var(--c-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: .57rem;
+  transition: background .22s ease, border-color .22s ease, color .22s ease, transform .22s ease;
+}
+.knowledge-refresh:hover:not(:disabled) { border-color: var(--discovery-accent); background: color-mix(in srgb, var(--discovery-accent) 16%, transparent); color: var(--c-text); transform: translateY(-1px); }
+.knowledge-refresh:disabled { cursor: wait; opacity: .72; }
+.knowledge-refresh .spinning { animation: loading-spin .8s linear infinite; }
 .telemetry-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

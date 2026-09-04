@@ -7,7 +7,7 @@ describe('ChangelogService runtime Git history', () => {
   let service: ChangelogService;
 
   beforeEach(() => {
-    service = new ChangelogService({} as any, {} as any);
+    service = new ChangelogService({} as any, {} as any, {} as any);
   });
 
   afterEach(async () => {
@@ -34,5 +34,11 @@ describe('ChangelogService runtime Git history', () => {
         original: 'feat: production history',
       },
     ]);
+  });
+
+  it('only skips translation when the commit message has no English letters', () => {
+    expect((service as any).detectLanguage('修复订阅源更新')).toBe('zh');
+    expect((service as any).detectLanguage('fix circle feed')).toBe('en');
+    expect((service as any).detectLanguage('修复 RSS 缓存')).toBe('mixed');
   });
 });

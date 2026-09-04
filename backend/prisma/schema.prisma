@@ -1008,7 +1008,7 @@ model ConstellationKnowledgeSelection {
 }
 
 model VisitorAchievement {
-  id            String   @id @default(uuid()) @db.Uuid
+  id            String   @id @db.Uuid
   visitorIdHash String   @map("visitor_id_hash") @db.VarChar(64)
   code          String   @db.VarChar(40)
   unlockedAt    DateTime @default(now()) @map("unlocked_at")
@@ -1016,4 +1016,41 @@ model VisitorAchievement {
   @@unique([visitorIdHash, code])
   @@index([code])
   @@map("visitor_achievements")
+}
+
+model ChangelogTranslation {
+  id                 String   @id @default(uuid()) @db.Uuid
+  repository         String   @db.VarChar(220)
+  branch             String   @db.VarChar(180)
+  commitSha          String   @map("commit_sha") @db.VarChar(40)
+  originalMessage    String   @map("original_message") @db.Text
+  translatedMessage  String?  @map("translated_message") @db.Text
+  language           String   @db.VarChar(20)
+  translationService String?  @map("translation_service") @db.VarChar(20)
+  status             String   @default("pending") @db.VarChar(20)
+  author             String   @db.VarChar(100)
+  commitUrl          String   @map("commit_url") @db.Text
+  committedAt        DateTime @map("committed_at")
+  lastError          String?  @map("last_error") @db.Text
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([repository, commitSha])
+  @@index([repository, branch, committedAt])
+  @@index([status, updatedAt])
+  @@map("changelog_translations")
+}
+
+model ChangelogSyncState {
+  id           String   @id @default(uuid()) @db.Uuid
+  repository   String   @db.VarChar(220)
+  branch       String   @db.VarChar(180)
+  fetchedAt    DateTime @map("fetched_at")
+  sourceStatus String   @map("source_status") @db.VarChar(20)
+  sourceLabel  String   @map("source_label") @db.VarChar(100)
+  lastError    String?  @map("last_error") @db.Text
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([repository, branch])
+  @@map("changelog_sync_states")
 }

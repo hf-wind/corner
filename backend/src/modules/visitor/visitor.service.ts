@@ -408,16 +408,65 @@ export class VisitorService {
     visitorIdHash: string,
     userId: string | null,
     planetId: string,
-    knowledge: string[],
+    legacyKnowledge?: string[],
   ) {
     const cleanPlanetId = planetId.trim().slice(0, 40);
-    const items = [...new Set(
-      (Array.isArray(knowledge) ? knowledge : [])
-        .map((item) => String(item).trim())
-        .filter(Boolean),
-    )].slice(0, 30);
-    if (!cleanPlanetId || !items.length) {
-      throw new BadRequestException('缺少有效的星体科普内容');
+    if (!cleanPlanetId) {
+      throw new BadRequestException('缺少有效的星体ID');
+    }
+
+    // 从 settings 获取科普内容
+    const items = legacyKnowledge?.length
+      ? [...new Set(legacyKnowledge.map((item) => String(item).trim()).filter(Boolean))].slice(0, 1000)
+      : await this.getConstellationKnowledge(cleanPlanetId);
+    if (!items.length) {
+      throw new BadRequestException('该星体暂无科普内容');
+    }
+
+    if (legacyKnowledge?.length && this.prisma.constellationKnowledgeSelection) {
+      const existing = await this.prisma.constellationKnowledgeSelection.findUnique({
+        where: {
+          visitorIdHash_planetId: {
+            visitorIdHash,
+            planetId: cleanPlanetId,
+          },
+        },
+      });
+      if (existing) {
+        const index = (Math.max(0, existing.knowledgeIndex) + 1) % items.length;
+        const updated = await this.prisma.constellationKnowledgeSelection.update({
+          where: { id: existing.id },
+          data: { knowledgeIndex: index, knowledgeText: items[index] },
+        });
+        return {
+          ok: true,
+          reused: false,
+          planetId: updated.planetId,
+          index: updated.knowledgeIndex,
+          total: items.length,
+          knowledge: updated.knowledgeText,
+          selectedAt: updated.updatedAt,
+        };
+      }
+      const index = randomInt(items.length);
+      const created = await this.prisma.constellationKnowledgeSelection.create({
+        data: {
+          visitorIdHash,
+          userId: userId || undefined,
+          planetId: cleanPlanetId,
+          knowledgeIndex: index,
+          knowledgeText: items[index],
+        },
+      });
+      return {
+        ok: true,
+        reused: false,
+        planetId: created.planetId,
+        index: created.knowledgeIndex,
+        total: items.length,
+        knowledge: created.knowledgeText,
+        selectedAt: created.createdAt,
+      };
     }
 
     let effectiveHash = visitorIdHash;
@@ -443,76 +492,64 @@ export class VisitorService {
     });
     if (profile.isBanned) return { ok: false, reason: 'banned' };
 
-    const existing = await this.prisma.constellationKnowledgeSelection.findUnique({
-      where: {
-        visitorIdHash_planetId: {
-          visitorIdHash: effectiveHash,
-          planetId: cleanPlanetId,
-        },
-      },
-    });
-    if (existing) {
-      const index =
-        (Math.max(0, existing.knowledgeIndex) + 1) % items.length;
-      const updated = await this.prisma.constellationKnowledgeSelection.update({
-        where: { id: existing.id },
-        data: {
-          knowledgeIndex: index,
-          knowledgeText: items[index],
-        },
-      });
-      return {
-        ok: true,
-        reused: false,
-        planetId: updated.planetId,
-        index: updated.knowledgeIndex,
-        total: items.length,
-        knowledge: updated.knowledgeText,
-        selectedAt: updated.updatedAt,
-      };
+    // Redis 无重复随机抽取逻辑
+    const redisKey = `corner:knowledge:${effectiveHash}:${cleanPlanetId}`;
+    const history: number[] = (await this.redis.getJson<number[]>(redisKey)) || [];
+
+    // 如果全部看完，重置历史
+    if (history.length >= items.length) {
+      history.length = 0;
     }
 
-    const index = randomInt(items.length);
-    try {
-      const created = await this.prisma.constellationKnowledgeSelection.create({
-        data: {
-          visitorIdHash: effectiveHash,
-          userId,
-          planetId: cleanPlanetId,
-          knowledgeIndex: index,
-          knowledgeText: items[index],
-        },
-      });
-      return {
-        ok: true,
-        reused: false,
-        planetId: created.planetId,
-        index: created.knowledgeIndex,
-        total: items.length,
-        knowledge: created.knowledgeText,
-        selectedAt: created.createdAt,
-      };
-    } catch (error: any) {
-      if (error?.code !== 'P2002') throw error;
-      const raced = await this.prisma.constellationKnowledgeSelection.findUnique({
-        where: {
-          visitorIdHash_planetId: {
-            visitorIdHash: effectiveHash,
-            planetId: cleanPlanetId,
-          },
-        },
-      });
-      if (!raced) throw error;
-      return {
-        ok: true,
-        reused: true,
-        planetId: raced.planetId,
-        index: raced.knowledgeIndex,
-        total: items.length,
-        knowledge: raced.knowledgeText,
-        selectedAt: raced.createdAt,
-      };
+    // 从未看过的索引中随机选一个
+    const available = items.map((_, i) => i).filter((i) => !history.includes(i));
+    const selectedIndex = available[Math.floor(Math.random() * available.length)];
+
+    // 更新历史并保存到 Redis（14天过期）
+    history.push(selectedIndex);
+    await this.redis.setJson(redisKey, history, 1209600);
+
+    const now = new Date();
+    return {
+      ok: true,
+      reused: false,
+      planetId: cleanPlanetId,
+      index: selectedIndex,
+      total: items.length,
+      knowledge: items[selectedIndex],
+      selectedAt: now,
+    };
+  }
+
+  private async getConstellationKnowledge(planetId: string): Promise<string[]> {
+    if (!this.settings) return [];
+    const config = await this.settings.get('constellation_config');
+    if (!config || typeof config !== 'object') return [];
+    const cfg = config as Record<string, unknown>;
+
+    // 从 solarPlanets 查找
+    const solarPlanets = Array.isArray(cfg.solarPlanets) ? cfg.solarPlanets : [];
+    for (const planet of solarPlanets) {
+      if (planet && typeof planet === 'object') {
+        const p = planet as Record<string, unknown>;
+        if (p.id === planetId && Array.isArray(p.knowledge)) {
+          return p.knowledge.filter((k): k is string => typeof k === 'string' && k.trim().length > 0);
+        }
+      }
     }
+
+    // 从 specialBodies 查找
+    const specialBodies = Array.isArray(cfg.specialBodies) ? cfg.specialBodies : [];
+    for (const body of specialBodies) {
+      if (body && typeof body === 'object') {
+        const b = body as Record<string, unknown>;
+        if (b.id === planetId && Array.isArray(b.knowledge)) {
+          return b.knowledge.filter((k): k is string => typeof k === 'string' && k.trim().length > 0);
+        }
+      }
+    }
+
+    return [];
   }
 
   private async createMessage(
@@ -1248,7 +1285,11 @@ export class VisitorService {
         .map(([code]) => code);
       if (toUnlock.length > 0) {
         await this.prisma.visitorAchievement.createMany({
-          data: toUnlock.map((code) => ({ visitorIdHash, code })),
+          data: toUnlock.map((code) => ({
+            id: randomUUID(),
+            visitorIdHash,
+            code,
+          })),
           skipDuplicates: true,
         });
       }
@@ -1449,62 +1490,6 @@ export class VisitorService {
       chain: m.type === 'bottle' ? chains.get(m.chainId ?? m.id) || [] : [],
     }));
     return { items: decorated, total, page, pageSize };
-  }
-
-  async adminConstellationKnowledge(query: {
-    planetId?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    const where: Record<string, unknown> = {};
-    if (query.planetId?.trim()) where.planetId = query.planetId.trim().slice(0, 40);
-    const page = Math.max(1, Number(query.page) || 1);
-    const pageSize = Math.min(50, Math.max(10, Number(query.pageSize) || 10));
-    const [items, total] = await Promise.all([
-      this.prisma.constellationKnowledgeSelection.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      this.prisma.constellationKnowledgeSelection.count({ where }),
-    ]);
-    const hashes = [...new Set(items.map((item) => item.visitorIdHash))];
-    const userIds = [...new Set(items.map((item) => item.userId).filter(Boolean) as string[])];
-    const [profiles, users] = await Promise.all([
-      hashes.length
-        ? this.prisma.visitorProfile.findMany({
-            where: { visitorIdHash: { in: hashes } },
-            select: { visitorIdHash: true, nickname: true, email: true, userId: true },
-          })
-        : [],
-      userIds.length
-        ? this.prisma.user.findMany({
-            where: { id: { in: userIds } },
-            select: { id: true, username: true, email: true },
-          })
-        : [],
-    ]);
-    const profileMap = new Map(profiles.map((profile) => [profile.visitorIdHash, profile]));
-    const userMap = new Map(users.map((user) => [user.id, user]));
-    return {
-      items: items.map((item) => {
-        const profile = profileMap.get(item.visitorIdHash);
-        const account = item.userId ? userMap.get(item.userId) ?? null : null;
-        return {
-          ...item,
-          visitor: {
-            id: item.visitorIdHash.slice(0, 12),
-            nickname: profile?.nickname || null,
-            email: profile?.email || null,
-          },
-          account,
-        };
-      }),
-      total,
-      page,
-      pageSize,
-    };
   }
 
   async reviewMessage(

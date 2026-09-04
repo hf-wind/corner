@@ -154,57 +154,23 @@ describe('CircleService', () => {
     expect(distributed.slice(0, 3).map((entry: any) => entry.source.name)).toEqual(['frequent', 'quiet', 'other']);
   });
 
-  it('resets legacy manual sources once while keeping friend subscriptions automatic', async () => {
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-    try {
-      const settings = settingsWithFriends([
-        {
-          name: '友链站点',
-          url: 'https://friend.example',
-          rssUrl: 'https://friend.example/rss.xml',
-        },
-      ]);
-      settings.get.mockImplementation((key: string) => {
-        if (key === 'friends') {
-          return Promise.resolve([
-            {
-              name: '友链站点',
-              url: 'https://friend.example',
-              rssUrl: 'https://friend.example/rss.xml',
-            },
-          ]);
-        }
-        if (key === 'circle_config') {
-          return Promise.resolve({
-            subscriptions: [
-              {
-                name: '旧订阅',
-                url: 'https://legacy.example',
-                rssUrl: 'https://legacy.example/rss.xml',
-              },
-            ],
-            subscriptionExclusions: ['https://www.ithome.com/rss/'],
-          });
-        }
-        return Promise.resolve(null);
-      });
-      const service = new CircleService(settings);
+  it('keeps administrator subscriptions across configuration reads', async () => {
+    const settings = settingsWithFriends([]);
+    settings.get.mockImplementation((key: string) =>
+      Promise.resolve(key === 'circle_config' ? {
+        subscriptions: [{ name: '自定义源', url: 'https://custom.example', rssUrl: 'https://custom.example/feed.xml' }],
+      } : []),
+    );
+    const service = new CircleService(settings);
+    const config = await service.getConfig();
+    expect(config.subscriptions).toEqual(expect.arrayContaining([expect.objectContaining({ name: '自定义源' })]));
+    expect(settings.set).not.toHaveBeenCalled();
+  });
 
-      const config = await service.getConfig();
-
-      expect(config.subscriptions.map((item) => item.name)).toEqual(['IT之家', '友链站点']);
-      expect(settings.set).toHaveBeenCalledWith(
-        'circle_config',
-        expect.objectContaining({
-          subscriptions: [],
-          subscriptionExclusions: [],
-          sourceRevision: 1,
-        }),
-      );
-    } finally {
-      process.env.NODE_ENV = previousNodeEnv;
-    }
+  it('accepts public WordPress addresses in 192.0.78.0/24', () => {
+    const service = new CircleService(settingsWithFriends([]));
+    expect((service as any).isPublicIp('192.0.78.191')).toBe(true);
+    expect((service as any).isPublicIp('192.0.0.8')).toBe(false);
   });
 
   it('prefers explicit circle subscriptions over the legacy friends setting', async () => {

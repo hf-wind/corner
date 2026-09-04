@@ -186,7 +186,6 @@ export class VisitorController {
       visitorIdHash,
       req.user?.id ?? null,
       dto.planetId,
-      dto.knowledge,
     );
   }
 
@@ -244,21 +243,6 @@ export class VisitorController {
       keyword,
       banned,
       type,
-      page: page ? Number(page) : undefined,
-      pageSize: pageSize ? Number(pageSize) : undefined,
-    });
-  }
-
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
-  @Get('admin/constellation-knowledge')
-  adminConstellationKnowledge(
-    @Query('planetId') planetId?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
-    return this.visitorService.adminConstellationKnowledge({
-      planetId,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });

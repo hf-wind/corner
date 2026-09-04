@@ -10,8 +10,9 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import Parser from 'rss-parser';
-import { AiService } from '../ai/ai.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { BaiduTranslationService } from './baidu-translation.service';
 import {
   UpdateChangelogConfigDto,
   UpsertChangelogEntryDto,
@@ -19,8 +20,7 @@ import {
 
 const CONFIG_KEY = 'changelog_config';
 const MANUAL_KEY = 'changelog_manual_entries';
-const SNAPSHOT_KEY = 'changelog_snapshot';
-const SNAPSHOT_VERSION = 2;
+const TRANSLATION_BATCH_SIZE = 40;
 const execFileAsync = promisify(execFile);
 
 type ChangelogConfig = {
@@ -31,7 +31,6 @@ type ChangelogConfig = {
   repositoryName: string;
   branch: string;
   cacheTtl: number;
-  maxGroups: number;
 };
 
 type ReleaseItem = {
@@ -51,19 +50,26 @@ type ChangelogRelease = {
   sourceLabel: string;
   url: string;
   items: ReleaseItem[];
-  translation: 'ai' | 'rules' | 'manual';
+  translation: 'baidu' | 'original' | 'rules' | 'manual';
   published?: boolean;
 };
 
-type GitGroup = {
-  id: string;
+type GitCommit = {
+  sha: string;
   publishedAt: string;
+  author: string;
+  original: string;
   url: string;
-  items: Array<Omit<ReleaseItem, 'text'>>;
+};
+
+type SourceResult = {
+  commits: GitCommit[];
+  status: 'connected' | 'fallback' | 'unavailable';
+  label: string;
+  error?: string;
 };
 
 type Snapshot = {
-  signature: string;
   fetchedAt: string;
   sourceStatus: 'connected' | 'fallback' | 'stale' | 'unavailable';
   sourceLabel: string;
@@ -81,7 +87,8 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly settings: SettingsService,
-    private readonly ai: AiService,
+    private readonly prisma: PrismaService,
+    private readonly baiduTranslation: BaiduTranslationService,
   ) {}
 
   onModuleInit() {
@@ -106,17 +113,14 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     const releases = [
       ...snapshot.releases,
       ...manual.filter((item) => item.published),
-    ]
-      .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
-      .slice(0, 100);
+    ].sort(
+      (left, right) =>
+        Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
+    );
     const limit = Math.min(30, Math.max(4, Number(query.limit) || 12));
     const totalPages = Math.max(1, Math.ceil(releases.length / limit));
     const page = Math.min(totalPages, Math.max(1, Number(query.page) || 1));
     const start = (page - 1) * limit;
-    const itemCount = releases.reduce(
-      (total, release) => total + release.items.length,
-      0,
-    );
 
     return {
       enabled: config.enabled,
@@ -132,7 +136,10 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       page,
       totalPages,
       total: releases.length,
-      itemCount,
+      itemCount: releases.reduce(
+        (total, release) => total + release.items.length,
+        0,
+      ),
       fetchedAt: snapshot.fetchedAt,
       sourceStatus: snapshot.sourceStatus,
       sourceLabel: snapshot.sourceLabel,
@@ -141,10 +148,27 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
 
   async admin() {
     const config = await this.getConfig();
-    const [snapshot, manualEntries] = await Promise.all([
+    const repository = this.repositoryKey(config);
+    const [snapshot, manualEntries, translations] = await Promise.all([
       this.getAutomatic(config),
       this.getManualEntries(),
+      this.prisma.changelogTranslation.findMany({
+        where: { repository, branch: config.branch },
+        orderBy: { committedAt: 'desc' },
+        take: 200,
+      }),
     ]);
+    const translationStats = translations.reduce(
+      (stats, row) => {
+        stats.total += 1;
+        if (row.status === 'translated') stats.translated += 1;
+        else if (row.status === 'original') stats.original += 1;
+        else if (row.status === 'failed') stats.failed += 1;
+        else stats.pending += 1;
+        return stats;
+      },
+      { total: 0, translated: 0, original: 0, pending: 0, failed: 0 },
+    );
     return {
       config,
       manualEntries,
@@ -155,6 +179,21 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       tokenConfigured: Boolean(
         process.env.CHANGELOG_GITHUB_TOKEN || process.env.GITHUB_TOKEN,
       ),
+      translationConfigured: this.baiduTranslation.configured,
+      translationStats,
+      translations: translations.map((row) => ({
+        sha: row.commitSha,
+        original: row.originalMessage,
+        translated: row.translatedMessage || '',
+        language: row.language,
+        status: row.status,
+        service: row.translationService || '',
+        author: row.author,
+        committedAt: row.committedAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+        error: row.lastError || '',
+        url: row.commitUrl,
+      })),
     };
   }
 
@@ -176,10 +215,6 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       cacheTtl: Math.min(
         86400,
         Math.max(300, Number(dto.cacheTtl) || current.cacheTtl),
-      ),
-      maxGroups: Math.min(
-        30,
-        Math.max(4, Number(dto.maxGroups) || current.maxGroups),
       ),
     };
     await this.settings.set(CONFIG_KEY, next);
@@ -259,7 +294,6 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       ),
       branch: this.branch(value.branch, process.env.CHANGELOG_BRANCH || 'main'),
       cacheTtl: Math.min(86400, Math.max(300, Number(value.cacheTtl) || 1800)),
-      maxGroups: Math.min(30, Math.max(4, Number(value.maxGroups) === 12 ? 30 : Number(value.maxGroups) || 30)),
     };
   }
 
@@ -268,25 +302,29 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     if (!Array.isArray(value)) return [];
     return value
       .map((item) => this.normalizeManualEntry(item))
-      .filter((item): item is ChangelogRelease => Boolean(item))
-      .slice(0, 80);
+      .filter((item): item is ChangelogRelease => Boolean(item));
   }
 
   private async getAutomatic(config: ChangelogConfig, force = false) {
-    const signature = this.signature(config);
-    const stored = this.snapshot(await this.settings.get(SNAPSHOT_KEY));
+    const repository = this.repositoryKey(config);
+    const [state, count] = await Promise.all([
+      this.prisma.changelogSyncState.findUnique({
+        where: { repository_branch: { repository, branch: config.branch } },
+      }),
+      this.prisma.changelogTranslation.count({
+        where: { repository, branch: config.branch },
+      }),
+    ]);
     const fresh =
-      stored &&
-      stored.signature === signature &&
-      Date.now() - Date.parse(stored.fetchedAt) < config.cacheTtl * 1000;
-    if (!force && fresh) return stored;
-    if (!force && stored?.signature === signature && stored.releases.length) {
-      void this.runRefresh(config, stored).catch((error) =>
-        this.logger.warn(`后台刷新更新日志失败: ${this.errorMessage(error)}`),
+      state && Date.now() - state.fetchedAt.getTime() < config.cacheTtl * 1000;
+    if (!force && fresh) return this.loadSnapshot(config, state);
+    if (!force && count > 0) {
+      void this.runRefresh(config).catch((error) =>
+        this.logger.warn(`后台刷新风迹墙失败: ${this.errorMessage(error)}`),
       );
-      return stored;
+      return this.loadSnapshot(config, state);
     }
-    return this.runRefresh(config, stored);
+    return this.runRefresh(config);
   }
 
   private scheduleAutomaticRefresh(delayMs: number) {
@@ -309,106 +347,315 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     this.refreshTimer.unref?.();
   }
 
-  private runRefresh(config: ChangelogConfig, previous: Snapshot | null) {
+  private runRefresh(config: ChangelogConfig) {
     if (this.refreshPromise) return this.refreshPromise;
-    this.refreshPromise = this.refreshAutomatic(config, previous).finally(
-      () => {
-        this.refreshPromise = null;
-      },
-    );
+    this.refreshPromise = this.refreshAutomatic(config).finally(() => {
+      this.refreshPromise = null;
+    });
     return this.refreshPromise;
   }
 
-  private async refreshAutomatic(
-    config: ChangelogConfig,
-    previous: Snapshot | null,
-  ): Promise<Snapshot> {
-    const source = await this.fetchGitGroups(config);
-    if (!source.groups.length && previous?.releases.length) {
-      return {
-        ...previous,
-        sourceStatus: 'stale',
-        sourceLabel: '保留上次同步结果',
-      };
+  private async refreshAutomatic(config: ChangelogConfig): Promise<Snapshot> {
+    const repository = this.repositoryKey(config);
+    const existing = await this.prisma.changelogTranslation.findMany({
+      where: { repository },
+    });
+    const source = await this.fetchGitCommits(
+      config,
+      new Set(existing.map((row) => row.commitSha)),
+    );
+    if (source.commits.length) {
+      const existingMap = new Map(existing.map((row) => [row.commitSha, row]));
+      for (let offset = 0; offset < source.commits.length; offset += 100) {
+        const operations = source.commits.slice(offset, offset + 100).map((commit) => {
+          const language = this.detectLanguage(commit.original);
+          const current = existingMap.get(commit.sha);
+          const unchanged = current?.originalMessage === commit.original;
+          const status = language === 'zh' ? 'original' : 'pending';
+          return this.prisma.changelogTranslation.upsert({
+            where: {
+              repository_commitSha: { repository, commitSha: commit.sha },
+            },
+            create: {
+              repository,
+              branch: config.branch,
+              commitSha: commit.sha,
+              originalMessage: commit.original,
+              translatedMessage: language === 'zh' ? commit.original : null,
+              language,
+              translationService: null,
+              status,
+              author: commit.author,
+              commitUrl: commit.url,
+              committedAt: new Date(commit.publishedAt),
+            },
+            update: {
+              branch: config.branch,
+              author: commit.author,
+              commitUrl: commit.url,
+              committedAt: new Date(commit.publishedAt),
+              ...(unchanged
+                ? {}
+                : {
+                    originalMessage: commit.original,
+                    translatedMessage:
+                      language === 'zh' ? commit.original : null,
+                    language,
+                    translationService: null,
+                    status,
+                    lastError: null,
+                  }),
+            },
+          });
+        });
+        await this.prisma.$transaction(operations);
+      }
     }
 
-    let releases = source.groups.map((group) => this.fallbackRelease(group));
-    releases = await this.enrichWithAi(releases, previous?.releases || []);
-    const snapshot: Snapshot = {
-      signature: this.signature(config),
-      fetchedAt: new Date().toISOString(),
-      sourceStatus: source.status,
-      sourceLabel: source.label,
-      releases: releases.slice(0, config.maxGroups),
-    };
-    await this.settings.set(SNAPSHOT_KEY, snapshot);
-    return snapshot;
+    await this.translatePending(repository, config.branch);
+    const fetchedAt = new Date();
+    const hasRows =
+      (await this.prisma.changelogTranslation.count({
+        where: { repository, branch: config.branch },
+      })) > 0;
+    const sourceStatus = source.commits.length
+      ? source.status
+      : hasRows
+        ? 'stale'
+        : 'unavailable';
+    const sourceLabel = source.commits.length
+      ? source.label
+      : hasRows
+        ? '保留上次同步结果'
+        : source.label;
+    const state = await this.prisma.changelogSyncState.upsert({
+      where: { repository_branch: { repository, branch: config.branch } },
+      create: {
+        repository,
+        branch: config.branch,
+        fetchedAt,
+        sourceStatus,
+        sourceLabel,
+        lastError: source.error || null,
+      },
+      update: {
+        fetchedAt,
+        sourceStatus,
+        sourceLabel,
+        lastError: source.error || null,
+      },
+    });
+    return this.loadSnapshot(config, state);
   }
 
-  private async fetchGitGroups(config: ChangelogConfig): Promise<{
-    groups: GitGroup[];
-    status: Snapshot['sourceStatus'];
-    label: string;
-  }> {
+  private async loadSnapshot(
+    config: ChangelogConfig,
+    state: {
+      fetchedAt: Date;
+      sourceStatus: string;
+      sourceLabel: string;
+    } | null,
+  ): Promise<Snapshot> {
+    const rows = await this.prisma.changelogTranslation.findMany({
+      where: {
+        repository: this.repositoryKey(config),
+        branch: config.branch,
+      },
+      orderBy: { committedAt: 'desc' },
+    });
+    return {
+      fetchedAt: (state?.fetchedAt || new Date(0)).toISOString(),
+      sourceStatus: (state?.sourceStatus || 'unavailable') as Snapshot['sourceStatus'],
+      sourceLabel: state?.sourceLabel || '等待首次同步',
+      releases: rows.map((row) => {
+        const text = row.translatedMessage || this.ruleTranslate(row.originalMessage);
+        return {
+          id: `git:${row.commitSha}`,
+          title: text,
+          summary:
+            row.status === 'translated'
+              ? '提交说明已由百度翻译为中文。'
+              : row.status === 'original'
+                ? '原提交说明已是中文，无需翻译。'
+                : '翻译暂未完成，将在下次同步时自动重试。',
+          publishedAt: row.committedAt.toISOString(),
+          source: 'git',
+          sourceLabel: 'Git 自动记录',
+          url: row.commitUrl,
+          items: [
+            {
+              sha: row.commitSha,
+              text,
+              original: row.originalMessage,
+              author: row.author,
+              url: row.commitUrl,
+            },
+          ],
+          translation:
+            row.status === 'translated'
+              ? 'baidu'
+              : row.status === 'original'
+                ? 'original'
+                : 'rules',
+        } satisfies ChangelogRelease;
+      }),
+    };
+  }
+
+  private async translatePending(repository: string, branch: string) {
+    const pending = await this.prisma.changelogTranslation.findMany({
+      where: {
+        repository,
+        branch,
+        language: { in: ['en', 'mixed'] },
+        status: { in: ['pending', 'failed'] },
+      },
+      orderBy: { committedAt: 'asc' },
+    });
+    if (!pending.length || !this.baiduTranslation.configured) return;
+
+    for (let offset = 0; offset < pending.length; offset += TRANSLATION_BATCH_SIZE) {
+      const batch = pending.slice(offset, offset + TRANSLATION_BATCH_SIZE);
+      try {
+        const inputs = batch.map((row) => this.translationInput(row.originalMessage));
+        const results = await this.baiduTranslation.translateBatch(
+          inputs.map((input) => input.text),
+          'auto',
+          'zh',
+        );
+        await this.prisma.$transaction(
+          batch.map((row, index) =>
+            this.prisma.changelogTranslation.update({
+              where: { id: row.id },
+              data: {
+                translatedMessage: `${inputs[index].prefix}${results[index].text}`.trim(),
+                translationService: 'baidu',
+                status: 'translated',
+                lastError: null,
+              },
+            }),
+          ),
+        );
+      } catch (error) {
+        const message = this.errorMessage(error).slice(0, 2000);
+        this.logger.warn(`百度翻译批次失败: ${message}`);
+        await this.prisma.$transaction(
+          batch.map((row) =>
+            this.prisma.changelogTranslation.update({
+              where: { id: row.id },
+              data: { status: 'failed', lastError: message },
+            }),
+          ),
+        );
+      }
+    }
+  }
+
+  private async fetchGitCommits(
+    config: ChangelogConfig,
+    known: Set<string>,
+  ): Promise<SourceResult> {
     const token = String(
       process.env.CHANGELOG_GITHUB_TOKEN || process.env.GITHUB_TOKEN || '',
     ).trim();
-
+    let officialError = '';
     if (token) {
       try {
-        const groups = await this.fetchGithubEvents(config);
-        if (groups.length) {
-          return { groups, status: 'connected', label: 'GitHub 推送事件' };
-        }
+        const commits = await this.fetchGithubCommits(config, token, known);
+        return { commits, status: 'connected', label: 'GitHub 官方提交接口' };
       } catch (error) {
-        this.logger.warn(`GitHub 事件接口不可用: ${this.errorMessage(error)}`);
+        officialError = this.errorMessage(error);
+        this.logger.warn(`GitHub 官方提交接口不可用: ${officialError}`);
       }
     }
 
     try {
-      const groups = await this.fetchLocalCommits(config);
-      if (groups.length) {
-        return { groups, status: 'fallback', label: '本地 Git 提交' };
-      }
+      const commits = await this.fetchLocalCommits(config);
+      if (commits.length)
+        return {
+          commits,
+          status: 'fallback',
+          label: token ? '部署 Git 历史（GitHub 接口异常）' : '部署 Git 历史',
+          error: officialError || undefined,
+        };
     } catch (error) {
-      this.logger.debug(`本地 Git 仓库不可用: ${this.errorMessage(error)}`);
-    }
-
-    if (!token) {
-      try {
-        const groups = await this.fetchGithubEvents(config);
-        if (groups.length) {
-          return { groups, status: 'connected', label: 'GitHub 推送事件' };
-        }
-      } catch (error) {
-        this.logger.warn(`GitHub 事件接口不可用: ${this.errorMessage(error)}`);
-      }
+      this.logger.debug(`本地 Git 历史不可用: ${this.errorMessage(error)}`);
     }
 
     try {
-      const groups = await this.fetchAtomCommits(config);
-      return { groups, status: 'fallback', label: 'Git 提交流' };
+      const commits = await this.fetchAtomCommits(config);
+      return {
+        commits,
+        status: 'fallback',
+        label: 'Git 提交流',
+        error: officialError || undefined,
+      };
     } catch (error) {
-      this.logger.warn(`Git 提交流不可用: ${this.errorMessage(error)}`);
-      return { groups: [], status: 'unavailable', label: '无法获取 Git 提交记录' };
+      const message = [officialError, this.errorMessage(error)]
+        .filter(Boolean)
+        .join('; ');
+      return {
+        commits: [],
+        status: 'unavailable',
+        label: '无法获取 Git 提交记录',
+        error: message,
+      };
     }
+  }
+
+  private async fetchGithubCommits(
+    config: ChangelogConfig,
+    token: string,
+    known: Set<string>,
+  ) {
+    const commits: GitCommit[] = [];
+    for (let page = 1; ; page += 1) {
+      const response = await fetch(
+        `https://api.github.com/repos/${config.repositoryOwner}/${config.repositoryName}/commits?sha=${encodeURIComponent(config.branch)}&per_page=100&page=${page}`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            'User-Agent': 'corner-changelog',
+            Authorization: `Bearer ${token}`,
+          },
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+      if (!response.ok) throw new Error(`GitHub API ${response.status}`);
+      const batch = (await response.json()) as Array<Record<string, unknown>>;
+      let reachedKnownCommit = false;
+      for (const value of batch) {
+        const commit = this.record(value);
+        const sha = this.text(commit.sha, '', 40);
+        if (known.has(sha)) reachedKnownCommit = true;
+        const detail = this.record(commit.commit);
+        const author = this.record(detail.author || detail.committer);
+        const original = this.commitMessage(detail.message);
+        if (!sha || !original) continue;
+        commits.push({
+          sha,
+          original,
+          author: this.text(author.name, 'repository', 100),
+          publishedAt: this.isoDate(
+            author.date || this.record(detail.committer).date,
+          ),
+          url: `${this.repositoryUrl(config)}/commit/${sha}`,
+        });
+      }
+      if (batch.length < 100 || reachedKnownCommit) break;
+    }
+    return commits;
   }
 
   private async fetchLocalCommits(config: ChangelogConfig) {
     const runtimeLog = await this.readRuntimeLog();
-    if (runtimeLog.length) return this.groupLocalCommits(runtimeLog, config);
-    const rootResult = await execFileAsync(
-      'git',
-      ['rev-parse', '--show-toplevel'],
-      {
-        cwd: process.cwd(),
-        maxBuffer: 1024 * 1024,
-      },
-    );
+    if (runtimeLog.length) return this.localCommits(runtimeLog, config);
+    const rootResult = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: process.cwd(),
+      maxBuffer: 1024 * 1024,
+    });
     const repositoryRoot = String(rootResult.stdout).trim();
     if (!repositoryRoot) return [];
-
-    const limit = Math.max(40, config.maxGroups * 8);
     const logResult = await execFileAsync(
       'git',
       [
@@ -416,11 +663,10 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
         repositoryRoot,
         'log',
         config.branch,
-        `--max-count=${limit}`,
         '--date=iso-strict',
         '--pretty=format:%H%x1f%aI%x1f%an%x1f%s%x1e',
       ],
-      { maxBuffer: 4 * 1024 * 1024 },
+      { maxBuffer: 256 * 1024 * 1024 },
     );
     const commits = String(logResult.stdout)
       .split('\x1e')
@@ -430,362 +676,111 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
         const [sha = '', publishedAt = '', author = '', original = ''] =
           line.split('\x1f');
         return { sha, publishedAt, author, original };
-      })
-      .filter((commit) => commit.sha && commit.original);
-
-    return this.groupLocalCommits(commits, config);
+      });
+    return this.localCommits(commits, config);
   }
 
   private async readRuntimeLog() {
-    try {
-      const candidates = Array.from(
-        new Set(['/app/.runtime-git-log', `${process.cwd()}/.runtime-git-log`]),
-      );
-      let content = '';
-      for (const file of candidates) {
-        try {
-          content = await readFile(file, 'utf8');
-          if (content.trim()) break;
-        } catch {
-          // Try the next known runtime location.
-        }
+    for (const file of ['/app/.runtime-git-log', `${process.cwd()}/.runtime-git-log`]) {
+      try {
+        const content = await readFile(file, 'utf8');
+        if (!content.trim()) continue;
+        return content
+          .split(/\r?\n/)
+          .map((line) => {
+            const [sha = '', publishedAt = '', author = '', ...message] =
+              line.split('\t');
+            return { sha, publishedAt, author, original: message.join('\t') };
+          })
+          .filter(
+            (commit) =>
+              /^[0-9a-f]{40}$/i.test(commit.sha) && Boolean(commit.original),
+          );
+      } catch {
+        // Try the next runtime location.
       }
-      if (!content.trim()) return [];
-      return content
-        .split(/\r?\n/)
-        .map((line) => {
-          const [sha = '', publishedAt = '', author = '', ...message] =
-            line.split('\t');
-          return { sha, publishedAt, author, original: message.join('\t') };
-        })
-        .filter(
-          (commit) =>
-            /^[0-9a-f]{40}$/i.test(commit.sha) && Boolean(commit.original),
-        );
-    } catch {
-      return [];
     }
+    return [];
   }
 
-  private groupLocalCommits(commits: Array<{ sha: string; publishedAt: string; author: string; original: string }>, config: ChangelogConfig) {
-    const grouped = new Map<string, GitGroup>();
-    for (const commit of commits) {
-      const publishedAt = this.isoDate(commit.publishedAt);
-      const day = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date(publishedAt));
-      const group = grouped.get(day) || {
-        id: `local:${day}:${commit.sha.slice(0, 12)}`,
-        publishedAt,
-        url: `${this.repositoryUrl(config)}/commits/${config.branch}`,
-        items: [],
-      };
-      group.items.push({
-        sha: commit.sha,
+  private localCommits(
+    commits: Array<{
+      sha: string;
+      publishedAt: string;
+      author: string;
+      original: string;
+    }>,
+    config: ChangelogConfig,
+  ): GitCommit[] {
+    return commits
+      .filter((commit) => commit.sha && commit.original)
+      .map((commit) => ({
+        ...commit,
         original: this.commitMessage(commit.original),
+        publishedAt: this.isoDate(commit.publishedAt),
         author: this.text(commit.author, 'repository', 100),
         url: `${this.repositoryUrl(config)}/commit/${commit.sha}`,
-      });
-      grouped.set(day, group);
-    }
-    return [...grouped.values()].slice(0, config.maxGroups);
+      }));
   }
 
-  private async fetchGithubEvents(config: ChangelogConfig) {
-    const token = String(
-      process.env.CHANGELOG_GITHUB_TOKEN || process.env.GITHUB_TOKEN || '',
-    ).trim();
-    const response = await fetch(
-      `https://api.github.com/repos/${config.repositoryOwner}/${config.repositoryName}/events?per_page=100`,
-      {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': 'corner-changelog',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        signal: AbortSignal.timeout(8000),
-      },
-    );
-    if (!response.ok) throw new Error(`GitHub API ${response.status}`);
-    const events = (await response.json()) as Array<Record<string, unknown>>;
-    const branchRef = `refs/heads/${config.branch}`;
-    return events
-      .filter(
-        (event) =>
-          event.type === 'PushEvent' &&
-          this.record(event.payload).ref === branchRef,
-      )
-      .map((event) => {
-        const payload = this.record(event.payload);
-        const commits = Array.isArray(payload.commits) ? payload.commits : [];
-        const head = this.text(payload.head, '', 80);
-        const before = this.text(payload.before, '', 80);
-        return {
-          id: `push:${this.text(event.id, head || randomUUID(), 120)}`,
-          publishedAt: this.isoDate(event.created_at),
-          url:
-            before && head
-              ? `${this.repositoryUrl(config)}/compare/${before}...${head}`
-              : this.repositoryUrl(config),
-          items: commits
-            .map((commit) => this.githubCommit(config, commit))
-            .filter((item): item is Omit<ReleaseItem, 'text'> => Boolean(item)),
-        } satisfies GitGroup;
-      })
-      .filter((group) => group.items.length)
-      .slice(0, config.maxGroups);
-  }
-
-  private githubCommit(
-    config: ChangelogConfig,
-    value: unknown,
-  ): Omit<ReleaseItem, 'text'> | null {
-    const commit = this.record(value);
-    const sha = this.text(commit.sha, '', 80);
-    const original = this.commitMessage(commit.message);
-    if (!sha || !original) return null;
-    const author = this.record(commit.author);
-    return {
-      sha,
-      original,
-      author: this.text(author.name || author.login, 'repository', 100),
-      url: `${this.repositoryUrl(config)}/commit/${sha}`,
-    };
-  }
-
-  private async fetchAtomCommits(config: ChangelogConfig) {
+  private async fetchAtomCommits(config: ChangelogConfig): Promise<GitCommit[]> {
     const branch = config.branch
       .split('/')
       .map((part) => encodeURIComponent(part))
       .join('/');
     const response = await fetch(
       `${this.repositoryUrl(config)}/commits/${branch}.atom`,
-      {
-        headers: { 'User-Agent': 'corner-changelog' },
-        signal: AbortSignal.timeout(8000),
-      },
+      { headers: { 'User-Agent': 'corner-changelog' }, signal: AbortSignal.timeout(8000) },
     );
     if (!response.ok) throw new Error(`Git Atom ${response.status}`);
     const feed = await this.parser.parseString(await response.text());
-    const grouped = new Map<string, GitGroup>();
-    for (const item of feed.items.slice(0, 60)) {
+    return feed.items.flatMap((item) => {
       const original = this.commitMessage(item.title);
       const url = this.text(item.link, this.repositoryUrl(config), 2048);
       const sha = url.split('/').filter(Boolean).at(-1) || '';
-      if (!original || !sha) continue;
-      const publishedAt = this.isoDate(item.isoDate || item.pubDate);
-      const day = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date(publishedAt));
-      const group = grouped.get(day) || {
-        id: `day:${day}`,
-        publishedAt,
-        url: `${this.repositoryUrl(config)}/commits/${branch}`,
-        items: [],
-      };
-      group.items.push({
-        sha,
-        original,
-        author: this.text(item.creator || item.author, 'repository', 100),
-        url,
-      });
-      grouped.set(day, group);
-    }
-    return [...grouped.values()].slice(0, config.maxGroups);
-  }
-
-  private fallbackRelease(group: GitGroup): ChangelogRelease {
-    const items: ReleaseItem[] = group.items.map((item) => ({
-      ...item,
-      text: this.ruleTranslate(item.original),
-    }));
-    const first = items[0]?.text || '代码与体验更新';
-    const title =
-      items.length > 1
-        ? `${first.replace(/[。；;]$/, '').slice(0, 34)}等 ${items.length} 项更新`
-        : first;
-    return {
-      id: group.id,
-      title,
-      summary:
-        items.length > 1
-          ? `本次推送包含 ${items.length} 项调整，以下为完整变更。`
-          : '本次推送完成一项明确更新。',
-      publishedAt: group.publishedAt,
-      source: 'git',
-      sourceLabel: 'Git 自动记录',
-      url: group.url,
-      items,
-      translation: 'rules',
-    };
-  }
-
-  private async enrichWithAi(
-    releases: ChangelogRelease[],
-    previous: ChangelogRelease[],
-  ) {
-    const previousMap = new Map(
-      previous.map((release) => [release.id, release]),
-    );
-    const pending: ChangelogRelease[] = [];
-    const result = releases.map((release) => {
-      const cached = previousMap.get(release.id);
-      const same =
-        cached &&
-        cached.items.map((item) => item.sha).join(',') ===
-          release.items.map((item) => item.sha).join(',');
-      if (same && cached.translation === 'ai') return cached;
-      pending.push(release);
-      return release;
+      if (!original || !sha) return [];
+      return [
+        {
+          sha,
+          original,
+          author: this.text(item.creator || item.author, 'repository', 100),
+          publishedAt: this.isoDate(item.isoDate || item.pubDate),
+          url,
+        },
+      ];
     });
-    if (!pending.length) return result;
-
-    try {
-      const style = await this.ai.getSiteStyleInstruction('风迹墙');
-      const response = await this.ai.chat(
-        [
-          {
-            role: 'system',
-            content: [
-              '你是「风迹墙」编辑。把 Git 提交整理成自然、克制、具体的中文，不夸大、不虚构。每次推送必须有一个概括标题、一句摘要，并保留全部提交为顺序列表。技术名词可以保留英文。只输出 JSON 数组。',
-              style,
-            ]
-              .filter(Boolean)
-              .join('\n\n'),
-          },
-          {
-            role: 'user',
-            content: `请整理以下推送：${JSON.stringify(
-              pending.slice(0, 10).map((release) => ({
-                id: release.id,
-                commits: release.items.map((item) => ({
-                  sha: item.sha,
-                  message: item.original,
-                })),
-              })),
-            )}\n输出格式：[{'id':'原id','title':'不超过30字','summary':'不超过70字','items':[{'sha':'原sha','text':'中文变更说明'}]}]`,
-          },
-        ],
-        { temperature: 0.2, maxTokens: 3200, thinking: 'disabled' },
-      );
-      const translated = this.parseAiReleases(response);
-      const translatedMap = new Map(
-        translated.map((release) => [this.text(release.id, '', 150), release]),
-      );
-      return result.map((release) => {
-        const copy = translatedMap.get(release.id);
-        if (!copy) return release;
-        const copyItems = Array.isArray(copy.items) ? copy.items : [];
-        const itemMap = new Map(
-          copyItems.map((item) => {
-            const record = this.record(item);
-            return [
-              this.text(record.sha, '', 80),
-              this.text(record.text, '', 240),
-            ];
-          }),
-        );
-        return {
-          ...release,
-          title: this.text(copy.title, release.title, 100),
-          summary: this.text(copy.summary, release.summary, 320),
-          items: release.items.map((item) => ({
-            ...item,
-            text: itemMap.get(item.sha) || item.text,
-          })),
-          translation: 'ai' as const,
-        };
-      });
-    } catch (error) {
-      this.logger.warn(`更新日志 AI 翻译不可用: ${this.errorMessage(error)}`);
-      return result;
-    }
   }
 
-  private parseAiReleases(value: string): Array<Record<string, unknown>> {
-    const match = value.match(/\[[\s\S]*\]/);
-    if (!match) return [];
-    try {
-      const parsed = JSON.parse(match[0]) as unknown;
-      return Array.isArray(parsed)
-        ? parsed.map((item) => this.record(item))
-        : [];
-    } catch {
-      return [];
-    }
+  private detectLanguage(message: string): 'zh' | 'en' | 'mixed' {
+    const hasChinese = /\p{Script=Han}/u.test(message);
+    const hasEnglish = /[A-Za-z]/.test(message);
+    if (!hasEnglish) return 'zh';
+    return hasChinese ? 'mixed' : 'en';
+  }
+
+  private translationInput(message: string) {
+    const match = message.match(
+      /^(feat|fix|refactor|perf|docs|chore|style|test|build|ci)(?:\([^)]*\))?!?:\s*(.+)$/i,
+    );
+    if (!match) return { prefix: '', text: message };
+    const prefixes: Record<string, string> = {
+      feat: '新增：',
+      fix: '修复：',
+      refactor: '重构：',
+      perf: '优化：',
+      docs: '文档：',
+      chore: '维护：',
+      style: '样式：',
+      test: '测试：',
+      build: '构建：',
+      ci: '部署：',
+    };
+    return { prefix: prefixes[match[1].toLowerCase()] || '', text: match[2] };
   }
 
   private ruleTranslate(message: string) {
-    const conventional = message.match(
-      /^(feat|fix|refactor|perf|docs|chore|style|test|build|ci)(?:\([^)]*\))?!?:\s*(.+)$/i,
-    );
-    const type = conventional?.[1]?.toLowerCase() || '';
-    let body = conventional?.[2] || message;
-    if (/\p{Script=Han}/u.test(body)) return body.trim();
-
-    const phrases: Array<[RegExp, string]> = [
-      [/reading experience/gi, '阅读体验'],
-      [/github oauth callback/gi, 'GitHub OAuth 回调'],
-      [/oauth account binding/gi, 'OAuth 账号绑定'],
-      [/global toast feedback/gi, '全局提示反馈'],
-      [/frontend docker build/gi, '前端 Docker 构建'],
-      [/missing supabase env vars/gi, '缺失的 Supabase 环境变量'],
-      [/development environment/gi, '开发环境'],
-      [/production environment/gi, '生产环境'],
-      [/client configuration/gi, '客户端配置'],
-      [/loading state/gi, '加载状态'],
-      [/notifications/gi, '通知'],
-      [/article/gi, '文章'],
-      [/circle feed|circle/gi, '风讯角'],
-      [/rss reading feed/gi, 'RSS 阅读信息流'],
-      [/rss feed/gi, 'RSS 信息流'],
-      [/account/gi, '账号'],
-      [/integration/gi, '集成'],
-      [/experience/gi, '体验'],
-      [/configuration/gi, '配置'],
-      [/callback/gi, '回调'],
-      [/button/gi, '按钮'],
-      [/redirect/gi, '跳转'],
-      [/login/gi, '登录'],
-      [/frontend/gi, '前端'],
-      [/build args/gi, '构建参数'],
-      [/flow/gi, '流程'],
-      [/refine|polish/gi, '打磨'],
-      [/redesign/gi, '重新设计'],
-      [/optimize/gi, '优化'],
-      [/stabilize/gi, '稳定'],
-      [/implement/gi, '实现'],
-      [/resolve/gi, '解决'],
-      [/gracefully handle/gi, '妥善处理'],
-      [/isolate/gi, '隔离'],
-      [/hide/gi, '隐藏'],
-      [/import/gi, '引入'],
-      [/add/gi, '新增'],
-    ];
-    for (const [pattern, translation] of phrases)
-      body = body.replace(pattern, translation);
-    body = body.replace(/\s+/g, ' ').trim();
-    const prefixes: Record<string, string> = {
-      feat: '新增',
-      fix: '修复',
-      refactor: '重构',
-      perf: '优化',
-      docs: '更新文档：',
-      chore: '维护：',
-      style: '调整样式：',
-      test: '完善测试：',
-      build: '更新构建：',
-      ci: '更新部署：',
-    };
-    const prefix = prefixes[type] || '更新：';
-    if (body.startsWith(prefix.replace('：', ''))) return body;
-    return `${prefix}${prefix.endsWith('：') ? '' : ' '}${body}`.trim();
+    const input = this.translationInput(message);
+    return `${input.prefix}${input.text}`.trim();
   }
 
   private manualEntry(dto: UpsertChangelogEntryDto, id: string) {
@@ -827,10 +822,9 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       items: entry.items
         .map((item, index) => {
           const record = this.record(item);
-          const text = this.text(record.text, '', 240);
           return {
             sha: this.text(record.sha, `${id}:${index}`, 180),
-            text,
+            text: this.text(record.text, '', 240),
             original: '',
             author: '',
             url: '',
@@ -842,20 +836,8 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private snapshot(value: unknown): Snapshot | null {
-    const snapshot = this.record(value);
-    if (!snapshot.signature || !Array.isArray(snapshot.releases)) return null;
-    return snapshot as unknown as Snapshot;
-  }
-
-  private signature(config: ChangelogConfig) {
-    return [
-      SNAPSHOT_VERSION,
-      config.repositoryOwner,
-      config.repositoryName,
-      config.branch,
-      config.maxGroups,
-    ].join(':');
+  private repositoryKey(config: ChangelogConfig) {
+    return `${config.repositoryOwner}/${config.repositoryName}`.toLowerCase();
   }
 
   private repositoryUrl(config: ChangelogConfig) {

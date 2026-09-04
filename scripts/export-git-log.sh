@@ -11,7 +11,7 @@ temporary="$(mktemp "$output.XXXXXX")"
 cleanup() { rm -f -- "$temporary"; }
 trap cleanup EXIT
 
-git log -n 240 \
+git log \
   --date=iso-strict \
   --pretty=format:'%H%x09%aI%x09%an%x09%s' > "$temporary"
 

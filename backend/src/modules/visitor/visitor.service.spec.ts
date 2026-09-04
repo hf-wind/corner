@@ -1354,6 +1354,50 @@ describe('VisitorService', () => {
     });
   });
 
+  describe('时光星图科普', () => {
+    it('最多接收 1000 条并按访客记录逐条轮换，只返回当前一条', async () => {
+      const visitorIdHash = hashOf('guest-1');
+      const update = jest.fn().mockImplementation(({ data }) => Promise.resolve({
+        id: 'selection-1',
+        planetId: 'mars',
+        ...data,
+        updatedAt: new Date('2026-09-04T00:00:00Z'),
+      }));
+      const prisma = {
+        visitorProfile: {
+          upsert: jest.fn().mockResolvedValue({ isBanned: false }),
+        },
+        constellationKnowledgeSelection: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'selection-1',
+            knowledgeIndex: 998,
+          }),
+          update,
+        },
+      } as any;
+      const knowledge = Array.from({ length: 1100 }, (_, index) => `火星科普 ${index + 1}`);
+
+      const result = await makeService(prisma).selectConstellationKnowledge(
+        req,
+        visitorIdHash,
+        null,
+        'mars',
+        knowledge,
+      );
+
+      expect(update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ knowledgeIndex: 999, knowledgeText: '火星科普 1000' }),
+      }));
+      expect(result).toMatchObject({
+        ok: true,
+        index: 999,
+        total: 1000,
+        knowledge: '火星科普 1000',
+      });
+      expect(result).not.toHaveProperty('items');
+    });
+  });
+
   describe('后台管理 — 身份与详情', () => {
     it('adminMessages 返回漂流瓶捞起者', async () => {
       const prisma = {

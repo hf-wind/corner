@@ -36,7 +36,7 @@
 
       <section class="constellation-settings">
         <div class="section-head"><div><small>SCENE SETTINGS</small><h2>星图显示配置</h2></div><a-button type="primary" size="small" :loading="settingsSaving" @click="saveSceneSettings"><Icon name="ph:floppy-disk-bold" />保存配置</a-button></div>
-        <p class="section-intro">控制星体密度、时间环间隙、移动速度，以及前台太阳系行星的名称、特点和解析内容。</p>
+        <p class="section-intro">控制星体密度、时间环间隙、移动速度，以及所有可聚焦非内容星体的名称、简介和科普彩蛋。</p>
         <div class="scene-settings-grid">
           <label><span>太阳系行星数量</span><a-input-number v-model:value="sceneSettings.solarSystemPlanetCount" :min="1" :max="7" :step="1" /></label>
           <label><span>太阳系轨道缩放</span><a-slider v-model:value="sceneSettings.solarOrbitScale" :min="0.6" :max="1.6" :step="0.1" /><output>{{ sceneSettings.solarOrbitScale.toFixed(1) }}x</output></label>
@@ -50,16 +50,16 @@
             <label><span>名称</span><a-input v-model:value="planet.name" /></label>
             <label><span>简介（两行）</span><a-textarea v-model:value="planet.description" :rows="2" :maxlength="180" /></label>
             <label><span>特点</span><a-input v-model:value="planet.feature" /></label>
-            <details class="knowledge-editor wide"><summary><span>解析 / 科普</span><b>{{ planet.knowledge?.length || 0 }}/30</b><Icon name="ph:caret-down-bold" /></summary><a-textarea :value="(planet.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 18 }" @change="updatePlanetKnowledge(planet, $event)" /></details>
+            <details class="knowledge-editor wide"><summary><span>科普 / 彩蛋</span><b>{{ planet.knowledge?.length || 0 }}/1000</b><Icon name="ph:caret-down-bold" /></summary><a-textarea :value="(planet.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 18 }" @change="updatePlanetKnowledge(planet, $event)" /></details>
           </article>
         </div>
         <div class="special-body-settings">
           <article v-for="body in sceneSettings.specialBodies" :key="body.id">
-            <header><Icon :name="body.id === 'sun' ? 'ph:sun-bold' : 'ph:circle-half-tilt-bold'" /><strong>{{ body.id === 'sun' ? '太阳' : '黑洞' }}</strong></header>
+            <header><Icon :name="specialBodyIcon(body.id)" /><strong>{{ specialBodyType(body.id) }}</strong></header>
             <label><span>标题</span><a-input v-model:value="body.title" /></label>
             <label><span>简介（两行）</span><a-textarea v-model:value="body.description" :rows="2" :maxlength="180" /></label>
             <label><span>状态</span><a-input v-model:value="body.status" /></label>
-            <details class="knowledge-editor"><summary><span>解析 / 科普</span><b>{{ body.knowledge?.length || 0 }}/30</b><Icon name="ph:caret-down-bold" /></summary><a-textarea :value="(body.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 18 }" @change="updatePlanetKnowledge(body, $event)" /></details>
+            <details class="knowledge-editor"><summary><span>科普 / 彩蛋</span><b>{{ body.knowledge?.length || 0 }}/1000</b><Icon name="ph:caret-down-bold" /></summary><a-textarea :value="(body.knowledge || []).join('\n')" :auto-size="{ minRows: 5, maxRows: 18 }" @change="updatePlanetKnowledge(body, $event)" /></details>
           </article>
         </div>
       </section>
@@ -91,16 +91,27 @@ const error = ref('')
 const activeIssue = ref<any>(null)
 const settingsSaving = ref(false)
 const defaultSolarPlanets = [
-  ['mercury', '水星', '撞击坑与铁质核心'], ['venus', '金星', '硫酸云带与温室效应'], ['mars', '火星', '铁锈地表与极冠'],
-  ['jupiter', '木星', '大红斑与条带云系'], ['saturn', '土星', '冰尘星环与卡西尼缝'], ['uranus', '天王星', '甲烷冰层与极端倾角'], ['neptune', '海王星', '深蓝色大气与暗斑'],
-].map(([id, name, feature]) => ({ id, name, feature, description: String((SOLAR_KNOWLEDGE[id] || [])[0] || `${name}以${feature}构成独特的表面风貌，观测数据会随遥测指令实时更新。`), knowledge: [...(SOLAR_KNOWLEDGE[id] || [`${name}的核心观测特征是${feature}。`])] }))
+  { id: 'mercury', name: '水星', catalog: 'MERCURY · 类地行星', status: '昼夜温差极端', distance: '0.39 AU', period: '87.97 日', temperature: '−173 至 427 °C', feature: '撞击坑与铁质核心' },
+  { id: 'venus', name: '金星', catalog: 'VENUS · 类地行星', status: '厚重云层覆盖', distance: '0.72 AU', period: '224.70 日', temperature: '约 464 °C', feature: '硫酸云带与温室效应' },
+  { id: 'mars', name: '火星', catalog: 'MARS · 类地行星', status: '尘暴季节活跃', distance: '1.52 AU', period: '686.98 日', temperature: '平均 −63 °C', feature: '铁锈地表与极冠' },
+  { id: 'jupiter', name: '木星', catalog: 'JUPITER · 气态巨行星', status: '大气带高速流动', distance: '5.20 AU', period: '11.86 年', temperature: '云顶约 −110 °C', feature: '大红斑与条带云系' },
+  { id: 'saturn', name: '土星', catalog: 'SATURN · 气态巨行星', status: '环系层次清晰', distance: '9.58 AU', period: '29.45 年', temperature: '云顶约 −140 °C', feature: '冰尘星环与卡西尼缝' },
+  { id: 'uranus', name: '天王星', catalog: 'URANUS · 冰巨行星', status: '横躺姿态运行', distance: '19.2 AU', period: '84.02 年', temperature: '约 −195 °C', feature: '甲烷冰层与极端倾角' },
+  { id: 'neptune', name: '海王星', catalog: 'NEPTUNE · 冰巨行星', status: '超音速风暴活跃', distance: '30.1 AU', period: '164.79 年', temperature: '约 −200 °C', feature: '深蓝色大气与暗斑' },
+].map((planet) => ({ ...planet, description: String((SOLAR_KNOWLEDGE[planet.id] || [])[0] || `${planet.name}以${planet.feature}构成独特的表面风貌，观测数据会随遥测指令实时更新。`), knowledge: [...(SOLAR_KNOWLEDGE[planet.id] || [`${planet.name}的核心观测特征是${planet.feature}。`])] }))
 const defaultSpecialBodies = [
   { id: 'sun', title: '太阳', description: '太阳以稳定的核聚变为整个行星系统提供光与热，磁场活动塑造着日球层边界。', status: '日球层遥测在线', knowledge: [...SPECIAL_KNOWLEDGE.sun] },
   { id: 'black-hole', title: '玄渊 X-1', description: '这是一个以吸积盘与引力透镜特征构建的超大质量黑洞模型，所有亮度均来自周围高温物质。', status: '吸积盘稳定', knowledge: [...SPECIAL_KNOWLEDGE['black-hole']] },
+  { id: 'station', title: '风隅轨道站', description: '长期在轨的记忆实验平台，承担材料暴露、生命支持与深空通信验证任务。', status: '乘组值守中', knowledge: [...SPECIAL_KNOWLEDGE.station] },
+  { id: 'satellite', title: '听风一号', description: '光学通信与遥感试验卫星，在晨昏轨道上为离散记忆寻找同频信标。', status: '太阳同步轨道运行', knowledge: [...SPECIAL_KNOWLEDGE.satellite] },
+  { id: 'satellite-aurora', title: '逐光二号', description: '面向极光与高层大气的宽视场观测平台，记录磁暴期间的带电粒子沉降。', status: '极区扫描进行中', knowledge: [...SPECIAL_KNOWLEDGE['satellite-aurora']] },
+  { id: 'satellite-relay', title: '潮声三号', description: '搭载定向高增益天线的深空中继节点，为远端记忆坐标提供转发与时间同步。', status: '跨轨链路稳定', knowledge: [...SPECIAL_KNOWLEDGE['satellite-relay']] },
+  { id: 'spacecraft', title: '风隅号', description: '由陶瓷复合装甲、三联离子推进阵列和全景舰桥构成的深空巡航舰。', status: '三联离子驱动在线', knowledge: [...SPECIAL_KNOWLEDGE.spacecraft] },
+  { id: 'scoutcraft', title: '棱镜号', description: '为星际航道测绘而生的高速探测艇，将星光与脉冲星信号叠合为航向解。', status: '脉冲星导航解算中', knowledge: [...SPECIAL_KNOWLEDGE.scoutcraft] },
 ]
 function mergedKnowledge(value: unknown, fallback: string[]) {
   const custom = Array.isArray(value) ? value.map(item => String(item).trim()).filter(Boolean) : []
-  return [...custom, ...fallback.filter(item => !custom.includes(item))].slice(0, 30)
+  return [...custom, ...fallback.filter(item => !custom.includes(item))].slice(0, 1000)
 }
 function normalizeSolarPlanets(value: unknown) {
   const configured = Array.isArray(value) ? value : []
@@ -112,8 +123,13 @@ function normalizeSolarPlanets(value: unknown) {
       ...item,
       id: fallback.id,
       name: String(item.name || fallback.name),
+      catalog: String(item.catalog || fallback.catalog),
+      status: String(item.status || fallback.status),
       feature: String(item.feature || fallback.feature),
       description: String(item.description || fallback.description),
+      distance: String(item.distance || fallback.distance),
+      period: String(item.period || fallback.period),
+      temperature: String(item.temperature || fallback.temperature),
       knowledge: mergedKnowledge(item.knowledge, fallback.knowledge),
     }
   })
@@ -229,7 +245,15 @@ function openIssue(issue: any) {
 
 function updatePlanetKnowledge(planet: any, event: Event) {
   const value = (event.target as HTMLTextAreaElement)?.value || ''
-  planet.knowledge = value.split(/\r?\n/).map(item => item.trim()).filter(Boolean).slice(0, 30)
+  planet.knowledge = value.split(/\r?\n/).map(item => item.trim()).filter(Boolean).slice(0, 1000)
+}
+
+function specialBodyType(id: string) {
+  return ({ sun: '太阳', 'black-hole': '黑洞', station: '空间站', satellite: '深空信标卫星', 'satellite-aurora': '极光观测卫星', 'satellite-relay': '深空中继卫星', spacecraft: '深空巡航舰', scoutcraft: '航道测绘艇' } as Record<string, string>)[id] || id
+}
+
+function specialBodyIcon(id: string) {
+  return ({ sun: 'ph:sun-bold', 'black-hole': 'ph:circle-half-tilt-bold', station: 'ph:broadcast-bold', satellite: 'ph:broadcast-duotone', 'satellite-aurora': 'ph:aperture-bold', 'satellite-relay': 'ph:broadcast-bold', spacecraft: 'ph:rocket-launch-bold', scoutcraft: 'ph:shooting-star-bold' } as Record<string, string>)[id] || 'ph:star-four-bold'
 }
 
 function typeText(type: string) {

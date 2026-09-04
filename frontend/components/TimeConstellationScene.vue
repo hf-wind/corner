@@ -2,7 +2,7 @@
   <div
     ref="root"
     class="constellation-scene"
-    :class="{ 'is-ready': ready, 'is-ambient': ambient }"
+    :class="{ 'is-ready': ready, 'is-ambient': ambient, 'is-intro-ready': introReady }"
   >
     <div ref="host" class="scene-host" />
     <div ref="tooltip" class="scene-tooltip" aria-hidden="true" />
@@ -117,6 +117,7 @@ const emit = defineEmits<{
   discover: [id: DiscoveryId];
   clear: [];
   ready: [];
+  introReady: [];
   fallback: [reason: "webgl" | "initialization"];
   focusCleared: [];
   immersiveChange: [active: boolean];
@@ -126,6 +127,7 @@ const root = ref<HTMLElement | null>(null);
 const host = ref<HTMLElement | null>(null);
 const tooltip = ref<HTMLElement | null>(null);
 const ready = ref(false);
+const introReady = ref(false);
 const failed = ref(false);
 const reducedMotion = ref(false);
 let renderer: THREE.WebGLRenderer | null = null;
@@ -1190,7 +1192,7 @@ function addCore() {
   moon.position.set(20.5, 0, 0);
   moonOrbit.add(moon);
   core.add(moonOrbit);
-  registerDiscovery("planet", "风隅星 · 记忆母星", core, 12.5);
+  registerDiscovery("planet", "记忆母星", core, 12.5);
   scene.add(core);
 }
 
@@ -1293,7 +1295,7 @@ function addSun() {
   sun.add(outerHalo);
   const sunlight = new THREE.PointLight(0xffe6c8, 1500, 720, 1.32);
   sun.add(sunlight);
-  registerDiscovery("sun", "日冕观测站", sun, 16);
+  registerDiscovery("sun", "恒星 · 黄矮星", sun, 16);
   scene.add(sun);
 }
 
@@ -1416,7 +1418,7 @@ function addBlackHole() {
   halo.scale.set(92, 92, 1);
   blackHole.add(halo);
 
-  registerDiscovery("black-hole", "玄渊 X-1 · 事件视界", blackHole, 30);
+  registerDiscovery("black-hole", "超大质量黑洞模型", blackHole, 30);
   scene.add(blackHole);
 }
 
@@ -1706,7 +1708,7 @@ function addSpaceStation() {
     beacon.scale.set(2.2, 2.2, 1);
     spaceStation.add(beacon);
   }
-  registerDiscovery("station", "风隅轨道站 · FYOS-01", spaceStation, 16);
+  registerDiscovery("station", "近地轨道空间站", spaceStation, 16);
   const orbitPoints: THREE.Vector3[] = [];
   for (let index = 0; index <= 240; index++)
     orbitPoints.push(stationOrbitPosition((index / 240) * Math.PI * 2));
@@ -1894,7 +1896,7 @@ function addAuroraSatellite() {
     ring.name = "aurora-signal-ring";
     satelliteAurora.add(ring);
   }
-  registerDiscovery("satellite-aurora", "极光观测卫星 · AURORA-02", satelliteAurora, 10);
+  registerDiscovery("satellite-aurora", "极光观测卫星", satelliteAurora, 10);
   scene.add(satelliteAurora);
 }
 
@@ -1993,7 +1995,7 @@ function addRelaySatellite() {
   beaconCore.position.copy(beacon.position);
   beaconCore.renderOrder = 8;
   satelliteRelay.add(beaconCore);
-  registerDiscovery("satellite-relay", "潮汐中继卫星 · TRIDENT-03", satelliteRelay, 11);
+  registerDiscovery("satellite-relay", "深空中继卫星", satelliteRelay, 11);
   scene.add(satelliteRelay);
 }
 
@@ -2463,7 +2465,7 @@ function addSpacecraft() {
   spacecraft.add(marking);
 
   spacecraft.scale.setScalar(lowQuality ? 0.62 : 0.8);
-  registerDiscovery("spacecraft", "风隅号 · FY-01", spacecraft, 10);
+  registerDiscovery("spacecraft", "深空巡航舰", spacecraft, 10);
   scene.add(spacecraft);
 }
 
@@ -2578,7 +2580,7 @@ function addScoutcraft() {
   cockpitLight.position.set(5, 3.2, 0);
   scoutcraft.add(cockpitLight);
   scoutcraft.scale.setScalar(lowQuality ? 0.56 : 0.74);
-  registerDiscovery("scoutcraft", "棱镜号 · PRISM-07", scoutcraft, 10);
+  registerDiscovery("scoutcraft", "航道测绘艇", scoutcraft, 10);
   scene.add(scoutcraft);
 }
 
@@ -2902,7 +2904,7 @@ function addSolarSystem() {
     }
     system.add(body);
     solarSystemBodies.push(body);
-    registerDiscovery(discoveryIds[index], `${name} · 太阳系行星`, body, radius * 2.2);
+    registerDiscovery(discoveryIds[index], "太阳系行星", body, radius * 2.2);
     const orbit = new THREE.Mesh(track(new THREE.TorusGeometry(orbitRadius * orbitScale, 0.035 * orbitScale, 4, lowQuality ? 72 : 120, Math.PI * 1.28)), track(new THREE.MeshBasicMaterial({ color: 0x6d87a6, transparent: true, opacity: 0.08, depthWrite: false })));
     orbit.rotation.set(Math.PI / 2 + index * 0.08, 0, -0.48 + index * 0.52);
     system.add(orbit);
@@ -4023,6 +4025,10 @@ function applyCruiseCamera(now: number, delta: number) {
   } else {
     camera.position.copy(nextPosition);
     controls.target.copy(target);
+    if (!introReady.value) {
+      introReady.value = true;
+      emit('introReady');
+    }
   }
   camera.lookAt(controls.target);
 }
@@ -4607,6 +4613,10 @@ defineExpose({
   overflow: hidden;
   background: #05090c;
   transition: background-color 0.45s ease;
+  pointer-events: none;
+}
+.constellation-scene.is-intro-ready {
+  pointer-events: auto;
 }
 .scene-host {
   position: absolute;

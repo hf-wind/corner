@@ -156,7 +156,7 @@ type CircleItem = {
   };
 };
 type SectionKey = "all" | "thought" | "news" | "tech" | "ai" | "friends";
-const pageSize = 20;
+const pageSize = 10;
 const api = useApi();
 const router = useRouter();
 const pageRef = ref<HTMLElement | null>(null);
@@ -370,12 +370,13 @@ function openItem(item: CircleItem) {
   scrollPersistedForNavigation = true;
   void router.push({ path: "/circle/read", query: { id: item.id } });
 }
-async function loadFeed(target = page.value) {
+async function loadFeed(target = page.value, refresh = false) {
   loading.value = true;
   try {
     const result = await api.get<any>("/circle/feed", {
       page: target,
       limit: pageSize,
+      ...(refresh ? { refresh: true } : {}),
     });
     cache.value = {
       items: Array.isArray(result?.items) ? result.items : [],
@@ -406,7 +407,7 @@ onMounted(async () => {
   restoreReading();
   const shouldRestore = clientState.getSession('circleReturning', false) === true;
   clientState.removeSession('circleReturning');
-  if (!items.value.length) await loadFeed();
+  await loadFeed(page.value, true);
   await nextTick();
   if (shouldRestore) await restoreScroll();
   else if (pageRef.value) pageRef.value.scrollTop = 0;

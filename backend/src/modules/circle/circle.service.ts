@@ -12,7 +12,6 @@ const MAX_FEED_BYTES = 2_000_000;
 const MAX_ITEM_CONTENT_CHARS = 20_000;
 const MAX_REDIRECTS = 3;
 const FEED_CONCURRENCY = 6;
-const SOURCE_CONFIG_REVISION = 1;
 const DEFAULT_SUBSCRIPTIONS: CircleSubscription[] = [
   {
     name: 'IT之家',
@@ -25,9 +24,6 @@ const DEFAULT_SUBSCRIPTIONS: CircleSubscription[] = [
     origin: 'default',
   },
 ];
-// Explicit administrator entries are authoritative and must not be filtered
-// as legacy defaults on subsequent reads.
-const LEGACY_DEFAULT_RSS = new Set(['https://mrxwlb.com/feed', 'https://onojyun.com/feed', 'https://rsshub.app/zhihu/hot', 'https://sspai.com/feed']);
 
 export type CircleConfig = {
   enabled: boolean;
@@ -37,7 +33,6 @@ export type CircleConfig = {
   subscriptions: CircleSubscription[];
   subscriptionsConfigured: boolean;
   subscriptionExclusions: string[];
-  sourceRevision: number;
   cacheTtl: number;
 };
 
@@ -110,17 +105,15 @@ export class CircleService {
   async getConfig(): Promise<CircleConfig> {
     const [raw, rawFriends] = await Promise.all([this.settings.get('circle_config'), this.settings.get('friends')]);
     const value = this.objectValue(raw);
-    const sourceRevision = Number(value.sourceRevision) || 0;
-    const resetLegacySubscriptions = process.env.NODE_ENV !== 'test' && sourceRevision < SOURCE_CONFIG_REVISION;
     const covers = Array.isArray(value.covers) ? value.covers.map((cover) => this.stringValue(cover)).filter(Boolean) : [];
     const subscriptionsConfigured = Array.isArray(value.subscriptions);
-    const subscriptionExclusions = !resetLegacySubscriptions && Array.isArray(value.subscriptionExclusions) ? value.subscriptionExclusions.map((item: unknown) => this.subscriptionKey(this.stringValue(item))).filter(Boolean) : [];
+    const subscriptionExclusions = Array.isArray(value.subscriptionExclusions) ? value.subscriptionExclusions.map((item: unknown) => this.subscriptionKey(this.stringValue(item))).filter(Boolean) : [];
     const configuredSubscriptions: CircleSubscription[] =
-      subscriptionsConfigured && !resetLegacySubscriptions
+      subscriptionsConfigured
         ? (value.subscriptions
             .map((item: unknown) => this.subscriptionValue(item))
             .filter(Boolean)
-            .filter((item: CircleSubscription) => item.kind !== 'friend' && !LEGACY_DEFAULT_RSS.has(this.subscriptionKey(item.rssUrl))) as CircleSubscription[])
+            .filter((item: CircleSubscription) => item.kind !== 'friend') as CircleSubscription[])
         : [];
     const friendSubscriptions = Array.isArray(rawFriends)
       ? (rawFriends
@@ -133,7 +126,16 @@ export class CircleService {
     // Keep explicit edits as the source of truth for matching RSS URLs, while
     // continuously bringing newly-added RSS links into the list.
     const defaultSubscriptions = process.env.NODE_ENV === 'test' ? [] : DEFAULT_SUBSCRIPTIONS;
-    const subscriptions = this.mergeSubscriptions(this.mergeSubscriptions(configuredSubscriptions, defaultSubscriptions, subscriptionExclusions), friendSubscriptions, subscriptionExclusions, true).slice(0, 40);
+    const subscriptions = this.mergeSubscriptions(
+      this.mergeSubscriptions(
+        configuredSubscriptions,
+        defaultSubscriptions,
+        subscriptionExclusions,
+      ),
+      friendSubscriptions,
+      subscriptionExclusions,
+      true,
+    );
     const config: CircleConfig = {
       enabled: value.enabled !== false,
       title: this.stringValue(value.title) && this.stringValue(value.title) !== '朋友圈' ? this.stringValue(value.title) : '风讯角',
@@ -142,17 +144,8 @@ export class CircleService {
       subscriptions,
       subscriptionsConfigured,
       subscriptionExclusions,
-      sourceRevision: SOURCE_CONFIG_REVISION,
       cacheTtl: Math.min(3600, Math.max(60, Number(value.cacheTtl) || 600)),
     };
-    if (resetLegacySubscriptions) {
-      await this.settings.set('circle_config', {
-        ...value,
-        subscriptions: [],
-        subscriptionExclusions: [],
-        sourceRevision: SOURCE_CONFIG_REVISION,
-      });
-    }
     return config;
   }
 
@@ -165,7 +158,10 @@ export class CircleService {
           .map((cover) => cover.trim())
           .filter(Boolean);
     const submittedSubscriptions = input.subscriptions === undefined ? undefined : input.subscriptions.map((item) => this.subscriptionValue(item)).filter((item): item is CircleSubscription => Boolean(item));
-    const subscriptions = submittedSubscriptions === undefined ? current.subscriptions.filter((item) => item.kind !== 'friend') : submittedSubscriptions.filter((item) => item.kind !== 'friend').slice(0, 40);
+    const subscriptions =
+      submittedSubscriptions === undefined
+        ? current.subscriptions.filter((item) => item.kind !== 'friend')
+        : submittedSubscriptions.filter((item) => item.kind !== 'friend');
     const exclusions = new Set(current.subscriptionExclusions);
     if (input.subscriptions !== undefined) {
       const defaultKeys = DEFAULT_SUBSCRIPTIONS.map((item) => this.subscriptionKey(item.rssUrl));
@@ -190,7 +186,6 @@ export class CircleService {
       subscriptionsConfigured: true,
       subscriptions,
       subscriptionExclusions: Array.from(exclusions),
-      sourceRevision: SOURCE_CONFIG_REVISION,
       cacheTtl: Math.min(3600, Math.max(60, Number(input.cacheTtl) || current.cacheTtl)),
     };
     await this.settings.set('circle_config', next);
@@ -204,7 +199,7 @@ export class CircleService {
     const fingerprint = this.subscriptionFingerprint(config.subscriptions);
     const page = Math.max(1, Math.floor(Number(query.page) || 1));
     const limit = Math.min(50, Math.max(1, Math.floor(Number(query.limit) || 20)));
-    const cacheKey = `corner:circle:feed:${createHash('sha1').update(fingerprint).digest('hex')}`;
+    const cacheKey = `corner:circle:feed:v2:${createHash('sha1').update(fingerprint).digest('hex')}`;
     let cached: FeedCache | null = null;
     if (!query.refresh && this.redis) cached = await this.redis.getJson<FeedCache>(cacheKey).catch(() => null);
     if (!query.refresh && cached) {
@@ -216,14 +211,37 @@ export class CircleService {
     const friends = Array.isArray(config.subscriptions)
       ? config.subscriptions
           .map((friend) => this.objectValue(friend))
-          .filter((friend) => friend.enabled !== false && this.stringValue(friend.rssUrl || friend.siteRssUrl))
-          .slice(0, 40)
+          .filter(
+            (friend) =>
+              friend.enabled !== false &&
+              this.stringValue(friend.rssUrl || friend.siteRssUrl),
+          )
       : [];
-    const results: CircleItem[][] = [];
+    const results: { items: CircleItem[]; healthy: boolean; error?: string; rssUrl: string }[] = [];
     for (let index = 0; index < friends.length; index += FEED_CONCURRENCY) {
-      results.push(...(await Promise.all(friends.slice(index, index + FEED_CONCURRENCY).map((friend) => this.fetchFriendFeed(friend)))));
+      const batch = friends.slice(index, index + FEED_CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(async (friend) => {
+          const result = await this.fetchFriendFeed(friend);
+          return {
+            ...result,
+            rssUrl: this.stringValue(friend.rssUrl || friend.siteRssUrl),
+          };
+        })
+      );
+      results.push(...batchResults);
     }
-    const items = this.distributeItems(results.flat().sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt))).slice(0, 500);
+
+    // Keep every item returned by every configured feed. Pagination is applied
+    // only in pageResult so slow and prolific sources remain available.
+    const items = this.distributeItems(
+      results
+        .flatMap((r) => r.items)
+        .sort(
+          (left, right) =>
+            Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
+        ),
+    );
     const fetchedAt = new Date().toISOString();
     this.cache = {
       expires: Date.now() + config.cacheTtl * 1000,
@@ -241,7 +259,7 @@ export class CircleService {
       totalPages?: number;
       items?: CircleItem[];
     };
-    const pages = Math.min(Number(first.totalPages) || 1, 10);
+    const pages = Number(first.totalPages) || 1;
     const found = (first.items || []).find((item) => item.id === target);
     if (found) return found;
     for (let page = 2; page <= pages; page += 1) {
@@ -273,11 +291,11 @@ export class CircleService {
     };
   }
 
-  private async fetchFriendFeed(friend: Record<string, unknown>): Promise<CircleItem[]> {
+  private async fetchFriendFeed(friend: Record<string, unknown>): Promise<{ items: CircleItem[]; healthy: boolean; error?: string }> {
     const rssUrl = this.stringValue(friend.rssUrl || friend.siteRssUrl);
     const configuredSiteUrl = this.stringValue(friend.url || friend.siteUrl);
     const siteUrl = this.absoluteUrl(configuredSiteUrl, rssUrl) || rssUrl;
-    const source: CircleItem['source'] = {
+    let source: CircleItem['source'] = {
       name: this.stringValue(friend.name || friend.siteName) || this.hostName(siteUrl),
       url: siteUrl,
       avatar: this.stringValue(friend.avatar || friend.siteAvatar) ? this.absoluteUrl(this.stringValue(friend.avatar || friend.siteAvatar), siteUrl) : '',
@@ -286,18 +304,34 @@ export class CircleService {
       rssUrl,
     };
     try {
-      const xml = await this.fetchXml(rssUrl);
-      if (!xml) return [];
+      let effectiveRssUrl = rssUrl;
+      let xml = await this.fetchXml(rssUrl).catch(() => '');
+      if (!xml && configuredSiteUrl) {
+        const discovered = await this.discoverFeed(configuredSiteUrl, rssUrl);
+        if (discovered) {
+          effectiveRssUrl = discovered.url;
+          xml = discovered.xml;
+          source = { ...source, rssUrl: effectiveRssUrl };
+          this.logger.log(`风讯角为 ${source.name} 使用备用订阅源 ${effectiveRssUrl}`);
+        }
+      }
+      if (!xml) return { items: [], healthy: true };
       const feed = await this.parseFeed(xml);
       const atomFeed = feed.atom;
-      return feed.items.slice(0, 30).map((entry, index) => {
+      const items = feed.items.map((entry, index) => {
         const title = this.stringValue(entry.title) || '未命名文章';
         const url = this.stringValue(entry.link) || siteUrl;
         const encoded = this.stringValue(entry.contentEncoded);
         const description = this.stringValue(entry.descriptionHtml || entry.content || entry.summary);
         const rawContent = encoded || description;
         const hasHtml = /<([a-z][\w-]*)(?:\s[^>]*)?>/i.test(rawContent);
-        const parserRule = encoded ? 'rss-content-encoded' : hasHtml ? (atomFeed ? 'atom-content-html' : 'rss-description-html') : 'text-summary';
+        const parserRule: CircleItem['parserRule'] = encoded
+          ? 'rss-content-encoded'
+          : hasHtml
+            ? atomFeed
+              ? 'atom-content-html'
+              : 'rss-description-html'
+            : 'text-summary';
         const contentHtml = hasHtml ? this.sanitizeFeedHtml(rawContent, url || siteUrl) : '';
         const image = this.extractImage('', rawContent, url || siteUrl);
         const enclosure = this.stringValue(entry.enclosure?.url);
@@ -323,9 +357,11 @@ export class CircleService {
           comments: this.absoluteUrl(this.stringValue(entry.comments), siteUrl) || '',
         };
       });
+      return { items, healthy: true };
     } catch (error) {
-      this.logger.warn(`见闻 RSS 读取失败 ${rssUrl}: ${error instanceof Error ? error.message : String(error)}`);
-      return [];
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`风讯角 RSS 读取失败 ${rssUrl}: ${errorMessage}`);
+      return { items: [], healthy: false, error: errorMessage };
     }
   }
 
@@ -392,48 +428,70 @@ export class CircleService {
   }
 
   private async fetchXml(value: string) {
-    let current = await this.safeFeedUrl(value);
     const cacheKey = `corner:circle:rss:${createHash('sha1').update(value).digest('hex')}`;
     const sourceCache = this.redis ? await this.redis.getJson<FeedSourceCache>(cacheKey).catch(() => null) : null;
-    for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
-      const headers: Record<string, string> = {
-        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
-        'User-Agent': 'CornerCircle/1.0',
-      };
-      if (sourceCache?.etag) headers['If-None-Match'] = sourceCache.etag;
-      if (sourceCache?.lastModified) headers['If-Modified-Since'] = sourceCache.lastModified;
-      const response = await fetch(current, {
-        redirect: 'manual',
-        signal: AbortSignal.timeout(7000),
-        headers,
-      });
-      if (response.status === 304 && sourceCache?.xml) return sourceCache.xml;
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (!location || redirect === MAX_REDIRECTS) return '';
-        current = await this.safeFeedUrl(new URL(location, current).toString());
-        continue;
+    try {
+      let current = await this.safeFeedUrl(value);
+      for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
+        const headers: Record<string, string> = {
+          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+          'User-Agent': 'Mozilla/5.0 (compatible; CornerCircle/1.0; +https://corner.ink)',
+        };
+        if (sourceCache?.etag) headers['If-None-Match'] = sourceCache.etag;
+        if (sourceCache?.lastModified) headers['If-Modified-Since'] = sourceCache.lastModified;
+        const response = await fetch(current, {
+          redirect: 'manual',
+          signal: AbortSignal.timeout(7000),
+          headers,
+        });
+        if (response.status === 304 && sourceCache?.xml) {
+          this.logger.debug(`RSS 304 未修改，使用缓存: ${value}`);
+          return sourceCache.xml;
+        }
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get('location');
+          if (!location || redirect === MAX_REDIRECTS) {
+            this.logger.warn(`RSS 重定向次数超限或缺少 Location: ${value}`);
+            return sourceCache?.xml || '';
+          }
+          this.logger.debug(`RSS 重定向 ${response.status} -> ${location}`);
+          current = await this.safeFeedUrl(new URL(location, current).toString());
+          continue;
+        }
+        if (!response.ok) {
+          this.logger.warn(`RSS HTTP ${response.status}: ${value}`);
+          if (sourceCache?.xml) return sourceCache.xml;
+          throw new Error(`RSS HTTP ${response.status}`);
+        }
+        const declaredSize = Number(response.headers.get('content-length') || 0);
+        if (declaredSize > MAX_FEED_BYTES) {
+          this.logger.warn(`RSS 内容超过 ${MAX_FEED_BYTES} 字节限制: ${value}`);
+          return sourceCache?.xml || '';
+        }
+        const xml = await this.readLimitedText(response, MAX_FEED_BYTES);
+        if (this.redis && xml) {
+          await this.redis
+            .setJson(
+              cacheKey,
+              {
+                xml,
+                etag: response.headers.get('etag') || undefined,
+                lastModified: response.headers.get('last-modified') || undefined,
+              },
+              86400,
+            )
+            .catch(() => undefined);
+        }
+        return xml || sourceCache?.xml || '';
       }
-      if (!response.ok) return '';
-      const declaredSize = Number(response.headers.get('content-length') || 0);
-      if (declaredSize > MAX_FEED_BYTES) return '';
-      const xml = await this.readLimitedText(response, MAX_FEED_BYTES);
-      if (this.redis && xml) {
-        await this.redis
-          .setJson(
-            cacheKey,
-            {
-              xml,
-              etag: response.headers.get('etag') || undefined,
-              lastModified: response.headers.get('last-modified') || undefined,
-            },
-            86400,
-          )
-          .catch(() => undefined);
+    } catch (error) {
+      if (sourceCache?.xml) {
+        this.logger.warn(`RSS 实时读取失败，使用最近缓存 ${value}: ${error instanceof Error ? error.message : String(error)}`);
+        return sourceCache.xml;
       }
-      return xml;
+      throw error;
     }
-    return '';
+    return sourceCache?.xml || '';
   }
 
   private async readLimitedText(response: Response, limit: number) {
@@ -455,6 +513,46 @@ export class CircleService {
     return result + decoder.decode();
   }
 
+  private async discoverFeed(siteValue: string, excludedValue: string) {
+    const site = await this.safeFeedUrl(siteValue);
+    const response = await fetch(site, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 (compatible; CornerCircle/1.0; +https://corner.ink)',
+      },
+    });
+    if (!response.ok) return null;
+    const html = await this.readLimitedText(response, MAX_FEED_BYTES);
+    const candidates = [
+      ...[...html.matchAll(/<link\b[^>]*>/gi)]
+        .map((match) => match[0])
+        .filter(
+          (tag) =>
+            /\brel=["'][^"']*alternate/i.test(tag) &&
+            /\btype=["']application\/(?:rss\+xml|atom\+xml)/i.test(tag),
+        )
+        .map((tag) => tag.match(/\bhref=["']([^"']+)["']/i)?.[1] || ''),
+      '/atom.xml',
+      '/rss.xml',
+      '/feed/',
+    ];
+    const excluded = this.subscriptionKey(excludedValue);
+    const unique = Array.from(
+      new Set(
+        candidates
+          .map((candidate) => this.absoluteUrl(candidate, site.toString()))
+          .filter((candidate) => candidate && this.subscriptionKey(candidate) !== excluded),
+      ),
+    );
+    for (const url of unique.slice(0, 8)) {
+      const xml = await this.fetchXml(url).catch(() => '');
+      if (xml && /<(rss|feed|rdf:RDF)\b/i.test(xml)) return { url, xml };
+    }
+    return null;
+  }
+
   private async safeFeedUrl(value: string) {
     const url = new URL(value);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
@@ -464,8 +562,18 @@ export class CircleService {
     if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
       throw new Error('RSS 地址不允许访问本机或私有网络');
     }
-    const addresses = isIP(host) ? [host] : (await lookup(host, { all: true, verbatim: true })).map((entry) => entry.address);
-    if (!addresses.length || addresses.some((address) => !this.isPublicIp(address))) {
+    let addresses: string[];
+    try {
+      addresses = isIP(host) ? [host] : (await lookup(host, { all: true, verbatim: true })).map((entry) => entry.address);
+    } catch (error) {
+      this.logger.warn(`RSS DNS 解析失败 ${host}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`RSS 地址 ${host} DNS 解析失败`);
+    }
+    if (!addresses.length) {
+      throw new Error(`RSS 地址 ${host} 未解析到任何 IP`);
+    }
+    if (addresses.some((address) => !this.isPublicIp(address))) {
+      this.logger.warn(`RSS 地址 ${host} 解析到私有网络: ${addresses.join(', ')}`);
       throw new Error('RSS 地址解析到了非公开网络');
     }
     return url;
@@ -475,7 +583,7 @@ export class CircleService {
     const normalized = value.toLowerCase();
     if (isIP(normalized) === 4) {
       const [a, b, c] = normalized.split('.').map(Number);
-      return !(a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 0) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113) || a >= 224);
+      return !(a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 0 && c === 0) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113) || a >= 224);
     }
     if (isIP(normalized) !== 6) return false;
     const mappedDotted = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
@@ -597,8 +705,9 @@ export class CircleService {
     return value.trim().replace(/\/+$/, '').toLowerCase();
   }
 
-  /** 交错不同来源，避免高频订阅源占满首屏。 */
+  /** 分层轮询不同来源，确保多页维度下每个来源都有机会出现。 */
   private distributeItems(items: CircleItem[]) {
+    // 按来源分组
     const groups = new Map<string, CircleItem[]>();
     for (const item of items) {
       const key = this.subscriptionKey(item.source.rssUrl || item.source.url || item.source.name);
@@ -606,16 +715,32 @@ export class CircleService {
       group.push(item);
       groups.set(key, group);
     }
-    const queues = Array.from(groups.values()).map((group) => group.sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt)));
+
+    // 每组按时间排序（最新在前）
+    const queues = Array.from(groups.entries()).map(([key, items]) => ({
+      key,
+      queue: items.sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt)),
+    }));
+
+    // 分层轮询：每轮从每个来源取1条，直到没有更多内容
     const result: CircleItem[] = [];
-    let offset = 0;
-    while (queues.some((queue) => queue.length)) {
-      for (let index = 0; index < queues.length; index += 1) {
-        const queue = queues[(index + offset) % queues.length];
-        if (queue?.length) result.push(queue.shift() as CircleItem);
+    let maxRounds = 5; // 最多5轮，确保多页维度均匀
+    let round = 0;
+
+    while (round < maxRounds && queues.some(q => q.queue.length > 0)) {
+      for (const source of queues) {
+        if (source.queue.length > 0) {
+          result.push(source.queue.shift() as CircleItem);
+        }
       }
-      offset = (offset + 1) % Math.max(queues.length, 1);
+      round++;
     }
+
+    // 如果还有剩余内容，按时间填充
+    const remaining = queues.flatMap(q => q.queue);
+    remaining.sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt));
+    result.push(...remaining);
+
     return result;
   }
 }

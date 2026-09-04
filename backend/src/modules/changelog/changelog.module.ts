@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
-import { AiModule } from '../ai/ai.module';
 import { SettingsModule } from '../settings/settings.module';
 import { ChangelogController } from './changelog.controller';
 import { ChangelogService } from './changelog.service';
+import { BaiduTranslationService } from './baidu-translation.service';
 
 @Module({
-  imports: [SettingsModule, AiModule],
+  imports: [SettingsModule],
   controllers: [ChangelogController],
-  providers: [ChangelogService],
+  providers: [ChangelogService, BaiduTranslationService],
 })
 export class ChangelogModule {}
