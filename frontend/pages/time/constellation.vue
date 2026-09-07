@@ -14,8 +14,10 @@
         :selected-id="selected?.id"
         :resolve-image="mediaUrl"
         :scene-settings="sceneSettings"
+        :start-intro="constellationIntroStarted"
         :intro-delay-ms="180"
         @ready="handleConstellationSceneReady"
+        @intro-progress="handleConstellationIntroProgress"
         @intro-ready="handleConstellationIntroReady"
         @select="handleSceneSelect"
         @discover="handleDiscovery"
@@ -44,7 +46,7 @@
               <span class="loading-brand">
                 <img src="/logo.png" alt="" width="32" height="32" />
                 <span
-                  ><strong>WIND CORNER</strong><small>CONSTELLATION SYSTEM</small></span
+                  ><strong>TIME CONSTELLATION</strong><small>ORBITAL MEMORY ATLAS</small></span
                 >
               </span>
               <b
@@ -52,12 +54,13 @@
               >
             </header>
             <div class="loading-track" aria-hidden="true">
+              <span class="loading-track__ticks"><i v-for="tick in 13" :key="tick" /></span>
               <i :style="{ transform: `scaleX(${constellationDisplayProgress / 100})` }" />
-              <span :style="{ left: `${constellationDisplayProgress}%` }" />
+              <b :style="{ left: `${constellationDisplayProgress}%` }" />
             </div>
             <footer>
               <span><i />{{ constellationLoadingStage }}</span>
-              <small>{{ constellationLoadingDetail }}</small>
+              <small><em />{{ constellationLoadingDetail }} · {{ constellationTaskSummary }}</small>
             </footer>
           </div>
         </div>
@@ -423,12 +426,19 @@ const sceneSettingsReady = ref(false);
 const discoveryClosing = ref(false);
 const immersiveMode = ref(false);
 const constellationLoaderVisible = ref(true);
+const constellationIntroStarted = ref(false);
 const constellationDisplayProgress = ref(0);
 const constellationTargetProgress = ref(0);
 const constellationLoadingStage = ref("准备星图界面");
 const constellationLoadingDetail = ref("初始化视觉与交互资源");
+const constellationCompletedTasks = ref<string[]>([]);
+const constellationTotalTasks = 4;
+const constellationIntroProgress = ref(0);
 const constellationRoundedProgress = computed(() =>
   Math.round(constellationDisplayProgress.value),
+);
+const constellationTaskSummary = computed(() =>
+  `${constellationCompletedTasks.value.length}/${constellationTotalTasks} 项资源`,
 );
 let requestSequence = 0;
 let neighborRequestSequence = 0;
@@ -964,34 +974,32 @@ function advanceConstellationProgress(
   }
 }
 
-function syncConstellationProgress() {
+function markConstellationTask(id: string, stage: string, detail: string) {
   if (constellationCompletionStarted) return;
-  let target = 8;
-  let stage = "准备星图界面";
-  let detail = "初始化视觉与交互资源";
+  if (!constellationCompletedTasks.value.includes(id)) {
+    constellationCompletedTasks.value = [...constellationCompletedTasks.value, id];
+  }
+  constellationLoadingStage.value = stage;
+  constellationLoadingDetail.value = detail;
+  const progress = Math.min(
+    100,
+    (constellationCompletedTasks.value.length / constellationTotalTasks) * 100,
+  );
+  advanceConstellationProgress(progress, stage, detail);
+  if (
+    constellationCompletedTasks.value.length >= constellationTotalTasks &&
+    !constellationCompletionStarted
+  ) {
+    void completeConstellationLoading("星图资源已就绪", "正在准备入场动画");
+  }
+}
 
-  if (graphReady.value) {
-    target = 30;
-    stage = "时光坐标已载入";
-    detail = "同步记忆轨道与关联数据";
-  }
-  if (sceneSettingsReady.value) {
-    target = 46;
-    stage = "星体参数已校准";
-    detail = "配置星图观测与互动信息";
-  }
-  if (homePreload.value.ready) {
-    target = 64;
-    stage = "时间轨道已接入";
-    detail = "准备星图首帧画面";
-  }
-  if (sceneReady.value) {
-    target = 84;
-    stage = "首帧已经就绪";
-    detail = "校准页面层级与进入状态";
-  }
-
-  advanceConstellationProgress(target, stage, detail);
+function handleConstellationIntroProgress(progress: number) {
+  constellationIntroProgress.value = Math.max(
+    constellationIntroProgress.value,
+    Math.min(1, progress),
+  );
+  if (constellationCompletionStarted) return;
 }
 
 function constellationNextPaint() {
@@ -1022,17 +1030,17 @@ async function completeConstellationLoading(stage: string, detail: string) {
   if (constellationDisposed) return;
   await new Promise((resolve) => window.setTimeout(resolve, 460));
   if (constellationDisposed) return;
+  constellationIntroStarted.value = true;
   constellationLoaderVisible.value = false;
 }
 
 function handleConstellationSceneReady() {
   sceneReady.value = true;
-  syncConstellationProgress();
+  markConstellationTask("scene", "星图首帧已绘制", "校准观测层与记忆节点");
 }
 
 function handleConstellationIntroReady() {
   sceneIntroReady.value = true;
-  void completeConstellationLoading("星图已经就绪", "一切准备就绪");
 }
 
 function handleConstellationFallback() {
@@ -1040,28 +1048,32 @@ function handleConstellationFallback() {
   fallbackMode.value = true;
   sceneReady.value = true;
   sceneIntroReady.value = true;
+  markConstellationTask("scene", "兼容画面已绘制", "切换至稳定观测层");
+  handleConstellationIntroProgress(1);
   void completeConstellationLoading("兼容星图已经就绪", "已切换到兼容观测画面");
 }
 
 watch(
-  () => [
-    graphReady.value,
-    sceneSettingsReady.value,
-    homePreload.value.ready,
-    sceneReady.value,
-    sceneIntroReady.value,
-  ],
-  syncConstellationProgress,
+  () => homePreload.value.ready,
+  (ready) => {
+    if (ready)
+      markConstellationTask("home", "时间轨道已接入", "站点内容已完成预载");
+  },
+  { immediate: true },
 );
 
 onMounted(() => {
   constellationDisposed = false;
-  syncConstellationProgress();
+  advanceConstellationProgress(0, "准备星图界面", "等待真实观测资源响应");
   constellationSceneTimeout = window.setTimeout(() => {
-    if (!constellationLoaderVisible.value || sceneIntroReady.value) return;
+    if (!constellationLoaderVisible.value || sceneReady.value) return;
+    if (!graphReady.value || !homePreload.value.ready || !sceneSettingsReady.value)
+      return;
     if (!sceneReady.value) fallbackMode.value = true;
     sceneReady.value = true;
     sceneIntroReady.value = true;
+    markConstellationTask("scene", "兼容画面已绘制", "切换至稳定观测层");
+    handleConstellationIntroProgress(1);
     void completeConstellationLoading("星图已经就绪", "正在使用兼容观测画面");
   }, 10_000);
   void loadGraph();
@@ -1091,6 +1103,7 @@ async function loadGraph() {
     graph.relations = Array.isArray(result?.relations) ? result.relations : [];
     graph.graphVersion = String(result?.graphVersion || "");
     graphReady.value = true;
+    markConstellationTask("graph", "时光坐标已载入", "已收到记忆节点与关联轨道");
     fallbackMode.value = false;
     const focus = String(route.query.focus || "");
     const focusedNode = graph.nodes.find((item) => item.id === focus);
@@ -1099,6 +1112,7 @@ async function loadGraph() {
     if (sequence === requestSequence) {
       error.value = exception?.message || "真实记忆暂时无法连接";
       graphReady.value = true;
+      markConstellationTask("graph", "时光坐标已响应", "将以当前可用数据继续观测");
     }
   }
 }
@@ -1455,6 +1469,7 @@ async function loadSceneSettings() {
     // Public settings are optional; retain defaults when unavailable.
   } finally {
     sceneSettingsReady.value = true;
+    markConstellationTask("settings", "星体参数已校准", "观测配置已准备完成");
   }
 }
 
@@ -1507,16 +1522,40 @@ useHead({ title: "时光星图" });
   justify-items: center;
   background: #030712;
   color: var(--space-muted);
+  overflow: hidden;
+}
+.constellation-entry-loading::before,
+.constellation-entry-loading::after {
+  position: absolute;
+  width: min(72vw, 520px);
+  height: min(72vw, 520px);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 14%, transparent);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+.constellation-entry-loading::before {
+  transform: rotate(-18deg) scaleY(.34);
+  box-shadow: 0 0 0 36px color-mix(in srgb, var(--c-primary) 5%, transparent), 0 0 0 72px color-mix(in srgb, var(--c-primary) 3%, transparent);
+}
+.constellation-entry-loading::after {
+  width: min(38vw, 260px);
+  height: min(38vw, 260px);
+  border-color: color-mix(in srgb, var(--c-primary) 16%, transparent);
+  transform: rotate(28deg) scaleY(.34);
 }
 .loading-window {
-  width: min(330px, calc(100vw - 44px));
-  padding: 18px 19px 16px;
+  position: relative;
+  z-index: 1;
+  width: min(430px, calc(100vw - 36px));
+  padding: 23px 23px 19px;
   border: 1px solid color-mix(in srgb, var(--space-accent) 26%, transparent);
-  border-radius: 8px;
-  background: rgb(4 10 24 / 86%);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgb(7 18 42 / 95%), rgb(2 7 20 / 96%));
   box-shadow:
-    0 20px 70px rgb(0 0 0 / 28%),
-    0 0 0 1px rgb(255 255 255 / 2%) inset;
+    0 28px 90px rgb(0 0 0 / 52%),
+    0 0 0 1px rgb(255 255 255 / 4%) inset,
+    0 0 70px color-mix(in srgb, var(--space-accent) 12%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -1531,11 +1570,15 @@ useHead({ title: "时光星图" });
   justify-content: space-between;
 }
 .loading-brand {
-  gap: 10px;
+  gap: 12px;
 }
 .loading-brand img {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--space-accent) 46%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(104 203 255 / 20%), transparent 68%);
   object-fit: contain;
 }
 .loading-brand > span {
@@ -1544,7 +1587,8 @@ useHead({ title: "时光星图" });
 }
 .loading-brand strong {
   color: var(--space-text);
-  font: 650 0.54rem var(--font-brand);
+  font: 700 0.65rem var(--font-brand);
+  letter-spacing: 0.14em;
 }
 .loading-brand small,
 .loading-window footer small {
@@ -1564,28 +1608,37 @@ useHead({ title: "时光星图" });
 }
 .loading-track {
   position: relative;
-  height: 2px;
-  margin: 18px 0 13px;
-  background: rgb(174 205 255 / 12%);
+  height: 8px;
+  margin: 25px 0 17px;
+  border: 1px solid rgb(174 205 255 / 14%);
+  border-radius: 99px;
+  background: repeating-linear-gradient(90deg, rgb(174 205 255 / 10%) 0 1px, transparent 1px 22px), rgb(174 205 255 / 6%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 5%) inset;
+  isolation: isolate;
 }
+.loading-track__ticks { position: absolute; z-index: 0; inset: -5px 0; display: flex; justify-content: space-between; pointer-events: none; }
+.loading-track__ticks i { width: 1px; height: 3px; background: rgb(174 205 255 / 30%); }
 .loading-track > i {
   position: absolute;
-  inset: 0;
-  background: var(--space-accent);
-  box-shadow: 0 0 14px var(--c-primary-soft);
+  z-index: 1;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c-primary) 74%, #244b8f), color-mix(in srgb, var(--c-primary) 28%, #fff) 48%, var(--c-primary));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c-primary) 58%, transparent);
   transform: scaleX(0);
   transform-origin: left center;
   will-change: transform;
 }
-.loading-track > span {
+.loading-track > b {
   position: absolute;
+  z-index: 2;
   top: 50%;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--space-accent);
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--c-primary) 30%, #fff);
   border-radius: 50%;
-  background: #071022;
-  box-shadow: 0 0 0 3px var(--c-primary-soft);
+  background: var(--c-primary);
+  box-shadow: 0 0 0 4px var(--c-primary-soft), 0 0 18px color-mix(in srgb, var(--c-primary) 70%, transparent);
   transform: translate(-50%, -50%);
   will-change: left;
 }
@@ -1597,7 +1650,7 @@ useHead({ title: "时光星图" });
   min-width: 0;
   gap: 7px;
   color: var(--space-muted);
-  font-size: 0.52rem;
+  font-size: 0.57rem;
   white-space: nowrap;
 }
 .loading-window footer > span i {
@@ -1614,6 +1667,7 @@ useHead({ title: "时光星图" });
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.loading-window footer > small em { display: inline-block; width: 4px; height: 4px; margin-right: 6px; border-radius: 50%; background: var(--space-accent); opacity: .7; }
 .constellation-entry-leave-active {
   transition:
     opacity 0.86s cubic-bezier(0.22, 1, 0.36, 1),

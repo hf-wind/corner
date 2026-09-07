@@ -90,6 +90,7 @@ const props = withDefaults(
     routeNodeIds?: string[];
     resolveImage?: (source: string) => string;
     ambient?: boolean;
+    startIntro?: boolean;
     introDelayMs?: number;
     narrativeProgress?: number;
     sceneSettings?: {
@@ -106,6 +107,7 @@ const props = withDefaults(
     routeNodeIds: () => [],
     resolveImage: (source: string) => source,
     ambient: false,
+    startIntro: true,
     introDelayMs: 0,
     narrativeProgress: -1,
     sceneSettings: () => ({ nonContentStarCount: 2400, ringGap: 34, movementSpeed: 1, solarSystemPlanetCount: 7, solarOrbitScale: 1, solarPlanets: [] }),
@@ -117,6 +119,7 @@ const emit = defineEmits<{
   discover: [id: DiscoveryId];
   clear: [];
   ready: [];
+  introProgress: [progress: number];
   introReady: [];
   fallback: [reason: "webgl" | "initialization"];
   focusCleared: [];
@@ -155,8 +158,22 @@ let meteorTrail: THREE.Line | null = null;
 let warpLines: THREE.LineSegments | null = null;
 let warpMaterial: THREE.LineBasicMaterial | null = null;
 let introStartedAt = 0;
+let lastIntroProgressEmitted = -1;
 let introInterrupted = false;
 let introCompleted = false;
+
+function startIntro() {
+  if (introInterrupted || introCompleted || introStartedAt) return;
+  introStartedAt = performance.now() + Math.max(0, props.introDelayMs);
+}
+
+watch(
+  () => props.startIntro,
+  (enabled) => {
+    if (enabled) startIntro();
+  },
+  { immediate: true },
+);
 let ambientOrbitPhase = -0.18;
 let discoveryEffect: DiscoveryId | "" = "";
 let discoveryEffectStartedAt = 0;
@@ -4394,8 +4411,16 @@ function animate(now = performance.now()) {
     }
 
     let introProgress = 1;
-    if (!introInterrupted && !introCompleted)
+    if (!introInterrupted && !introCompleted && introStartedAt)
       introProgress = applyIntroCamera(now);
+    else if (!introInterrupted && !introCompleted) introProgress = 0;
+    if (
+      introProgress !== lastIntroProgressEmitted &&
+      (Math.abs(introProgress - lastIntroProgressEmitted) >= 0.008 || introProgress >= 1)
+    ) {
+      lastIntroProgressEmitted = introProgress;
+      emit("introProgress", introProgress);
+    }
     if (warpMaterial) {
       const introWarp =
         introProgress < 1
@@ -4517,7 +4542,9 @@ async function initialize() {
     syncSmoothZoomFromCamera();
     resize();
     renderer.render(scene, camera);
-    introStartedAt = performance.now() + Math.max(0, props.introDelayMs);
+    introStartedAt = props.startIntro
+      ? performance.now() + Math.max(0, props.introDelayMs)
+      : 0;
     ready.value = true;
     emit("ready");
     animate();

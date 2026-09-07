@@ -33,7 +33,7 @@
             <span class="loading-brand">
               <img src="/logo.png" alt="" width="32" height="32" />
               <span
-                ><strong>WIND CORNER</strong><small>WELCOME SYSTEM</small></span
+                ><strong>WIND CORNER</strong><small>RETURNING TO YOUR CORNER</small></span
               >
             </span>
             <b
@@ -41,12 +41,13 @@
             >
           </header>
           <div class="loading-track" aria-hidden="true">
+            <span class="loading-track__ticks"><i v-for="tick in 11" :key="tick" /></span>
             <i :style="{ transform: `scaleX(${displayProgress / 100})` }" />
-            <span :style="{ left: `${displayProgress}%` }" />
+            <b :style="{ left: `${displayProgress}%` }" />
           </div>
           <footer>
             <span><i />{{ loadingStage }}</span>
-            <small>{{ loadingDetail }}</small>
+            <small><em />{{ loadingDetail }} · {{ completedLoadingTasks.length }}/{{ loadingTaskTotal }} 项</small>
           </footer>
         </div>
       </div>
@@ -149,6 +150,8 @@ const displayProgress = ref(0);
 const targetProgress = ref(0);
 const loadingStage = ref("准备页面环境");
 const loadingDetail = ref("初始化视觉与交互资源");
+const completedLoadingTasks = ref<string[]>([]);
+const loadingTaskTotal = 4;
 const roundedProgress = computed(() => Math.round(displayProgress.value));
 let progressFrame = 0;
 let progressUpdatedAt = 0;
@@ -202,6 +205,17 @@ function advanceProgress(target: number, stage: string, detail: string) {
   }
 }
 
+function markLoadingTask(id: string, stage: string, detail: string) {
+  if (!completedLoadingTasks.value.includes(id)) {
+    completedLoadingTasks.value = [...completedLoadingTasks.value, id];
+  }
+  const progress = Math.min(
+    100,
+    (completedLoadingTasks.value.length / loadingTaskTotal) * 100,
+  );
+  advanceProgress(progress, stage, detail);
+}
+
 function nextPaint() {
   return new Promise<void>((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -233,18 +247,19 @@ function handleSceneReady() {
   window.clearTimeout(sceneTimeout);
   sceneReady.value = true;
   sceneSettled.value = true;
+  markLoadingTask("scene", "首帧已经就绪", "校准页面层级与入场状态");
 }
 
 function handleSceneFallback() {
   window.clearTimeout(sceneTimeout);
   sceneFailed.value = true;
   sceneSettled.value = true;
+  markLoadingTask("scene", "已切换兼容画面", "保持内容可见并完成入场准备");
 }
 
 onMounted(async () => {
-  advanceProgress(10, "准备页面环境", "初始化视觉与交互资源");
+  advanceProgress(0, "准备页面环境", "等待真实资源响应");
   await nextPaint();
-  advanceProgress(22, "同步站点信息", "读取标题与欢迎页配置");
 
   const settingsRequest = loadSiteSettings();
   const homeRequest = Promise.allSettled([
@@ -262,7 +277,7 @@ onMounted(async () => {
   ]).then(([result]) => result);
 
   await Promise.resolve(settingsRequest);
-  advanceProgress(38, "站点信息已同步", "准备时光星图数据");
+  markLoadingTask("settings", "站点信息已同步", "欢迎页配置已完成读取");
   const graphResult = await graphRequest;
 
   if (graphResult.status === "fulfilled") {
@@ -276,9 +291,9 @@ onMounted(async () => {
   } else {
     sceneFailed.value = true;
   }
-  advanceProgress(62, "时光坐标已载入", "同步首页文章与侧栏内容");
+  markLoadingTask("graph", "时光坐标已载入", "记忆轨道数据已完成同步");
   await homeRequest;
-  advanceProgress(78, "首页内容已就绪", "构建星图与首帧画面");
+  markLoadingTask("home", "首页内容已就绪", "文章与侧栏资源已完成预载");
   await nextTick();
 
   if (!graph.nodes.length || sceneFailed.value) {
@@ -289,7 +304,8 @@ onMounted(async () => {
     await waitForScene();
   }
 
-  advanceProgress(94, "首帧已经就绪", "校准页面层级与入场状态");
+  if (!completedLoadingTasks.value.includes("scene"))
+    markLoadingTask("scene", "首帧已经就绪", "校准页面层级与入场状态");
   await nextPaint();
   advanceProgress(100, "欢迎回来", "一切准备就绪");
   await waitForProgress(99.9);
@@ -674,17 +690,34 @@ useHead(() => ({
   justify-items: center;
   background: #030712;
   color: var(--space-muted);
+  overflow: hidden;
+}
+.entry-loading::before {
+  position: absolute;
+  width: min(78vw, 560px);
+  height: min(78vw, 560px);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 12%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 42px color-mix(in srgb, var(--c-primary) 4%, transparent), 0 0 0 84px color-mix(in srgb, var(--c-primary) 2%, transparent);
+  content: "";
+  transform: rotate(-12deg) scaleY(.3);
+  pointer-events: none;
+}
+.entry-loading .loading-window {
+  position: relative;
+  z-index: 1;
 }
 
 .loading-window {
-  width: min(330px, calc(100vw - 44px));
-  padding: 18px 19px 16px;
+  width: min(390px, calc(100vw - 40px));
+  padding: 22px 22px 18px;
   border: 1px solid color-mix(in srgb, var(--space-accent) 26%, transparent);
-  border-radius: 8px;
-  background: rgb(4 10 24 / 86%);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgb(13 24 48 / 92%), rgb(4 10 24 / 94%));
   box-shadow:
-    0 20px 70px rgb(0 0 0 / 28%),
-    0 0 0 1px rgb(255 255 255 / 2%) inset;
+    0 24px 80px rgb(0 0 0 / 42%),
+    0 0 0 1px rgb(255 255 255 / 4%) inset,
+    0 0 50px color-mix(in srgb, var(--space-accent) 8%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -702,12 +735,16 @@ useHead(() => ({
 }
 
 .loading-brand {
-  gap: 10px;
+  gap: 11px;
 }
 
 .loading-brand img {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--space-accent) 38%, transparent);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 4%);
   object-fit: contain;
 }
 
@@ -718,7 +755,8 @@ useHead(() => ({
 
 .loading-brand strong {
   color: var(--space-text);
-  font: 650 0.54rem var(--font-brand);
+  font: 700 0.62rem var(--font-brand);
+  letter-spacing: 0.12em;
 }
 
 .loading-brand small,
@@ -742,30 +780,39 @@ useHead(() => ({
 
 .loading-track {
   position: relative;
-  height: 2px;
-  margin: 18px 0 13px;
-  background: rgb(174 205 255 / 12%);
+  height: 7px;
+  margin: 24px 0 16px;
+  border: 1px solid rgb(174 205 255 / 12%);
+  border-radius: 99px;
+  background: rgb(174 205 255 / 7%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 4%) inset;
+  isolation: isolate;
 }
+.loading-track__ticks { position: absolute; z-index: 0; inset: -5px 0; display: flex; justify-content: space-between; pointer-events: none; }
+.loading-track__ticks i { width: 1px; height: 3px; background: rgb(174 205 255 / 22%); }
 
 .loading-track > i {
   position: absolute;
-  inset: 0;
-  background: var(--space-accent);
-  box-shadow: 0 0 14px var(--c-primary-soft);
+  z-index: 1;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c-primary) 72%, #244b8f), color-mix(in srgb, var(--c-primary) 26%, #fff) 52%, var(--c-primary));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--c-primary) 62%, transparent);
   transform: scaleX(0);
   transform-origin: left center;
   will-change: transform;
 }
 
-.loading-track > span {
+.loading-track > b {
   position: absolute;
+  z-index: 2;
   top: 50%;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--space-accent);
+  width: 11px;
+  height: 11px;
+  border: 2px solid color-mix(in srgb, var(--c-primary) 30%, #fff);
   border-radius: 50%;
-  background: #071022;
-  box-shadow: 0 0 0 3px var(--c-primary-soft);
+  background: var(--c-primary);
+  box-shadow: 0 0 0 4px var(--c-primary-soft), 0 0 16px color-mix(in srgb, var(--c-primary) 70%, transparent);
   transform: translate(-50%, -50%);
   will-change: left;
 }
@@ -779,7 +826,7 @@ useHead(() => ({
   min-width: 0;
   gap: 7px;
   color: var(--space-muted);
-  font-size: 0.52rem;
+  font-size: 0.57rem;
   white-space: nowrap;
 }
 
@@ -798,6 +845,7 @@ useHead(() => ({
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.loading-window footer > small em { display: inline-block; width: 4px; height: 4px; margin-right: 6px; border-radius: 50%; background: var(--c-primary); opacity: .65; }
 
 .entry-fade-leave-active {
   transition:
