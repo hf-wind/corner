@@ -93,7 +93,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       payload?.message ||
       payload?.error ||
       `Request failed (${response.status})`;
-    throw new Error(String(message));
+    const error = new Error(String(message)) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
   return handleResponse<T>(payload);
 }

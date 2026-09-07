@@ -306,6 +306,7 @@ function coverUrl(source: string) {
 
 const api = useApi();
 const route = useRoute();
+const router = useRouter();
 const slug = route.params.slug as string;
 const isAdminPreview = computed(() => route.query.preview === "1");
 const editorId = "article-preview";
@@ -377,6 +378,10 @@ const articleContext = computed(() => ({
   sourceId: article.value?.id || "",
 }));
 
+function redirectNotFound() {
+  void router.replace({ path: "/404", query: { from: route.fullPath } });
+}
+
 async function loadArticle() {
   articleLoading.value = true;
   coverLoaded.value = false;
@@ -384,6 +389,10 @@ async function loadArticle() {
     const p = await api.get<any>(
       isAdminPreview.value ? `/posts/${slug}/preview` : `/posts/${slug}`,
     );
+    if (!p || typeof p !== "object") {
+      redirectNotFound();
+      return;
+    }
     article.value = {
       author: p.author?.username ?? "作者",
       tag: p.category?.name ?? "",
@@ -398,8 +407,8 @@ async function loadArticle() {
       tags: p.tags ?? [],
       id: p.id,
     };
-  } catch {
-    /* keep empty */
+  } catch (cause: any) {
+    if (cause?.status === 404) redirectNotFound();
   } finally {
     articleLoading.value = false;
   }

@@ -176,6 +176,10 @@ const contentStartsWithSummary = computed(() => {
   return Boolean(summary && content.startsWith(summary));
 });
 
+function redirectNotFound() {
+  void router.replace({ path: "/404", query: { from: route.fullPath } });
+}
+
 function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -295,8 +299,10 @@ async function load() {
     item.value = await api.get(
       `/circle/item/${encodeURIComponent(itemId.value)}`,
     );
-  } catch {
+    if (!item.value) redirectNotFound();
+  } catch (cause: any) {
     item.value = null;
+    if (cause?.status === 404) redirectNotFound();
   } finally {
     loading.value = false;
     if (item.value) await reveal();

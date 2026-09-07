@@ -49,6 +49,7 @@
 <script setup lang="ts">
 const api = useApi();
 const route = useRoute();
+const router = useRouter();
 const { mediaUrl } = useMediaUrl();
 const loading = ref(true);
 const error = ref("");
@@ -61,6 +62,10 @@ const regionText = computed(() => [place.value.province, place.value.city, place
 const totalMemories = computed(() => moments.value.length + albums.value.length + photos.value.length);
 const mapLink = computed(() => ({ path: "/time/map", query: { lng: place.value.longitude, lat: place.value.latitude, place: place.value.slug } }));
 let requestSequence = 0;
+
+function redirectNotFound() {
+  void router.replace({ path: "/404", query: { from: route.fullPath } });
+}
 
 function formatDate(value?: string) {
   if (!value) return "";
@@ -79,12 +84,20 @@ async function load() {
   try {
     const detail = await api.get<any>(`/memories/places/${slug.value}`);
     if (sequence !== requestSequence) return;
+    if (!detail?.place) {
+      redirectNotFound();
+      return;
+    }
     place.value = detail.place || {};
     moments.value = detail.moments || [];
     albums.value = detail.albums || [];
     photos.value = detail.photos || [];
   } catch (exception: any) {
     if (sequence !== requestSequence) return;
+    if (exception?.status === 404) {
+      redirectNotFound();
+      return;
+    }
     place.value = { name: "地点不存在" };
     error.value = exception?.message || "暂时无法读取这里的记忆";
   } finally {

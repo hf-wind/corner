@@ -1,6 +1,13 @@
 <template>
   <main ref="pageRef" class="wind-page" @scroll.passive="persistScroll">
-    <div class="wind-shell">
+    <Loading
+      v-if="loading && !items.length"
+      class="wind-loading-screen"
+      fullscreen
+      title="正在收拢风讯"
+      text="正在读取最新订阅内容"
+    />
+    <div v-else class="wind-shell">
       <header class="wind-masthead">
         <div class="masthead-mark" aria-hidden="true">
           <Icon name="ph:wind-bold" /><i class="mark-status" />
@@ -275,10 +282,10 @@ function readingMinutes(item: CircleItem) {
 }
 function dismissNewItems() {
   reading.lastSeenAt = items.value[0]?.publishedAt || new Date().toISOString();
-  clientState.set('site', 'circleLastSeenAt', reading.lastSeenAt);
+  clientState.set("site", "circleLastSeenAt", reading.lastSeenAt);
 }
 function restoreReading() {
-  reading.lastSeenAt = String(clientState.get('site', 'circleLastSeenAt', ''));
+  reading.lastSeenAt = String(clientState.get("site", "circleLastSeenAt", ""));
 }
 function validateListImage(event: Event, id: string) {
   const image = event.target;
@@ -303,12 +310,12 @@ function persistScroll() {
     entries.find(
       (entry) => entry.offsetTop + entry.offsetHeight >= host.scrollTop + 20,
     ) || entries.at(-1);
-  clientState.setSession('circleScroll', {
-      top: host.scrollTop,
-      anchorId: anchor?.dataset.itemId || "",
-      anchorOffset: anchor ? host.scrollTop - scrollLayoutTop(anchor, host) : 0,
-      page: page.value,
-    });
+  clientState.setSession("circleScroll", {
+    top: host.scrollTop,
+    anchorId: anchor?.dataset.itemId || "",
+    anchorOffset: anchor ? host.scrollTop - scrollLayoutTop(anchor, host) : 0,
+    page: page.value,
+  });
 }
 function clearScrollRestore() {
   scrollRestoreActive = false;
@@ -347,7 +354,10 @@ async function restoreScroll() {
   const host = pageRef.value;
   if (!host) return;
   try {
-    const value = clientState.getSession('circleScroll', {}) as Record<string, any>;
+    const value = clientState.getSession("circleScroll", {}) as Record<
+      string,
+      any
+    >;
     await nextTick();
     const anchor = value.anchorId
       ? host.querySelector<HTMLElement>(
@@ -366,17 +376,16 @@ async function restoreScroll() {
 }
 function openItem(item: CircleItem) {
   persistScroll();
-  clientState.setSession('circleReturning', true);
+  clientState.setSession("circleReturning", true);
   scrollPersistedForNavigation = true;
   void router.push({ path: "/circle/read", query: { id: item.id } });
 }
-async function loadFeed(target = page.value, refresh = false) {
+async function loadFeed(target = page.value) {
   loading.value = true;
   try {
     const result = await api.get<any>("/circle/feed", {
       page: target,
       limit: pageSize,
-      ...(refresh ? { refresh: true } : {}),
     });
     cache.value = {
       items: Array.isArray(result?.items) ? result.items : [],
@@ -405,12 +414,26 @@ async function changePage(target: number) {
 let clockTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(async () => {
   restoreReading();
-  const shouldRestore = clientState.getSession('circleReturning', false) === true;
-  clientState.removeSession('circleReturning');
-  await loadFeed(page.value, true);
-  await nextTick();
-  if (shouldRestore) await restoreScroll();
-  else if (pageRef.value) pageRef.value.scrollTop = 0;
+  const shouldRestore =
+    clientState.getSession("circleReturning", false) === true;
+  clientState.removeSession("circleReturning");
+  const savedScroll = clientState.getSession("circleScroll", {}) as Record<
+    string,
+    any
+  >;
+  const savedPage = Math.max(1, Number(savedScroll.page) || page.value);
+  if (shouldRestore) {
+    if (!items.value.length || page.value !== savedPage) {
+      page.value = savedPage;
+      await loadFeed(savedPage);
+    }
+    await nextTick();
+    await restoreScroll();
+  } else {
+    await loadFeed(page.value);
+    await nextTick();
+    if (pageRef.value) pageRef.value.scrollTop = 0;
+  }
   clockTimer = setInterval(() => {
     clock.value = Date.now();
   }, 60000);
@@ -419,13 +442,14 @@ onUnmounted(() => {
   clearScrollRestore();
   if (!scrollPersistedForNavigation) persistScroll();
   if (clockTimer) clearInterval(clockTimer);
-  clientState.set('site', 'circleLastSeenAt', reading.lastSeenAt);
+  clientState.set("site", "circleLastSeenAt", reading.lastSeenAt);
 });
 useHead(() => ({ title: `${config.value.title || "风讯角"} · 风隅随笔` }));
 </script>
 
 <style scoped>
 .wind-page {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -457,7 +481,7 @@ useHead(() => ({ title: `${config.value.title || "风讯角"} · 风隅随笔` }
   color: var(--c-primary);
   font-size: 1.35rem;
   place-items: center;
-  animation: mark-arrive 0.7s var(--ui-ease-out) both;
+  animation: mark-float 4.8s ease-in-out infinite;
 }
 .masthead-copy {
   min-width: 0;
@@ -760,6 +784,15 @@ useHead(() => ({ title: `${config.value.title || "风讯角"} · 风隅随笔` }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+@keyframes mark-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-1deg);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0) rotate(2deg);
   }
 }
 @keyframes pulse {

@@ -163,6 +163,10 @@ const latestDate = computed(() =>
   ),
 );
 
+function redirectNotFound() {
+  void router.replace({ path: "/404", query: { from: route.fullPath } });
+}
+
 function formatSidebarDate(value?: string) {
   if (!value) return "";
   const date = new Date(value);
@@ -179,13 +183,25 @@ function scrollToMoment(slug: string) {
 async function fetchMoments(targetPage = 1) {
   loading.value = true;
   try {
-    const res = await api.get<any>("/moments", {
-      page: targetPage,
-      limit: 10,
-      sort: "latest",
-      place: selectedPlace.value || undefined,
-    });
-    const nextItems = (res.items ?? []).map((item: any) => ({
+    const [res, focusedMoment] = await Promise.all([
+      api.get<any>("/moments", {
+        page: targetPage,
+        limit: 10,
+        sort: "latest",
+        place: selectedPlace.value || undefined,
+      }),
+      focusSlug.value
+        ? api.get<any>(`/moments/${encodeURIComponent(focusSlug.value)}`)
+        : Promise.resolve(null),
+    ]);
+    const sourceItems = Array.isArray(res.items) ? [...res.items] : [];
+    if (
+      focusedMoment &&
+      !sourceItems.some((item: any) => item.slug === focusedMoment.slug)
+    ) {
+      sourceItems.unshift(focusedMoment);
+    }
+    const nextItems = sourceItems.map((item: any) => ({
       id: item.id,
       slug: item.slug,
       title: item.title,
@@ -205,11 +221,11 @@ async function fetchMoments(targetPage = 1) {
     totalPages.value = res.totalPages ?? 1;
     if (focusSlug.value) {
       await nextTick();
-      document
-        .getElementById(`moment-${focusSlug.value}`)
-        ?.scrollIntoView({ block: "start" });
+      const focused = document.getElementById(`moment-${focusSlug.value}`);
+      if (focused) focused.scrollIntoView({ block: "start" });
     }
-  } catch {
+  } catch (cause: any) {
+    if (cause?.status === 404 && focusSlug.value) redirectNotFound();
     moments.value = [];
     total.value = 0;
     totalPages.value = 1;

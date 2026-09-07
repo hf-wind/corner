@@ -16,7 +16,7 @@
         </p>
         <div class="error-path">
           <Icon name="ph:map-pin-line-bold" />
-          <span>{{ route.fullPath }}</span>
+          <span>{{ missingPath }}</span>
         </div>
         <div class="error-actions">
           <AppLink to="/home" class="primary-action">
@@ -57,6 +57,7 @@
 <script setup lang="ts">
 const route = useRoute();
 const router = useRouter();
+const missingPath = computed(() => String(route.query.from || route.fullPath));
 
 function goBack() {
   if (window.history.length > 1) router.back();

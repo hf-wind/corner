@@ -165,6 +165,7 @@
 <script setup lang="ts">
 const api = useApi();
 const route = useRoute();
+const router = useRouter();
 const { mediaUrl } = useMediaUrl();
 const pageEl = ref<HTMLElement | null>(null);
 const loading = ref(true);
@@ -185,6 +186,10 @@ const lightboxImages = computed(() =>
     caption: item.caption || undefined,
   })),
 );
+
+function redirectNotFound() {
+  void router.replace({ path: "/404", query: { from: route.fullPath } });
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "未标日期";
@@ -241,14 +246,19 @@ async function load() {
   loading.value = true;
   try {
     album.value = await api.get(`/albums/${route.params.slug}`);
+    if (!album.value) {
+      redirectNotFound();
+      return;
+    }
     const photoId = String(route.query.photo || "");
     if (photoId) {
       const target =
         album.value?.items?.findIndex((item: any) => item.id === photoId) ?? -1;
       if (target >= 0) nextTick(() => open(target));
     }
-  } catch {
+  } catch (cause: any) {
     album.value = null;
+    if (cause?.status === 404) redirectNotFound();
   } finally {
     loading.value = false;
   }

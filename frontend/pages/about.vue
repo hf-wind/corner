@@ -1,382 +1,412 @@
 <template>
   <div class="about-page-shell">
-    <main ref="aboutMain" class="about-main" @scroll.passive="handleScroll">
-      <div class="about-container">
-        <section class="about-hero">
-          <div class="hero-intro">
-            <div class="hero-kicker">
-              <span>ABOUT / {{ currentYear }}</span>
-              <i aria-hidden="true"></i>
-              <span>PERSONAL FIELD NOTES</span>
+    <Loading
+      v-if="loading"
+      fullscreen
+      title="正在展开个人档案"
+      text="内容抵达后将直接呈现"
+    />
+    <template v-else-if="profile">
+      <main
+        ref="aboutMain"
+        class="about-main about-content-ready"
+        @scroll.passive="handleScroll"
+      >
+        <div class="about-container">
+          <section class="about-hero">
+            <div class="hero-intro">
+              <div class="hero-kicker">
+                <span>ABOUT / {{ currentYear }}</span>
+                <i aria-hidden="true"></i>
+                <span>PERSONAL FIELD NOTES</span>
+              </div>
+              <p class="hero-role">{{ profile.role }}</p>
+              <h1>{{ profile.name }}<b>.</b></h1>
+              <span class="hero-badge">{{ profile.badge }}</span>
+              <p class="hero-motto">{{ profile.motto }}</p>
+              <div class="hero-facts">
+                <span
+                  ><Icon name="ph:map-pin-bold" />{{ profile.location }}</span
+                >
+                <span
+                  ><i class="online-dot" aria-hidden="true"></i
+                  >{{ profile.availability }}</span
+                >
+              </div>
+              <div v-if="profile.heroTags.length" class="hero-tags">
+                <span v-for="tag in profile.heroTags" :key="tag">{{
+                  tag
+                }}</span>
+              </div>
+              <div class="hero-actions">
+                <button
+                  class="primary-action"
+                  type="button"
+                  @click="scrollToSection('introduction')"
+                >
+                  <Icon name="ph:arrow-down-bold" />
+                  了解更多
+                </button>
+                <a
+                  v-if="primaryContact"
+                  class="secondary-action"
+                  :href="safeUrl(primaryContact.url)"
+                  :target="
+                    isExternalLink(primaryContact.url) ? '_blank' : undefined
+                  "
+                  :rel="
+                    isExternalLink(primaryContact.url)
+                      ? 'noopener noreferrer'
+                      : undefined
+                  "
+                >
+                  <Icon name="ph:paper-plane-tilt-bold" />
+                  联系我
+                </a>
+              </div>
             </div>
-            <p class="hero-role">{{ profile.role }}</p>
-            <h1>{{ profile.name }}<b>.</b></h1>
-            <span class="hero-badge">{{ profile.badge }}</span>
-            <p class="hero-motto">{{ profile.motto }}</p>
-            <div class="hero-facts">
-              <span><Icon name="ph:map-pin-bold" />{{ profile.location }}</span>
-              <span
-                ><i class="online-dot" aria-hidden="true"></i
-                >{{ profile.availability }}</span
+
+            <div class="hero-portrait-wrap">
+              <div class="portrait-note" aria-hidden="true">
+                <span>NO. 01</span>
+                <span>KEEP MAKING</span>
+              </div>
+              <div class="portrait-frame">
+                <img :src="avatarSrc" :alt="`${profile.name}的头像`" />
+                <span class="portrait-mark">
+                  <i aria-hidden="true"></i>
+                  CURRENTLY HERE
+                </span>
+              </div>
+              <div class="portrait-caption">
+                <span>风隅随笔</span>
+                <small>一张靠窗的旧书桌</small>
+              </div>
+            </div>
+          </section>
+
+          <div class="hero-welcome">
+            <div class="welcome-symbol" aria-hidden="true">
+              <Icon name="ph:wind-duotone" />
+              <span></span>
+            </div>
+            <div class="welcome-content">
+              <span class="welcome-kicker">WELCOME TO MY CORNER</span>
+              <h2>把生活写成一份仍在更新的档案</h2>
+              <p>
+                这里没有标准答案，只有一些正在发生的工作、阅读和思考。谢谢你愿意停下来看看。
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="阅读几页闲话"
+              @click="
+                scrollToSection(profile.notes.length ? 'notes' : 'introduction')
+              "
+            >
+              <Icon name="ph:arrow-right-bold" />
+            </button>
+          </div>
+
+          <section
+            id="introduction"
+            class="content-section introduction reveal-block"
+          >
+            <SectionHeading
+              index="01"
+              eyebrow="A BRIEF ACCOUNT"
+              :title="profile.sectionTitles.introduction"
+              :description="profile.sectionDescriptions.introduction"
+            />
+            <div class="intro-body">
+              <div class="prose">
+                <p v-for="paragraph in introductionParagraphs" :key="paragraph">
+                  {{ paragraph }}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section
+            v-if="profile.notes.length"
+            id="notes"
+            class="content-section notes reveal-block"
+          >
+            <SectionHeading
+              index="02"
+              eyebrow="NOTES FROM THE CORNER"
+              :title="profile.sectionTitles.notes"
+              :description="profile.sectionDescriptions.notes"
+            />
+            <div class="note-grid">
+              <article
+                v-for="(note, index) in profile.notes"
+                :key="`${note.title}-${index}`"
+                class="note-card"
               >
+                <div class="note-meta">
+                  <span class="note-index">{{ padIndex(index + 1) }}</span>
+                  <span class="note-icon"
+                    ><Icon :name="note.icon || 'ph:leaf-bold'"
+                  /></span>
+                </div>
+                <span class="note-kicker">{{ note.subtitle }}</span>
+                <h3>{{ note.title }}</h3>
+                <p>{{ note.content }}</p>
+              </article>
             </div>
-            <div v-if="profile.heroTags.length" class="hero-tags">
-              <span v-for="tag in profile.heroTags" :key="tag">{{ tag }}</span>
-            </div>
-            <div class="hero-actions">
-              <button
-                class="primary-action"
-                type="button"
-                @click="scrollToSection('introduction')"
-              >
-                <Icon name="ph:arrow-down-bold" />
-                了解更多
-              </button>
-              <a
-                v-if="primaryContact"
-                class="secondary-action"
-                :href="safeUrl(primaryContact.url)"
+          </section>
+
+          <section
+            v-if="profile.skills.length"
+            id="skills"
+            class="content-section skills reveal-block"
+          >
+            <SectionHeading
+              index="03"
+              eyebrow="SELECTED WORKS"
+              :title="profile.sectionTitles.skills"
+              :description="profile.sectionDescriptions.skills"
+            />
+            <div class="works-list">
+              <component
+                :is="skill.url ? 'a' : 'article'"
+                v-for="(skill, index) in profile.skills"
+                :key="`${skill.name}-${index}`"
+                class="work-item"
+                :class="{ linked: Boolean(skill.url) }"
+                :href="skill.url ? safeUrl(skill.url) : undefined"
                 :target="
-                  isExternalLink(primaryContact.url) ? '_blank' : undefined
+                  skill.url && isExternalLink(skill.url) ? '_blank' : undefined
                 "
                 :rel="
-                  isExternalLink(primaryContact.url)
+                  skill.url && isExternalLink(skill.url)
                     ? 'noopener noreferrer'
                     : undefined
                 "
               >
-                <Icon name="ph:paper-plane-tilt-bold" />
-                联系我
-              </a>
+                <span class="work-index">{{ padIndex(index + 1) }}</span>
+                <span class="work-copy">
+                  <strong>{{ skill.name }}</strong>
+                  <small>{{ skill.description }}</small>
+                </span>
+                <Icon
+                  v-if="skill.url"
+                  class="work-arrow"
+                  name="ph:arrow-up-right-bold"
+                />
+              </component>
             </div>
-          </div>
+          </section>
 
-          <div class="hero-portrait-wrap">
-            <div class="portrait-note" aria-hidden="true">
-              <span>NO. 01</span>
-              <span>KEEP MAKING</span>
-            </div>
-            <div class="portrait-frame">
-              <img :src="avatarSrc" :alt="`${profile.name}的头像`" />
-              <span class="portrait-mark">
-                <i aria-hidden="true"></i>
-                CURRENTLY HERE
-              </span>
-            </div>
-            <div class="portrait-caption">
-              <span>风隅随笔</span>
-              <small>一张靠窗的旧书桌</small>
-            </div>
-          </div>
-        </section>
-
-        <div class="hero-welcome">
-          <div class="welcome-symbol" aria-hidden="true">
-            <Icon name="ph:wind-duotone" />
-            <span></span>
-          </div>
-          <div class="welcome-content">
-            <span class="welcome-kicker">WELCOME TO MY CORNER</span>
-            <h2>把生活写成一份仍在更新的档案</h2>
-            <p>
-              这里没有标准答案，只有一些正在发生的工作、阅读和思考。谢谢你愿意停下来看看。
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label="阅读几页闲话"
-            @click="
-              scrollToSection(profile.notes.length ? 'notes' : 'introduction')
-            "
+          <section
+            v-if="toolCards.length"
+            id="activity"
+            class="content-section activity reveal-block"
           >
-            <Icon name="ph:arrow-right-bold" />
-          </button>
-        </div>
-
-        <section
-          id="introduction"
-          class="content-section introduction reveal-block"
-        >
-          <SectionHeading
-            index="01"
-            eyebrow="A BRIEF ACCOUNT"
-            :title="profile.sectionTitles.introduction"
-            :description="profile.sectionDescriptions.introduction"
-          />
-          <div class="intro-body">
-            <div class="prose">
-              <p v-for="paragraph in introductionParagraphs" :key="paragraph">
-                {{ paragraph }}
-              </p>
+            <SectionHeading
+              index="04"
+              eyebrow="TOOLS & LITTLE JOYS"
+              :title="profile.sectionTitles.activity"
+              :description="profile.sectionDescriptions.activity"
+            />
+            <div class="workstation">
+              <article
+                v-for="tool in toolCards"
+                :key="tool.name"
+                class="workstation-card"
+              >
+                <span class="workstation-icon"><Icon :name="tool.icon" /></span>
+                <h3>{{ tool.name }}</h3>
+                <span class="workstation-status">{{ tool.status }}</span>
+                <p>{{ tool.description }}</p>
+              </article>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section
-          v-if="profile.notes.length"
-          id="notes"
-          class="content-section notes reveal-block"
-        >
-          <SectionHeading
-            index="02"
-            eyebrow="NOTES FROM THE CORNER"
-            :title="profile.sectionTitles.notes"
-            :description="profile.sectionDescriptions.notes"
-          />
-          <div class="note-grid">
-            <article
-              v-for="(note, index) in profile.notes"
-              :key="`${note.title}-${index}`"
-              class="note-card"
-            >
-              <div class="note-meta">
-                <span class="note-index">{{ padIndex(index + 1) }}</span>
-                <span class="note-icon"
-                  ><Icon :name="note.icon || 'ph:leaf-bold'"
-                /></span>
+          <section
+            v-if="profile.timeline.length"
+            id="timeline"
+            class="content-section timeline reveal-block"
+          >
+            <SectionHeading
+              index="05"
+              eyebrow="ON THE WAY"
+              :title="profile.sectionTitles.timeline"
+              :description="profile.sectionDescriptions.timeline"
+            />
+            <ol class="timeline-list">
+              <li
+                v-for="(item, index) in profile.timeline"
+                :key="`${item.year}-${item.title}`"
+                class="timeline-item"
+              >
+                <time>
+                  <span>{{ padIndex(index + 1) }}</span>
+                  <strong>{{ item.year }}</strong>
+                </time>
+                <div class="timeline-content">
+                  <h3>{{ item.title }}</h3>
+                  <p>{{ item.description }}</p>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <section
+            v-if="profile.values"
+            id="values"
+            class="content-section values reveal-block"
+          >
+            <SectionHeading
+              index="06"
+              eyebrow="THE THINGS THAT MATTER"
+              :title="profile.sectionTitles.values"
+              :description="profile.sectionDescriptions.values"
+            />
+            <div class="values-copy">
+              <Icon name="ph:quotes-fill" aria-hidden="true" />
+              <div>
+                <p v-for="(paragraph, index) in valuesParagraphs" :key="index">
+                  {{ paragraph }}
+                </p>
               </div>
-              <span class="note-kicker">{{ note.subtitle }}</span>
-              <h3>{{ note.title }}</h3>
-              <p>{{ note.content }}</p>
-            </article>
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section
-          v-if="profile.skills.length"
-          id="skills"
-          class="content-section skills reveal-block"
-        >
-          <SectionHeading
-            index="03"
-            eyebrow="SELECTED WORKS"
-            :title="profile.sectionTitles.skills"
-            :description="profile.sectionDescriptions.skills"
-          />
-          <div class="works-list">
-            <component
-              :is="skill.url ? 'a' : 'article'"
-              v-for="(skill, index) in profile.skills"
-              :key="`${skill.name}-${index}`"
-              class="work-item"
-              :class="{ linked: Boolean(skill.url) }"
-              :href="skill.url ? safeUrl(skill.url) : undefined"
-              :target="
-                skill.url && isExternalLink(skill.url) ? '_blank' : undefined
-              "
-              :rel="
-                skill.url && isExternalLink(skill.url)
-                  ? 'noopener noreferrer'
-                  : undefined
-              "
-            >
-              <span class="work-index">{{ padIndex(index + 1) }}</span>
-              <span class="work-copy">
-                <strong>{{ skill.name }}</strong>
-                <small>{{ skill.description }}</small>
-              </span>
-              <Icon
-                v-if="skill.url"
-                class="work-arrow"
-                name="ph:arrow-up-right-bold"
-              />
-            </component>
-          </div>
-        </section>
-
-        <section
-          v-if="toolCards.length"
-          id="activity"
-          class="content-section activity reveal-block"
-        >
-          <SectionHeading
-            index="04"
-            eyebrow="TOOLS & LITTLE JOYS"
-            :title="profile.sectionTitles.activity"
-            :description="profile.sectionDescriptions.activity"
-          />
-          <div class="workstation">
-            <article
-              v-for="tool in toolCards"
-              :key="tool.name"
-              class="workstation-card"
-            >
-              <span class="workstation-icon"><Icon :name="tool.icon" /></span>
-              <h3>{{ tool.name }}</h3>
-              <span class="workstation-status">{{ tool.status }}</span>
-              <p>{{ tool.description }}</p>
-            </article>
-          </div>
-        </section>
-
-        <section
-          v-if="profile.timeline.length"
-          id="timeline"
-          class="content-section timeline reveal-block"
-        >
-          <SectionHeading
-            index="05"
-            eyebrow="ON THE WAY"
-            :title="profile.sectionTitles.timeline"
-            :description="profile.sectionDescriptions.timeline"
-          />
-          <ol class="timeline-list">
-            <li
-              v-for="(item, index) in profile.timeline"
-              :key="`${item.year}-${item.title}`"
-              class="timeline-item"
-            >
-              <time>
-                <span>{{ padIndex(index + 1) }}</span>
-                <strong>{{ item.year }}</strong>
-              </time>
-              <div class="timeline-content">
-                <h3>{{ item.title }}</h3>
-                <p>{{ item.description }}</p>
+          <section
+            v-if="profile.facts.length"
+            id="facts"
+            class="content-section facts reveal-block"
+          >
+            <SectionHeading
+              index="07"
+              eyebrow="A FEW SMALL FACTS"
+              :title="profile.sectionTitles.facts"
+              :description="profile.sectionDescriptions.facts"
+            />
+            <dl class="facts-grid">
+              <div
+                v-for="fact in profile.facts"
+                :key="fact.label"
+                class="fact-card"
+              >
+                <dt>{{ fact.label }}</dt>
+                <dd>{{ fact.value }}</dd>
               </div>
-            </li>
-          </ol>
-        </section>
+            </dl>
+          </section>
 
-        <section
-          v-if="profile.values"
-          id="values"
-          class="content-section values reveal-block"
-        >
-          <SectionHeading
-            index="06"
-            eyebrow="THE THINGS THAT MATTER"
-            :title="profile.sectionTitles.values"
-            :description="profile.sectionDescriptions.values"
-          />
-          <div class="values-copy">
-            <Icon name="ph:quotes-fill" aria-hidden="true" />
+          <footer class="about-footer">
             <div>
-              <p v-for="(paragraph, index) in valuesParagraphs" :key="index">
-                {{ paragraph }}
-              </p>
+              <strong>风隅随笔</strong>
+              <span>WIND CORNER NOTES · {{ siteYearLabel }}</span>
             </div>
+            <div>
+              <q>{{ profile.motto }}</q>
+              <span>{{ profile.availability }}</span>
+            </div>
+          </footer>
+        </div>
+      </main>
+
+      <aside
+        class="about-sidebar about-content-ready"
+        aria-label="关于页面导航"
+      >
+        <section class="side-card side-profile">
+          <span class="side-kicker">A SMALL CORNER</span>
+          <div class="side-avatar">
+            <img :src="avatarSrc" :alt="`${profile.name}头像`" />
+          </div>
+          <h2>{{ profile.name }}</h2>
+          <p>{{ profile.role }}</p>
+          <div class="side-location">
+            <Icon name="ph:map-pin-bold" />{{ profile.location }}
+          </div>
+          <div v-if="profile.socialLinks.length" class="side-socials">
+            <a
+              v-for="link in profile.socialLinks"
+              :key="`${link.label}-${link.url}`"
+              :href="safeUrl(link.url)"
+              :title="link.label"
+              :aria-label="link.label"
+              :target="isExternalLink(link.url) ? '_blank' : undefined"
+              :rel="
+                isExternalLink(link.url) ? 'noopener noreferrer' : undefined
+              "
+              ><Icon :name="link.icon || 'ph:link-bold'"
+            /></a>
           </div>
         </section>
 
-        <section
-          v-if="profile.facts.length"
-          id="facts"
-          class="content-section facts reveal-block"
-        >
-          <SectionHeading
-            index="07"
-            eyebrow="A FEW SMALL FACTS"
-            :title="profile.sectionTitles.facts"
-            :description="profile.sectionDescriptions.facts"
-          />
-          <dl class="facts-grid">
-            <div
-              v-for="fact in profile.facts"
-              :key="fact.label"
-              class="fact-card"
+        <section class="side-card side-index">
+          <div class="side-card-title">
+            <span><Icon name="ph:list-numbers-bold" /></span>
+            <strong>页面目录</strong>
+            <small>{{ Math.round(scrollProgress) }}%</small>
+          </div>
+          <nav ref="sectionNavEl">
+            <button
+              v-for="item in sectionNav"
+              :key="item.id"
+              type="button"
+              :data-section="item.id"
+              :class="{ active: activeSection === item.id }"
+              :aria-current="activeSection === item.id ? 'location' : undefined"
+              @click="scrollToSection(item.id)"
             >
-              <dt>{{ fact.label }}</dt>
-              <dd>{{ fact.value }}</dd>
-            </div>
-          </dl>
+              <span>{{ item.index }}</span>
+              <strong>{{ item.title }}</strong>
+              <Icon name="ph:arrow-right-bold" />
+            </button>
+          </nav>
+          <i class="side-progress" aria-hidden="true"
+            ><span :style="{ width: `${scrollProgress}%` }"></span
+          ></i>
         </section>
 
-        <footer class="about-footer">
-          <div>
-            <strong>风隅随笔</strong>
-            <span>WIND CORNER NOTES · {{ siteYearLabel }}</span>
+        <section class="side-card side-summary">
+          <div class="side-card-title">
+            <span><Icon name="ph:archive-tray-bold" /></span>
+            <strong>正在整理</strong>
           </div>
-          <div>
-            <q>{{ profile.motto }}</q>
-            <span>{{ profile.availability }}</span>
+          <div class="summary-row">
+            <strong>{{ profile.skills.length }}</strong
+            ><span>作品项目</span>
           </div>
-        </footer>
-      </div>
-    </main>
+          <div class="summary-row">
+            <strong>{{ profile.notes.length }}</strong
+            ><span>生活札记</span>
+          </div>
+          <div class="summary-row">
+            <strong>{{ profile.timeline.length }}</strong
+            ><span>人生节点</span>
+          </div>
+        </section>
 
-    <aside class="about-sidebar" aria-label="关于页面导航">
-      <section class="side-card side-profile">
-        <span class="side-kicker">A SMALL CORNER</span>
-        <div class="side-avatar">
-          <img :src="avatarSrc" :alt="`${profile.name}头像`" />
-        </div>
-        <h2>{{ profile.name }}</h2>
-        <p>{{ profile.role }}</p>
-        <div class="side-location">
-          <Icon name="ph:map-pin-bold" />{{ profile.location }}
-        </div>
-        <div v-if="profile.socialLinks.length" class="side-socials">
-          <a
-            v-for="link in profile.socialLinks"
-            :key="`${link.label}-${link.url}`"
-            :href="safeUrl(link.url)"
-            :title="link.label"
-            :aria-label="link.label"
-            :target="isExternalLink(link.url) ? '_blank' : undefined"
-            :rel="isExternalLink(link.url) ? 'noopener noreferrer' : undefined"
-            ><Icon :name="link.icon || 'ph:link-bold'"
-          /></a>
-        </div>
-      </section>
-
-      <section class="side-card side-index">
-        <div class="side-card-title">
-          <span><Icon name="ph:list-numbers-bold" /></span>
-          <strong>页面目录</strong>
-          <small>{{ Math.round(scrollProgress) }}%</small>
-        </div>
-        <nav ref="sectionNavEl">
-          <button
-            v-for="item in sectionNav"
-            :key="item.id"
-            type="button"
-            :data-section="item.id"
-            :class="{ active: activeSection === item.id }"
-            :aria-current="activeSection === item.id ? 'location' : undefined"
-            @click="scrollToSection(item.id)"
-          >
-            <span>{{ item.index }}</span>
-            <strong>{{ item.title }}</strong>
-            <Icon name="ph:arrow-right-bold" />
-          </button>
-        </nav>
-        <i class="side-progress" aria-hidden="true"
-          ><span :style="{ width: `${scrollProgress}%` }"></span
-        ></i>
-      </section>
-
-      <section class="side-card side-summary">
-        <div class="side-card-title">
-          <span><Icon name="ph:archive-tray-bold" /></span>
-          <strong>正在整理</strong>
-        </div>
-        <div class="summary-row">
-          <strong>{{ profile.skills.length }}</strong
-          ><span>作品项目</span>
-        </div>
-        <div class="summary-row">
-          <strong>{{ profile.notes.length }}</strong
-          ><span>生活札记</span>
-        </div>
-        <div class="summary-row">
-          <strong>{{ profile.timeline.length }}</strong
-          ><span>人生节点</span>
-        </div>
-      </section>
-
-      <section class="side-card side-quote">
-        <Icon name="ph:quotes-fill" />
-        <p>“{{ profile.motto }}”</p>
-        <span>{{ profile.availability }}</span>
-      </section>
-    </aside>
+        <section class="side-card side-quote">
+          <Icon name="ph:quotes-fill" />
+          <p>“{{ profile.motto }}”</p>
+          <span>{{ profile.availability }}</span>
+        </section>
+      </aside>
+    </template>
+    <section v-else class="about-load-error" role="alert">
+      <Icon name="ph:cloud-slash-bold" />
+      <h1>个人档案暂时没有抵达</h1>
+      <p>{{ loadError || "请稍后再试" }}</p>
+      <button type="button" @click="loadProfile">
+        <Icon name="ph:arrow-clockwise-bold" />重新读取
+      </button>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { defineComponent, h } from "vue";
 import avatarFallback from "@/assets/images/avatar.jpg";
+import type { AboutProfile } from "@/types/about";
 import { normalizeAboutProfile } from "@/types/about";
 
 const SectionHeading = defineComponent({
@@ -403,7 +433,9 @@ const SectionHeading = defineComponent({
 
 const api = useApi();
 const { mediaUrl } = useMediaUrl();
-const profile = ref(normalizeAboutProfile(null));
+const profile = ref<AboutProfile | null>(null);
+const loading = ref(true);
+const loadError = ref("");
 const aboutMain = ref<HTMLElement | null>(null);
 const sectionNavEl = ref<HTMLElement | null>(null);
 const activeSection = ref("introduction");
@@ -413,59 +445,89 @@ const siteYearLabel = computed(() =>
   currentYear === 2026 ? "2026" : `2026 - ${currentYear}`,
 );
 const avatarSrc = computed(() =>
-  profile.value.avatarUrl ? mediaUrl(profile.value.avatarUrl) : avatarFallback,
+  profile.value?.avatarUrl ? mediaUrl(profile.value.avatarUrl) : avatarFallback,
 );
 const primaryContact = computed(
   () =>
-    profile.value.socialLinks.find((link) =>
+    profile.value?.socialLinks.find((link) =>
       /^(mailto:|tel:)/i.test(link.url),
-    ) || profile.value.socialLinks[0],
+    ) || profile.value?.socialLinks[0],
 );
 const introductionParagraphs = computed(() =>
-  splitParagraphs(profile.value.introduction),
+  splitParagraphs(profile.value?.introduction || ""),
 );
-const valuesParagraphs = computed(() => splitParagraphs(profile.value.values));
+const valuesParagraphs = computed(() =>
+  splitParagraphs(profile.value?.values || ""),
+);
 
-const sectionNav = computed(() => [
-  {
-    id: "introduction",
-    index: "01",
-    title: profile.value.sectionTitles.introduction,
-  },
-  ...(profile.value.notes.length
-    ? [{ id: "notes", index: "02", title: profile.value.sectionTitles.notes }]
-    : []),
-  ...(profile.value.skills.length
-    ? [{ id: "skills", index: "03", title: profile.value.sectionTitles.skills }]
-    : []),
-  ...(profile.value.tools.length
+const sectionNav = computed(() =>
+  profile.value
     ? [
         {
-          id: "activity",
-          index: "04",
-          title: profile.value.sectionTitles.activity,
+          id: "introduction",
+          index: "01",
+          title: profile.value.sectionTitles.introduction,
         },
+        ...(profile.value.notes.length
+          ? [
+              {
+                id: "notes",
+                index: "02",
+                title: profile.value.sectionTitles.notes,
+              },
+            ]
+          : []),
+        ...(profile.value.skills.length
+          ? [
+              {
+                id: "skills",
+                index: "03",
+                title: profile.value.sectionTitles.skills,
+              },
+            ]
+          : []),
+        ...(profile.value.tools.length
+          ? [
+              {
+                id: "activity",
+                index: "04",
+                title: profile.value.sectionTitles.activity,
+              },
+            ]
+          : []),
+        ...(profile.value.timeline.length
+          ? [
+              {
+                id: "timeline",
+                index: "05",
+                title: profile.value.sectionTitles.timeline,
+              },
+            ]
+          : []),
+        ...(profile.value.values
+          ? [
+              {
+                id: "values",
+                index: "06",
+                title: profile.value.sectionTitles.values,
+              },
+            ]
+          : []),
+        ...(profile.value.facts.length
+          ? [
+              {
+                id: "facts",
+                index: "07",
+                title: profile.value.sectionTitles.facts,
+              },
+            ]
+          : []),
       ]
-    : []),
-  ...(profile.value.timeline.length
-    ? [
-        {
-          id: "timeline",
-          index: "05",
-          title: profile.value.sectionTitles.timeline,
-        },
-      ]
-    : []),
-  ...(profile.value.values
-    ? [{ id: "values", index: "06", title: profile.value.sectionTitles.values }]
-    : []),
-  ...(profile.value.facts.length
-    ? [{ id: "facts", index: "07", title: profile.value.sectionTitles.facts }]
-    : []),
-]);
+    : [],
+);
 
 const toolCards = computed(() =>
-  profile.value.tools.map((name, index) => ({
+  (profile.value?.tools || []).map((name, index) => ({
     name,
     icon: toolIcon(name),
     status: toolStatus(name, index),
@@ -606,21 +668,26 @@ function handleScroll() {
   });
 }
 
-onMounted(async () => {
-  await nextTick();
-  setupRevealObserver();
-  handleScroll();
+async function loadProfile() {
+  loading.value = true;
+  loadError.value = "";
   try {
     profile.value = normalizeAboutProfile(
       await api.get("/settings/about_profile"),
     );
-    await nextTick();
-    setupRevealObserver();
-    handleScroll();
-  } catch {
-    // Defaults keep the public page complete when settings are unavailable.
+  } catch (cause: any) {
+    profile.value = null;
+    loadError.value = cause?.message || "个人档案读取失败";
+  } finally {
+    loading.value = false;
   }
-});
+  if (!profile.value) return;
+  await nextTick();
+  setupRevealObserver();
+  handleScroll();
+}
+
+onMounted(loadProfile);
 
 onUnmounted(() => {
   revealObserver?.disconnect();
@@ -628,8 +695,8 @@ onUnmounted(() => {
 });
 
 useHead(() => ({
-  title: `关于我 - ${profile.value.name}`,
-  meta: [{ name: "description", content: profile.value.motto }],
+  title: profile.value ? `关于我 - ${profile.value.name}` : "关于我",
+  meta: [{ name: "description", content: profile.value?.motto || "" }],
 }));
 </script>
 
@@ -642,6 +709,7 @@ useHead(() => ({
     var(--ui-accent-warm) 9%,
     var(--ld-bg-card)
   );
+  position: relative;
   display: flex;
   width: 100%;
   height: 100%;
@@ -650,6 +718,71 @@ useHead(() => ({
   overflow: hidden;
   background: var(--c-bg);
   color: var(--c-text);
+}
+
+.about-content-ready {
+  animation: about-content-in 0.72s var(--ui-ease-out) both;
+}
+
+.about-sidebar.about-content-ready {
+  animation-delay: 0.08s;
+}
+
+.about-load-error {
+  display: grid;
+  width: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--c-text-3);
+  text-align: center;
+}
+
+.about-load-error > :deep(svg) {
+  color: var(--c-primary);
+  font-size: 2rem;
+}
+
+.about-load-error h1,
+.about-load-error p {
+  margin: 0;
+}
+
+.about-load-error h1 {
+  color: var(--c-text);
+  font-size: 1rem;
+}
+
+.about-load-error p {
+  font-size: 0.66rem;
+}
+
+.about-load-error button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--c-bg-1);
+  color: var(--c-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.65rem;
+}
+
+@keyframes about-content-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
 }
 
 .about-main {
@@ -2189,7 +2322,8 @@ useHead(() => ({
   .hero-intro,
   .hero-portrait-wrap,
   .hero-welcome,
-  .welcome-symbol span {
+  .welcome-symbol span,
+  .about-content-ready {
     animation: none;
   }
   .reveal-block {

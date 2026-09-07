@@ -188,10 +188,15 @@
 import type { LibraryItem } from "@/types/library";
 const api = useApi();
 const route = useRoute();
+const router = useRouter();
 const { mediaUrl } = useMediaUrl();
 const loading = ref(true);
 const item = ref<LibraryItem | null>(null);
 const related = ref<LibraryItem[]>([]);
+
+function redirectNotFound() {
+  void router.replace({ path: "/404", query: { from: route.fullPath } });
+}
 const detailPageRef = ref<HTMLElement | null>(null);
 const progressLabels: Record<string, string> = {
   "want-to-read": "想读",
@@ -268,6 +273,10 @@ async function load() {
   loading.value = true;
   try {
     item.value = await api.get<LibraryItem>(`/library/${route.params.slug}`);
+    if (!item.value) {
+      redirectNotFound();
+      return;
+    }
     const res = await api.get<any>("/library", {
       type: item.value.type,
       limit: 3,
@@ -276,8 +285,9 @@ async function load() {
     related.value = (res.items || [])
       .filter((entry: LibraryItem) => entry.id !== item.value?.id)
       .slice(0, 2);
-  } catch {
+  } catch (cause: any) {
     item.value = null;
+    if (cause?.status === 404) redirectNotFound();
   } finally {
     loading.value = false;
   }
