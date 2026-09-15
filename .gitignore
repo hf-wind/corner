@@ -17,7 +17,12 @@ backups/
 .superpowers/
 .codex-dev/
 backend/.prisma-tmp/
-docs/superpowers/plans/2026-07-25-friend-link-application.md
+
+# Documentation and design notes stay local for this personal deployment.
+docs/
+
+# Repository artwork is generated/managed outside the source repository.
+logo/
 
 # Local planning and implementation notes are intentionally not part of the
 # deployable source tree. Keep dated plans/specs and ad-hoc implementation
@@ -30,3 +35,16 @@ docs/superpowers/specs/
 **/*-spec.md
 **/*-roadmap.md
 **/implementation-*.md
+
+# Never commit local credentials, certificates, or private keys. The example
+# environment templates below are intentionally kept under version control.
+.env.*
+!.env.example
+!**/.env.example
+!**/.env.tunnel.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
