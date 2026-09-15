@@ -8,7 +8,7 @@ Type=oneshot
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/corner/app
-ExecStart=/srv/corner/app/scripts/backup.sh
+ExecStart=/usr/bin/env bash /srv/corner/app/scripts/backup.sh
 Nice=10
 
 [Install]

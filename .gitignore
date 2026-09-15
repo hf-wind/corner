@@ -18,3 +18,15 @@ backups/
 .codex-dev/
 backend/.prisma-tmp/
 docs/superpowers/plans/2026-07-25-friend-link-application.md
+
+# Local planning and implementation notes are intentionally not part of the
+# deployable source tree. Keep dated plans/specs and ad-hoc implementation
+# notes private while continuing to version stable operational documentation.
+docs/plans/
+docs/plan/
+docs/superpowers/plans/
+docs/superpowers/specs/
+**/*-plan.md
+**/*-spec.md
+**/*-roadmap.md
+**/implementation-*.md

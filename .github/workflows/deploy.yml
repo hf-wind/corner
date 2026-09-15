@@ -85,7 +85,7 @@ jobs:
             ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
               "cd \"$APP_PATH\" && bash ./scripts/update-deploy-secrets.sh"
           ssh -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "flock -w 300 /tmp/corner-production-deploy.lock bash -lc 'cd \"$APP_PATH\" && ./scripts/deploy.sh'"
+            "flock -w 300 /tmp/corner-production-deploy.lock bash -lc 'cd \"$APP_PATH\" && bash ./scripts/deploy.sh'"
 
   release:
     needs: deploy
