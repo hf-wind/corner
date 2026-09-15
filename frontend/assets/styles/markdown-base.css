@@ -56,6 +56,25 @@
   --md-theme-table-td-border-color: var(--border) !important;
 }
 
+/* md-editor-v3 applies its dark palette to the outer editor shell as well as
+ * the preview node. Keep every shell layer transparent so reading surfaces
+ * inherit the page background instead of the library's default navy
+ * (#182641) panel. This affects articles, moments, and RSS/circle readers. */
+.md-base-wrap .md-editor,
+.md-base-wrap .md-editor-content,
+.md-base-wrap .md-editor-preview-wrapper,
+.md-base-wrap .md-editor-preview,
+.admin-md-editor .md-editor,
+.admin-md-editor .md-editor-content,
+.admin-md-editor .md-editor-preview-wrapper,
+.admin-md-editor .md-editor-preview {
+  --md-bk-color: transparent !important;
+  --md-theme-bg-color: transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
 .md-base-preview,
 .md-base-wrap .md-editor-preview,
 .admin-md-editor .md-editor-preview {
