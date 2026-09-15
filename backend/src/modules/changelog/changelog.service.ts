@@ -484,14 +484,9 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { committedAt: 'desc' },
     });
-    const displayableRows = rows.filter(
-      (row) => row.status === 'translated' || row.status === 'original',
-    );
-    const translationPending = rows.some(
-      (row) =>
-        (row.status === 'pending' || row.status === 'failed') &&
-        (row.language === 'en' || row.language === 'mixed'),
-    );
+    // 翻译失败或未配置时仍展示原文，避免前台一直卡在“正在完成提交翻译”。
+    const displayableRows = rows.filter((row) => ['translated', 'original', 'pending', 'failed'].includes(row.status));
+    const translationPending = false;
     return {
       fetchedAt: (state?.fetchedAt || new Date(0)).toISOString(),
       sourceStatus: (state?.sourceStatus || 'unavailable') as Snapshot['sourceStatus'],

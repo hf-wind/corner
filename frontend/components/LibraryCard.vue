@@ -1,7 +1,7 @@
 <template>
   <AppLink :to="`/library/${item.slug}`" class="library-card" :class="item.type">
     <div class="cover-wrap">
-      <img v-if="item.coverImage" :src="mediaUrl(item.coverImage)" :alt="`${item.title}封面`" loading="lazy">
+      <img v-if="item.coverImage && !coverFailed" :src="coverSrc" :alt="`${item.title}封面`" loading="lazy" @error="coverFailed = true">
       <div v-else class="cover-placeholder">
         <Icon :name="item.type === 'book' ? 'ph:book-open-text' : 'ph:film-strip'" />
         <span>{{ item.title }}</span>
@@ -33,6 +33,8 @@ import type { LibraryItem } from '@/types/library'
 const props = defineProps<{ item: LibraryItem }>()
 const { mediaUrl } = useMediaUrl()
 const router = useRouter()
+const coverFailed = ref(false)
+const coverSrc = computed(() => mediaUrl(props.item.coverImage))
 const creator = computed(() => props.item.type === 'book'
   ? (props.item.creator ? `著 · ${props.item.creator}` : '作者未记')
   : (props.item.director ? `导演 · ${props.item.director}` : '导演未记'))

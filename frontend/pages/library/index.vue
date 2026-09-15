@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import type { LibraryItem, LibraryType } from '@/types/library'
-type FilterType = 'all' | LibraryType
+type FilterType = 'all' | LibraryType | 'epub'
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
@@ -54,24 +54,26 @@ const items = ref<LibraryItem[]>([])
 const loading = ref(true)
 const switching = ref(false)
 const contentVersion = ref(0)
-const activeType = ref<FilterType>(['book', 'film'].includes(String(route.query.type)) ? route.query.type as LibraryType : 'all')
+const activeType = ref<FilterType>(['book', 'film', 'epub'].includes(String(route.query.type)) ? route.query.type as FilterType : 'all')
 const search = ref(String(route.query.q || ''))
 const page = ref(1)
 const totalPages = ref(1)
 const meta = reactive({ books: 0, films: 0, total: 0 })
 let requestSequence = 0
 let localQuerySync = false
-const activeTabIndex = computed(() => Math.max(0, ['all', 'book', 'film'].indexOf(activeType.value)))
+const activeTabIndex = computed(() => Math.max(0, ['all', 'book', 'film', 'epub'].indexOf(activeType.value)))
 const tabs = computed(() => [
   { value: 'all' as FilterType, label: '全部收藏', icon: 'ph:squares-four-bold', count: meta.total },
   { value: 'book' as FilterType, label: '阅读书架', icon: 'ph:book-open-text-bold', count: meta.books },
   { value: 'film' as FilterType, label: '悬疑片单', icon: 'ph:film-strip-bold', count: meta.films },
+  { value: 'epub' as FilterType, label: 'EPUB', icon: 'ph:book-open-bold', count: meta.epub },
 ])
-const sectionTitle = computed(() => activeType.value === 'film' ? '迷雾剧场' : activeType.value === 'book' ? '枕边书页' : '最近收藏')
-const sectionDescription = computed(() => activeType.value === 'film' ? '偏爱那些线索藏在暗处、结局值得再想一遍的故事。排名是我的私人秩序。' : activeType.value === 'book' ? '一本书真正被读完，也许是在合上它之后。这里留下摘录，也留下当时的自己。' : '书和影不必分得太开，它们都是通往别处的一扇门。')
+const sectionTitle = computed(() => activeType.value === 'film' ? '迷雾剧场' : activeType.value === 'epub' ? '掌上书房' : activeType.value === 'book' ? '枕边书页' : '最近收藏')
+const sectionDescription = computed(() => activeType.value === 'film' ? '偏爱那些线索藏在暗处、结局值得再想一遍的故事。排名是我的私人秩序。' : activeType.value === 'epub' ? '已绑定 EPUB 的书籍可以直接在线阅读，阅读进度会跟随访客指纹保存。' : activeType.value === 'book' ? '一本书真正被读完，也许是在合上它之后。这里留下摘录，也留下当时的自己。' : '书和影不必分得太开，它们都是通往别处的一扇门。')
 const libraryStats = computed(() => [
   { icon: 'ph:book-open-text-bold', value: meta.books, label: '读过的书' },
   { icon: 'ph:film-strip-bold', value: meta.films, label: '悬疑片单' },
+  { icon: 'ph:book-open-bold', value: meta.epub, label: 'EPUB 书籍' },
 ])
 
 async function loadItems() {
@@ -92,7 +94,7 @@ function clearSearch() { search.value = ''; searchItems() }
 function goPage(next: number) { page.value = next; loadItems(); document.querySelector('.collection-section')?.scrollIntoView({ behavior: 'smooth' }) }
 watch(() => [route.query.type, route.query.q], ([type, query]) => {
   if (localQuerySync) { localQuerySync = false; return }
-  const nextType: FilterType = ['book', 'film'].includes(String(type)) ? String(type) as LibraryType : 'all'
+  const nextType: FilterType = ['book', 'film', 'epub'].includes(String(type)) ? String(type) as FilterType : 'all'
   const nextSearch = String(query || '')
   if (nextType === activeType.value && nextSearch === search.value) return
   activeType.value = nextType
@@ -116,7 +118,7 @@ useHead({ title: '书影', meta: [{ name: 'description', content: '风隅随笔�
 .hero-number { position:absolute; right:1px; bottom:12px; color:var(--c-text-3); font-size:.44rem; letter-spacing:.15em; line-height:1.5; text-align:right; opacity:.65; }
 .collection-section { position:relative; width:100%; margin:0 auto; padding:26px 0 44px; }
 .collection-toolbar { display:flex; align-items:center; justify-content:space-between; gap:20px; }
-.filter-tabs { --active-index:0; position:relative; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; padding:4px; border-radius:12px; background:var(--c-bg-2); isolation:isolate; }.filter-tabs::before { position:absolute; z-index:0; top:4px; bottom:4px; left:4px; width:calc((100% - 18px)/3); border-radius:9px; background:var(--ld-bg-card); box-shadow:0 4px 13px var(--ld-shadow); content:''; transform:translate3d(calc(var(--active-index) * (100% + 5px)),0,0); transition:transform .5s cubic-bezier(.16,1,.3,1),background-color .3s ease; }.filter-tabs button { position:relative; z-index:1; display:flex; min-width:0; height:36px; align-items:center; justify-content:center; gap:7px; padding:0 13px; border:0; border-radius:9px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.68rem; transition:color .32s ease,transform .42s cubic-bezier(.16,1,.3,1); }.filter-tabs button span { color:var(--c-text-3); font-size:.53rem; }.filter-tabs button.active { color:var(--library-accent); font-weight:700; transform:translateY(-1px); }
+.filter-tabs { --active-index:0; position:relative; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; padding:4px; border-radius:12px; background:var(--c-bg-2); isolation:isolate; }.filter-tabs::before { position:absolute; z-index:0; top:4px; bottom:4px; left:4px; width:calc((100% - 23px)/4); border-radius:9px; background:var(--ld-bg-card); box-shadow:0 4px 13px var(--ld-shadow); content:''; transform:translate3d(calc(var(--active-index) * (100% + 5px)),0,0); transition:transform .5s cubic-bezier(.16,1,.3,1),background-color .3s ease; }.filter-tabs button { position:relative; z-index:1; display:flex; min-width:0; height:36px; align-items:center; justify-content:center; gap:7px; padding:0 13px; border:0; border-radius:9px; background:transparent; color:var(--c-text-2); cursor:pointer; font:inherit; font-size:.68rem; transition:color .32s ease,transform .42s cubic-bezier(.16,1,.3,1); }.filter-tabs button span { color:var(--c-text-3); font-size:.53rem; }.filter-tabs button.active { color:var(--library-accent); font-weight:700; transform:translateY(-1px); }
 .library-search { display:flex; width:min(270px,100%); height:38px; align-items:center; gap:8px; padding:0 11px; border-bottom:1px solid var(--border); color:var(--c-text-3); transition:border-color .2s; }.library-search:focus-within { border-color:var(--library-accent); }.library-search input { min-width:0; flex:1; border:0; outline:0; background:transparent; color:var(--c-text); font:inherit; font-size:.68rem; }.library-search button { display:grid; border:0; background:transparent; color:var(--c-text-3); cursor:pointer; place-items:center; }
 .section-intro { display:flex; align-items:flex-end; justify-content:space-between; gap:30px; margin:30px 0 16px; }.section-intro span { color:var(--library-accent); font-size:.48rem; font-weight:700; letter-spacing:.2em; }.section-intro h2 { margin:5px 0 0; font-family:var(--font-heading); font-size:1.3rem; }.section-intro p { max-width:465px; color:var(--c-text-3); font-size:.65rem; line-height:1.8; text-align:right; }
 .card-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
@@ -124,5 +126,5 @@ useHead({ title: '书影', meta: [{ name: 'description', content: '风隅随笔�
 .library-pagination { display:flex; align-items:center; justify-content:center; gap:24px; margin-top:36px; }.library-pagination button { display:grid; width:38px; height:38px; border:1px solid var(--border); border-radius:50%; background:var(--ld-bg-card); color:var(--c-text-2); cursor:pointer; place-items:center; }.library-pagination button:disabled { cursor:not-allowed; opacity:.35; }.library-pagination span { display:flex; align-items:center; gap:9px; color:var(--c-text-3); font-size:.62rem; font-variant-numeric:tabular-nums; }.library-pagination span i { width:28px; height:1px; background:var(--border); }
 .library-footer { display:flex; width:100%; align-items:center; gap:14px; margin:0 auto; padding:20px 0 max(20px,env(safe-area-inset-bottom)); border-top:1px solid var(--border); color:var(--c-text-3); font-size:.49rem; letter-spacing:.13em; }.library-footer i { flex:1; height:1px; background:linear-gradient(90deg,var(--border),transparent); }
 @media (max-width:1050px) { .library-hero { grid-template-columns:1fr; gap:30px; }.hero-stats { width:max-content; }.card-grid { grid-template-columns:1fr; } }
-@media (max-width:700px) { .library-page { padding:max(68px,calc(env(safe-area-inset-top) + 60px)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }.library-hero { min-height:auto; padding:27px 20px; }.hero-copy h1 { font-size:2.15rem; }.hero-stats { gap:16px; padding:17px 18px; }.hero-stats strong { font-size:1.55rem; }.collection-toolbar { align-items:stretch; flex-direction:column; }.filter-tabs { display:grid; grid-template-columns:repeat(3,1fr); }.filter-tabs button { justify-content:center; padding:0 7px; }.library-search { width:100%; }.section-intro { align-items:flex-start; flex-direction:column; gap:8px; margin-top:32px; }.section-intro p { text-align:left; }.hero-number { display:none; } }
+@media (max-width:700px) { .library-page { padding:max(68px,calc(env(safe-area-inset-top) + 60px)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }.library-hero { min-height:auto; padding:27px 20px; }.hero-copy h1 { font-size:2.15rem; }.hero-stats { gap:16px; padding:17px 18px; }.collection-toolbar { align-items:stretch; flex-direction:column; }.filter-tabs { display:grid; grid-template-columns:repeat(4,1fr); }.filter-tabs button { justify-content:center; padding:0 7px; font-size:.6rem; }.library-search { width:100%; }.section-intro { align-items:flex-start; flex-direction:column; gap:8px; margin-top:32px; }.section-intro p { text-align:left; }.hero-number { display:none; } }
 </style>

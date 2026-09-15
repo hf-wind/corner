@@ -238,8 +238,8 @@ export class LibraryService {
     else if (query.status && query.status !== 'all')
       where.publishStatus = query.status;
     if (query.admin && query.needsPublish) where.needsPublish = true;
-    if (query.type && ['book', 'film'].includes(query.type))
-      where.type = query.type;
+    if (query.type && ['book', 'film'].includes(query.type)) where.type = query.type;
+    if (query.type === 'epub') { where.type = 'book'; where.epubMediaPath = { not: null }; }
     if (query.search?.trim()) {
       const search = query.search.trim();
       where.OR = [
@@ -260,13 +260,14 @@ export class LibraryService {
           ];
     if (!query.admin) {
       const rows = await this.prisma.libraryItem.findMany({
-        where: { publishStatus: 'published' },
+        where: { publishStatus: 'published', ...(query.type === 'epub' ? { type: 'book', epubMediaPath: { not: null } } : {}) },
         include: { place: true },
         orderBy: orderBy as any,
       });
       let visible = rows.map((item) => this.presentItem(item));
       if (query.type && ['book', 'film'].includes(query.type))
         visible = visible.filter((item) => item.type === query.type);
+      if (query.type === 'epub') visible = visible.filter((item) => item.type === 'book' && item.epubMediaPath);
       if (query.search?.trim()) {
         const search = query.search.trim().toLocaleLowerCase();
         visible = visible.filter((item) =>
@@ -321,15 +322,18 @@ export class LibraryService {
   }
 
   async getMeta() {
-    const [books, films] = await Promise.all([
+    const [books, films, epub] = await Promise.all([
       this.prisma.libraryItem.count({
         where: { type: 'book', publishStatus: 'published' },
       }),
       this.prisma.libraryItem.count({
         where: { type: 'film', publishStatus: 'published' },
       }),
+      this.prisma.libraryItem.count({
+        where: { type: 'book', publishStatus: 'published', epubMediaPath: { not: null } },
+      }),
     ]);
-    return { books, films, total: books + films };
+    return { books, films, epub, total: books + films };
   }
 
   async findById(id: string) {

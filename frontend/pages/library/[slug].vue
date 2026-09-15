@@ -8,7 +8,7 @@
     </div>
     <template v-else-if="item">
       <section class="detail-hero content-reveal reveal-block">
-        <div class="hero-backdrop" :style="item.coverImage
+        <div class="hero-backdrop" :style="item.coverImage && !coverFailed
             ? { backgroundImage: `url(${mediaUrl(item.coverImage)})` }
             : {}
           " />
@@ -19,7 +19,7 @@
           </AppLink>
           <div class="hero-content">
             <div class="poster" :class="item.type">
-              <img v-if="item.coverImage" :src="mediaUrl(item.coverImage)" :alt="item.title" />
+              <img v-if="item.coverImage && !coverFailed" :src="mediaUrl(item.coverImage)" :alt="item.title" @error="coverFailed = true" />
               <div v-else>
                 <Icon :name="item.type === 'book' ? 'ph:book-open-text' : 'ph:film-strip'
                   " /><span>{{ item.title }}</span>
@@ -68,7 +68,7 @@
                     }}</small><strong>{{ experienceLabel }}</strong>
                 </div>
               </div>
-              <AppLink v-if="item.type === 'book' && item.epubMediaPath" :to="`/library/${item.slug}/read`" class="read-epub-button"><Icon name="ph:book-open-text-bold" /> 继续在线阅读 <Icon name="ph:arrow-up-right-bold" /></AppLink>
+              <AppLink v-if="item.type === 'book' && item.epubMediaPath" :to="`/library/${item.slug}/read`" class="read-epub-button"><Icon name="ph:book-open-text-bold" /> {{ hasReadProgress ? '继续阅读' : '开始阅读' }} <Icon name="ph:arrow-up-right-bold" /></AppLink>
             </div>
           </div>
         </div>
@@ -191,9 +191,12 @@ const api = useApi();
 const route = useRoute();
 const router = useRouter();
 const { mediaUrl } = useMediaUrl();
+const { visitorId } = useVisitor();
 const loading = ref(true);
 const item = ref<LibraryItem | null>(null);
 const related = ref<LibraryItem[]>([]);
+const hasReadProgress = ref(false);
+const coverFailed = ref(false);
 
 function redirectNotFound() {
   void router.replace({ path: "/404", query: { from: route.fullPath } });
@@ -274,6 +277,7 @@ async function load() {
   loading.value = true;
   try {
     item.value = await api.get<LibraryItem>(`/library/${route.params.slug}`);
+    if (typeof window !== 'undefined') hasReadProgress.value = Boolean(localStorage.getItem(`corner:epub:${visitorId()}:${route.params.slug}`));
     if (!item.value) {
       redirectNotFound();
       return;
