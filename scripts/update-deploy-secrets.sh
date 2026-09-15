@@ -12,7 +12,7 @@ cat > "$incoming"
 touch "$env_file"
 chmod 0600 "$env_file"
 
-allowed='^(BAIDU_TRANSLATE_APP_ID|BAIDU_TRANSLATE_SECRET_KEY|CHANGELOG_GITHUB_TOKEN)='
+allowed='^(BAIDU_TRANSLATE_APP_ID|BAIDU_TRANSLATE_SECRET_KEY|BAIDU_TRANSLATE_API_KEY|CHANGELOG_GITHUB_TOKEN)='
 if grep -Ev "$allowed|^$" "$incoming" | grep -q .; then
   echo "部署密钥包含不允许的变量" >&2
   exit 1
