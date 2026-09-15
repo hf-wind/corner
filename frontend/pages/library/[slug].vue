@@ -68,6 +68,7 @@
                     }}</small><strong>{{ experienceLabel }}</strong>
                 </div>
               </div>
+              <AppLink v-if="item.type === 'book' && item.epubMediaPath" :to="`/library/${item.slug}/read`" class="read-epub-button"><Icon name="ph:book-open-text-bold" /> 继续在线阅读 <Icon name="ph:arrow-up-right-bold" /></AppLink>
             </div>
           </div>
         </div>
@@ -569,6 +570,9 @@ useHead({
   color: var(--c-text);
   font-size: 0.75rem;
 }
+
+.read-epub-button { display:inline-flex; align-items:center; gap:7px; margin-top:24px; padding:10px 15px; border-radius:999px; background:var(--detail-accent); color:#fff; font-size:.68rem; font-weight:700; text-decoration:none; box-shadow:0 8px 20px color-mix(in srgb,var(--detail-accent) 24%,transparent); transition:transform .28s cubic-bezier(.16,1,.3,1),box-shadow .28s ease; }
+.read-epub-button:hover { box-shadow:0 12px 26px color-mix(in srgb,var(--detail-accent) 34%,transparent); transform:translateY(-2px); }
 
 .detail-body {
   display: grid;

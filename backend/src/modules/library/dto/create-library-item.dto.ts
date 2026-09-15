@@ -51,4 +51,5 @@ export class CreateLibraryItemDto extends SpacetimeDto {
   @IsOptional() @IsInt() @Min(1) runtimeMinutes?: number;
   @IsOptional() @IsInt() @Min(1) episodeCount?: number;
   @IsOptional() @IsString() @MaxLength(100) platform?: string;
+  @IsOptional() @IsString() epubMediaPath?: string;
 }

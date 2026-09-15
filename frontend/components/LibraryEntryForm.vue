@@ -140,6 +140,16 @@
           <p>建议比例 2:3，宽度至少 600px。</p>
         </a-card>
 
+        <a-card v-if="form.type === 'book'" :bordered="false" class="section-card epub-card">
+          <div class="section-title"><span>阅读器</span></div>
+          <div class="epub-picker" :class="{ ready: form.epubMediaPath }">
+            <Icon name="ph:book-open-text-bold" />
+            <div><strong>{{ form.epubMediaPath ? '已绑定 EPUB 电子书' : '绑定 EPUB 电子书' }}</strong><small>{{ form.epubMediaPath ? form.epubMediaPath.split('/').pop() : '前台可在线阅读，并记住访客阅读位置' }}</small></div>
+          </div>
+          <a-button block @click="pickEpub"><Icon name="ph:folder-open-bold" /> 从媒体库选择 EPUB</a-button>
+          <a-button v-if="form.epubMediaPath" block type="text" danger @click="form.epubMediaPath = ''">移除绑定</a-button>
+        </a-card>
+
         <a-card :bordered="false" class="section-card quick-card">
           <div class="section-title"><span>展示设置</span></div>
           <div class="switch-row">
@@ -178,7 +188,7 @@ const emptyForm = () => ({
   place: null as Place | null,
   locationVisibility: 'private' as 'public' | 'blurred' | 'private',
   locationPrecision: 'place' as 'exact' | 'place' | 'city' | 'province',
-  locationSource: 'manual' as 'manual' | 'map' | 'exif' | 'imported',
+  locationSource: 'manual' as 'manual' | 'map' | 'exif' | 'imported', epubMediaPath: '',
 })
 const form = reactive(emptyForm())
 const genresText = ref('')
@@ -270,6 +280,12 @@ async function pickCover() {
   if (urls.length) form.coverImage = urls[0]
 }
 
+async function pickEpub() {
+  const { openItems } = useMediaLibrary()
+  const items = await openItems({ multiple: false, type: 'epub' })
+  if (items.length) form.epubMediaPath = items[0].path
+}
+
 function locationKey() {
   return `${form.place?.id || ''}|${form.locationVisibility}|${form.locationPrecision}`
 }
@@ -317,6 +333,7 @@ async function performSave(confirmExactLocation: boolean) {
     runtimeMinutes: form.runtimeMinutes,
     episodeCount: form.episodeCount,
     platform: form.platform,
+    epubMediaPath: form.epubMediaPath || null,
     genres: splitComma(genresText.value), cast: splitComma(castText.value),
     highlights: splitLines(highlightsText.value), quotes: splitLines(quotesText.value),
     placeId: form.place?.id || null,
@@ -375,6 +392,11 @@ async function performSave(confirmExactLocation: boolean) {
 .cover-empty { display:flex; height:100%; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--c-text-3); font-size:.72rem; }
 .cover-empty :deep(svg) { font-size:2.7rem; color:var(--c-primary); opacity:.6; }
 .cover-url { margin-top:10px; }
+.epub-picker { display:flex; align-items:center; gap:10px; margin-bottom:12px; padding:12px; border-radius:10px; background:var(--c-bg-1); color:var(--c-primary); }
+.epub-picker :deep(svg) { flex:0 0 auto; font-size:1.5rem; }
+.epub-picker div { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.epub-picker strong { color:var(--c-text); font-size:.7rem; }
+.epub-picker small { overflow:hidden; color:var(--c-text-3); font-size:.56rem; text-overflow:ellipsis; white-space:nowrap; }
 .cover-card > :deep(.ant-card-body) > p { margin:10px 0 0; color:var(--c-text-3); font-size:.67rem; line-height:1.6; }
 .switch-row { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .switch-row > div { display:flex; flex-direction:column; gap:3px; }

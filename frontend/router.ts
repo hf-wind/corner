@@ -99,6 +99,11 @@ const routes: RouteRecordRaw[] = [
     component: lazyRoute(() => import("./pages/library/index.vue")),
   },
   {
+    path: "/library/:slug/read",
+    component: lazyRoute(() => import("./pages/library/read/[slug].vue")),
+    meta: { layout: false },
+  },
+  {
     path: "/library/:slug",
     component: lazyRoute(() => import("./pages/library/[slug].vue")),
   },

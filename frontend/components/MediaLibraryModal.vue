@@ -31,6 +31,7 @@
           <a-menu-item key="type:document"
             ><FileTextOutlined /> 文档</a-menu-item
           >
+          <a-menu-item key="type:epub"><Icon name="ph:book-open-text-bold" /> EPUB 书籍</a-menu-item>
         </a-menu>
       </div>
       <div class="media-main">
@@ -40,7 +41,7 @@
             :accept="
               type === 'audio'
                 ? 'audio/*,.mp3,.flac,.m4a,.wav,.ogg'
-                : 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt'
+                : type === 'epub' ? '.epub,application/epub+zip' : 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.epub'
             "
             :beforeUpload="handleUpload"
           >
@@ -95,6 +96,7 @@
                     @click.stop
                   />
                 </div>
+                <div v-else-if="isEpub(item)" class="media-card-icon epub-icon"><Icon name="ph:book-open-text-bold" /><small>EPUB</small></div>
                 <div v-else class="media-card-icon"><FileOutlined /></div>
                 <button
                   type="button"
@@ -216,6 +218,7 @@ watch(
 
 const isImage = (item: any) => item.mimeType?.startsWith("image/");
 const isAudio = (item: any) => item.mimeType?.startsWith("audio/");
+const isEpub = (item: any) => item.mimeType === 'application/epub+zip' || /\.epub$/i.test(item.filename || item.path || '')
 
 function previewItem(item: any) {
   const index = items.value.findIndex((entry) => entry.id === item.id);
@@ -225,8 +228,8 @@ function previewItem(item: any) {
 }
 
 function toggleSelect(item: any) {
-  if (props.type && !String(item.mimeType || "").startsWith(`${props.type}/`)) {
-    toast.warning("请选择音频文件");
+  if (props.type && !((props.type === 'epub' && isEpub(item)) || String(item.mimeType || "").startsWith(`${props.type}/`))) {
+    toast.warning(props.type === 'epub' ? "请选择 EPUB 书籍" : "请选择匹配类型的文件");
     return;
   }
   const nextIds = new Set(selectedIds.value);
@@ -474,6 +477,8 @@ watch(visible, (v) => {
   font-size: 32px;
   color: var(--c-text-3);
 }
+.epub-icon { flex-direction: column; gap: 5px; color: var(--c-primary); }
+.epub-icon small { font-size: .55rem; font-weight: 700; letter-spacing: .12em; }
 .media-card-selected {
   position: absolute;
   top: 6px;

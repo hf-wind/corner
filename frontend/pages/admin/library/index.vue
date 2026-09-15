@@ -32,7 +32,7 @@
                   <Icon v-else :name="record.type === 'book' ? 'ph:book-open-text' : 'ph:film-strip'" />
                 </div>
                 <i v-if="record.needsPublish" class="change-dot" />
-                <div><div class="work-title"><strong>{{ record.title }}</strong><a-tag v-if="record.needsPublish" color="orange">{{ record.publishStatus === 'published' ? '已更新' : '有新内容' }}</a-tag></div><span>{{ record.originalTitle || creatorLabel(record) }}</span></div>
+                <div><div class="work-title"><strong>{{ record.title }}</strong><a-tag v-if="record.epubMediaPath" color="cyan"><Icon name="ph:book-open-text-bold" /> EPUB</a-tag><a-tag v-if="record.needsPublish" color="orange">{{ record.publishStatus === 'published' ? '已更新' : '有新内容' }}</a-tag></div><span>{{ record.originalTitle || creatorLabel(record) }}</span></div>
               </div>
             </template>
             <template v-else-if="column.key === 'type'">

@@ -51,6 +51,7 @@ const mimeTypeMap: Record<string, string[]> = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/plain',
   ],
+  epub: ['application/epub+zip', 'application/epub', 'application/octet-stream'],
 };
 
 const UPLOAD_ROOT = join(process.cwd(), 'uploads');

@@ -23,6 +23,7 @@
         <span>{{ experienceDate }}</span>
         <span class="read-more">{{ item.type === 'book' ? '翻开' : '回看' }} <Icon name="ph:arrow-right-bold" /></span>
       </div>
+      <button v-if="item.type === 'book' && item.epubMediaPath" type="button" class="epub-link" @click.stop="router.push(`/library/${item.slug}/read`)"><Icon name="ph:book-open-text-bold" /> 在线阅读</button>
     </div>
   </AppLink>
 </template>
@@ -31,6 +32,7 @@
 import type { LibraryItem } from '@/types/library'
 const props = defineProps<{ item: LibraryItem }>()
 const { mediaUrl } = useMediaUrl()
+const router = useRouter()
 const creator = computed(() => props.item.type === 'book'
   ? (props.item.creator ? `著 · ${props.item.creator}` : '作者未记')
   : (props.item.director ? `导演 · ${props.item.director}` : '导演未记'))
@@ -43,8 +45,8 @@ const experienceDate = computed(() => {
 </script>
 
 <style scoped>
-.library-card { display:grid; grid-template-columns:148px minmax(0,1fr); min-height:238px; overflow:hidden; border:1px solid color-mix(in srgb,var(--border) 68%,transparent); border-radius:20px; background:color-mix(in srgb,var(--ld-bg-card) 95%,transparent); box-shadow:0 12px 36px color-mix(in srgb,var(--ld-shadow) 42%,transparent); color:inherit; text-decoration:none; transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .25s ease; }
-.library-card:hover { border-color:color-mix(in srgb,var(--c-primary) 38%,var(--border)); box-shadow:0 20px 48px color-mix(in srgb,var(--ld-shadow) 65%,transparent); transform:translateY(-5px); }
+.library-card { position:relative; display:grid; grid-template-columns:148px minmax(0,1fr); min-height:238px; overflow:hidden; border:0; border-radius:14px; background:var(--ld-bg-card); box-shadow:0 2px 8px color-mix(in srgb,var(--ld-shadow) 34%,transparent); color:inherit; text-decoration:none; contain:layout paint; animation:library-card-enter .54s cubic-bezier(.16,1,.3,1) backwards; transition:transform .28s cubic-bezier(.16,1,.3,1),box-shadow .28s ease; }
+.library-card:hover { box-shadow:0 10px 24px color-mix(in srgb,var(--ld-shadow) 50%,transparent); transform:translate3d(0,-3px,0); }
 .cover-wrap { position:relative; min-height:100%; overflow:hidden; background:var(--c-bg-2); }
 .cover-wrap>img { width:100%; height:100%; min-height:238px; object-fit:cover; transition:transform .6s cubic-bezier(.16,1,.3,1); }
 .library-card:hover .cover-wrap>img { transform:scale(1.045); }
@@ -61,7 +63,10 @@ const experienceDate = computed(() => {
 .creator { margin:4px 0 0; color:var(--c-text-3); font-size:.66rem; }
 .reflection { display:-webkit-box; overflow:hidden; margin:14px 0 11px; color:var(--c-text-2); font-size:.73rem; line-height:1.75; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
 .genre-row { display:flex; flex-wrap:wrap; gap:5px; margin-top:auto; }.genre-row span { padding:3px 7px; border-radius:999px; background:var(--c-bg-2); color:var(--c-text-3); font-size:.56rem; }
-.card-foot { display:flex; align-items:center; justify-content:space-between; margin-top:13px; padding-top:11px; border-top:1px solid color-mix(in srgb,var(--border) 64%,transparent); color:var(--c-text-3); font-size:.58rem; font-variant-numeric:tabular-nums; }
+.card-foot { display:flex; align-items:center; justify-content:space-between; margin-top:13px; padding-top:11px; border-top:0; color:var(--c-text-3); font-size:.58rem; font-variant-numeric:tabular-nums; }
 .read-more { display:inline-flex; align-items:center; gap:4px; color:var(--c-primary); font-weight:650; }.read-more :deep(svg) { transition:transform .25s ease; }.library-card:hover .read-more :deep(svg) { transform:translateX(3px); }
+.epub-link { display:inline-flex; align-items:center; gap:5px; width:max-content; margin-top:8px; padding:0; border:0; background:transparent; color:var(--c-primary); cursor:pointer; font:inherit; font-size:.62rem; text-decoration:none; }
+@keyframes library-card-enter { from { opacity:0; transform:translate3d(0,12px,0) } to { opacity:1; transform:translate3d(0,0,0) } }
+.library-card:nth-child(2){animation-delay:55ms}.library-card:nth-child(3){animation-delay:110ms}.library-card:nth-child(4){animation-delay:165ms}.library-card:nth-child(5){animation-delay:220ms}.library-card:nth-child(6){animation-delay:275ms}
 @media (max-width:520px) { .library-card { grid-template-columns:116px minmax(0,1fr); min-height:206px; border-radius:16px; }.cover-wrap>img,.cover-placeholder { min-height:206px; }.card-body { padding:15px 14px 13px; }.reflection { margin-top:10px; -webkit-line-clamp:2; }.genre-row span:nth-child(n+3) { display:none; } }
 </style>

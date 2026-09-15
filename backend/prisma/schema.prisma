@@ -635,6 +635,7 @@ model LibraryItem {
   episodeCount             Int?      @map("episode_count")
   platform                 String?   @db.VarChar(100)
   sourceUrl                String?   @map("source_url") @db.Text
+  epubMediaPath            String?   @map("epub_media_path") @db.Text
   viewCount                Int       @default(0) @map("view_count")
   publishedAt              DateTime? @map("published_at")
   createdAt                DateTime  @default(now()) @map("created_at")

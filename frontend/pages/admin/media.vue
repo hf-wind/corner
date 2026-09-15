@@ -1,6 +1,6 @@
 <template>
   <div class="media-page admin-page-shell">
-    <header class="admin-page-head"><div><span>CONTENT RESOURCES</span><h1>媒体库</h1><p>按文件夹整理图片、视频、音频和文档。</p></div><div class="head-actions"><AdminRefreshButton :loading="loading" @click="loadAll" /><a-upload :show-upload-list="false" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" :before-upload="beforeUpload"><a-button type="primary"><UploadOutlined /> 上传文件</a-button></a-upload></div></header>
+    <header class="admin-page-head"><div><span>CONTENT RESOURCES</span><h1>媒体库</h1><p>按文件夹整理图片、视频、音频、文档与 EPUB 书籍。</p></div><div class="head-actions"><AdminRefreshButton :loading="loading" @click="loadAll" /><a-upload :show-upload-list="false" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.epub" :before-upload="beforeUpload"><a-button type="primary"><UploadOutlined /> 上传文件</a-button></a-upload></div></header>
     <div class="media-body">
       <div class="media-sidebar">
         <a-menu
@@ -28,6 +28,7 @@
             <a-select-option value="video">视频</a-select-option>
             <a-select-option value="audio">音频</a-select-option>
             <a-select-option value="document">文档</a-select-option>
+            <a-select-option value="epub">EPUB 书籍</a-select-option>
           </a-select>
           <a-button type="primary" @click="applyMediaFilters"><Icon name="ph:magnifying-glass-bold" /> 搜索</a-button>
           <a-button @click="resetMediaFilters"><Icon name="ph:arrow-counter-clockwise-bold" /> 重置</a-button>
@@ -62,6 +63,7 @@
                   <Icon name="ph:waveform-bold" />
                   <audio :src="mediaUrl(item.path)" controls preload="metadata" />
                 </div>
+                <div v-else-if="isEpub(item)" class="media-icon epub-media-icon"><Icon name="ph:book-open-text-bold" /><small>EPUB</small></div>
                 <div v-else class="media-icon"><FileOutlined style="font-size:28px" /></div>
                 <div class="media-meta">
                   <span class="media-name" :title="item.filename">{{ item.filename }}</span>
@@ -136,6 +138,7 @@ const isImage = (item: any) => {
   return /image\//.test(value) || /\.(avif|gif|jpe?g|png|svg|webp)(?:\?|$)/.test(value) || item.folder === 'emoji'
 }
 const isAudio = (item: any) => item.mimeType?.startsWith('audio/')
+const isEpub = (item: any) => item.mimeType === 'application/epub+zip' || /\.epub$/i.test(item.filename || item.path || '')
 
 function previewItem(item: any) {
   const index = items.value.findIndex(entry => entry.id === item.id)
@@ -339,6 +342,7 @@ onMounted(() => { loadMedia(); loadFolders() })
 .media-audio-wrap { display:flex; width:100%; height:120px; box-sizing:border-box; align-items:center; justify-content:center; flex-direction:column; gap:10px; padding:18px 10px 10px; overflow:hidden; background:var(--c-bg-1); color:var(--c-primary); font-size:1.5rem; }
 .media-audio-wrap audio { display:block; width:100%; max-width:220px; height:32px; }
 .media-icon { width:100%; height:120px; display:flex; align-items:center; justify-content:center; color:var(--c-text-3); background:var(--c-bg-1); }
+.epub-media-icon { flex-direction:column; gap:6px; color:var(--c-primary); }.epub-media-icon small { font-size:.56rem; font-weight:700; letter-spacing:.12em; }
 .media-meta { display:flex; align-items:center; min-height:38px; padding:4px 6px; gap:4px; }
 .media-name { font-size:0.7rem; color:var(--c-text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
 @media(max-width:700px){.media-body{flex-direction:column}.media-sidebar{width:100%;max-height:150px;border-right:0;border-bottom:1px solid var(--border)}.head-actions{align-items:stretch;flex-wrap:wrap}}

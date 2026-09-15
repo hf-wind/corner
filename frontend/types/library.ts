@@ -38,6 +38,7 @@ export interface LibraryItem {
   runtimeMinutes?: number | null
   episodeCount?: number | null
   platform?: string | null
+  epubMediaPath?: string | null
   viewCount: number
   publishedAt?: string | null
   createdAt: string

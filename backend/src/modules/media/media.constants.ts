@@ -18,6 +18,7 @@ export const PRESET_FOLDERS: MediaFolderDef[] = [
   { key: 'about', label: '关于', preset: true },
   { key: 'audio', label: '音频', preset: true },
   { key: 'general', label: '通用', preset: true },
+  { key: 'epub', label: 'EPUB 书籍', preset: true },
 ];
 
 export const PRESET_FOLDER_KEYS = PRESET_FOLDERS.map((f) => f.key);

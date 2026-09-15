@@ -507,6 +507,7 @@ export class LibraryService {
       'language',
       'director',
       'platform',
+      'epubMediaPath',
     ]) {
       if (key in data)
         data[key] =
@@ -625,6 +626,7 @@ export class LibraryService {
       'runtimeMinutes',
       'episodeCount',
       'platform',
+      'epubMediaPath',
     ];
     const snapshot: Record<string, any> = {};
     for (const field of fields) snapshot[field] = item[field] ?? null;
