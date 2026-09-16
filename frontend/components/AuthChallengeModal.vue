@@ -218,7 +218,6 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
   min-height: 74px;
   align-items: center;
   overflow: hidden;
-  border: 1px solid var(--border);
   border-radius: 7px;
   background: color-mix(in srgb, var(--c-bg-1) 72%, transparent);
 }

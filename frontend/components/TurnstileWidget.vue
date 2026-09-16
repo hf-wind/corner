@@ -1,6 +1,9 @@
 <template>
-  <div v-if="enabled" class="turnstile-slot">
-    <div ref="container"></div>
+  <div class="turnstile-slot">
+    <div v-if="enabled" ref="container"></div>
+    <div v-else class="turnstile-placeholder">
+      <Icon name="ph:shield-check-bold" />
+    </div>
   </div>
 </template>
 
@@ -159,5 +162,15 @@ defineExpose({ reset, waitForToken })
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.turnstile-placeholder {
+  width: 100%;
+  min-height: 65px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-3);
+  font-size: 1.5rem;
+  opacity: 0.5;
 }
 </style>

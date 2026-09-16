@@ -81,7 +81,7 @@
             <a-button type="primary" :loading="removeSending" html-type="submit">发送验证码</a-button>
           </a-form>
           <a-form v-else layout="vertical" @finish="confirmRemove">
-            <a-form-item label="邮箱验证码" required><a-input v-model:value="removeCode" placeholder="请输入收到的验证码" /></a-form-item>
+            <a-form-item label="邮箱验证码" required><a-input v-model:value="removeCode" placeholder="请输入收到的验证码" :maxlength="4" /></a-form-item>
             <a-button type="primary" :loading="removeSubmitting" html-type="submit">验证并移除</a-button>
           </a-form>
         </section>

@@ -170,13 +170,7 @@ export class EmailService {
   }
 
   async generateVerificationCode(): Promise<string> {
-    const chars =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+    return String(Math.floor(1000 + Math.random() * 9000));
   }
 
   async sendVerificationCode(

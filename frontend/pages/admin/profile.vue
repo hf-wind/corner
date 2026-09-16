@@ -136,7 +136,7 @@
               <a-input
                 v-model:value="pwdForm.code"
                 placeholder="请输入验证码"
-                :maxlength="6"
+                :maxlength="4"
               />
               <a-button
                 :disabled="codeCooldown > 0"

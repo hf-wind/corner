@@ -105,8 +105,8 @@
                       name="code"
                       inputmode="numeric"
                       autocomplete="one-time-code"
-                      placeholder="6 位验证码"
-                      maxlength="6"
+                      placeholder="4 位验证码"
+                      maxlength="4"
                       required
                       :disabled="submitting"
                     />
@@ -365,8 +365,8 @@ async function handleLogin() {
     openChallenge("password");
     return;
   }
-  if (!/^\d{6}$/.test(code.value))
-    return void toast.warning("请输入 6 位验证码");
+  if (!/^\d{4}$/.test(code.value))
+    return void toast.warning("请输入 4 位验证码");
   submitting.value = true;
   try {
     const result = await api.post<any>("/auth/login", {

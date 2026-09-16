@@ -91,14 +91,18 @@ foreach ($required in @('DEV_POSTGRES_DB', 'DEV_POSTGRES_USER', 'DEV_POSTGRES_PA
   if (-not $values[$required]) { throw "Missing remote setting: $required" }
 }
 
-Write-TunnelLog 'Reading production SMTP configuration...'
-$remoteSmtpEnv = & ssh @sshArgs $SshTarget "grep -E '^(EMAIL_SMTP_(HOST|PORT|SECURE|USER|PASS)|EMAIL_FROM_(NAME|ADDRESS))=' '$RemoteAppPath/.env'"
-$smtpReadExit = $LASTEXITCODE
-$smtpValues = ConvertFrom-DotEnvLines $remoteSmtpEnv
-if ($smtpReadExit -ne 0 -or -not $smtpValues.EMAIL_SMTP_PASS) {
-  throw 'Unable to read the production SMTP configuration.'
+Write-TunnelLog 'Using local SMTP configuration from backend/.env.tunnel...'
+$smtpValues = @{}
+$existingTunnelEnv = Read-DotEnvValues $backendEnv
+foreach ($name in @('EMAIL_SMTP_HOST', 'EMAIL_SMTP_PORT', 'EMAIL_SMTP_SECURE', 'EMAIL_SMTP_USER', 'EMAIL_SMTP_PASS', 'EMAIL_FROM_NAME', 'EMAIL_FROM_ADDRESS')) {
+  if ($existingTunnelEnv[$name]) {
+    $smtpValues[$name] = $existingTunnelEnv[$name]
+  }
 }
-Write-TunnelLog "Read production SMTP configuration (keys=$($smtpValues.Count); values hidden)."
+if (-not $smtpValues.EMAIL_SMTP_PASS) {
+  Write-TunnelLog 'WARNING: No SMTP configuration found in backend/.env.tunnel. Email features may not work.'
+}
+Write-TunnelLog "Loaded local SMTP configuration (keys=$($smtpValues.Count); values hidden)."
 
 $rootEnv = Read-DotEnvValues (Join-Path $repoRoot '.env')
 $exampleEnv = Read-DotEnvValues (Join-Path $repoRoot '.env.example')

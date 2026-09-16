@@ -102,9 +102,9 @@
                 <input
                   v-model="code"
                   type="text"
-                  maxlength="6"
+                  maxlength="4"
                   class="vn-input"
-                  placeholder="6 位验证码"
+                  placeholder="4 位验证码"
                   aria-label="验证码"
                   :disabled="submitting"
                   @keydown.enter="submit"
@@ -383,8 +383,8 @@ async function submitLogin(): Promise<boolean> {
       error.value = "请输入密码";
       return false;
     }
-  } else if (!code.value || code.value.length !== 6) {
-    error.value = "请输入 6 位验证码";
+  } else if (!code.value || code.value.length !== 4) {
+    error.value = "请输入 4 位验证码";
     return false;
   }
   const payload: Record<string, string> = { email: clean };

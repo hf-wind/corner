@@ -126,7 +126,7 @@
           ><input
             v-model.number="readerFontSize"
             type="range"
-            min="15"
+            min="14"
             max="26"
             step="1"
             @input="
@@ -152,6 +152,23 @@
           >
             {{ value.toFixed(2) }}
           </button>
+        </div></label
+      ><label
+        >字间距
+        <div class="range-row">
+          <button type="button" @click="changeLetterSpacing(-0.02)">−</button
+          ><input
+            v-model.number="readerLetterSpacing"
+            type="range"
+            min="0"
+            max="0.2"
+            step="0.02"
+            @input="
+              applyReaderTheme();
+              persistReaderSettings();
+            "
+          /><button type="button" @click="changeLetterSpacing(0.02)">＋</button
+          ><output>{{ readerLetterSpacing.toFixed(2) }}em</output>
         </div></label
       ><label
         >翻页效果
@@ -201,9 +218,10 @@ const storageKey = computed(
   () => `corner:epub:${visitorId()}:${route.params.slug}`,
 );
 const readerTheme = ref<"paper" | "night" | "mist">("paper");
-const readerFont = ref<"sans" | "serif" | "system">("serif");
-const readerFontSize = ref(19);
+const readerFont = ref<"rounded" | "serif" | "sans" | "system">("rounded");
+const readerFontSize = ref(16);
 const readerLineHeight = ref(1.85);
+const readerLetterSpacing = ref(0.02);
 const pageEffect = ref<"slide" | "curl">("slide");
 const themeOptions = [
   { value: "paper", label: "纸页" },
@@ -211,7 +229,8 @@ const themeOptions = [
   { value: "night", label: "夜读" },
 ] as const;
 const fontOptions = [
-  { value: "serif", label: "舒阅读" },
+  { value: "rounded", label: "圆润舒适" },
+  { value: "serif", label: "经典衬线" },
   { value: "sans", label: "清晰黑体" },
   { value: "system", label: "系统字体" },
 ] as const;
@@ -229,6 +248,7 @@ function persistReaderSettings() {
       font: readerFont.value,
       size: readerFontSize.value,
       line: readerLineHeight.value,
+      letterSpacing: readerLetterSpacing.value,
       effect: pageEffect.value,
     }),
   );
@@ -239,12 +259,14 @@ function restoreReaderSettings() {
     const saved = JSON.parse(localStorage.getItem(settingsKey.value) || "{}");
     if (["paper", "night", "mist"].includes(saved.theme))
       readerTheme.value = saved.theme;
-    if (["serif", "sans", "system"].includes(saved.font))
+    if (["rounded", "serif", "sans", "system"].includes(saved.font))
       readerFont.value = saved.font;
     if (Number.isFinite(saved.size))
-      readerFontSize.value = Math.max(15, Math.min(26, saved.size));
+      readerFontSize.value = Math.max(14, Math.min(26, saved.size));
     if (Number.isFinite(saved.line))
       readerLineHeight.value = Math.max(1.5, Math.min(2.3, saved.line));
+    if (Number.isFinite(saved.letterSpacing))
+      readerLetterSpacing.value = Math.max(0, Math.min(0.2, saved.letterSpacing));
     if (["slide", "curl"].includes(saved.effect))
       pageEffect.value = saved.effect;
   } catch {
@@ -258,8 +280,16 @@ function setReaderTheme(theme: typeof readerTheme.value) {
 }
 function changeFontSize(delta: number) {
   readerFontSize.value = Math.max(
-    15,
+    14,
     Math.min(26, readerFontSize.value + delta),
+  );
+  applyReaderTheme();
+  persistReaderSettings();
+}
+function changeLetterSpacing(delta: number) {
+  readerLetterSpacing.value = Math.max(
+    0,
+    Math.min(0.2, readerLetterSpacing.value + delta),
   );
   applyReaderTheme();
   persistReaderSettings();
@@ -274,16 +304,19 @@ function applyReaderTheme() {
         ? { color: "#39434a", background: "#e9eef0" }
         : { color: "#34332f", background: "#fbf7ee" };
   const family =
-    readerFont.value === "serif"
-      ? "Iowan Old Style, STSong, Songti SC, serif"
-      : readerFont.value === "sans"
-        ? "Noto Sans SC, system-ui, sans-serif"
-        : "system-ui, sans-serif";
+    readerFont.value === "rounded"
+      ? "Nunito Variable, Noto Sans SC Variable, system-ui, sans-serif"
+      : readerFont.value === "serif"
+        ? "Iowan Old Style, STSong, Songti SC, serif"
+        : readerFont.value === "sans"
+          ? "Noto Sans SC, system-ui, sans-serif"
+          : "system-ui, sans-serif";
   themes.override("color", palette.color);
   themes.override("background", palette.background);
   themes.override("font-family", family);
   themes.override("font-size", `${readerFontSize.value}px`);
   themes.override("line-height", String(readerLineHeight.value));
+  themes.override("letter-spacing", `${readerLetterSpacing.value}em`);
   themes.default({
     img: {
       height: "auto",
@@ -321,7 +354,18 @@ function handleKey(event: KeyboardEvent) {
   )
     return;
   const key = event.key.toLowerCase();
-  if (["arrowdown", "arrowright", "s", "d"].includes(key)) {
+  if (key === "escape") {
+    if (focusMode.value) {
+      event.preventDefault();
+      focusMode.value = false;
+    } else if (tocOpen.value) {
+      event.preventDefault();
+      tocOpen.value = false;
+    } else if (settingsOpen.value) {
+      event.preventDefault();
+      settingsOpen.value = false;
+    }
+  } else if (["arrowdown", "arrowright", "s", "d"].includes(key)) {
     event.preventDefault();
     void turn("next");
   } else if (["arrowup", "arrowleft", "w", "a"].includes(key)) {
@@ -341,7 +385,8 @@ function handlePointerUp(event: PointerEvent) {
   const dx = event.clientX - pointerStart.value.x;
   const dy = event.clientY - pointerStart.value.y;
   pointerStart.value = null;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < 34) return;
+  const minSwipeDistance = window.innerWidth < 640 ? 24 : 34;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < minSwipeDistance) return;
   void turn(
     Math.abs(dx) > Math.abs(dy)
       ? dx < 0
@@ -383,7 +428,8 @@ function attachContentEvents() {
       const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
       start = null;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 34) return;
+      const minSwipeDistance = window.innerWidth < 640 ? 24 : 34;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < minSwipeDistance) return;
       void turn(
         Math.abs(dx) > Math.abs(dy)
           ? dx < 0
@@ -487,6 +533,13 @@ async function load() {
     loading.value = false;
   }
 }
+watch(focusMode, async (isFocus) => {
+  if (!rendition.value || !progressCfi.value) return;
+  await nextTick();
+  if (isFocus) {
+    await rendition.value.display(progressCfi.value);
+  }
+});
 onMounted(() => {
   window.addEventListener("keydown", handleKey);
   void load();
@@ -530,8 +583,6 @@ useHead({ title: computed(() => `${item.value?.title || "在线阅读"} · 书�
   justify-content: space-between;
   gap: 18px;
   padding: 0 clamp(16px, 4vw, 54px);
-  border-bottom: 1px solid
-    color-mix(in srgb, var(--reader-ink) 12%, transparent);
   background: color-mix(in srgb, var(--reader-bg) 88%, transparent);
   backdrop-filter: blur(18px);
 }
@@ -645,10 +696,12 @@ useHead({ title: computed(() => `${item.value?.title || "在线阅读"} · 书�
   box-shadow: 0 12px 50px rgb(20 35 60 / 10%);
   transition:
     border-radius 0.45s ease,
-    box-shadow 0.45s ease;
+    box-shadow 0.45s ease,
+    width 0.45s ease;
 }
 .focus .book-view {
   width: 100%;
+  max-width: 100%;
   border-radius: 0;
   box-shadow: none;
 }
@@ -866,16 +919,24 @@ useHead({ title: computed(() => `${item.value?.title || "在线阅读"} · 书�
 @keyframes reader-curl {
   0% {
     opacity: 0.55;
-    transform: perspective(1100px) rotateY(-9deg) translateX(16px);
+    transform: perspective(1100px) rotateY(-12deg) translateX(20px) scale(0.98);
     transform-origin: left center;
+    filter: brightness(0.85);
   }
-  55% {
-    opacity: 0.9;
-    transform: perspective(1100px) rotateY(4deg) translateX(-4px);
+  30% {
+    opacity: 0.75;
+    transform: perspective(1100px) rotateY(-6deg) translateX(10px) scale(0.99);
+    filter: brightness(0.92);
+  }
+  60% {
+    opacity: 0.92;
+    transform: perspective(1100px) rotateY(2deg) translateX(-3px) scale(1.01);
+    filter: brightness(1.02);
   }
   100% {
     opacity: 1;
-    transform: none;
+    transform: perspective(1100px) rotateY(0deg) translateX(0) scale(1);
+    filter: brightness(1);
   }
 }
 </style>
