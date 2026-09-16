@@ -34,19 +34,20 @@ export class AuthService {
     email: string,
     type: 'register' | 'login' | 'change_password',
   ) {
+    email = this.normalizeEmail(email);
     if (type === 'register') {
-      const existing = await this.prisma.user.findUnique({ where: { email } });
+      const existing = await this.findUserByEmail(email);
       if (existing) throw new ConflictException('该邮箱已被注册');
     }
 
     if (type === 'login') {
-      const user = await this.prisma.user.findUnique({ where: { email } });
+      const user = await this.findUserByEmail(email);
       if (!user) throw new BadRequestException('该邮箱未注册');
       if (!user.isActive) throw new BadRequestException('账号已被禁用');
     }
 
     if (type === 'change_password') {
-      const user = await this.prisma.user.findUnique({ where: { email } });
+      const user = await this.findUserByEmail(email);
       if (!user) throw new BadRequestException('该邮箱未注册');
       if (!user.isActive) throw new BadRequestException('账号已被禁用');
     }
@@ -55,25 +56,24 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    const email = this.normalizeEmail(dto.email);
     const validCode = await this.emailService.verifyCode(
-      dto.email,
+      email,
       dto.code,
       'register',
     );
     if (!validCode) throw new BadRequestException('验证码无效或已过期');
 
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const existing = await this.findUserByEmail(email);
     if (existing) throw new ConflictException('Email already exists');
 
-    const username = await this.generateUsername(dto.email);
+    const username = await this.generateUsername(email);
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = await this.prisma.user.create({
       data: {
         username,
-        email: dto.email,
+        email,
         passwordHash,
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
         role: 'user',
@@ -84,15 +84,14 @@ export class AuthService {
   }
 
   async login(dto: LoginDto & { code?: string }) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const email = this.normalizeEmail(dto.email);
+    const user = await this.findUserByEmail(email);
     if (!user) throw new UnauthorizedException('Invalid credentials');
     if (!user.isActive) throw new UnauthorizedException('账号已被禁用');
 
     if (dto.code) {
       const valid = await this.emailService.verifyCode(
-        dto.email,
+        email,
         dto.code,
         'login',
       );
@@ -146,15 +145,16 @@ export class AuthService {
   }
 
   async githubLogin(githubUser: GitHubUser) {
-    const { user, action } = await this.userService.findOrCreateGitHubUser(githubUser);
+    const { user, action } =
+      await this.userService.findOrCreateGitHubUser(githubUser);
     if (!user.isActive) throw new UnauthorizedException('账号已被禁用');
-    
+
     const token = this.jwt.sign({
       sub: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     });
-    
+
     return {
       access_token: token,
       user: {
@@ -162,7 +162,7 @@ export class AuthService {
         email: user.email,
         username: user.username,
         role: user.role,
-        avatar: user.avatar
+        avatar: user.avatar,
       },
       account_status: action,
     };
@@ -187,6 +187,18 @@ export class AuthService {
     }
 
     return `${base}_${Date.now().toString(36)}`;
+  }
+
+  private normalizeEmail(email: string): string {
+    return String(email || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private findUserByEmail(email: string) {
+    return this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
   }
 
   private token(user: AuthUser) {

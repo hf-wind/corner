@@ -79,10 +79,19 @@ foreach ($required in @('DEV_POSTGRES_DB', 'DEV_POSTGRES_USER', 'DEV_POSTGRES_PA
 }
 
 $rootEnv = Read-DotEnvValues (Join-Path $repoRoot '.env')
+$exampleEnv = Read-DotEnvValues (Join-Path $repoRoot '.env.example')
 $existingTunnelEnv = Read-DotEnvValues $backendEnv
 $adminValues = @{}
 foreach ($name in @('SEED_ADMIN_USERNAME', 'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD')) {
-  $adminValues[$name] = if ($existingTunnelEnv[$name]) { $existingTunnelEnv[$name] } else { $rootEnv[$name] }
+  $adminValues[$name] = if ($existingTunnelEnv[$name]) {
+    $existingTunnelEnv[$name]
+  } elseif ($rootEnv[$name]) {
+    $rootEnv[$name]
+  } elseif ($name -eq 'SEED_ADMIN_PASSWORD' -and $values.DEV_SEED_ADMIN_PASSWORD) {
+    $values.DEV_SEED_ADMIN_PASSWORD
+  } else {
+    $exampleEnv[$name]
+  }
   if (-not $adminValues[$name]) {
     throw "Missing local administrator setting: $name. Configure it in backend/.env.tunnel or the root .env before starting the development tunnel."
   }

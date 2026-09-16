@@ -66,14 +66,12 @@ const tabs = computed(() => [
   { value: 'all' as FilterType, label: '全部收藏', icon: 'ph:squares-four-bold', count: meta.total },
   { value: 'book' as FilterType, label: '阅读书架', icon: 'ph:book-open-text-bold', count: meta.books },
   { value: 'film' as FilterType, label: '悬疑片单', icon: 'ph:film-strip-bold', count: meta.films },
-  { value: 'epub' as FilterType, label: 'EPUB', icon: 'ph:book-open-bold', count: meta.epub },
 ])
 const sectionTitle = computed(() => activeType.value === 'film' ? '迷雾剧场' : activeType.value === 'epub' ? '掌上书房' : activeType.value === 'book' ? '枕边书页' : '最近收藏')
 const sectionDescription = computed(() => activeType.value === 'film' ? '偏爱那些线索藏在暗处、结局值得再想一遍的故事。排名是我的私人秩序。' : activeType.value === 'epub' ? '已绑定 EPUB 的书籍可以直接在线阅读，阅读进度会跟随访客指纹保存。' : activeType.value === 'book' ? '一本书真正被读完，也许是在合上它之后。这里留下摘录，也留下当时的自己。' : '书和影不必分得太开，它们都是通往别处的一扇门。')
 const libraryStats = computed(() => [
   { icon: 'ph:book-open-text-bold', value: meta.books, label: '读过的书' },
   { icon: 'ph:film-strip-bold', value: meta.films, label: '悬疑片单' },
-  { icon: 'ph:book-open-bold', value: meta.epub, label: 'EPUB 书籍' },
 ])
 
 async function loadItems() {

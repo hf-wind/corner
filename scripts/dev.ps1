@@ -213,7 +213,11 @@ try {
   if ($SkipSetup) { $tunnelArgs += '-SkipSetup' }
 
   Write-Host 'Starting SSH tunnel (PostgreSQL 15432, Redis 16379)...'
-  $tunnel = Start-ManagedProcess -FilePath $powershellPath -ArgumentList $tunnelArgs -WorkingDirectory $repoRoot -StandardOutput $logFiles.tunnelOut -StandardError $logFiles.tunnelErr
+  # Start-Process joins array arguments before invoking PowerShell 5. Keep the
+  # quoted -File path in one argument string so directories with spaces survive.
+  $tunnelArgumentString = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -SshHost "{1}" -SshUser "{2}" -KeyPath "{3}" -RemoteAppPath "{4}"' -f $tunnelScript, $SshHost, $SshUser, $KeyPath, $RemoteAppPath
+  if ($SkipSetup) { $tunnelArgumentString += ' -SkipSetup' }
+  $tunnel = Start-ManagedProcess -FilePath $powershellPath -ArgumentList $tunnelArgumentString -WorkingDirectory $repoRoot -StandardOutput $logFiles.tunnelOut -StandardError $logFiles.tunnelErr
 
   $tunnelReady = Wait-ForPorts -Ports @(15432, 16379) -Deadline (Get-Date).AddMinutes(2) -Processes @($tunnel)
   if (-not $tunnelReady -or -not (Test-Path -LiteralPath $backendEnv)) {

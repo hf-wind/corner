@@ -30,6 +30,7 @@
     </div>
 
     <form
+      ref="loginForm"
       class="auth-form"
       :aria-busy="submitting"
       @submit.prevent="handleLogin"
@@ -108,9 +109,9 @@
         <div class="auth-divider">
           <span>或</span>
         </div>
-        <GitHubLoginButton 
-          :loading="githubLoading" 
-          @login="handleGitHubLogin" 
+        <GitHubLoginButton
+          :loading="githubLoading"
+          @login="handleGitHubLogin"
         />
       </template>
       <button class="submit-button" type="submit" :disabled="submitting">
@@ -129,7 +130,6 @@
 </template>
 
 <script setup lang="ts">
-
 const api = useApi();
 const router = useRouter();
 const route = useRoute();
@@ -149,6 +149,7 @@ const turnstileWidget = ref<{
   reset: () => void;
   waitForToken: (timeoutMs?: number) => Promise<string>;
 } | null>(null);
+const loginForm = ref<HTMLFormElement | null>(null);
 let cooldownTimer: ReturnType<typeof setInterval> | null = null;
 
 function safeRedirect() {
@@ -225,6 +226,15 @@ async function handleGitHubLogin() {
   }
 }
 async function handleLogin() {
+  // Edge password autofill can update the rendered inputs without dispatching
+  // an input event, leaving Vue's model stale. Read the submitted DOM values.
+  const submitted = loginForm.value ? new FormData(loginForm.value) : null;
+  const submittedEmail = String(submitted?.get("email") || email.value).trim();
+  const submittedPassword = String(
+    submitted?.get("password") || password.value,
+  );
+  email.value = submittedEmail;
+  if (loginType.value === "password") password.value = submittedPassword;
   if (loginType.value === "code" && code.value.length !== 6)
     return void toast.warning("请输入 6 位验证码");
   if (submitting.value) return;
@@ -233,11 +243,11 @@ async function handleLogin() {
     const token = await resolveTurnstile();
     if (!token) return;
     const payload: Record<string, string> = {
-      email: email.value,
+      email: submittedEmail,
       turnstileToken: token,
     };
     payload[loginType.value === "password" ? "password" : "code"] =
-      loginType.value === "password" ? password.value : code.value;
+      loginType.value === "password" ? submittedPassword : code.value;
     const result = await api.post<any>("/auth/login", payload);
     const { setSession, panelHome } = useAuth();
     setSession(result.access_token, result.user || {});
