@@ -1,10 +1,22 @@
 <template>
   <Teleport to="body">
     <Transition name="visitor-name">
-      <div v-if="visible" class="visitor-name-overlay" role="presentation" @click.self="close">
-        <section class="visitor-name-card" role="dialog" aria-modal="true" aria-label="身份认证">
+      <div
+        v-if="visible"
+        class="visitor-name-overlay"
+        role="presentation"
+        @click.self="close"
+      >
+        <section
+          class="visitor-name-card"
+          role="dialog"
+          aria-modal="true"
+          aria-label="身份认证"
+        >
           <div class="vn-art" aria-hidden="true">
-            <span class="vn-orb" /><span class="vn-ring ring-a" /><span class="vn-ring ring-b" />
+            <span class="vn-orb" /><span class="vn-ring ring-a" /><span
+              class="vn-ring ring-b"
+            />
             <span class="vn-star star-a" /><span class="vn-star star-b" />
           </div>
 
@@ -29,21 +41,13 @@
             >
               <Icon name="ph:sign-in-bold" />登录
             </button>
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="mode === 'register'"
-              :class="{ active: mode === 'register' }"
-              :disabled="submitting"
-              @click="switchMode('register')"
-            >
-              <Icon name="ph:user-plus-bold" />注册
-            </button>
           </div>
 
           <template v-if="mode === 'guest'">
             <h2>在这座角落留下名字</h2>
-            <p>留言与漂流瓶需要署名。名字会随足迹出现在时光留言板与访客记录里。</p>
+            <p>
+              留言与漂流瓶需要署名。名字会随足迹出现在时光留言板与访客记录里。
+            </p>
             <div class="vn-input-wrap">
               <input
                 v-model="name"
@@ -61,7 +65,9 @@
 
           <template v-else-if="mode === 'login'">
             <h2>欢迎回来</h2>
-            <p>登录后能实时收到瓶子被捞起、被回复的通知，并同步你的访客足迹。</p>
+            <p>
+              登录后能实时收到瓶子被捞起、被回复的通知，并同步你的访客足迹。
+            </p>
             <div class="vn-email-wrap">
               <input
                 v-model="email"
@@ -74,7 +80,11 @@
               />
             </div>
             <div class="vn-mode-row" v-if="loginType === 'code'">
-              <span class="vn-mode-note"><Icon name="ph:info-bold" />验证码将发送至该邮箱</span>
+              <span class="vn-mode-note"
+                ><Icon
+                  name="ph:info-bold"
+                />未注册邮箱验证后会自动创建账号</span
+              >
             </div>
             <div v-if="loginType === 'password'" class="vn-email-wrap">
               <input
@@ -103,85 +113,28 @@
                   type="button"
                   class="vn-sendcode"
                   :disabled="cooldown > 0 || sendingCode || submitting"
-                  @click="sendCode('login')"
+                  @click="sendCode"
                 >
-                  {{ sendingCode ? '验证中…' : cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
+                  {{
+                    sendingCode
+                      ? "验证中…"
+                      : cooldown > 0
+                        ? `${cooldown}s`
+                        : "发送验证码"
+                  }}
                 </button>
               </div>
             </div>
             <div class="vn-switch-row">
-              <button type="button" class="vn-link-btn" :disabled="submitting" @click="loginType = loginType === 'password' ? 'code' : 'password'">
-                {{ loginType === 'password' ? '用验证码登录' : '用密码登录' }}
-              </button>
-              <button type="button" class="vn-link-btn" :disabled="submitting" @click="switchMode('register')">
-                没有账号？去注册
-              </button>
-            </div>
-          </template>
-
-          <template v-else>
-            <h2>创建账号</h2>
-            <p>注册后可以给瓶主回信、收到站内通知，拥有固定的旅人身份与头像。</p>
-            <div class="vn-email-wrap">
-              <input
-                v-model="email"
-                type="email"
-                class="vn-input"
-                placeholder="邮箱"
-                aria-label="邮箱"
+              <button
+                type="button"
+                class="vn-link-btn"
                 :disabled="submitting"
-                @keydown.enter="submit"
-              />
-            </div>
-            <div class="vn-email-wrap">
-              <div class="vn-code-row">
-                <input
-                  v-model="code"
-                  type="text"
-                  maxlength="6"
-                  class="vn-input"
-                  placeholder="6 位验证码"
-                  aria-label="验证码"
-                  :disabled="submitting"
-                  @keydown.enter="submit"
-                />
-                <button
-                  type="button"
-                  class="vn-sendcode"
-                  :disabled="cooldown > 0 || sendingCode || submitting"
-                  @click="sendCode('register')"
-                >
-                  {{ sendingCode ? '验证中…' : cooldown > 0 ? `${cooldown}s` : '发送验证码' }}
-                </button>
-              </div>
-            </div>
-            <div class="vn-email-wrap">
-              <input
-                v-model="password"
-                type="password"
-                minlength="6"
-                class="vn-input"
-                placeholder="至少 6 位密码"
-                aria-label="密码"
-                :disabled="submitting"
-                @keydown.enter="submit"
-              />
-            </div>
-            <div class="vn-email-wrap">
-              <input
-                v-model="confirmPassword"
-                type="password"
-                minlength="6"
-                class="vn-input"
-                placeholder="再次输入密码"
-                aria-label="确认密码"
-                :disabled="submitting"
-                @keydown.enter="submit"
-              />
-            </div>
-            <div class="vn-switch-row">
-              <button type="button" class="vn-link-btn" :disabled="submitting" @click="switchMode('login')">
-                已有账号？去登录
+                @click="
+                  loginType = loginType === 'password' ? 'code' : 'password'
+                "
+              >
+                {{ loginType === "password" ? "用验证码登录" : "用密码登录" }}
               </button>
             </div>
           </template>
@@ -192,8 +145,20 @@
             <Icon name="ph:sparkle-bold" />{{ pendingHint }}
           </div>
           <div class="vn-actions">
-            <button type="button" class="vn-skip" :disabled="submitting" @click="close">稍后再说</button>
-            <button type="button" class="vn-submit" :disabled="submitting" @click="submit">
+            <button
+              type="button"
+              class="vn-skip"
+              :disabled="submitting"
+              @click="close"
+            >
+              稍后再说
+            </button>
+            <button
+              type="button"
+              class="vn-submit"
+              :disabled="submitting"
+              @click="submit"
+            >
               <Icon
                 :name="submitting ? 'ph:circle-notch-bold' : submitIcon"
                 :spin="submitting"
@@ -210,296 +175,267 @@
 <script setup lang="ts">
 const props = withDefaults(
   defineProps<{
-    visible: boolean
-    initial?: string
-    pendingHint?: string
+    visible: boolean;
+    initial?: string;
+    pendingHint?: string;
   }>(),
-  { initial: '', pendingHint: '' },
-)
+  { initial: "", pendingHint: "" },
+);
 const emit = defineEmits<{
-  (e: 'close'): void
-  (e: 'confirm', name: string, turnstileToken: string): void
-  (e: 'authenticated'): void
-}>()
+  (e: "close"): void;
+  (e: "confirm", name: string, turnstileToken: string): void;
+  (e: "authenticated"): void;
+}>();
 
-const api = useApi()
-const toast = useToast()
-const { setSession } = useAuth()
+const api = useApi();
+const toast = useToast();
+const { setSession } = useAuth();
 
-const mode = ref<'guest' | 'login' | 'register'>('guest')
-const loginType = ref<'password' | 'code'>('password')
-const name = ref(props.initial)
-const email = ref('')
-const password = ref('')
-const confirmPassword = ref('')
-const code = ref('')
-const submitting = ref(false)
-const sendingCode = ref(false)
-const cooldown = ref(0)
-const error = ref('')
-const turnstileToken = ref('')
-const turnstileWidget = ref<{ reset: () => void; waitForToken: (timeoutMs?: number) => Promise<string> } | null>(null)
-let cooldownTimer: ReturnType<typeof setInterval> | null = null
+const mode = ref<"guest" | "login">("guest");
+const loginType = ref<"password" | "code">("code");
+const name = ref(props.initial);
+const email = ref("");
+const password = ref("");
+const code = ref("");
+const submitting = ref(false);
+const sendingCode = ref(false);
+const cooldown = ref(0);
+const error = ref("");
+const turnstileToken = ref("");
+const turnstileWidget = ref<{
+  reset: () => void;
+  waitForToken: (timeoutMs?: number) => Promise<string>;
+} | null>(null);
+let cooldownTimer: ReturnType<typeof setInterval> | null = null;
 
-let completionDeadline = 0
-let completionTimer: ReturnType<typeof setTimeout> | null = null
+let completionDeadline = 0;
+let completionTimer: ReturnType<typeof setTimeout> | null = null;
 
 function clearCompletionTimer() {
-  if (completionTimer) clearTimeout(completionTimer)
-  completionTimer = null
+  if (completionTimer) clearTimeout(completionTimer);
+  completionTimer = null;
 }
 
 function armCompletionDeadline() {
-  completionDeadline = Date.now() + 45_000
-  clearCompletionTimer()
+  completionDeadline = Date.now() + 45_000;
+  clearCompletionTimer();
   completionTimer = setTimeout(() => {
-    completionTimer = null
+    completionTimer = null;
     if (props.visible && Date.now() >= completionDeadline) {
-      submitting.value = false
-      error.value = '操作似乎没有完成，请重试或稍后再说'
+      submitting.value = false;
+      error.value = "操作似乎没有完成，请重试或稍后再说";
     }
-  }, 45_000)
+  }, 45_000);
 }
 
 const submitText = computed(() => {
-  if (mode.value === 'guest') return '开始旅程'
-  if (mode.value === 'login') return '登录'
-  return '注册'
-})
+  if (mode.value === "guest") return "开始旅程";
+  return "登录";
+});
 const submitLoadingText = computed(() => {
-  if (submitting.value && props.pendingHint) return '正在继续…'
-  if (mode.value === 'guest') return '起名中…'
-  if (mode.value === 'login') return '登录中…'
-  return '注册中…'
-})
+  if (submitting.value && props.pendingHint) return "正在继续…";
+  if (mode.value === "guest") return "起名中…";
+  return "登录中…";
+});
 const submitIcon = computed(() => {
-  if (mode.value === 'guest') return 'ph:feather-bold'
-  if (mode.value === 'login') return 'ph:sign-in-bold'
-  return 'ph:user-plus-bold'
-})
+  if (mode.value === "guest") return "ph:feather-bold";
+  return "ph:sign-in-bold";
+});
 
 watch(
   () => props.visible,
   (open) => {
     if (!open) {
-      submitting.value = false
-      error.value = ''
-      resetTurnstile()
-      clearCompletionTimer()
-      password.value = ''
-      confirmPassword.value = ''
-      code.value = ''
-      email.value = ''
-      cooldown.value = 0
+      submitting.value = false;
+      error.value = "";
+      resetTurnstile();
+      clearCompletionTimer();
+      password.value = "";
+      code.value = "";
+      email.value = "";
+      cooldown.value = 0;
       if (cooldownTimer) {
-        clearInterval(cooldownTimer)
-        cooldownTimer = null
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
       }
-      return
+      return;
     }
-    name.value = props.initial
-    error.value = ''
+    name.value = props.initial;
+    error.value = "";
     nextTick(() => {
-      const card = document.querySelector<HTMLDivElement>('.visitor-name-card')
-      const input = document.querySelector<HTMLInputElement>('.visitor-name-card .vn-input')
-      input?.focus()
-      if (mode.value === 'guest') input?.select()
-      card?.scrollTo({ top: 0 })
-    })
+      const card = document.querySelector<HTMLDivElement>(".visitor-name-card");
+      const input = document.querySelector<HTMLInputElement>(
+        ".visitor-name-card .vn-input",
+      );
+      input?.focus();
+      if (mode.value === "guest") input?.select();
+      card?.scrollTo({ top: 0 });
+    });
   },
-)
+);
 
-function switchMode(next: 'guest' | 'login' | 'register') {
-  if (submitting.value) return
-  mode.value = next
-  error.value = ''
-  resetTurnstile()
+function switchMode(next: "guest" | "login") {
+  if (submitting.value) return;
+  mode.value = next;
+  error.value = "";
+  resetTurnstile();
   nextTick(() => {
-    document.querySelector<HTMLInputElement>('.visitor-name-card .vn-input')?.focus()
-  })
+    document
+      .querySelector<HTMLInputElement>(".visitor-name-card .vn-input")
+      ?.focus();
+  });
 }
 
 function resetTurnstile() {
-  turnstileToken.value = ''
-  turnstileWidget.value?.reset()
+  turnstileToken.value = "";
+  turnstileWidget.value?.reset();
 }
 
 function trimGuard() {
-  name.value = name.value.replace(/\s{2,}/g, ' ').slice(0, 20)
+  name.value = name.value.replace(/\s{2,}/g, " ").slice(0, 20);
 }
 
 function close() {
-  if (submitting.value) return
-  emit('close')
+  if (submitting.value) return;
+  emit("close");
 }
 
 async function resolveTurnstile(): Promise<string> {
-  if (!import.meta.env.PROD && !turnstileToken.value) return 'local-dev'
-  const token = turnstileToken.value || (await turnstileWidget.value?.waitForToken(3500)) || ''
+  if (!import.meta.env.PROD && !turnstileToken.value) return "local-dev";
+  const token =
+    turnstileToken.value ||
+    (await turnstileWidget.value?.waitForToken(3500)) ||
+    "";
   if (token) {
-    turnstileToken.value = token
-    return token
+    turnstileToken.value = token;
+    return token;
   }
-  toast.warning('请先完成人机验证')
-  return ''
+  toast.warning("请先完成人机验证");
+  return "";
 }
 
-async function sendCode(type: 'login' | 'register') {
-  clearCompletionTimer()
-  const clean = email.value.trim()
+async function sendCode() {
+  clearCompletionTimer();
+  const clean = email.value.trim();
   if (!clean) {
-    toast.warning('请先输入邮箱')
-    return
+    toast.warning("请先输入邮箱");
+    return;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-    toast.warning('邮箱格式好像不太对')
-    return
+    toast.warning("邮箱格式好像不太对");
+    return;
   }
-  sendingCode.value = true
-  const token = await resolveTurnstile()
+  sendingCode.value = true;
+  const token = await resolveTurnstile();
   if (!token) {
-    sendingCode.value = false
-    return
+    sendingCode.value = false;
+    return;
   }
-  error.value = ''
+  error.value = "";
   try {
-    await api.post('/auth/send-code', { email: clean, type, turnstileToken: token })
-    toast.success('验证码已发送，请查收邮箱')
-    cooldown.value = 60
-    if (cooldownTimer) clearInterval(cooldownTimer)
+    await api.post("/auth/send-code", {
+      email: clean,
+      type: "login",
+      turnstileToken: token,
+    });
+    toast.success("验证码已发送，请查收邮箱");
+    cooldown.value = 60;
+    if (cooldownTimer) clearInterval(cooldownTimer);
     cooldownTimer = setInterval(() => {
-      cooldown.value -= 1
+      cooldown.value -= 1;
       if (cooldown.value <= 0 && cooldownTimer) {
-        clearInterval(cooldownTimer)
-        cooldownTimer = null
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
       }
-    }, 1000)
+    }, 1000);
   } catch (err: any) {
-    error.value = err?.message || '发送验证码失败，请稍后再试'
+    error.value = err?.message || "发送验证码失败，请稍后再试";
   } finally {
-    sendingCode.value = false
-    resetTurnstile()
+    sendingCode.value = false;
+    resetTurnstile();
   }
 }
 
 async function submitGuest(): Promise<boolean> {
-  const clean = name.value.trim()
+  const clean = name.value.trim();
   if (!clean) {
-    error.value = '名字不能为空，哪怕是代号也好。'
-    return false
+    error.value = "名字不能为空，哪怕是代号也好。";
+    return false;
   }
-  const token = await resolveTurnstile()
-  if (!token) return false
-  emit('confirm', clean, token)
-  return true
+  const token = await resolveTurnstile();
+  if (!token) return false;
+  emit("confirm", clean, token);
+  return true;
 }
 
 async function submitLogin(): Promise<boolean> {
-  const clean = email.value.trim()
+  const clean = email.value.trim();
   if (!clean) {
-    error.value = '请输入邮箱'
-    return false
+    error.value = "请输入邮箱";
+    return false;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-    error.value = '邮箱格式好像不太对，检查一下？'
-    return false
+    error.value = "邮箱格式好像不太对，检查一下？";
+    return false;
   }
-  if (loginType.value === 'password') {
+  if (loginType.value === "password") {
     if (!password.value) {
-      error.value = '请输入密码'
-      return false
+      error.value = "请输入密码";
+      return false;
     }
   } else if (!code.value || code.value.length !== 6) {
-    error.value = '请输入 6 位验证码'
-    return false
+    error.value = "请输入 6 位验证码";
+    return false;
   }
-  const token = await resolveTurnstile()
-  if (!token) return false
-  const payload: Record<string, string> = { email: clean, turnstileToken: token }
-  if (loginType.value === 'password') payload.password = password.value
-  else payload.code = code.value
+  const payload: Record<string, string> = { email: clean };
+  if (loginType.value === "password") {
+    const token = await resolveTurnstile();
+    if (!token) return false;
+    payload.password = password.value;
+    payload.turnstileToken = token;
+  } else payload.code = code.value;
   try {
-    const res = await api.post<{ access_token: string; user: Record<string, unknown> }>('/auth/login', payload)
-    setSession(res.access_token, res.user as any)
-    toast.success('登录成功')
-    emit('authenticated')
-    return true
+    const res = await api.post<{
+      access_token: string;
+      user: Record<string, unknown>;
+    }>("/auth/login", payload);
+    setSession(res.access_token, res.user as any);
+    toast.success("登录成功");
+    emit("authenticated");
+    return true;
   } catch (err: any) {
-    error.value = err?.message || '登录失败，请检查邮箱和密码'
-    resetTurnstile()
-    return false
-  }
-}
-
-async function submitRegister(): Promise<boolean> {
-  const clean = email.value.trim()
-  if (!clean) {
-    error.value = '请输入邮箱'
-    return false
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-    error.value = '邮箱格式好像不太对，检查一下？'
-    return false
-  }
-  if (!code.value || code.value.length !== 6) {
-    error.value = '请输入 6 位验证码'
-    return false
-  }
-  if (!password.value || password.value.length < 6) {
-    error.value = '密码至少需要 6 位'
-    return false
-  }
-  if (password.value !== confirmPassword.value) {
-    error.value = '两次输入的密码不一致'
-    return false
-  }
-  const token = await resolveTurnstile()
-  if (!token) return false
-  try {
-    const res = await api.post<{ access_token: string; user: Record<string, unknown> }>('/auth/register', {
-      email: clean,
-      password: password.value,
-      code: code.value,
-      turnstileToken: token,
-    })
-    setSession(res.access_token, res.user as any)
-    toast.success('注册成功，欢迎加入！')
-    emit('authenticated')
-    return true
-  } catch (err: any) {
-    error.value = err?.message || '注册失败，请检查邮箱是否已被注册'
-    resetTurnstile()
-    return false
+    error.value = err?.message || "登录失败，请检查邮箱和密码";
+    resetTurnstile();
+    return false;
   }
 }
 
 async function submit() {
-  if (submitting.value) return
-  submitting.value = true
-  error.value = ''
-  let ok = false
-  if (mode.value === 'guest') ok = await submitGuest()
-  else if (mode.value === 'login') ok = await submitLogin()
-  else ok = await submitRegister()
+  if (submitting.value) return;
+  submitting.value = true;
+  error.value = "";
+  let ok = false;
+  if (mode.value === "guest") ok = await submitGuest();
+  else ok = await submitLogin();
   if (!ok) {
-    submitting.value = false
-    return
+    submitting.value = false;
+    return;
   }
   // 保持加载态：由父组件执行挂起动作后主动关闭（visible 变 false）；
   // 超时未关闭则恢复可操作状态，避免假死
-  armCompletionDeadline()
+  armCompletionDeadline();
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && props.visible) close()
+  if (e.key === "Escape" && props.visible) close();
 }
 
-onMounted(() => document.addEventListener('keydown', onKeydown))
+onMounted(() => document.addEventListener("keydown", onKeydown));
 onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown)
-  if (cooldownTimer) clearInterval(cooldownTimer)
-  clearCompletionTimer()
-})
+  document.removeEventListener("keydown", onKeydown);
+  if (cooldownTimer) clearInterval(cooldownTimer);
+  clearCompletionTimer();
+});
 </script>
 
 <style scoped>
@@ -522,7 +458,11 @@ onUnmounted(() => {
   overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
   border-radius: 22px;
-  background: linear-gradient(160deg, var(--ld-bg-card), color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft)));
+  background: linear-gradient(
+    160deg,
+    var(--ld-bg-card),
+    color-mix(in srgb, var(--ld-bg-card) 92%, var(--c-primary-soft))
+  );
   box-shadow: 0 26px 74px color-mix(in srgb, var(--ld-shadow) 74%, transparent);
   text-align: center;
   animation: vn-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -534,8 +474,14 @@ onUnmounted(() => {
   height: 72px;
   margin: 0 auto 14px;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, var(--c-primary-soft), color-mix(in srgb, var(--c-primary) 24%, transparent));
-  box-shadow: inset 0 0 22px color-mix(in srgb, var(--c-primary) 10%, transparent), 0 12px 30px color-mix(in srgb, var(--c-primary) 16%, transparent);
+  background: radial-gradient(
+    circle at 32% 28%,
+    var(--c-primary-soft),
+    color-mix(in srgb, var(--c-primary) 24%, transparent)
+  );
+  box-shadow:
+    inset 0 0 22px color-mix(in srgb, var(--c-primary) 10%, transparent),
+    0 12px 30px color-mix(in srgb, var(--c-primary) 16%, transparent);
 }
 .vn-orb {
   position: absolute;
@@ -544,7 +490,11 @@ onUnmounted(() => {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, var(--c-primary), color-mix(in srgb, var(--c-primary) 55%, transparent));
+  background: radial-gradient(
+    circle at 32% 28%,
+    var(--c-primary),
+    color-mix(in srgb, var(--c-primary) 55%, transparent)
+  );
   box-shadow: 0 0 20px color-mix(in srgb, var(--c-primary) 42%, transparent);
   transform: translate(-50%, -50%);
 }
@@ -571,13 +521,22 @@ onUnmounted(() => {
   box-shadow: 0 0 10px color-mix(in srgb, var(--c-primary) 60%, transparent);
   animation: vn-pulse 3.4s ease-in-out infinite;
 }
-.vn-star.star-a { top: 9px; right: 12px; }
-.vn-star.star-b { bottom: 14px; left: 10px; width: 4px; height: 4px; animation-delay: -1.4s; }
+.vn-star.star-a {
+  top: 9px;
+  right: 12px;
+}
+.vn-star.star-b {
+  bottom: 14px;
+  left: 10px;
+  width: 4px;
+  height: 4px;
+  animation-delay: -1.4s;
+}
 
 /* ===== Tabs ===== */
 .vn-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 5px;
   margin-bottom: 18px;
   padding: 4px;
@@ -599,15 +558,23 @@ onUnmounted(() => {
   font-size: 0.64rem;
   font-weight: 650;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
-.vn-tabs button > svg { font-size: 0.8rem; }
+.vn-tabs button > svg {
+  font-size: 0.8rem;
+}
 .vn-tabs button.active {
   background: var(--c-primary);
   box-shadow: 0 5px 14px color-mix(in srgb, var(--c-primary) 30%, transparent);
   color: #fff;
 }
-.vn-tabs button:disabled { cursor: not-allowed; opacity: 0.7; }
+.vn-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
 
 .visitor-name-card h2 {
   margin: 0 0 8px;
@@ -657,14 +624,20 @@ onUnmounted(() => {
   font: inherit;
   font-size: 0.8rem;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
-.vn-input::placeholder { color: var(--c-text-3); }
+.vn-input::placeholder {
+  color: var(--c-text-3);
+}
 .vn-input:focus {
   border-color: var(--c-primary);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 12%, transparent);
 }
-.vn-input:disabled { opacity: 0.7; }
+.vn-input:disabled {
+  opacity: 0.7;
+}
 .vn-count {
   position: absolute;
   top: 50%;
@@ -706,10 +679,17 @@ onUnmounted(() => {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
 }
-.vn-sendcode:hover:not(:disabled) { transform: translateY(-1px); }
-.vn-sendcode:disabled { cursor: not-allowed; opacity: 0.6; }
+.vn-sendcode:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.vn-sendcode:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .vn-switch-row {
   display: flex;
   align-items: center;
@@ -726,8 +706,13 @@ onUnmounted(() => {
   font-size: 0.6rem;
   cursor: pointer;
 }
-.vn-link-btn:hover { text-decoration: underline; }
-.vn-link-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.vn-link-btn:hover {
+  text-decoration: underline;
+}
+.vn-link-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 
 .vn-error {
   margin-top: 9px;
@@ -749,7 +734,9 @@ onUnmounted(() => {
   font-size: 0.62rem;
   font-weight: 600;
 }
-.vn-pending > svg { font-size: 0.8rem; }
+.vn-pending > svg {
+  font-size: 0.8rem;
+}
 
 .vn-actions {
   display: flex;
@@ -769,15 +756,24 @@ onUnmounted(() => {
   font: inherit;
   font-size: 0.68rem;
   cursor: pointer;
-  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
 }
-.vn-actions button:hover:not(:disabled) { transform: translateY(-1px); }
+.vn-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
 .vn-skip {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--c-text-3);
 }
-.vn-skip:disabled { cursor: not-allowed; opacity: 0.6; }
+.vn-skip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .vn-submit {
   border: 1px solid var(--c-primary);
   background: var(--c-primary);
@@ -785,16 +781,48 @@ onUnmounted(() => {
   color: #fff;
   font-weight: 700;
 }
-.vn-submit:disabled { opacity: 0.65; cursor: not-allowed; }
-.vn-name-enter-active { transition: opacity 0.24s ease; }
-.vn-name-leave-active { transition: opacity 0.18s ease; }
-.vn-name-enter-from, .vn-name-leave-to { opacity: 0; }
-@keyframes vn-card-in { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
-@keyframes vn-spin { to { transform: rotate(360deg); } }
-@keyframes vn-pulse { 50% { opacity: 0.35; transform: scale(0.8); } }
+.vn-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.vn-name-enter-active {
+  transition: opacity 0.24s ease;
+}
+.vn-name-leave-active {
+  transition: opacity 0.18s ease;
+}
+.vn-name-enter-from,
+.vn-name-leave-to {
+  opacity: 0;
+}
+@keyframes vn-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+@keyframes vn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes vn-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .vn-ring, .vn-star { animation: none; }
-  .visitor-name-card { animation: none; }
-  .vn-name-enter-active, .vn-name-leave-active { transition: none; }
+  .vn-ring,
+  .vn-star {
+    animation: none;
+  }
+  .visitor-name-card {
+    animation: none;
+  }
+  .vn-name-enter-active,
+  .vn-name-leave-active {
+    transition: none;
+  }
 }
 </style>

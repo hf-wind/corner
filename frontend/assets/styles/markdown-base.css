@@ -11,28 +11,32 @@
 .md-base-wrap .md-editor-preview,
 .admin-md-editor .md-editor-preview {
   --md-bk-color: transparent !important;
-  --md-bk-color-outstand: var(--c-bg-2) !important;
-  --md-bk-color-hover: var(--c-bg-2) !important;
-  --md-bk-color-block: var(--c-bg-1) !important;
-  --md-bk-color-code: var(--code-bg) !important;
-  --md-border-color: color-mix(in srgb, var(--border) 80%, transparent) !important;
+  --md-bk-color-outstand: transparent !important;
+  --md-bk-color-hover: transparent !important;
+  --md-bk-color-block: transparent !important;
+  --md-bk-color-code: transparent !important;
+  --md-border-color: color-mix(
+    in srgb,
+    var(--border) 80%,
+    transparent
+  ) !important;
   --md-color: var(--c-text) !important;
   --md-color-secondary: var(--c-text-2) !important;
   --md-primary-color: var(--c-primary) !important;
   /* Keep md-editor-v3 theme variables aligned with the site palette. */
   --md-theme-color: var(--c-text) !important;
   --md-theme-color-reverse: var(--c-bg) !important;
-  --md-theme-color-hover: var(--c-bg-2) !important;
-  --md-theme-color-hover-inset: var(--c-bg-2) !important;
+  --md-theme-color-hover: transparent !important;
+  --md-theme-color-hover-inset: transparent !important;
   --md-theme-link-color: var(--c-primary) !important;
   --md-theme-link-hover-color: var(--c-primary) !important;
   --md-theme-border-color: var(--border) !important;
   --md-theme-border-color-reverse: var(--border) !important;
   --md-theme-border-color-inset: var(--border) !important;
   --md-theme-bg-color: transparent !important;
-  --md-theme-bg-color-inset: var(--c-bg-2) !important;
+  --md-theme-bg-color-inset: transparent !important;
   --md-theme-code-copy-tips-color: var(--c-text) !important;
-  --md-theme-code-copy-tips-bg-color: var(--c-bg-2) !important;
+  --md-theme-code-copy-tips-bg-color: transparent !important;
   --md-theme-code-active-color: var(--c-primary) !important;
   --md-theme-heading-color: var(--c-text) !important;
   --md-theme-heading-border: none !important;
@@ -51,7 +55,7 @@
   --md-theme-quote-color: var(--c-text-2) !important;
   --md-theme-quote-border: 3px solid var(--c-primary) !important;
   --md-theme-quote-bg-color: transparent !important;
-  --md-theme-table-stripe-color: var(--c-bg-1) !important;
+  --md-theme-table-stripe-color: transparent !important;
   --md-theme-table-tr-bg-color: transparent !important;
   --md-theme-table-td-border-color: var(--border) !important;
 }
@@ -60,7 +64,10 @@
  * the preview node. Keep every shell layer transparent so reading surfaces
  * inherit the page background instead of the library's default navy
  * (#182641) panel. This affects articles, moments, and RSS/circle readers. */
+.md-base-wrap,
 .md-base-wrap .md-editor,
+.md-base-wrap .md-editor-dark,
+.md-base-wrap .md-editor-previewOnly,
 .md-base-wrap .md-editor-content,
 .md-base-wrap .md-editor-preview-wrapper,
 .md-base-wrap .md-editor-preview,
@@ -73,6 +80,35 @@
   background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
+}
+
+/* Reading content never owns a surface color. This also wins over the
+ * md-editor-v3 dark theme's #232323 fallback on preview-only shells. */
+.md-base-preview blockquote,
+.md-base-preview pre,
+.md-base-preview .md-editor-code,
+.md-base-preview code:not(pre code),
+.md-base-preview mark,
+.md-base-preview table,
+.md-base-preview table th,
+.md-base-preview table tr,
+.md-base-wrap .md-editor-preview blockquote,
+.md-base-wrap .md-editor-preview pre,
+.md-base-wrap .md-editor-preview .md-editor-code,
+.md-base-wrap .md-editor-preview code:not(pre code),
+.md-base-wrap .md-editor-preview mark,
+.md-base-wrap .md-editor-preview table,
+.md-base-wrap .md-editor-preview table th,
+.md-base-wrap .md-editor-preview table tr,
+.md-base-html,
+.md-base-html blockquote,
+.md-base-html pre,
+.md-base-html code,
+.md-base-html mark,
+.md-base-html table,
+.md-base-html th,
+.md-base-html tr {
+  background-color: transparent !important;
 }
 
 .md-base-preview,
@@ -264,8 +300,10 @@
   background: color-mix(in srgb, var(--c-primary) 82%, var(--c-text));
   content: "";
   transform: translateY(-50%);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m9 5 7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 
 /* h5, h6 — border-left */
@@ -381,8 +419,10 @@
   background: var(--c-primary);
   content: "";
   opacity: 0.72;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 6C6.5 7.5 5 9.8 5 13.2V18h6v-6H7.6c.2-1.8 1.2-3.2 3-4.2L9.5 6Zm9 0c-3 1.5-4.5 3.8-4.5 7.2V18h6v-6h-3.4c.2-1.8 1.2-3.2 3-4.2L18.5 6Z' fill='black'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 
 .md-base-preview blockquote p:first-child,
@@ -479,7 +519,8 @@
 @media (hover: hover) {
   .md-base-preview img:hover,
   .md-base-wrap .md-editor-preview img:hover {
-    box-shadow: 0 16px 36px color-mix(in srgb, var(--ld-shadow) 92%, transparent);
+    box-shadow: 0 16px 36px
+      color-mix(in srgb, var(--ld-shadow) 92%, transparent);
     transform: translateY(-2px);
   }
 }
@@ -649,9 +690,15 @@
   line-height: 1.35;
 }
 
-.md-base-html h1 { font-size: 1.6rem; }
-.md-base-html h2 { font-size: 1.35rem; }
-.md-base-html h3 { font-size: 1.12rem; }
+.md-base-html h1 {
+  font-size: 1.6rem;
+}
+.md-base-html h2 {
+  font-size: 1.35rem;
+}
+.md-base-html h3 {
+  font-size: 1.12rem;
+}
 
 .md-base-html a {
   color: var(--c-primary);

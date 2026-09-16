@@ -33,7 +33,10 @@
           v-for="group in navGroups"
           :key="group.key"
           class="nav-group"
-          :class="{ 'is-open': isGroupOpen(group), 'single-group': group.key === 'articles' }"
+          :class="{
+            'is-open': isGroupOpen(group),
+            'single-group': group.key === 'articles',
+          }"
         >
           <button
             v-if="!collapsed && group.key !== 'articles'"
@@ -73,7 +76,7 @@
       <div class="sidebar-bottom-scroll">
         <div class="sidebar-divider"></div>
         <AppLink v-if="!isLoggedIn && !isPanel" to="/login" class="login-link">
-          <Icon name="ph:sign-in-bold" /> 登录 / 注册
+          <Icon name="ph:sign-in-bold" /> 邮箱登录
         </AppLink>
         <div v-else-if="isLoggedIn" class="user-card">
           <div class="user-row">
@@ -262,7 +265,11 @@ const adminFullNav = [
   { to: "/admin/media", icon: "ph:image-bold", label: "媒体库" },
   { to: "/admin/users", icon: "ph:users-three-bold", label: "用户管理" },
   { to: "/admin/visitor", icon: "ph:footprints-bold", label: "访问管理" },
-  { to: "/admin/visitor-content", icon: "ph:chat-circle-dots-bold", label: "留言与漂流瓶" },
+  {
+    to: "/admin/visitor-content",
+    icon: "ph:chat-circle-dots-bold",
+    label: "留言与漂流瓶",
+  },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件功能" },
   { to: "/admin/logs", icon: "ph:terminal-window-bold", label: "系统日志" },

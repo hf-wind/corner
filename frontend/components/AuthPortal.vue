@@ -4,42 +4,16 @@
     class="auth-portal"
     :class="{ 'motion-ready': motionReady }"
   >
+    <div class="auth-current" aria-hidden="true">
+      <i v-for="index in 4" :key="index"><span /></i>
+    </div>
     <nav class="auth-nav" aria-label="认证页导航">
       <AppLink to="/home" class="auth-back" title="返回首页">
         <Icon name="ph:arrow-left-bold" /><span>返回首页</span>
       </AppLink>
-      <div class="auth-theme" aria-label="外观模式">
-        <button
-          type="button"
-          :class="{ active: theme === 'light' }"
-          title="亮色"
-          @click="setTheme('light')"
-        >
-          <Icon name="ph:sun-bold" />
-        </button>
-        <button
-          type="button"
-          :class="{ active: theme === 'dark' }"
-          title="深色"
-          @click="setTheme('dark')"
-        >
-          <Icon name="ph:moon-bold" />
-        </button>
-        <button
-          type="button"
-          :class="{ active: theme === 'auto' }"
-          title="跟随系统"
-          @click="setTheme('auto')"
-        >
-          <Icon name="ph:desktop-bold" />
-        </button>
-      </div>
     </nav>
 
     <section class="auth-brand" aria-label="风隅随笔">
-      <div class="auth-current" aria-hidden="true">
-        <i v-for="index in 3" :key="index"><span /></i>
-      </div>
       <div class="brand-lockup">
         <img src="/logo.png" alt="风隅随笔站点标志" width="58" height="58" />
         <div>
@@ -48,9 +22,7 @@
         </div>
       </div>
       <div class="brand-copy">
-        <span class="brand-index"
-          >{{ mode === "login" ? "01" : "02" }} / AUTH</span
-        >
+        <span class="brand-index">01 / AUTH</span>
         <h1>{{ headline }}</h1>
         <p>{{ description }}</p>
       </div>
@@ -72,12 +44,11 @@
 import gsap from "gsap";
 
 defineProps<{
-  mode: "login" | "register";
+  mode: "login";
   headline: string;
   description: string;
 }>();
 
-const { theme, setTheme } = useTheme();
 const { siteTitle } = useSiteSettings();
 const currentYear = new Date().getFullYear();
 const portalRef = ref<HTMLElement | null>(null);
@@ -130,7 +101,13 @@ onBeforeUnmount(() => {
   height: 100dvh;
   grid-template-columns: minmax(340px, 46%) minmax(420px, 54%);
   overflow: hidden;
-  background: var(--c-bg);
+  background:
+    linear-gradient(
+      125deg,
+      color-mix(in srgb, var(--c-primary-soft) 34%, transparent),
+      transparent 38%
+    ),
+    var(--c-bg);
   color: var(--c-text);
   isolation: isolate;
 }
@@ -168,11 +145,10 @@ onBeforeUnmount(() => {
   left: 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   pointer-events: none;
 }
-.auth-back,
-.auth-theme {
+.auth-back {
   pointer-events: auto;
 }
 .auth-back {
@@ -187,34 +163,6 @@ onBeforeUnmount(() => {
 .auth-back:hover {
   color: var(--c-primary);
 }
-.auth-theme {
-  display: flex;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--ld-bg-card) 86%, transparent);
-  box-shadow: var(--ui-shadow-soft);
-  backdrop-filter: blur(14px);
-}
-.auth-theme button {
-  display: grid;
-  width: 31px;
-  height: 29px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--c-text-3);
-  cursor: pointer;
-  place-items: center;
-}
-.auth-theme button:hover {
-  color: var(--c-primary);
-}
-.auth-theme button.active {
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-}
 .auth-brand {
   position: relative;
   display: flex;
@@ -222,36 +170,40 @@ onBeforeUnmount(() => {
   flex-direction: column;
   justify-content: space-between;
   padding: 92px clamp(38px, 6vw, 92px) 34px;
-  overflow: hidden;
-  border-right: 1px solid var(--border);
-  background: color-mix(in srgb, var(--c-bg-1) 88%, var(--c-primary-soft));
+  overflow: visible;
+  background: transparent;
 }
 .auth-current {
   position: absolute;
-  inset: 18% -12% 14% 8%;
+  z-index: -1;
+  inset: 4% -18% 4% -12%;
   overflow: hidden;
   pointer-events: none;
 }
 .auth-current > i {
   position: absolute;
-  right: 0;
-  left: 0;
-  height: 42%;
+  right: -5%;
+  left: -5%;
+  height: 34%;
   border-top: 1px solid color-mix(in srgb, var(--c-primary) 16%, transparent);
   border-radius: 50%;
   transform: rotate(var(--current-angle));
 }
 .auth-current > i:nth-child(1) {
   --current-angle: -8deg;
-  top: 12%;
+  top: 8%;
 }
 .auth-current > i:nth-child(2) {
   --current-angle: 4deg;
-  top: 43%;
+  top: 33%;
 }
 .auth-current > i:nth-child(3) {
   --current-angle: -2deg;
-  top: 72%;
+  top: 59%;
+}
+.auth-current > i:nth-child(4) {
+  --current-angle: 6deg;
+  top: 84%;
 }
 .auth-current span {
   position: absolute;
@@ -271,6 +223,10 @@ onBeforeUnmount(() => {
 .auth-current > i:nth-child(3) span {
   animation-delay: -6s;
   animation-duration: 13s;
+}
+.auth-current > i:nth-child(4) span {
+  animation-delay: -9s;
+  animation-duration: 15s;
 }
 .brand-lockup {
   display: flex;
@@ -339,11 +295,26 @@ onBeforeUnmount(() => {
   gap: 5px;
 }
 .auth-workspace {
+  position: relative;
   display: grid;
   min-width: 0;
   overflow-y: auto;
   padding: 76px clamp(28px, 6vw, 84px) 38px;
   place-items: center;
+}
+.auth-workspace::before {
+  position: absolute;
+  top: 11%;
+  bottom: 11%;
+  left: 0;
+  width: 1px;
+  background: linear-gradient(
+    transparent,
+    var(--border) 16%,
+    var(--border) 84%,
+    transparent
+  );
+  content: "";
 }
 .auth-panel {
   position: relative;
@@ -421,6 +392,12 @@ onBeforeUnmount(() => {
   gap: 15px;
   margin-top: 22px;
 }
+.auth-panel :deep(.auth-form--verify) {
+  margin-top: 16px;
+}
+.auth-panel :deep(.auth-step-panel) {
+  min-height: 268px;
+}
 .auth-panel :deep(.auth-method-field) {
   position: relative;
   min-height: 68px;
@@ -455,7 +432,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 46px;
   min-width: 0;
-  padding: 0 13px 0 39px;
+  padding: 0 44px 0 39px;
   border: 1px solid var(--border);
   border-radius: 7px;
   outline: 0;
@@ -467,6 +444,22 @@ onBeforeUnmount(() => {
     border-color 0.2s ease,
     box-shadow 0.2s ease,
     background-color 0.2s ease;
+}
+.auth-panel :deep(.auth-input:-webkit-autofill),
+.auth-panel :deep(.auth-input:-webkit-autofill:hover),
+.auth-panel :deep(.auth-input:-webkit-autofill:focus) {
+  border-color: var(--border);
+  border-radius: 7px;
+  -webkit-text-fill-color: var(--c-text);
+  caret-color: var(--c-text);
+  box-shadow: 0 0 0 1000px var(--c-bg-1) inset;
+  background-clip: padding-box;
+}
+.auth-panel :deep(.auth-input:-webkit-autofill:focus) {
+  border-color: var(--c-primary);
+  box-shadow:
+    0 0 0 1000px var(--ld-bg-card) inset,
+    0 0 0 3px var(--c-primary-soft);
 }
 .auth-panel :deep(.auth-input:focus) {
   border-color: var(--c-primary);
@@ -516,6 +509,58 @@ onBeforeUnmount(() => {
 .auth-panel :deep(.form-note svg) {
   flex: none;
   margin-top: 2px;
+  color: var(--c-primary);
+}
+.auth-panel :deep(.auth-account-note),
+.auth-panel :deep(.auth-privacy) {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: 0.57rem;
+  line-height: 1.65;
+}
+.auth-panel :deep(.auth-account-note svg),
+.auth-panel :deep(.auth-privacy svg) {
+  flex: none;
+  margin-top: 2px;
+  color: var(--c-primary);
+}
+.auth-panel :deep(.auth-privacy) {
+  margin-top: 20px;
+  padding-top: 17px;
+  border-top: 1px solid var(--border);
+}
+.auth-panel :deep(.auth-email-summary) {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c-bg-1) 74%, transparent);
+  color: var(--c-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.66rem;
+}
+.auth-panel :deep(.auth-email-summary span) {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth-panel :deep(.auth-email-summary:hover) {
+  border-color: var(--c-primary);
   color: var(--c-primary);
 }
 .auth-panel :deep(.submit-button) {
@@ -575,6 +620,23 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: translateY(-5px);
 }
+.auth-panel :deep(.auth-step-enter-active),
+.auth-panel :deep(.auth-step-leave-active) {
+  transition:
+    opacity 0.22s ease,
+    transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.22s ease;
+}
+.auth-panel :deep(.auth-step-enter-from) {
+  opacity: 0;
+  filter: blur(5px);
+  transform: translateX(16px);
+}
+.auth-panel :deep(.auth-step-leave-to) {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateX(-10px);
+}
 .auth-panel :deep(.auth-divider) {
   display: flex;
   align-items: center;
@@ -618,7 +680,7 @@ onBeforeUnmount(() => {
     min-height: 250px;
     padding: 76px 24px 26px;
     border-right: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   }
   .brand-copy {
     margin-top: 44px;
@@ -641,6 +703,9 @@ onBeforeUnmount(() => {
   .auth-workspace {
     min-height: calc(100dvh - 250px);
     padding: 34px 20px max(32px, env(safe-area-inset-bottom));
+  }
+  .auth-workspace::before {
+    display: none;
   }
   .auth-panel::before,
   .auth-panel::after {

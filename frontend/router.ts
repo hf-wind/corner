@@ -129,7 +129,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/register",
-    component: lazyRoute(() => import("./pages/register.vue")),
+    redirect: (to) => ({ path: "/login", query: to.query }),
     meta: { layout: false },
   },
 
@@ -438,7 +438,7 @@ router.afterEach((to) => {
     to.fullPath.startsWith("/") &&
     !to.fullPath.startsWith("//")
   ) {
-    useClientState().setSession('lastPublicRoute', to.fullPath);
+    useClientState().setSession("lastPublicRoute", to.fullPath);
   }
   window.requestAnimationFrame(() =>
     document.documentElement.classList.remove("space-pending"),

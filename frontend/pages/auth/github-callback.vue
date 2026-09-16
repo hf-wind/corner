@@ -1,333 +1,405 @@
 <template>
-  <main class="callback-container" :class="{ 'is-error': error, 'is-success': !loading && !error }">
-    <div class="callback-grid" aria-hidden="true" />
-    <div class="callback-orbit callback-orbit--one" aria-hidden="true" />
-    <div class="callback-orbit callback-orbit--two" aria-hidden="true" />
-
-    <header class="callback-header">
-      <a class="callback-brand" href="/home" aria-label="返回风隅随笔首页">
-        <span class="brand-mark"><Icon name="ph:wind-bold" /></span>
+  <AuthPortal
+    mode="login"
+    headline="身份正穿过风隅"
+    description="GitHub 已经回应。再确认一次，就把这次相遇安全地留在本站。"
+  >
+    <section class="callback-panel" aria-live="polite">
+      <div
+        class="provider-signal"
+        :class="{ success: ready, error: error }"
+        aria-hidden="true"
+      >
+        <i /><i />
         <span>
-          <strong>风隅随笔</strong>
-          <small>WIND CORNER NOTES</small>
+          <Icon
+            :name="
+              error
+                ? 'ph:warning-bold'
+                : ready
+                  ? 'ph:check-bold'
+                  : 'ph:github-logo-bold'
+            "
+          />
         </span>
-      </a>
-      <span class="callback-index">AUTH / {{ loading ? "01" : error ? "ERR" : "02" }}</span>
-    </header>
-
-    <section class="callback-card" aria-live="polite">
-      <div class="provider-mark" aria-hidden="true">
-        <Icon name="ph:github-logo-bold" />
-        <span class="provider-ring provider-ring--outer" />
-        <span class="provider-ring provider-ring--inner" />
       </div>
 
-      <div v-if="loading" class="callback-state">
-        <span class="state-kicker">SECURE HANDSHAKE</span>
-        <h1>正在连接 GitHub</h1>
-        <p>正在确认你的身份，马上就好。</p>
-        <div class="progress-track" aria-label="正在连接">
-          <span />
+      <Transition name="callback-state" mode="out-in">
+        <div v-if="loading" key="loading" class="callback-state">
+          <span class="state-kicker">SECURE HANDSHAKE</span>
+          <h2>正在确认 GitHub 身份</h2>
+          <p>授权信息正在安全抵达，请稍候。</p>
+          <div class="callback-progress"><i /></div>
+          <div class="status-row">
+            <Icon name="ph:lock-key-bold" />加密连接中
+          </div>
         </div>
-        <div class="state-meta"><span>安全连接</span><span class="meta-dot" /><span>请稍候</span></div>
-      </div>
 
-      <div v-else-if="error" class="callback-state callback-state--error">
-        <span class="state-kicker">CONNECTION INTERRUPTED</span>
-        <h1>登录没有完成</h1>
-        <p>{{ error }}</p>
-        <div class="callback-actions">
-          <button class="action-primary" type="button" @click="retry">
-            <Icon name="ph:arrow-clockwise-bold" />再次尝试
+        <div
+          v-else-if="error"
+          key="error"
+          class="callback-state callback-state--error"
+        >
+          <span class="state-kicker">CONNECTION PAUSED</span>
+          <h2>连接没有完成</h2>
+          <p>{{ error }}</p>
+          <div class="callback-actions">
+            <button class="submit-button" type="button" @click="retry">
+              <Icon name="ph:arrow-clockwise-bold" />重新连接
+            </button>
+            <button class="callback-secondary" type="button" @click="goToLogin">
+              返回登录
+            </button>
+          </div>
+        </div>
+
+        <div v-else key="ready" class="callback-state callback-state--ready">
+          <span class="state-kicker">IDENTITY READY</span>
+          <h2>授权已经就绪</h2>
+          <p>确认后将完成本站登录，并前往你刚才想去的页面。</p>
+          <div class="identity-ticket">
+            <span><Icon name="ph:github-logo-bold" />GitHub</span>
+            <i />
+            <strong>{{ pendingEmail }}</strong>
+            <Icon name="ph:check-circle-fill" />
+          </div>
+          <button
+            class="submit-button confirm-button"
+            type="button"
+            :disabled="completing"
+            @click="completeLogin"
+          >
+            <Icon
+              :name="
+                completing ? 'ph:circle-notch-bold' : 'ph:arrow-right-bold'
+              "
+              :spin="completing"
+            />
+            {{ completing ? "正在完成登录" : "确认并进入风隅" }}
           </button>
-          <button class="action-secondary" type="button" @click="goToLogin">返回登录</button>
         </div>
-      </div>
-
-      <div v-else class="callback-state callback-state--success">
-        <span class="state-kicker">IDENTITY CONFIRMED</span>
-        <h1>登录成功</h1>
-        <p>身份已经确认，点击下方按钮完成本站登录。</p>
-        <div class="success-line"><Icon name="ph:check-bold" /><span>连接已建立</span></div>
-        <div class="callback-actions">
-          <button class="action-primary" type="button" :disabled="completing" @click="completeLogin">
-            <Icon :name="completing ? 'ph:spinner-gap-bold' : 'ph:arrow-right-bold'" />
-            {{ completing ? '正在进入' : '确认并进入风隅' }}
-          </button>
-        </div>
-      </div>
-
-      <footer class="callback-footer"><span>corner.ink</span><span>·</span><span>encrypted session</span></footer>
+      </Transition>
     </section>
-  </main>
+  </AuthPortal>
 </template>
 
 <script setup lang="ts">
-import { useSupabase } from '@/composables/useSupabase'
+import { useSupabase } from "@/composables/useSupabase";
 
-const route = useRoute()
-const router = useRouter()
-const { getUser } = useSupabase()
-const { setSession } = useAuth()
-const api = useApi()
+const route = useRoute();
+const router = useRouter();
+const toast = useToast();
+const { getUser } = useSupabase();
+const { setSession } = useAuth();
+const api = useApi();
 
-const loading = ref(true)
-const error = ref<string | null>(null)
-const completing = ref(false)
-const pendingGithubUser = ref<any | null>(null)
+const loading = ref(true);
+const error = ref<string | null>(null);
+const completing = ref(false);
+const pendingGithubUser = ref<any | null>(null);
+const ready = computed(() => !loading.value && !error.value);
+const pendingEmail = computed(
+  () => pendingGithubUser.value?.email || "已验证账号",
+);
 
-const clearOAuthHash = () => {
-  if (typeof window === 'undefined' || !window.location.hash) return
-  window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`)
+function safeRedirect() {
+  const target =
+    typeof route.query.redirect === "string" ? route.query.redirect : "";
+  return target.startsWith("/") && !target.startsWith("//") ? target : "/home";
 }
 
-const handleCallback = async () => {
-  try {
-    loading.value = true
-    error.value = null
-    
-    const user = await getUser()
-    
-    if (!user) {
-      throw new Error('获取用户信息失败')
-    }
+function clearOAuthHash() {
+  if (typeof window === "undefined" || !window.location.hash) return;
+  window.history.replaceState(
+    {},
+    document.title,
+    `${window.location.pathname}${window.location.search}`,
+  );
+}
 
-    // Never leave OAuth access/refresh tokens visible in the address bar,
-    // including when the local account request fails and the user retries.
-    clearOAuthHash()
-    
-    const state = useClientState()
-    const turnstileToken = String(state.getSession('githubTurnstileToken', ''))
+async function handleCallback() {
+  try {
+    loading.value = true;
+    error.value = null;
+    const user = await getUser();
+    if (!user) throw new Error("没有读取到 GitHub 授权信息");
+    clearOAuthHash();
+
+    const turnstileToken = String(
+      useClientState().getSession("githubTurnstileToken", ""),
+    );
+    if (!turnstileToken) throw new Error("安全校验已失效，请重新发起登录");
     pendingGithubUser.value = {
       id: user.id,
       email: user.email,
-      username: user.user_metadata?.user_name || user.user_metadata?.preferred_username,
+      username:
+        user.user_metadata?.user_name || user.user_metadata?.preferred_username,
       avatar: user.user_metadata?.avatar_url,
       turnstileToken,
-    }
+    };
   } catch (err: any) {
-    error.value = err.message || '登录失败，请重试'
+    error.value = err?.message || "GitHub 登录失败，请重试";
   } finally {
-    clearOAuthHash()
-    loading.value = false
+    clearOAuthHash();
+    loading.value = false;
   }
 }
 
 async function completeLogin() {
-  if (!pendingGithubUser.value || completing.value) return
-  completing.value = true
+  if (!pendingGithubUser.value || completing.value) return;
+  completing.value = true;
   try {
-    const { turnstileToken, ...githubUser } = pendingGithubUser.value
-    // Turnstile responses are single-use. Never leave the token available for
-    // a later attempt after this request has started.
-    useClientState().removeSession('githubTurnstileToken')
-    const response = await api.post<any>('/auth/github', { githubUser, turnstileToken })
-    // The API client normally unwraps { code, data }, but keep the callback
-    // correct when a proxy or an older deployment returns that envelope.
-    const result = response?.data && typeof response.data === 'object'
-      ? response.data
-      : response
-    const accessToken = String(result?.access_token || result?.accessToken || '').trim()
-    const nextUser = result?.user
+    const { turnstileToken, ...githubUser } = pendingGithubUser.value;
+    useClientState().removeSession("githubTurnstileToken");
+    const response = await api.post<any>("/auth/github", {
+      githubUser,
+      turnstileToken,
+    });
+    const result =
+      response?.data && typeof response.data === "object"
+        ? response.data
+        : response;
+    const accessToken = String(
+      result?.access_token || result?.accessToken || "",
+    ).trim();
+    const nextUser = result?.user;
     if (!accessToken || !nextUser?.id || !nextUser?.username) {
-      throw new Error('本站登录凭据无效，请重新尝试')
+      throw new Error("本站登录凭据无效，请重新尝试");
     }
     setSession(accessToken, {
       id: String(nextUser.id),
       username: String(nextUser.username),
       email: nextUser.email ? String(nextUser.email) : undefined,
       avatar: nextUser.avatar ? String(nextUser.avatar) : null,
-      role: nextUser.role ? String(nextUser.role) : 'user',
-    })
-    const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-    const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
-    await router.replace(redirect)
+      role: nextUser.role ? String(nextUser.role) : "user",
+    });
+    toast.success(
+      result?.account_status === "created"
+        ? "账号已创建，GitHub 登录成功"
+        : "GitHub 登录成功",
+    );
+    await new Promise<void>((resolve) => setTimeout(resolve, 240));
+    await router.replace(safeRedirect());
   } catch (err: any) {
-    error.value = err?.message || '本站登录未完成，请重试'
-    pendingGithubUser.value = null
+    error.value = err?.message || "本站登录未完成，请重试";
+    pendingGithubUser.value = null;
+    toast.error(error.value || "本站登录未完成，请重试");
   } finally {
-    completing.value = false
+    completing.value = false;
   }
 }
 
-const retry = () => {
-  useClientState().removeSession('githubTurnstileToken')
-  const target = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-  const redirect = target.startsWith('/') && !target.startsWith('//') ? target : '/home'
-  router.replace({ path: '/login', query: { redirect } })
+function retry() {
+  useClientState().removeSession("githubTurnstileToken");
+  router.replace({ path: "/login", query: { redirect: safeRedirect() } });
 }
 
-const goToLogin = () => {
-  router.push('/login')
+function goToLogin() {
+  useClientState().removeSession("githubTurnstileToken");
+  router.push("/login");
 }
 
-onMounted(() => {
-  handleCallback()
-})
+onMounted(handleCallback);
 </script>
 
 <style scoped>
-.callback-container {
-  --callback-accent: var(--c-primary, #4f8cff);
-  --callback-accent-soft: var(--c-primary-soft, rgb(79 140 255 / 14%));
+.callback-panel {
+  width: 100%;
+}
+
+.provider-signal {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  overflow: hidden;
-  padding: 88px 24px 40px;
-  background:
-    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--callback-accent) 12%, transparent), transparent 34%),
-    var(--c-bg);
+  display: grid;
+  width: 76px;
+  height: 76px;
+  margin-bottom: 26px;
+  place-items: center;
+}
+
+.provider-signal > span {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 40%, var(--border));
+  border-radius: 50%;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-size: 1.55rem;
+  place-items: center;
+}
+
+.provider-signal > i {
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 24%, transparent);
+  border-radius: 50%;
+  animation: callback-ring 2.3s ease-out infinite;
+}
+
+.provider-signal > i:nth-child(2) {
+  animation-delay: -1.15s;
+}
+.provider-signal.success > span {
+  border-color: color-mix(in srgb, #42a77b 46%, var(--border));
+  background: color-mix(in srgb, #42a77b 13%, transparent);
+  color: #42a77b;
+}
+.provider-signal.error > span {
+  border-color: color-mix(in srgb, #dc6268 46%, var(--border));
+  background: color-mix(in srgb, #dc6268 13%, transparent);
+  color: #dc6268;
+}
+.callback-state {
+  min-height: 235px;
+}
+.state-kicker {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: 0.51rem;
+  font-weight: 750;
+}
+.callback-state h2 {
+  margin: 9px 0 0;
   color: var(--c-text);
-  isolation: isolate;
+  font-size: 1.65rem;
+  letter-spacing: 0;
+}
+.callback-state > p {
+  max-width: 360px;
+  margin: 9px 0 0;
+  color: var(--c-text-3);
+  font-size: 0.7rem;
+  line-height: 1.75;
+}
+.callback-state--error .state-kicker {
+  color: #dc6268;
+}
+.callback-state--ready .state-kicker {
+  color: #42a77b;
 }
 
-.callback-grid {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--border) 34%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--border) 34%, transparent) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse at center, black 0%, transparent 74%);
-  opacity: 0.32;
+.callback-progress {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  margin-top: 35px;
+  overflow: hidden;
+  background: var(--border);
 }
-
-.callback-orbit {
+.callback-progress i {
   position: absolute;
-  z-index: -1;
-  width: min(74vw, 780px);
-  aspect-ratio: 1;
-  border: 1px solid color-mix(in srgb, var(--callback-accent) 16%, transparent);
-  border-radius: 50%;
-  pointer-events: none;
+  inset: 0 auto 0 -28%;
+  width: 34%;
+  background: var(--c-primary);
+  animation: callback-progress 1.35s ease-in-out infinite;
 }
-
-.callback-orbit::after {
-  position: absolute;
-  top: 10%;
-  left: 50%;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--callback-accent);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--callback-accent) 12%, transparent), 0 0 24px var(--callback-accent);
-  content: "";
-}
-
-.callback-orbit--one { transform: rotate(-22deg) scaleY(0.48); animation: orbit-drift 13s ease-in-out infinite; }
-.callback-orbit--two { width: min(53vw, 560px); transform: rotate(34deg) scaleY(0.52); opacity: 0.62; animation: orbit-drift 16s ease-in-out -4s infinite reverse; }
-
-.callback-header {
-  position: absolute;
-  top: 24px;
-  right: 28px;
-  left: 28px;
+.status-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--c-text-3);
+  font-size: 0.56rem;
 }
 
-.callback-brand {
-  display: inline-flex;
+.identity-ticket {
+  display: grid;
+  grid-template-columns: auto 1px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  color: var(--c-text);
-  text-decoration: none;
+  height: 48px;
+  margin-top: 26px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--c-text-2);
+  font-size: 0.61rem;
 }
-
-.brand-mark {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  border: 1px solid color-mix(in srgb, var(--callback-accent) 35%, var(--border));
-  border-radius: 10px;
-  background: var(--callback-accent-soft);
-  color: var(--callback-accent);
-  place-items: center;
-}
-
-.callback-brand strong,
-.callback-brand small { display: block; }
-.callback-brand strong { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em; }
-.callback-brand small { margin-top: 2px; color: var(--c-text-3); font-size: 0.46rem; letter-spacing: 0.18em; }
-.callback-index { color: var(--c-text-3); font-size: 0.52rem; letter-spacing: 0.16em; }
-
-.callback-card {
+.identity-ticket span {
   display: flex;
-  width: min(100%, 430px);
-  min-height: 455px;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 48px 42px 27px;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--callback-accent));
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--c-bg-1) 84%, transparent);
-  box-shadow: 0 26px 70px color-mix(in srgb, var(--ld-shadow) 24%, transparent), inset 0 1px color-mix(in srgb, white 30%, transparent);
-  backdrop-filter: blur(22px);
-  text-align: center;
-  animation: card-in 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+  gap: 6px;
+  color: var(--c-text);
+  font-weight: 700;
 }
-
-.provider-mark {
-  position: relative;
+.identity-ticket > i {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+.identity-ticket strong {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.identity-ticket > svg {
+  color: #42a77b;
+}
+.confirm-button {
+  margin-top: 14px;
+}
+.callback-actions {
   display: grid;
-  width: 92px;
-  height: 92px;
-  margin-bottom: 28px;
-  border: 1px solid color-mix(in srgb, var(--callback-accent) 40%, var(--border));
-  border-radius: 50%;
-  background: var(--callback-accent-soft);
-  color: var(--callback-accent);
-  font-size: 2.15rem;
-  place-items: center;
+  gap: 9px;
+  margin-top: 27px;
+}
+.callback-secondary {
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.65rem;
+}
+.callback-secondary:hover {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+.callback-state-enter-active,
+.callback-state-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.22s ease;
+}
+.callback-state-enter-from {
+  opacity: 0;
+  filter: blur(5px);
+  transform: translateX(14px);
+}
+.callback-state-leave-to {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateX(-8px);
 }
 
-.provider-ring { position: absolute; inset: -10px; border: 1px solid color-mix(in srgb, var(--callback-accent) 28%, transparent); border-radius: 50%; animation: ring-pulse 2.6s ease-out infinite; }
-.provider-ring--inner { inset: -4px; animation-delay: -1.3s; opacity: 0.7; }
-.is-error .provider-mark { color: #e76f73; border-color: color-mix(in srgb, #e76f73 42%, var(--border)); background: color-mix(in srgb, #e76f73 12%, transparent); }
-.is-success .provider-mark { color: #4eb889; border-color: color-mix(in srgb, #4eb889 42%, var(--border)); background: color-mix(in srgb, #4eb889 12%, transparent); }
-
-.callback-state { width: 100%; }
-.state-kicker { color: var(--callback-accent); font-size: 0.52rem; font-weight: 700; letter-spacing: 0.18em; }
-.callback-state h1 { margin: 11px 0 8px; font-size: clamp(1.35rem, 4vw, 1.7rem); font-weight: 700; letter-spacing: 0; }
-.callback-state p { min-height: 22px; margin: 0; color: var(--c-text-2); font-size: 0.76rem; line-height: 1.7; overflow-wrap: anywhere; }
-.callback-state--error .state-kicker { color: #e76f73; }
-.callback-state--success .state-kicker { color: #4eb889; }
-
-.progress-track { position: relative; width: 100%; height: 4px; margin: 29px 0 14px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--border) 74%, transparent); }
-.progress-track span { position: absolute; inset: 0 auto 0 -35%; width: 42%; border-radius: inherit; background: linear-gradient(90deg, transparent, var(--callback-accent), transparent); animation: progress-sweep 1.55s ease-in-out infinite; }
-.state-meta { display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--c-text-3); font-size: 0.58rem; letter-spacing: 0.04em; }
-.meta-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--callback-accent); }
-
-.callback-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 24px; }
-.callback-actions button { min-height: 38px; padding: 0 16px; border-radius: 9px; font: inherit; font-size: 0.68rem; cursor: pointer; transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease; }
-.callback-actions button:hover { transform: translateY(-1px); }
-.action-primary { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--callback-accent); background: var(--callback-accent); color: #fff; }
-.action-secondary { border: 1px solid var(--border); background: transparent; color: var(--c-text-2); }
-.action-secondary:hover { border-color: var(--callback-accent); color: var(--callback-accent); }
-.success-line { display: inline-flex; align-items: center; gap: 7px; margin-top: 26px; color: #4eb889; font-size: 0.65rem; }
-.success-line :deep(svg) { width: 15px; height: 15px; padding: 3px; border-radius: 50%; background: color-mix(in srgb, #4eb889 16%, transparent); }
-.callback-footer { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 34px; color: var(--c-text-3); font-size: 0.5rem; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.78; }
-
-@keyframes card-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes progress-sweep { from { transform: translateX(0); } to { transform: translateX(320%); } }
-@keyframes ring-pulse { 0%, 100% { opacity: 0.22; transform: scale(0.96); } 50% { opacity: 0.7; transform: scale(1.04); } }
-@keyframes orbit-drift { 0%, 100% { translate: 0 0; } 50% { translate: 0 -9px; } }
-
-@media (max-width: 560px) {
-  .callback-container { padding: 76px 16px 28px; }
-  .callback-header { top: 18px; right: 18px; left: 18px; }
-  .callback-card { min-height: 420px; padding: 38px 25px 24px; border-radius: 17px; }
-  .provider-mark { width: 80px; height: 80px; margin-bottom: 24px; font-size: 1.85rem; }
-  .callback-brand small { display: none; }
+@keyframes callback-ring {
+  from {
+    opacity: 0.6;
+    transform: scale(0.72);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.12);
+  }
 }
-
+@keyframes callback-progress {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(380%);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .callback-card, .callback-orbit, .provider-ring, .progress-track span { animation: none; }
+  .provider-signal > i,
+  .callback-progress i {
+    animation: none;
+  }
 }
 </style>

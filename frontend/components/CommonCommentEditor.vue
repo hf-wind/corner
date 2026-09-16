@@ -6,12 +6,22 @@
           <img v-if="user?.avatar" :src="mediaUrl(user.avatar)" alt="" />
           <Icon v-else name="ph:user-circle-fill" class="avatar-fallback" />
         </div>
-        <span class="comment-form-username">{{ user?.username || '用户' }}</span>
+        <span class="comment-form-username">{{
+          user?.username || "用户"
+        }}</span>
         <div class="comment-form-tabs">
-          <button type="button" :class="{ active: tab === 'write' }" @click="tab = 'write'">
+          <button
+            type="button"
+            :class="{ active: tab === 'write' }"
+            @click="tab = 'write'"
+          >
             <Icon name="ph:pencil-bold" />撰写
           </button>
-          <button type="button" :class="{ active: tab === 'preview' }" @click="switchPreview">
+          <button
+            type="button"
+            :class="{ active: tab === 'preview' }"
+            @click="switchPreview"
+          >
             <Icon name="ph:eye-bold" />预览
           </button>
         </div>
@@ -27,18 +37,40 @@
           @paste="onPaste"
         />
         <div class="comment-toolbar">
-          <button ref="emojiButtonRef" type="button" class="emoji-btn" :class="{ active: emojiOpen }" @click="emojiOpen = !emojiOpen" title="插入表情">
+          <button
+            ref="emojiButtonRef"
+            type="button"
+            class="emoji-btn"
+            :class="{ active: emojiOpen }"
+            @click="emojiOpen = !emojiOpen"
+            title="插入表情"
+          >
             <Icon name="ph:smiley-bold" />
           </button>
-          <EmojiPalette :open="emojiOpen" :anchor="emojiButtonRef" placement="top" @select="insertEmoji" @close="emojiOpen = false" />
+          <EmojiPalette
+            :open="emojiOpen"
+            :anchor="emojiButtonRef"
+            placement="top"
+            @select="insertEmoji"
+            @close="emojiOpen = false"
+          />
         </div>
       </div>
-      <div v-show="tab === 'preview'" class="comment-preview" v-html="renderContent(previewContent)" />
+      <div
+        v-show="tab === 'preview'"
+        class="comment-preview"
+        v-html="renderContent(previewContent)"
+      />
 
       <div class="comment-form-actions">
-        <button type="button" class="comment-submit" :disabled="!hasContent || submitting" @click="submit">
+        <button
+          type="button"
+          class="comment-submit"
+          :disabled="!hasContent || submitting"
+          @click="submit"
+        >
           <Icon name="ph:paper-plane-right-fill" />
-          <span>{{ submitting ? '提交中...' : '发表评论' }}</span>
+          <span>{{ submitting ? "提交中..." : "发表评论" }}</span>
         </button>
       </div>
     </template>
@@ -47,140 +79,160 @@
       <Icon name="ph:chat-centered-dots-bold" class="prompt-icon" />
       <p class="prompt-text">请登录后发表评论</p>
       <div class="prompt-actions">
-        <AppLink to="/login" class="prompt-btn prompt-btn-primary">去登录</AppLink>
-        <AppLink to="/register" class="prompt-btn prompt-btn-secondary">注册</AppLink>
+        <AppLink to="/login" class="prompt-btn prompt-btn-primary"
+          >邮箱登录</AppLink
+        >
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { renderCommentContent } from '@/utils/commentContent'
+import { renderCommentContent } from "@/utils/commentContent";
 
-const props = withDefaults(defineProps<{
-  submitting?: boolean
-}>(), {
-  submitting: false,
-})
+const props = withDefaults(
+  defineProps<{
+    submitting?: boolean;
+  }>(),
+  {
+    submitting: false,
+  },
+);
 
 const emit = defineEmits<{
-  submit: [content: string]
-}>()
+  submit: [content: string];
+}>();
 
-const { mediaUrl } = useMediaUrl()
-const { user, isLoggedIn } = useAuth()
-function renderContent(text: string) { return renderCommentContent(text, mediaUrl) }
+const { mediaUrl } = useMediaUrl();
+const { user, isLoggedIn } = useAuth();
+function renderContent(text: string) {
+  return renderCommentContent(text, mediaUrl);
+}
 
-const tab = ref<'write' | 'preview'>('write')
-const emojiOpen = ref(false)
-const hasContent = ref(false)
+const tab = ref<"write" | "preview">("write");
+const emojiOpen = ref(false);
+const hasContent = ref(false);
 
-watch(() => props.submitting, (cur, prev) => {
-  if (prev === true && cur === false) clearEditor()
-})
-const editorRef = ref<HTMLDivElement | null>(null)
-const emojiButtonRef = ref<HTMLButtonElement | null>(null)
-const previewContent = ref('')
+watch(
+  () => props.submitting,
+  (cur, prev) => {
+    if (prev === true && cur === false) clearEditor();
+  },
+);
+const editorRef = ref<HTMLDivElement | null>(null);
+const emojiButtonRef = ref<HTMLButtonElement | null>(null);
+const previewContent = ref("");
 
 function onInput() {
-  const editor = editorRef.value
-  hasContent.value = editor ? editor.textContent?.trim().length > 0 : false
+  const editor = editorRef.value;
+  hasContent.value = editor ? editor.textContent?.trim().length > 0 : false;
 }
 
 function onPaste(e: ClipboardEvent) {
-  e.preventDefault()
-  const text = e.clipboardData?.getData('text/plain') || ''
-  const sel = window.getSelection()
-  if (!sel || !sel.rangeCount) return
-  const range = sel.getRangeAt(0)
-  range.deleteContents()
-  range.insertNode(document.createTextNode(text))
-  range.collapse(false)
-  sel.removeAllRanges()
-  sel.addRange(range)
-  onInput()
+  e.preventDefault();
+  const text = e.clipboardData?.getData("text/plain") || "";
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  range.insertNode(document.createTextNode(text));
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  onInput();
 }
 
 function serialize(): string {
-  const editor = editorRef.value
-  if (!editor) return ''
-  const parts: string[] = []
+  const editor = editorRef.value;
+  if (!editor) return "";
+  const parts: string[] = [];
   const walk = (nodes: NodeListOf<ChildNode>) => {
     for (const node of Array.from(nodes)) {
       if (node.nodeType === Node.TEXT_NODE) {
-        parts.push(node.textContent || '')
+        parts.push(node.textContent || "");
       } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement
-        if (el.tagName === 'IMG') {
-          const src = (el as HTMLImageElement).dataset.emojiSrc || ''
+        const el = node as HTMLElement;
+        if (el.tagName === "IMG") {
+          const src = (el as HTMLImageElement).dataset.emojiSrc || "";
           if (src) {
-            const label = (el as HTMLImageElement).dataset.emojiLabel || '表情'
-            parts.push(`[[emoji:${src}|${label}]]`)
+            const label = (el as HTMLImageElement).dataset.emojiLabel || "表情";
+            parts.push(`[[emoji:${src}|${label}]]`);
           }
-        } else if (el.tagName === 'BR') {
-          parts.push('\n')
-        } else if (el.tagName === 'DIV') {
-          walk(el.childNodes)
-          parts.push('\n')
+        } else if (el.tagName === "BR") {
+          parts.push("\n");
+        } else if (el.tagName === "DIV") {
+          walk(el.childNodes);
+          parts.push("\n");
         } else {
-          walk(el.childNodes)
+          walk(el.childNodes);
         }
       }
     }
-  }
-  walk(editor.childNodes)
-  return parts.join('')
+  };
+  walk(editor.childNodes);
+  return parts.join("");
 }
 
-function insertEmoji(payload: { char?: string; imageUrl?: string; label?: string }) {
-  const editor = editorRef.value
-  if (!editor) return
-  editor.focus()
-  const sel = window.getSelection()
-  let range: Range
-  if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-    range = sel.getRangeAt(0)
-    range.deleteContents()
+function insertEmoji(payload: {
+  char?: string;
+  imageUrl?: string;
+  label?: string;
+}) {
+  const editor = editorRef.value;
+  if (!editor) return;
+  editor.focus();
+  const sel = window.getSelection();
+  let range: Range;
+  if (
+    sel &&
+    sel.rangeCount > 0 &&
+    editor.contains(sel.getRangeAt(0).commonAncestorContainer)
+  ) {
+    range = sel.getRangeAt(0);
+    range.deleteContents();
   } else {
-    range = document.createRange()
-    range.setStart(editor, editor.childNodes.length || 0)
-    range.collapse(false)
+    range = document.createRange();
+    range.setStart(editor, editor.childNodes.length || 0);
+    range.collapse(false);
   }
   if (payload.imageUrl) {
-    const img = document.createElement('img')
-    img.src = mediaUrl(payload.imageUrl)
-    img.alt = 'emoji'
-    img.className = 'inline-emoji'
-    img.dataset.emojiSrc = payload.imageUrl
-    img.dataset.emojiLabel = payload.label || ''
-    range.insertNode(img)
+    const img = document.createElement("img");
+    img.src = mediaUrl(payload.imageUrl);
+    img.alt = "emoji";
+    img.className = "inline-emoji";
+    img.dataset.emojiSrc = payload.imageUrl;
+    img.dataset.emojiLabel = payload.label || "";
+    range.insertNode(img);
   } else if (payload.char) {
-    range.insertNode(document.createTextNode(payload.char))
+    range.insertNode(document.createTextNode(payload.char));
   }
-  range.collapse(false)
-  if (sel) { sel.removeAllRanges(); sel.addRange(range) }
-  editor.focus()
-  onInput()
-  emojiOpen.value = false
+  range.collapse(false);
+  if (sel) {
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  editor.focus();
+  onInput();
+  emojiOpen.value = false;
 }
 
 function switchPreview() {
-  previewContent.value = serialize()
-  tab.value = 'preview'
+  previewContent.value = serialize();
+  tab.value = "preview";
 }
 
 function submit() {
-  const content = serialize()
-  if (!content.trim()) return
-  emit('submit', content)
+  const content = serialize();
+  if (!content.trim()) return;
+  emit("submit", content);
 }
 
 function clearEditor() {
-  if (editorRef.value) editorRef.value.innerHTML = ''
-  hasContent.value = false
-  tab.value = 'write'
+  if (editorRef.value) editorRef.value.innerHTML = "";
+  hasContent.value = false;
+  tab.value = "write";
 }
-defineExpose({ clearEditor })
+defineExpose({ clearEditor });
 </script>
 
 <style scoped>
@@ -200,7 +252,8 @@ defineExpose({ clearEditor })
 }
 .comment-form-avatar img,
 .avatar-fallback {
-  width: 32px; height: 32px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   color: var(--c-text-3);
@@ -237,7 +290,10 @@ defineExpose({ clearEditor })
   color: var(--c-primary);
   box-shadow: 0 1px 3px var(--ld-shadow);
 }
-.comment-form-body { margin-bottom: 12px; position: relative; }
+.comment-form-body {
+  margin-bottom: 12px;
+  position: relative;
+}
 .comment-editor :deep(.inline-emoji) {
   display: inline;
   width: auto;
@@ -264,7 +320,9 @@ defineExpose({ clearEditor })
   word-wrap: break-word;
   text-align: left;
 }
-.comment-editor:focus { box-shadow: inset 0 0 0 1.5px var(--c-primary); }
+.comment-editor:focus {
+  box-shadow: inset 0 0 0 1.5px var(--c-primary);
+}
 .comment-editor:empty:before {
   content: attr(data-placeholder);
   color: var(--c-text-3);
@@ -281,7 +339,8 @@ defineExpose({ clearEditor })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -290,7 +349,11 @@ defineExpose({ clearEditor })
   cursor: pointer;
   transition: all 0.15s;
 }
-.emoji-btn:hover, .emoji-btn.active { color: var(--c-primary); background: var(--c-primary-soft); }
+.emoji-btn:hover,
+.emoji-btn.active {
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
 .comment-preview {
   padding: 10px 12px;
   border-radius: 10px;
@@ -301,7 +364,11 @@ defineExpose({ clearEditor })
   min-height: 80px;
   margin-bottom: 12px;
 }
-.comment-form-actions { display: flex; flex-direction: column; gap: 10px; }
+.comment-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .comment-submit {
   display: inline-flex;
   align-items: center;
@@ -318,8 +385,13 @@ defineExpose({ clearEditor })
   white-space: nowrap;
   box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 28%, transparent);
 }
-.comment-submit:hover { opacity: 0.92; }
-.comment-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.comment-submit:hover {
+  opacity: 0.92;
+}
+.comment-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .comment-preview :deep(.inline-emoji) {
   display: inline;
   width: auto;
@@ -344,7 +416,11 @@ defineExpose({ clearEditor })
   color: var(--c-text-2);
   margin-bottom: 16px;
 }
-.prompt-actions { display: flex; gap: 10px; justify-content: center; }
+.prompt-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
 .prompt-btn {
   display: inline-flex;
   align-items: center;
@@ -363,10 +439,15 @@ defineExpose({ clearEditor })
   color: #fff;
   box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 28%, transparent);
 }
-.prompt-btn-primary:hover { opacity: 0.92; }
+.prompt-btn-primary:hover {
+  opacity: 0.92;
+}
 .prompt-btn-secondary {
   background: var(--c-bg-2);
   color: var(--c-text-2);
 }
-.prompt-btn-secondary:hover { color: var(--c-primary); background: var(--c-primary-soft); }
+.prompt-btn-secondary:hover {
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
 </style>

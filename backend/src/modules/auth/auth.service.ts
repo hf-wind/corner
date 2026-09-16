@@ -12,6 +12,7 @@ import { LoginDto } from './dto/login.dto';
 import { GitHubUser } from './types/github-user.type';
 import { UserService } from '../user/user.service';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 
 type AuthUser = {
   id: string;
@@ -42,8 +43,7 @@ export class AuthService {
 
     if (type === 'login') {
       const user = await this.findUserByEmail(email);
-      if (!user) throw new BadRequestException('该邮箱未注册');
-      if (!user.isActive) throw new BadRequestException('账号已被禁用');
+      if (user && !user.isActive) throw new BadRequestException('账号已被禁用');
     }
 
     if (type === 'change_password') {
@@ -85,9 +85,8 @@ export class AuthService {
 
   async login(dto: LoginDto & { code?: string }) {
     const email = this.normalizeEmail(dto.email);
-    const user = await this.findUserByEmail(email);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    if (!user.isActive) throw new UnauthorizedException('账号已被禁用');
+    let user = await this.findUserByEmail(email);
+    let accountStatus: 'created' | 'existing' = 'existing';
 
     if (dto.code) {
       const valid = await this.emailService.verifyCode(
@@ -96,14 +95,23 @@ export class AuthService {
         'login',
       );
       if (!valid) throw new BadRequestException('验证码无效或已过期');
+      if (!user) {
+        user = await this.createPasswordlessUser(email);
+        accountStatus = 'created';
+      }
     } else if (dto.password) {
+      if (!user) throw new UnauthorizedException('邮箱或密码不正确');
       const valid = await bcrypt.compare(dto.password, user.passwordHash);
-      if (!valid) throw new UnauthorizedException('Invalid credentials');
+      if (!valid) throw new UnauthorizedException('邮箱或密码不正确');
     } else {
       throw new BadRequestException('请提供密码或验证码');
     }
 
-    return this.token(user);
+    if (!user.isActive) throw new UnauthorizedException('账号已被禁用');
+    return {
+      ...this.token(user),
+      account_status: accountStatus,
+    };
   }
 
   async profile(userId: string) {
@@ -187,6 +195,23 @@ export class AuthService {
     }
 
     return `${base}_${Date.now().toString(36)}`;
+  }
+
+  private async createPasswordlessUser(email: string) {
+    const username = await this.generateUsername(email);
+    const passwordHash = await bcrypt.hash(
+      randomBytes(48).toString('base64url'),
+      12,
+    );
+    return this.prisma.user.create({
+      data: {
+        username,
+        email,
+        passwordHash,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        role: 'user',
+      },
+    });
   }
 
   private normalizeEmail(email: string): string {

@@ -58,7 +58,9 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: any) {
-    await this.turnstile.verify(dto.turnstileToken, req.ip);
+    // The email-code request has already passed Turnstile. The one-time code is
+    // the second proof, so code login must not force users through it twice.
+    if (!dto.code) await this.turnstile.verify(dto.turnstileToken, req.ip);
     return this.auth.login(dto);
   }
 
@@ -81,7 +83,7 @@ export class AuthController {
 
   @Post('github')
   async githubLogin(@Body() body: GitHubLoginRequestDto, @Req() req: any) {
-    await this.turnstile.verify(body.turnstileToken, req.ip)
+    await this.turnstile.verify(body.turnstileToken, req.ip);
     return this.auth.githubLogin(body.githubUser);
   }
 }

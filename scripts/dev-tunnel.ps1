@@ -4,7 +4,8 @@ param(
   [string]$SshUser = 'ubuntu',
   [string]$KeyPath = "$env:USERPROFILE/.ssh/id_ed25519",
   [string]$RemoteAppPath = '/srv/corner/app',
-  [switch]$SkipSetup
+  [switch]$SkipSetup,
+  [switch]$WriteConfigOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +50,21 @@ function ConvertTo-DotEnvLine {
   return "$Name=`"$escaped`""
 }
 
+function ConvertFrom-DotEnvLines {
+  param([string[]]$Lines)
+
+  $result = @{}
+  foreach ($line in $Lines) {
+    if ($line -notmatch '^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$') { continue }
+    $value = $Matches[2]
+    if ($value.Length -ge 2 -and (($value[0] -eq '"' -and $value[-1] -eq '"') -or ($value[0] -eq "'" -and $value[-1] -eq "'"))) {
+      $value = $value.Substring(1, $value.Length - 2)
+    }
+    $result[$Matches[1]] = $value
+  }
+  return $result
+}
+
 if (-not (Test-Path -LiteralPath $KeyPath)) {
   throw "SSH private key not found: $KeyPath"
 }
@@ -69,14 +85,20 @@ if ($readExit -ne 0 -or -not $remoteEnv) {
   throw 'Unable to read the remote development data configuration.'
 }
 
-$values = @{}
-foreach ($line in $remoteEnv) {
-  if ($line -match '^([A-Z0-9_]+)=(.*)$') { $values[$Matches[1]] = $Matches[2] }
-}
+$values = ConvertFrom-DotEnvLines $remoteEnv
 
 foreach ($required in @('DEV_POSTGRES_DB', 'DEV_POSTGRES_USER', 'DEV_POSTGRES_PASSWORD', 'DEV_REDIS_PASSWORD', 'DEV_JWT_SECRET')) {
   if (-not $values[$required]) { throw "Missing remote setting: $required" }
 }
+
+Write-TunnelLog 'Reading production SMTP configuration...'
+$remoteSmtpEnv = & ssh @sshArgs $SshTarget "grep -E '^(EMAIL_SMTP_(HOST|PORT|SECURE|USER|PASS)|EMAIL_FROM_(NAME|ADDRESS))=' '$RemoteAppPath/.env'"
+$smtpReadExit = $LASTEXITCODE
+$smtpValues = ConvertFrom-DotEnvLines $remoteSmtpEnv
+if ($smtpReadExit -ne 0 -or -not $smtpValues.EMAIL_SMTP_PASS) {
+  throw 'Unable to read the production SMTP configuration.'
+}
+Write-TunnelLog "Read production SMTP configuration (keys=$($smtpValues.Count); values hidden)."
 
 $rootEnv = Read-DotEnvValues (Join-Path $repoRoot '.env')
 $exampleEnv = Read-DotEnvValues (Join-Path $repoRoot '.env.example')
@@ -112,10 +134,28 @@ $lines = @(
   'NODE_ENV=development',
   'PORT=4000'
 )
+$smtpNames = @(
+  'EMAIL_SMTP_HOST',
+  'EMAIL_SMTP_PORT',
+  'EMAIL_SMTP_SECURE',
+  'EMAIL_SMTP_USER',
+  'EMAIL_SMTP_PASS',
+  'EMAIL_FROM_NAME',
+  'EMAIL_FROM_ADDRESS'
+)
+foreach ($name in $smtpNames) {
+  if ($smtpValues.ContainsKey($name)) {
+    $lines += ConvertTo-DotEnvLine $name $smtpValues[$name]
+  }
+}
 [System.IO.File]::WriteAllLines($backendEnv, $lines, [System.Text.UTF8Encoding]::new($false))
 Write-TunnelLog "Wrote $($lines.Count) configuration lines to backend/.env.tunnel."
 
-Write-Host 'Tunnel configuration written to backend/.env.tunnel (credentials are not printed).'
+Write-Host 'Tunnel and SMTP configuration written to backend/.env.tunnel (credentials are not printed).'
+if ($WriteConfigOnly) {
+  Write-TunnelLog 'Configuration-only mode completed; SSH tunnel was not started.'
+  exit 0
+}
 Write-Host 'Keep this terminal open. In another terminal run:'
 Write-Host '  cd backend'
 Write-Host '  npm run tunnel:init   # first use only'
