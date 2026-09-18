@@ -23,6 +23,7 @@
   </component>
   <GlobalToast v-if="toasts.length" />
   <LightConfirm />
+  <GlobalEffectCanvas />
 </template>
 
 <script setup lang="ts">
@@ -38,7 +39,6 @@ import DefaultLayout from "./layouts/default.vue";
 import AdminLayout from "./layouts/admin.vue";
 import WelcomeLayout from "./layouts/welcome.vue";
 import LightConfirm from "./components/LightConfirm.vue";
-import { useVisitor } from "./composables/useVisitor";
 import { trackUmamiPageview } from "./composables/useUmamiAnalytics";
 
 const GlobalToast = defineAsyncComponent(
@@ -86,9 +86,18 @@ watch(
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) {
       const dark = document.documentElement.classList.contains("dark");
+      const ocean = document.documentElement.dataset.palette === "ocean";
       themeColor.setAttribute(
         "content",
-        isSpaceRoute.value ? "#030712" : dark ? "#030b18" : "#eaf5ff",
+        isSpaceRoute.value
+          ? "#030712"
+          : dark
+            ? ocean
+              ? "#04101d"
+              : "#030b18"
+            : ocean
+              ? "#e8f1fb"
+              : "#eaf5ff",
       );
     }
   },
@@ -112,6 +121,7 @@ onMounted(() => {
   void loadSiteSettings();
   initTheme();
   initTypography();
+  void visitor.identify();
   window.addEventListener('pagehide', () => { void visitor.flushEvents(true) });
   if (sessionReady.value) {
     void refreshProfile();

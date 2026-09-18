@@ -252,13 +252,19 @@ import type {
 const api = useApi();
 const route = useRoute();
 const { mediaUrl } = useMediaUrl();
-const { selectMemory: selectSharedMemory } = useMemorySelection();
+const {
+  selectMemory: selectSharedMemory,
+  clearMemory: clearSharedMemory,
+  setMemoryContext,
+  clearMemoryContext,
+} = useMemorySelection();
 const pageEl = ref<HTMLElement | null>(null);
 const mapEl = ref<HTMLElement | null>(null);
 const listEl = ref<HTMLElement | null>(null);
 const adapter = shallowRef<MapAdapter | null>(null);
 const result = ref<MemoryMapResult>({
   items: [],
+  recentMemories: [],
   totalMemories: 0,
   returned: 0,
   truncated: false,
@@ -323,6 +329,7 @@ const selectedMemory = computed(
 onMounted(async () => {
   if (!mapEl.value) return;
   document.addEventListener("fullscreenchange", onFullscreenChange);
+  void loadGlobalMemoryContext();
   try {
     const longitude = Number(route.query.lng);
     const latitude = Number(route.query.lat);
@@ -354,7 +361,31 @@ onMounted(async () => {
   }
 });
 
+async function loadGlobalMemoryContext() {
+  try {
+    const overview = await api.get<MemoryMapResult>(
+      "/memories/map",
+      {
+        west: -179.99,
+        south: -85,
+        east: 179.99,
+        north: 85,
+        zoom: 1,
+        types: types.value.join(","),
+        year: year.value || undefined,
+        place: place.value || undefined,
+      },
+      { signal: AbortSignal.timeout(8000) },
+    );
+    setMemoryContext(buildMapContext(overview));
+  } catch {
+    // 地图上下文是增强信息，失败不影响地图主体继续初始化。
+  }
+}
+
 onUnmounted(() => {
+  clearSharedMemory();
+  clearMemoryContext();
   if (requestTimer) window.clearTimeout(requestTimer);
   if (tourTimer) window.clearTimeout(tourTimer);
   requestController?.abort();
@@ -393,6 +424,7 @@ async function loadMap(boundsOverride?: MapBounds, zoomOverride?: number) {
     if (sequence !== requestSequence) return;
     mapError.value = "";
     result.value = next;
+    setMemoryContext(buildMapContext(next));
     map.setItems(next.items, selectedId.value);
     if (revealInitialResult) {
       const [onlyItem] = next.items;
@@ -429,7 +461,15 @@ async function loadMap(boundsOverride?: MapBounds, zoomOverride?: number) {
 
 function selectMemory(item: MemoryMapItem, center = false, scroll = false) {
   selectedId.value = item.id;
-  selectSharedMemory({ id: item.id, type: item.type, href: item.href });
+  selectSharedMemory({
+    id: item.id,
+    type: item.type,
+    href: item.href,
+    title: item.title,
+    excerpt: item.excerpt,
+    placeName: item.placeName,
+    occurredAt: item.occurredAt,
+  });
   adapter.value?.setItems(result.value.items, item.id);
   if (center) focusSelectedMemory(item);
   if (scroll) {
@@ -447,7 +487,21 @@ function focusSelectedMemory(item: MemoryMapItem) {
 }
 function clearSelection() {
   selectedId.value = "";
+  clearSharedMemory();
   adapter.value?.setItems(result.value.items);
+}
+
+function buildMapContext(data: MemoryMapResult) {
+  const recent = data.recentMemories || [];
+  const lines = recent.map((item, index) => {
+    const date = item.occurredAt ? item.occurredAt.slice(0, 10) : "日期未记录";
+    const excerpt = String(item.excerpt || "").replace(/\s+/g, " ").trim().slice(0, 100);
+    return `${index + 1}. ${date}｜${item.placeName}｜${item.title}${excerpt ? `｜${excerpt}` : ""}`;
+  });
+  return [
+    `当前地图视野共有 ${data.totalMemories} 条公开记忆。`,
+    lines.length ? `当前视野最近记忆：\n${lines.join("\n")}` : "当前视野暂无可列出的公开记忆。",
+  ].join("\n");
 }
 async function expandCluster(item: MemoryMapCluster) {
   adapter.value?.setCenter(item.longitude, item.latitude, 15);

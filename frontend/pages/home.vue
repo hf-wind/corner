@@ -5,7 +5,7 @@
         class="featured-module-slot home-module"
         style="--home-enter-order: 0"
       >
-        <FeaturedSwiper />
+        <DailyCompass />
       </div>
       <!-- AI discovery is temporarily removed from the home flow. -->
 
@@ -98,12 +98,12 @@ import { defineAsyncComponent, onActivated, onDeactivated } from "vue";
 import { useBottomDockState } from "@/composables/useBottomDockState";
 import { importWithRetry } from "@/utils/lazyImport";
 
-const FeaturedSwiper = defineAsyncComponent(() =>
+const DailyCompass = defineAsyncComponent(() =>
   importWithRetry(
-    () => import("@/components/FeaturedSwiper.vue"),
+    () => import("@/components/DailyCompass.vue"),
     2,
     180,
-    "featured-swiper",
+    "daily-compass",
   ),
 );
 const HomeSidebar = defineAsyncComponent(() =>

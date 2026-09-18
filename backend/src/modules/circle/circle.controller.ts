@@ -14,6 +14,24 @@ export class CircleController {
     return this.circle.getConfig().then((config) => ({ enabled: config.enabled }));
   }
 
+  /** 风讯存档：数据库维度查询（时间/来源/关键词） */
+  @Get('archive')
+  archive(
+    @Query('scope') scope?: string,
+    @Query('source') source?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.circle.archive({
+      scope,
+      source,
+      q,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   @Get('feed')
   feed(
     @Query('page') page?: string,

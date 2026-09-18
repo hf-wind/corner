@@ -267,11 +267,11 @@ function startCooldown() {
   }, 1000);
 }
 
-async function sendLoginCode(turnstileToken: string) {
+async function sendLoginCode(geetestToken: string) {
   await api.post("/auth/send-code", {
     email: email.value,
     type: "login",
-    turnstileToken,
+    geetestToken,
   });
   startCooldown();
   loginType.value = "code";
@@ -281,24 +281,24 @@ async function sendLoginCode(turnstileToken: string) {
   codeInput.value?.focus();
 }
 
-async function handleChallengeVerified(turnstileToken: string) {
+async function handleChallengeVerified(geetestToken: string) {
   if (challengeBusy.value) return;
   challengeBusy.value = true;
   const action = challengeAction.value;
   try {
     if (action === "email" || action === "resend") {
-      await sendLoginCode(turnstileToken);
+      await sendLoginCode(geetestToken);
       challengeOpen.value = false;
       return;
     }
     if (action === "password") {
-      await completePasswordLogin(turnstileToken);
+      await completePasswordLogin(geetestToken);
       challengeOpen.value = false;
       return;
     }
 
     githubLoading.value = true;
-    useClientState().setSession("githubTurnstileToken", turnstileToken);
+    useClientState().setSession("githubGeetestToken", geetestToken);
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => setTimeout(resolve, 160)),
     );
@@ -306,7 +306,7 @@ async function handleChallengeVerified(turnstileToken: string) {
   } catch (error: any) {
     if (action === "github") {
       githubLoading.value = false;
-      useClientState().removeSession("githubTurnstileToken");
+      useClientState().removeSession("githubGeetestToken");
     }
     challengeOpen.value = false;
     toast.error(
@@ -339,7 +339,7 @@ async function finishLogin(result: any) {
   await router.push(safeRedirect() || panelHome());
 }
 
-async function completePasswordLogin(turnstileToken: string) {
+async function completePasswordLogin(geetestToken: string) {
   const submitted = loginForm.value ? new FormData(loginForm.value) : null;
   const submittedPassword = String(
     submitted?.get("password") || password.value,
@@ -351,7 +351,7 @@ async function completePasswordLogin(turnstileToken: string) {
     const result = await api.post<any>("/auth/login", {
       email: email.value,
       password: submittedPassword,
-      turnstileToken,
+      geetestToken,
     });
     await finishLogin(result);
   } finally {

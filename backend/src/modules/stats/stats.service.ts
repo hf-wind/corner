@@ -1,10 +1,211 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import * as os from 'os';
+
+type DailyFeaturedType = 'post' | 'moment' | 'library' | 'album';
 
 @Injectable()
 export class StatsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private settings: SettingsService,
+  ) {}
+
+  /**
+   * 今日风向标：优先读取后台手选的 featured_daily 配置；
+   * 未配置或配置失效时，自动从站点内容池按日期轮换挑选，保证每天都不同。
+   */
+  async dailyFeatured() {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    const configured = await this.readConfigured(today);
+    if (configured) return configured;
+    return this.pickAutomatic(today);
+  }
+
+  private async readConfigured(today: string) {
+    const raw = await this.settings.get('featured_daily').catch(() => null);
+    if (!raw || typeof raw !== 'object') return null;
+    const value = raw as Record<string, unknown>;
+    if (value.enabled === false) return null;
+    const pinnedDate = String(value.date || '').trim();
+    if (pinnedDate && pinnedDate !== today) return null;
+    const type = String(value.type || '') as DailyFeaturedType;
+    const slug = String(value.slug || '').trim();
+    const reason = String(value.reason || '').trim().slice(0, 120);
+    if (!type || !slug) return null;
+
+    const resolved = await this.resolveContent(type, slug);
+    if (!resolved) return null;
+    return {
+      ...resolved,
+      reason: reason || '今日站长亲手为你挑出的内容。',
+      pickedBy: 'manual',
+      date: pinnedDate || today,
+    };
+  }
+
+  private async resolveContent(type: DailyFeaturedType, slug: string) {
+    if (type === 'post') {
+      const post = await this.prisma.post.findFirst({
+        where: { slug, status: 'published' },
+        select: { slug: true, title: true, excerpt: true, coverImage: true },
+      });
+      if (!post) return null;
+      return {
+        type,
+        slug: post.slug,
+        title: post.title,
+        summary: post.excerpt || '',
+        image: post.coverImage || '',
+        href: '/article/' + post.slug,
+      };
+    }
+    if (type === 'moment') {
+      const moment = await this.prisma.moment.findFirst({
+        where: { slug, status: 'published' },
+        select: { slug: true, title: true },
+      });
+      if (!moment) return null;
+      return {
+        type,
+        slug: moment.slug,
+        title: moment.title || '一则瞬间',
+        summary: '',
+        image: '',
+        href: '/moments/' + moment.slug,
+      };
+    }
+    if (type === 'library') {
+      const item = await this.prisma.libraryItem.findFirst({
+        where: { slug, publishStatus: 'published' },
+        select: { slug: true, title: true, summary: true, coverImage: true },
+      });
+      if (!item) return null;
+      return {
+        type,
+        slug: item.slug,
+        title: item.title,
+        summary: item.summary || '',
+        image: item.coverImage || '',
+        href: '/library/' + item.slug,
+      };
+    }
+    const album = await this.prisma.album.findFirst({
+      where: { slug, status: 'published' },
+      include: { coverMedia: { select: { path: true } } },
+    });
+    if (!album) return null;
+    return {
+      type: 'album',
+      slug: album.slug,
+      title: album.title,
+      summary: '',
+      image: album.coverMedia?.path || '',
+      href: '/albums/' + album.slug,
+    };
+  }
+
+  private async pickAutomatic(today: string) {
+    const dayNumber = Number(today.replace(/-/g, '')) % 997;
+    const [posts, moments, libraryItems, albums] = await Promise.all([
+      this.prisma.post.findMany({
+        where: { status: 'published', featured: true },
+        orderBy: { publishedAt: 'desc' },
+        take: 8,
+        select: { slug: true, title: true, excerpt: true, coverImage: true },
+      }),
+      this.prisma.moment.findMany({
+        where: { status: 'published' },
+        orderBy: { publishedAt: 'desc' },
+        take: 5,
+        select: { slug: true, title: true },
+      }),
+      this.prisma.libraryItem.findMany({
+        where: { publishStatus: 'published' },
+        orderBy: { publishedAt: 'desc' },
+        take: 5,
+        select: { slug: true, title: true, summary: true, coverImage: true, type: true },
+      }),
+      this.prisma.album.findMany({
+        where: { status: 'published' },
+        orderBy: { publishedAt: 'desc' },
+        take: 3,
+        include: { coverMedia: { select: { path: true } } },
+      }),
+    ]);
+
+    const pool: Array<Record<string, unknown>> = [];
+    for (const post of posts) {
+      pool.push({
+        type: 'post',
+        slug: post.slug,
+        title: post.title,
+        summary: post.excerpt || '',
+        image: post.coverImage || '',
+        href: '/article/' + post.slug,
+      });
+    }
+    for (const moment of moments) {
+      pool.push({
+        type: 'moment',
+        slug: moment.slug,
+        title: moment.title || '一则瞬间',
+        summary: '',
+        image: '',
+        href: '/moments/' + moment.slug,
+      });
+    }
+    for (const item of libraryItems) {
+      pool.push({
+        type: 'library',
+        slug: item.slug,
+        title: item.title,
+        summary: item.summary || '',
+        image: item.coverImage || '',
+        href: '/library/' + item.slug,
+      });
+    }
+    for (const album of albums) {
+      pool.push({
+        type: 'album',
+        slug: album.slug,
+        title: album.title,
+        summary: '',
+        image: album.coverMedia?.path || '',
+        href: '/albums/' + album.slug,
+      });
+    }
+    if (!pool.length) return null;
+
+    const picked = pool[dayNumber % pool.length] as {
+      type: string;
+      slug: string;
+      title: string;
+      summary: string;
+      image: string;
+      href: string;
+    };
+    const reasons: Record<string, string> = {
+      post: '风把这一页翻到了最上面，读完大概只需要十分钟。',
+      moment: '一段被时间留下的瞬间，今天恰好轮到它。',
+      library: '一份值得留在书架上的书影记录，今天想介绍给你。',
+      album: '一册值得慢慢翻的相簿，风替你翻开了第一页。',
+    };
+    return {
+      ...picked,
+      reason: reasons[picked.type] || '今日为你翻出的内容。',
+      pickedBy: 'auto',
+      date: today,
+    };
+  }
+
 
   async overview() {
     const [postCount, commentCount, totalViews] = await Promise.all([

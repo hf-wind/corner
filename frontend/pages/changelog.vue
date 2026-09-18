@@ -19,7 +19,7 @@
           metric-label="次更新"
         />
 
-        <div v-if="error && !data.releases.length" class="dynamic-state error">
+        <div v-if="error && !data.groups.length" class="dynamic-state error">
             <span class="state-mark"><Icon name="ph:cloud-slash-bold" /></span>
             <div>
               <strong>更新记录暂时没有抵达</strong>
@@ -35,8 +35,8 @@
             <div class="welcome-mark" aria-hidden="true"><Icon name="ph:wind-bold" /></div>
             <div class="welcome-copy">
               <span>WIND TRAIL / SHIPPED RECORDS</span>
-              <h2 id="release-title">近期抵达</h2>
-              <p>每一次提交都在这里留下可回看的轨迹，欢迎沿着时间线回望风隅的变化。</p>
+              <h2 id="release-title">时间风迹</h2>
+              <p>每一次提交都按时间聚合在这里，欢迎沿着时间线回望风隅的变化。</p>
               <div class="welcome-meta" aria-label="更新来源与统计">
                 <span><Icon name="ph:git-branch-bold" />{{ data.sourceLabel || "仓库同步中" }}</span>
                 <span><b>{{ data.total }}</b> 次更新</span>
@@ -46,6 +46,59 @@
             </div>
           </header>
 
+          <div class="changelog-filters" aria-label="时间筛选与搜索">
+            <div ref="monthPickerRef" class="month-picker" :class="{ open: monthOpen }">
+              <button
+                type="button"
+                class="month-trigger"
+                :aria-expanded="monthOpen"
+                @click="monthOpen = !monthOpen"
+              >
+                <Icon name="ph:calendar-blank-bold" />
+                <span>{{ monthLabel || "全部时间" }}</span>
+                <Icon name="ph:caret-down-bold" class="month-caret" />
+              </button>
+              <Transition name="month-pop">
+                <div v-if="monthOpen" class="month-menu" role="listbox">
+                  <button
+                    type="button"
+                    role="option"
+                    :aria-selected="!month"
+                    :class="{ active: !month }"
+                    @click="chooseMonth('')"
+                  >
+                    <Icon name="ph:infinity-bold" />
+                    全部时间
+                  </button>
+                  <button
+                    v-for="item in data.months"
+                    :key="item"
+                    type="button"
+                    role="option"
+                    :aria-selected="month === item"
+                    :class="{ active: month === item }"
+                    @click="chooseMonth(item)"
+                  >
+                    <Icon name="ph:calendar-dot-bold" />
+                    {{ formatMonth(item) }}
+                  </button>
+                </div>
+              </Transition>
+            </div>
+            <label class="trail-search">
+              <Icon name="ph:magnifying-glass-bold" />
+              <input
+                v-model.trim="searchInput"
+                type="search"
+                placeholder="搜索提交内容、标题…"
+                maxlength="60"
+              />
+              <button v-if="searchInput" type="button" aria-label="清空" @click="searchInput = ''">
+                <Icon name="ph:x-bold" />
+              </button>
+            </label>
+          </div>
+
             <div v-if="error" class="inline-error">
               <Icon name="ph:warning-circle-bold" />
               <span>{{ error }}</span>
@@ -53,12 +106,12 @@
             </div>
 
             <div
-              v-if="data.releases.length"
+              v-if="data.groups.length"
               class="release-stream"
               :class="{ updating }"
             >
               <article
-                v-for="(release, releaseIndex) in data.releases"
+                v-for="(release, releaseIndex) in data.groups"
                 :key="release.id"
                 class="release-entry"
                 :style="{ '--entry-delay': `${releaseIndex * 55}ms` }"
@@ -89,7 +142,7 @@
                     {{ release.summary }}
                   </p>
 
-                  <ol v-if="release.items.length > 1" class="change-list">
+                  <ol v-if="release.items.length" class="change-list">
                     <li
                       v-for="(item, itemIndex) in release.items"
                       :key="item.sha || `${release.id}-${itemIndex}`"
@@ -104,10 +157,10 @@
             </div>
             <div v-else-if="!loading && !error" class="empty-release">
               <span class="empty-mark"><Icon name="ph:wind-bold" /></span>
-              <div><h3>风还没有留下新的记录</h3><p>仓库同步完成后，最新变化会出现在这里。</p></div>
+              <div><h3>这段风里没有找到记录</h3><p>换个关键词或时间范围，也许就有惊喜。</p></div>
             </div>
             <div class="load-more-sentinel" aria-live="polite">
-              <span v-if="loading && data.releases.length">正在读取时间线</span>
+              <span v-if="loading && data.groups.length">正在读取时间线</span>
             </div>
         </section>
 
@@ -128,7 +181,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ChangelogResponse } from "@/types/changelog";
+import type { ChangelogRelease, ChangelogTimelineResponse } from "@/types/changelog";
 
 const api = useApi();
 const scrollRef = ref<HTMLElement | null>(null);
@@ -137,15 +190,26 @@ const loading = ref(true);
 const updating = ref(false);
 const ready = ref(false);
 const error = ref("");
+const month = ref("");
+const monthOpen = ref(false);
+const searchInput = ref("");
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let requestSequence = 0;
-const data = reactive<ChangelogResponse>({
+const monthPickerRef = ref<HTMLElement | null>(null);
+
+const monthLabel = computed(() =>
+  month.value ? formatMonth(month.value) : "",
+);
+
+const data = reactive<ChangelogTimelineResponse>({
   enabled: true,
   title: "风迹墙",
   subtitle:
     "风过无声，循迹可寻。每一次改变，都在时间里留下属于自己的印记，那些细微的更迭与变化，也终将成为一路走来不可忽略的痕迹。",
   repository: { owner: "", name: "", branch: "main", url: "" },
-  releases: [],
-      page: 1,
+  groups: [],
+  months: [],
+  page: 1,
   totalPages: 1,
   total: 0,
   itemCount: 0,
@@ -162,13 +226,15 @@ async function load(nextPage = page.value) {
   else loading.value = true;
   error.value = "";
   try {
-    const result = await api.get<ChangelogResponse>("/changelog", {
+    const result = await api.get<ChangelogTimelineResponse>("/changelog/timeline", {
       page: nextPage,
       limit: 10,
+      q: searchInput.value || undefined,
+      month: month.value || undefined,
     });
     if (sequence !== requestSequence) return;
-    const incoming = Array.isArray(result.releases) ? result.releases : [];
-    Object.assign(data, { ...result, releases: incoming });
+    const incoming = Array.isArray(result.groups) ? result.groups : [];
+    Object.assign(data, { ...result, groups: incoming });
     page.value = result.page;
     await nextTick();
     if (!ready.value) {
@@ -184,6 +250,35 @@ async function load(nextPage = page.value) {
       updating.value = false;
     }
   }
+}
+
+function chooseMonth(value: string) {
+  month.value = value;
+  monthOpen.value = false;
+  void load(1);
+}
+
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => void load(1), 380);
+}
+
+function formatMonth(value: string) {
+  const [year, monthPart] = value.split("-");
+  return `${year} 年 ${Number(monthPart)} 月`;
+}
+
+watch(searchInput, onSearchInput);
+
+function onDocumentClick(event: MouseEvent) {
+  if (!monthOpen.value) return;
+  if (monthPickerRef.value && !monthPickerRef.value.contains(event.target as Node)) {
+    monthOpen.value = false;
+  }
+}
+
+function onFilterKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && monthOpen.value) monthOpen.value = false;
 }
 
 async function changePage(nextPage: number) {
@@ -217,6 +312,14 @@ function formatSyncTime(value: string) {
 
 onMounted(() => {
   void load(1);
+  document.addEventListener("click", onDocumentClick);
+  document.addEventListener("keydown", onFilterKeydown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", onDocumentClick);
+  document.removeEventListener("keydown", onFilterKeydown);
+  if (searchTimer) clearTimeout(searchTimer);
 });
 useHead({
   title: "风迹墙 · 风隅随笔",
@@ -974,4 +1077,182 @@ useHead({
 /* A compact ledger gives each release a legible date and keeps the stream calm. */
 .changelog-page{width:min(1080px,calc(100% - 56px));padding:30px 0 72px}.release-section{padding:30px 0 10px}.changelog-welcome{grid-template-columns:52px minmax(0,1fr);gap:16px;margin:0 0 26px;padding:0 0 22px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none}.changelog-welcome::after{display:none}.welcome-mark{width:48px;height:48px;border-radius:8px;background:var(--c-primary-soft);box-shadow:none}.welcome-copy h2{font-size:1.2rem}.welcome-copy>p{max-width:700px;font-size:.68rem}.welcome-meta{gap:8px 16px;margin-top:12px;font-size:.58rem}.release-entry{grid-template-columns:112px minmax(0,1fr);gap:22px}.release-date{align-items:flex-start;justify-content:flex-end;padding:20px 16px 0 0}.release-date::after{right:0;background:var(--border)}.release-date>i{top:28px;right:-3px;width:7px;height:7px;background:var(--c-primary);box-shadow:0 0 0 4px var(--c-bg)}.release-date time{min-width:82px;padding:6px 8px;border:0;border-radius:0;background:transparent;color:var(--c-primary);font-size:.65rem}.release-body{margin-bottom:12px;padding:18px 20px 16px;border:1px solid color-mix(in srgb,var(--border) 84%,transparent);border-radius:8px;background:var(--ld-bg-card);box-shadow:none}.release-body:hover{background:color-mix(in srgb,var(--c-primary-soft) 12%,var(--ld-bg-card));box-shadow:none;transform:none}.release-body h3{margin-top:7px;font-size:1.04rem;line-height:1.45}.release-summary{font-size:.7rem;line-height:1.75}.change-list{margin-top:14px}.change-list li{padding:8px 9px;border-radius:5px}.change-list li>span{color:var(--c-primary);font-size:.58rem}.change-list p{font-size:.66rem;line-height:1.65}.change-list code{font-size:.54rem}.page-footer{margin:28px 0 0 134px}.release-stream.updating{filter:none;transform:none}.release-entry{animation-duration:.45s}
 @media(max-width:640px){.changelog-page{width:100%;padding-bottom:60px}.changelog-page :deep(.content-hero){margin-inline:14px}.release-section{padding:22px 14px 8px}.changelog-welcome{grid-template-columns:42px minmax(0,1fr);gap:12px;padding-bottom:18px}.welcome-mark{width:40px;height:40px;font-size:1.1rem}.welcome-copy h2{font-size:1.05rem}.welcome-copy>p{font-size:.62rem}.release-entry{grid-template-columns:72px minmax(0,1fr);gap:12px}.release-date{padding:16px 10px 0 0}.release-date time{min-width:58px;padding:4px 0;font-size:.51rem}.release-date>i{top:24px}.release-body{margin-bottom:9px;padding:13px 14px 12px}.release-body h3{font-size:.88rem}.release-summary,.change-list p{font-size:.61rem}.change-list li{padding:6px}.page-footer{margin:24px 14px 0 86px}}
+
+/* ---- 时间筛选与搜索 ---- */
+.changelog-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 22px;
+}
+
+.month-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.month-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 10px;
+  background: var(--ld-bg-card);
+  color: var(--c-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  transition: border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.month-trigger:hover,
+.month-picker.open .month-trigger {
+  color: var(--c-primary);
+  border-color: color-mix(in srgb, var(--c-primary) 48%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 10%, transparent);
+}
+
+.month-caret {
+  font-size: 0.6rem;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.month-picker.open .month-caret {
+  transform: rotate(180deg);
+}
+
+.month-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 168px;
+  max-height: 264px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 12px;
+  background: var(--ld-bg-card);
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--ld-shadow) 36%, transparent);
+}
+
+.month-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  text-align: left;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.month-menu button:hover {
+  background: color-mix(in srgb, var(--c-primary-soft) 46%, transparent);
+  color: var(--c-text);
+}
+
+.month-menu button.active {
+  background: color-mix(in srgb, var(--c-primary-soft) 72%, transparent);
+  color: var(--c-primary);
+  font-weight: 650;
+}
+
+.month-pop-enter-active {
+  transition: opacity 0.2s ease, transform 0.26s cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+
+.month-pop-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.month-pop-enter-from,
+.month-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+}
+
+.trail-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  max-width: 320px;
+}
+
+.trail-search > svg {
+  position: absolute;
+  left: 12px;
+  color: var(--c-text-3);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+
+.trail-search input {
+  width: 100%;
+  padding: 9px 34px 9px 34px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 10px;
+  background: var(--ld-bg-card);
+  color: var(--c-text);
+  font: inherit;
+  font-size: 0.7rem;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.trail-search input::placeholder {
+  color: var(--c-text-3);
+}
+
+.trail-search input:focus {
+  border-color: color-mix(in srgb, var(--c-primary) 48%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 10%, transparent);
+}
+
+.trail-search button {
+  position: absolute;
+  right: 8px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-bg-2) 80%, transparent);
+  color: var(--c-text-3);
+  cursor: pointer;
+  font-size: 0.55rem;
+  place-items: center;
+}
+
+.trail-search button:hover {
+  color: var(--c-text);
+}
+
+@media (max-width: 640px) {
+  .changelog-filters {
+    flex-wrap: wrap;
+  }
+
+  .trail-search {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .month-caret,
+  .month-pop-enter-active,
+  .month-pop-leave-active,
+  .month-trigger {
+    transition: none;
+  }
+}
 </style>

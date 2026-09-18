@@ -7,7 +7,7 @@ describe('ChangelogService runtime Git history', () => {
   let service: ChangelogService;
 
   beforeEach(() => {
-    service = new ChangelogService({} as any, {} as any, {} as any);
+    service = new ChangelogService({} as any, {} as any, {} as any, {} as any);
   });
 
   afterEach(async () => {
@@ -117,7 +117,7 @@ describe('ChangelogService admin translation pagination', () => {
       },
     };
     const translation = { configured: true };
-    const service = new ChangelogService({} as any, prisma as any, translation as any);
+    const service = new ChangelogService({} as any, prisma as any, translation as any, {} as any);
     jest.spyOn(service as any, 'getConfig').mockResolvedValue({
       enabled: true,
       repositoryOwner: 'hf-wind',

@@ -5,7 +5,6 @@
         v-if="total > 1 && !hidden"
         class="pagination-anchor"
         :class="{ 'is-devtools-collapsed': isDevtoolsCollapsed }"
-        @mousemove="bringUp"
       >
         <span class="pagination-glowing" aria-hidden="true" />
         <nav class="corner-pagination" aria-label="分页导航">
@@ -45,9 +44,16 @@
             </button>
           </div>
 
-          <span class="pagination-toggle" aria-hidden="true">
+          <button
+            type="button"
+            class="pagination-toggle"
+            :aria-expanded="!isDevtoolsCollapsed"
+            :title="isDevtoolsCollapsed ? '展开分页' : '收起分页'"
+            :aria-label="isDevtoolsCollapsed ? '展开分页' : '收起分页'"
+            @click.stop="togglePagination"
+          >
             <Icon name="ph:list-numbers-bold" />
-          </span>
+          </button>
         </nav>
       </div>
     </Transition>
@@ -81,16 +87,16 @@ const slideDirection = ref<"page-up" | "page-down">("page-up");
 const {
   autoCollapsed: dockAutoCollapsed,
   recordsIntersecting,
+  nearBottom,
+  activeBottomDock,
   setPaginationVisible,
+  setActiveBottomDock,
 } = useBottomDockState();
-const isHovering = ref(false);
-const isTouchDevice = ref(false);
-let hoverTimer = 0;
+const expanded = ref(false);
+const autoExpanded = ref(false);
 const isDevtoolsCollapsed = computed(
   () =>
-    !isTouchDevice.value &&
-    !isHovering.value &&
-    (dockAutoCollapsed.value || recordsIntersecting.value),
+    !expanded.value && (dockAutoCollapsed.value || recordsIntersecting.value),
 );
 let previousPage = props.modelValue;
 
@@ -100,16 +106,9 @@ watch(
   { immediate: true },
 );
 
-onMounted(() => {
-  isTouchDevice.value =
-    "ontouchstart" in window ||
-    navigator.maxTouchPoints > 0 ||
-    window.matchMedia("(hover: none), (pointer: coarse)").matches;
-});
-
 onUnmounted(() => {
-  window.clearTimeout(hoverTimer);
   setPaginationVisible(false);
+  if (activeBottomDock.value === "pagination") setActiveBottomDock(null);
 });
 
 watch(
@@ -126,14 +125,30 @@ function goTo(page: number) {
   emit("change", page);
 }
 
-function bringUp() {
-  if (isTouchDevice.value) return;
-  isHovering.value = true;
-  window.clearTimeout(hoverTimer);
-  hoverTimer = window.setTimeout(() => {
-    isHovering.value = false;
-  }, 5000);
+// 展开与收起由点击图标驱动；滚动接近页面底部时自动展开并收起音乐胶囊
+function togglePagination() {
+  autoExpanded.value = false;
+  expanded.value = !expanded.value;
+  setActiveBottomDock(expanded.value ? "pagination" : null);
 }
+
+watch(nearBottom, (near) => {
+  if (near) {
+    expanded.value = true;
+    autoExpanded.value = true;
+    setActiveBottomDock("pagination");
+  } else if (autoExpanded.value) {
+    expanded.value = false;
+    autoExpanded.value = false;
+    if (activeBottomDock.value === "pagination") setActiveBottomDock(null);
+  }
+});
+
+watch(activeBottomDock, (active) => {
+  if (active !== "music") return;
+  expanded.value = false;
+  autoExpanded.value = false;
+});
 </script>
 
 <style scoped>
@@ -146,7 +161,12 @@ function bringUp() {
   height: var(--capsule-height);
   flex: 0 1 116px;
   align-items: center;
-  transition: all 0.6s, max-width 0.6s, padding 0.5s, transform 0.4s, opacity 0.2s;
+  transition:
+    all 0.6s,
+    max-width 0.6s,
+    padding 0.5s,
+    transform 0.4s,
+    opacity 0.2s;
 }
 
 .pagination-anchor.is-devtools-collapsed {
@@ -209,7 +229,8 @@ function bringUp() {
   border-radius: 100%;
   background: transparent;
   color: inherit;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
   font-size: 0.78rem;
   opacity: 0.8;
   transform: translateY(-50%);

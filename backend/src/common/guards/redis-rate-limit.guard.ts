@@ -157,6 +157,16 @@ export class RedisRateLimitGuard implements CanActivate {
         windowSeconds: 600,
         identity: 'email',
       });
+    } else if (method === 'POST' && path.endsWith('/visitor/identify')) {
+      rules.push({ name: 'visitor-identify', limit: 12, windowSeconds: 60 });
+    } else if (method === 'POST' && path.endsWith('/visitor/messages')) {
+      rules.push({ name: 'visitor-message', limit: 10, windowSeconds: 600 });
+    } else if (method === 'POST' && path.endsWith('/visitor/bottle/throw')) {
+      rules.push({ name: 'visitor-bottle-throw', limit: 6, windowSeconds: 3600 });
+    } else if (method === 'POST' && path.endsWith('/visitor/bottle/fish')) {
+      rules.push({ name: 'visitor-bottle-fish', limit: 12, windowSeconds: 3600 });
+    } else if (method === 'POST' && path.endsWith('/visitor/events')) {
+      rules.push({ name: 'visitor-events', limit: 30, windowSeconds: 60 });
     } else if (
       method === 'POST' &&
       /\/(?:comments|moment-comments)(?:\/[^/]+\/like)?$/.test(path)

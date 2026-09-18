@@ -25,5 +25,5 @@ export class GitHubLoginRequestDto {
   @IsString()
   @IsOptional()
   @MaxLength(2048)
-  turnstileToken?: string
+  geetestToken?: string
 }

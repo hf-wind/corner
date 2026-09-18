@@ -66,8 +66,17 @@ export class MemoryMapService {
       : viewportPoints;
     const clustered = this.cluster(points, normalized.zoom);
     const items = clustered.slice(0, 500);
+    const recentMemories = [...points]
+      .sort((left, right) =>
+        String(right.occurredAt || '').localeCompare(
+          String(left.occurredAt || ''),
+        ),
+      )
+      .slice(0, 8)
+      .map((point) => this.toMemory(point));
     const payload = {
       items,
+      recentMemories,
       totalMemories: points.length,
       returned: items.length,
       truncated: clustered.length > 500,

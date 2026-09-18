@@ -225,12 +225,86 @@
           </section>
 
           <section
+            v-if="profile.pet.enabled && profile.pet.name"
+            id="pet"
+            class="content-section pet-profile reveal-block"
+          >
+            <SectionHeading
+              index="05"
+              eyebrow="A SOFT ROOMMATE"
+              :title="profile.sectionTitles.pet"
+              :description="profile.sectionDescriptions.pet"
+            />
+            <div class="pet-intro">
+              <div class="pet-copy">
+                <span class="pet-name"
+                  ><Icon name="ph:cat-bold" />{{ profile.pet.name }}</span
+                >
+                <h3>{{ profile.pet.nickname || "家里的另一位成员" }}</h3>
+                <p v-if="profile.pet.story">{{ profile.pet.story }}</p>
+                <dl>
+                  <div v-if="profile.pet.breed">
+                    <dt>身份</dt>
+                    <dd>{{ profile.pet.breed }}</dd>
+                  </div>
+                  <div v-if="profile.pet.birthday">
+                    <dt>纪念日</dt>
+                    <dd>{{ profile.pet.birthday }}</dd>
+                  </div>
+                  <div v-if="profile.pet.personality">
+                    <dt>性格</dt>
+                    <dd>{{ profile.pet.personality }}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div class="pet-sketch" aria-hidden="true">
+                <svg viewBox="0 0 220 180" role="img">
+                  <path class="pet-tail" d="M157 130c37 10 48-28 22-39" />
+                  <path
+                    class="pet-body"
+                    d="M66 126c0-37 19-61 53-61 31 0 47 22 43 61l-5 31H74z"
+                  />
+                  <path
+                    class="pet-head"
+                    d="M79 76 73 40l28 17c11-4 24-4 35 0l28-17-6 38c7 8 10 19 8 30-3 22-23 36-49 36s-46-15-48-37c-1-12 3-23 10-31Z"
+                  />
+                  <path
+                    class="pet-face"
+                    d="M101 96h1m32 0h1M109 111c6 5 13 5 19 0"
+                  />
+                  <path
+                    class="pet-whiskers"
+                    d="M93 108 60 101m34 18-34 7m83-18 32-7m-31 18 32 7"
+                  />
+                </svg>
+                <span>在键盘旁边，监督每一次保存</span>
+              </div>
+            </div>
+            <div v-if="petPhotos.length" class="pet-gallery">
+              <figure
+                v-for="(photo, index) in petPhotos"
+                :key="`${photo.url}-${index}`"
+              >
+                <img
+                  :src="photo.url"
+                  :alt="photo.caption || `${profile.pet.name}的照片`"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption v-if="photo.caption">
+                  {{ photo.caption }}
+                </figcaption>
+              </figure>
+            </div>
+          </section>
+
+          <section
             v-if="profile.timeline.length"
             id="timeline"
             class="content-section timeline reveal-block"
           >
             <SectionHeading
-              index="05"
+              :index="profile.pet.enabled && profile.pet.name ? '06' : '05'"
               eyebrow="ON THE WAY"
               :title="profile.sectionTitles.timeline"
               :description="profile.sectionDescriptions.timeline"
@@ -259,7 +333,7 @@
             class="content-section values reveal-block"
           >
             <SectionHeading
-              index="06"
+              :index="profile.pet.enabled && profile.pet.name ? '07' : '06'"
               eyebrow="THE THINGS THAT MATTER"
               :title="profile.sectionTitles.values"
               :description="profile.sectionDescriptions.values"
@@ -280,7 +354,7 @@
             class="content-section facts reveal-block"
           >
             <SectionHeading
-              index="07"
+              :index="profile.pet.enabled && profile.pet.name ? '08' : '07'"
               eyebrow="A FEW SMALL FACTS"
               :title="profile.sectionTitles.facts"
               :description="profile.sectionDescriptions.facts"
@@ -306,6 +380,12 @@
               <q>{{ profile.motto }}</q>
               <span>{{ profile.availability }}</span>
             </div>
+            <span
+              v-if="profile.pet.enabled && profile.pet.name"
+              class="footer-paw"
+            >
+              <Icon name="ph:paw-print-fill" /> {{ profile.pet.name }} 也在这里
+            </span>
           </footer>
         </div>
       </main>
@@ -459,6 +539,12 @@ const introductionParagraphs = computed(() =>
 const valuesParagraphs = computed(() =>
   splitParagraphs(profile.value?.values || ""),
 );
+const petPhotos = computed(() =>
+  (profile.value?.pet.photos || []).map((photo) => ({
+    ...photo,
+    url: mediaUrl(photo.url),
+  })),
+);
 
 const sectionNav = computed(() =>
   profile.value
@@ -495,11 +581,23 @@ const sectionNav = computed(() =>
               },
             ]
           : []),
+        ...(profile.value.pet.enabled && profile.value.pet.name
+          ? [
+              {
+                id: "pet",
+                index: "05",
+                title: profile.value.sectionTitles.pet,
+              },
+            ]
+          : []),
         ...(profile.value.timeline.length
           ? [
               {
                 id: "timeline",
-                index: "05",
+                index:
+                  profile.value.pet.enabled && profile.value.pet.name
+                    ? "06"
+                    : "05",
                 title: profile.value.sectionTitles.timeline,
               },
             ]
@@ -508,7 +606,10 @@ const sectionNav = computed(() =>
           ? [
               {
                 id: "values",
-                index: "06",
+                index:
+                  profile.value.pet.enabled && profile.value.pet.name
+                    ? "07"
+                    : "06",
                 title: profile.value.sectionTitles.values,
               },
             ]
@@ -517,7 +618,10 @@ const sectionNav = computed(() =>
           ? [
               {
                 id: "facts",
-                index: "07",
+                index:
+                  profile.value.pet.enabled && profile.value.pet.name
+                    ? "08"
+                    : "07",
                 title: profile.value.sectionTitles.facts,
               },
             ]
@@ -1559,6 +1663,163 @@ useHead(() => ({
   overflow-wrap: anywhere;
 }
 
+.pet-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(220px, 0.55fr);
+  gap: 28px;
+  align-items: stretch;
+  padding-block: 8px 28px;
+}
+
+.pet-copy {
+  padding: 24px 0 24px 24px;
+  border-left: 2px solid color-mix(in srgb, var(--c-primary) 55%, var(--border));
+}
+
+.pet-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--c-primary);
+  font: 700 0.62rem var(--font-mono);
+}
+
+.pet-copy h3 {
+  margin: 10px 0 8px;
+  color: var(--c-text-1);
+  font: 600 1.35rem var(--font-heading);
+}
+
+.pet-copy > p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: 0.75rem;
+  line-height: 1.9;
+  white-space: pre-line;
+}
+
+.pet-copy dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 20px 0 0;
+}
+
+.pet-copy dl div {
+  display: grid;
+  gap: 3px;
+}
+.pet-copy dt {
+  color: var(--c-text-3);
+  font-size: 0.54rem;
+}
+.pet-copy dd {
+  margin: 0;
+  color: var(--c-text-1);
+  font-size: 0.66rem;
+}
+
+.pet-sketch {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 220px;
+  color: var(--c-primary);
+  background: color-mix(in srgb, var(--about-soft) 72%, transparent);
+}
+
+.pet-sketch svg {
+  width: min(210px, 86%);
+  overflow: visible;
+}
+.pet-body,
+.pet-head {
+  fill: color-mix(in srgb, var(--c-primary) 11%, var(--ld-bg-card));
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.pet-tail,
+.pet-face,
+.pet-whiskers {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+.pet-tail {
+  transform-origin: 158px 132px;
+  animation: pet-tail-wave 2.8s ease-in-out infinite;
+}
+.pet-head {
+  transform-origin: 118px 106px;
+  animation: pet-breathe 3.6s ease-in-out infinite;
+}
+.pet-sketch span {
+  color: var(--c-text-3);
+  font-size: 0.56rem;
+}
+
+.pet-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.pet-gallery figure {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+}
+.pet-gallery img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  transition:
+    transform 0.6s var(--ui-ease-out),
+    filter 0.4s ease;
+}
+.pet-gallery figure:hover img {
+  transform: scale(1.035);
+  filter: brightness(0.9);
+}
+.pet-gallery figcaption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 22px 10px 8px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 62%));
+  color: #fff;
+  font-size: 0.58rem;
+}
+
+.footer-paw {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--c-primary) !important;
+}
+
+@keyframes pet-tail-wave {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+@keyframes pet-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+
 .about-footer {
   display: flex;
   align-items: flex-end;
@@ -2312,6 +2573,21 @@ useHead(() => ({
   }
   .timeline-item {
     grid-template-columns: 72px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .pet-intro {
+    grid-template-columns: 1fr;
+  }
+  .pet-copy {
+    padding: 18px 0 18px 16px;
+  }
+  .pet-gallery {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pet-sketch {
+    min-height: 190px;
   }
 }
 

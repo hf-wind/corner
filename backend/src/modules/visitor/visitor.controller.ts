@@ -1,264 +1,176 @@
-﻿import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { TurnstileService } from '../auth/turnstile.service';
-import { VisitorService, VisitorActor } from './visitor.service';
-import { OptionalReasonDto } from '../../common/dto/request-body.dto';
 import {
-  CreateVisitorBottleDto,
-  CreateVisitorMessageDto,
-  SetVisitorNicknameDto,
-  TrackVisitorEventsDto,
-} from './dto/create-visitor-message.dto';
-import { SelectConstellationKnowledgeDto } from './dto/constellation-knowledge.dto';
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { VisitorService } from './visitor.service';
+
+class IdentifyDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  screen?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  timezone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  locale?: string;
+}
+
+class CreateMessageDto {
+  @IsString()
+  @MaxLength(200)
+  content: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  nickname?: string;
+}
+
+class ThrowBottleDto {
+  @IsString()
+  @MaxLength(200)
+  content: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  nickname?: string;
+
+  @IsOptional()
+  @IsString()
+  relayToId?: string;
+}
+
+class TrackEventsDto {
+  @IsArray()
+  events: Array<Record<string, unknown>>;
+}
+
+class ModerateMessageDto {
+  @IsIn(['approved', 'pending', 'rejected'])
+  status: string;
+}
+
+class BanDto {
+  @IsIn(['true', 'false'])
+  banned: 'true' | 'false';
+}
 
 @Controller('visitor')
 export class VisitorController {
-  constructor(
-    private readonly visitorService: VisitorService,
-    private readonly turnstile: TurnstileService,
-  ) {}
-
-  @Get('new-id')
-  newVisitorId() {
-    return { visitorId: this.visitorService.newVisitorId() };
-  }
+  constructor(private readonly visitor: VisitorService) {}
 
   @Post('identify')
-  @HttpCode(200)
-  async identify(
-    @Req() req: { ip: string },
-    @Headers('x-visitor-id') visitorId: string,
-    @Body() dto: SetVisitorNicknameDto,
-  ) {
-    await this.turnstile.verify(dto.turnstileToken, req.ip);
-    const hash = this.visitorService.resolveVisitorId({
-      headers: { 'x-visitor-id': visitorId },
-      ip: req.ip,
-    });
-    return this.visitorService.identify({ headers: { 'x-visitor-id': visitorId }, ip: req.ip }, hash, dto.nickname);
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('track')
-  @HttpCode(200)
-  async trackVisit(
-    @Req()
-    req: {
-      ip: string;
-      user?: { id?: string };
-      headers: Record<string, string | string[] | undefined>;
-    },
-    @Headers('x-visitor-id') visitorId: string,
-  ) {
-    const hash = this.visitorService.resolveVisitorId({
-      headers: { 'x-visitor-id': visitorId },
-      ip: req.ip,
-    });
-    return this.visitorService.trackVisit({ headers: req.headers, ip: req.ip }, hash, req.user?.id ?? null);
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('track/batch')
-  @HttpCode(200)
-  async trackBatch(
-    @Req() req: { ip: string; user?: { id?: string }; headers: Record<string, string | string[] | undefined> },
-    @Headers('x-visitor-id') visitorId: string,
-    @Body() body: TrackVisitorEventsDto,
-  ) {
-    const hash = this.visitorService.resolveVisitorId({ headers: { 'x-visitor-id': visitorId }, ip: req.ip });
-    return this.visitorService.trackEvents({ headers: req.headers, ip: req.ip }, hash, req.user?.id ?? null, Array.isArray(body?.events) ? body.events : []);
-  }
-
-  @Get('messages')
-  async listMessages(@Query('type') type: string = 'message', @Query('page') page = '1') {
-    return this.visitorService.listMessages(type === 'bottle' ? 'bottle' : 'message', Math.max(1, Number(page) || 1));
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('messages')
-  async createMessage(
-    @Req() req: { ip: string; user?: { id?: string; username?: string } },
-    @Headers('x-visitor-id') visitorId: string,
-    @Body() dto: CreateVisitorMessageDto,
-  ) {
-    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
-    return this.visitorService.createMessageEntry(
-      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
-      actor,
-      visitorIdHash,
-      dto.content,
-    );
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Get('bottles/quota')
-  bottleQuota(@Req() req: { ip: string }, @Headers('x-visitor-id') visitorId: string) {
-    return this.visitorService.bottleQuota({
-      headers: { 'x-visitor-id': visitorId },
-      ip: req.ip,
-    });
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('bottles')
-  async throwBottle(
-    @Req() req: { ip: string; user?: { id?: string; username?: string } },
-    @Headers('x-visitor-id') visitorId: string,
-    @Body() dto: CreateVisitorBottleDto,
-  ) {
-    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
-    return this.visitorService.throwBottle(
-      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
-      actor,
-      visitorIdHash,
-      dto.content,
-      dto.parentId,
-    );
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('bottles/fish')
-  @HttpCode(200)
-  async fishBottle(
-    @Req() req: { ip: string; user?: { id?: string; username?: string } },
-    @Headers('x-visitor-id') visitorId: string,
-  ) {
-    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
-    return this.visitorService.fishBottle({ headers: { 'x-visitor-id': visitorId }, ip: req.ip }, actor, visitorIdHash);
-  }
-
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('bottles/:id/release')
-  @HttpCode(200)
-  async releaseBottle(
-    @Req() req: { ip: string; user?: { id?: string; username?: string } },
-    @Headers('x-visitor-id') visitorId: string,
-    @Param('id') id: string,
-  ) {
-    const actor: VisitorActor = req.user?.id ? { userId: req.user.id, username: req.user.username ?? '' } : null;
-    const visitorIdHash = this.visitorService.resolveVisitorIdOptional(visitorId);
-    return this.visitorService.releaseBottle(
-      { headers: { 'x-visitor-id': visitorId }, ip: req.ip },
-      actor,
-      visitorIdHash,
-      id,
-    );
-  }
-
-  @Get('wall')
-  async wall() {
-    return this.visitorService.wall();
-  }
-
-  @Get('me')
-  async me(@Headers('x-visitor-id') visitorId: string) {
-    const hash = this.visitorService.resolveVisitorId({
-      headers: { 'x-visitor-id': visitorId },
-    });
-    return this.visitorService.me(hash);
+  identify(@Req() req: any, @Body() dto: IdentifyDto) {
+    return this.visitor.identify(req, dto);
   }
 
   @Get('recent')
-  async recentVisits() {
-    return this.visitorService.recentVisits();
+  recent(@Query('limit') limit?: string) {
+    return this.visitor.recentVisitors(Number(limit) || 3);
   }
 
-  @UseGuards(OptionalJwtAuthGuard)
-  @Post('constellation/knowledge')
-  @HttpCode(200)
-  selectConstellationKnowledge(
-    @Req() req: { ip: string; user?: { id?: string }; headers: Record<string, string | string[] | undefined> },
-    @Headers('x-visitor-id') visitorId: string,
-    @Body() dto: SelectConstellationKnowledgeDto,
-  ) {
-    const visitorIdHash = this.visitorService.resolveVisitorId({
-      headers: { 'x-visitor-id': visitorId },
-      ip: req.ip,
-    });
-    return this.visitorService.selectConstellationKnowledge(
-      { headers: req.headers, ip: req.ip },
-      visitorIdHash,
-      req.user?.id ?? null,
-      dto.planetId,
-    );
+  @Post('events')
+  trackEvents(@Req() req: any, @Body() dto: TrackEventsDto) {
+    return this.visitor.trackEvents(req, dto.events);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
-  @Get('admin/stats')
-  adminStats() {
-    return this.visitorService.adminStats();
+  /* ---- 留言墙 ---- */
+
+  @Get('messages')
+  messages(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.visitor.listMessages(Number(page) || 1, Number(limit) || 30);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
+  @Post('messages')
+  createMessage(@Req() req: any, @Body() dto: CreateMessageDto) {
+    return this.visitor.createMessage(req, dto);
+  }
+
+  /* ---- 漂流瓶 ---- */
+
+  @Get('bottle/quota')
+  bottleQuota(@Req() req: any) {
+    return this.visitor.bottleQuota(req);
+  }
+
+  @Post('bottle/throw')
+  throwBottle(@Req() req: any, @Body() dto: ThrowBottleDto) {
+    return this.visitor.throwBottle(req, dto);
+  }
+
+  @Post('bottle/fish')
+  fishBottle(@Req() req: any) {
+    return this.visitor.fishBottle(req);
+  }
+
+  @Post('bottle/:id/release')
+  releaseBottle(@Req() req: any, @Param('id') id: string) {
+    return this.visitor.releaseBottle(req, id);
+  }
+
+  /* ---- 后台管理 ---- */
+
   @Get('admin/messages')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   adminMessages(
-    @Query('status') status?: string,
     @Query('type') type?: string,
-    @Query('keyword') keyword?: string,
+    @Query('status') status?: string,
+    @Query('q') q?: string,
     @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.visitorService.adminMessages({
-      status,
-      type,
-      keyword,
-      page: page ? Number(page) : undefined,
-      pageSize: pageSize ? Number(pageSize) : undefined,
-    });
+    return this.visitor.adminMessages({ type, status, q, page: Number(page), limit: Number(limit) });
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Put('admin/messages/:id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  @Post('admin/messages/:id/approve')
-  async approveMessage(@Param('id') id: string) {
-    return this.visitorService.reviewMessage(id, 'approve');
+  moderate(@Param('id') id: string, @Body() dto: ModerateMessageDto) {
+    return this.visitor.moderateMessage(id, dto.status);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Delete('admin/messages/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  @Post('admin/messages/:id/reject')
-  async rejectMessage(@Param('id') id: string, @Body() dto: OptionalReasonDto) {
-    return this.visitorService.reviewMessage(id, 'reject', dto?.reason);
+  removeMessage(@Param('id') id: string) {
+    return this.visitor.removeMessage(id);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
   @Get('admin/profiles')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   adminProfiles(
-    @Query('keyword') keyword?: string,
-    @Query('banned') banned?: string,
-    @Query('type') type?: 'user' | 'registered' | 'anonymous',
+    @Query('q') q?: string,
     @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.visitorService.adminProfiles({
-      keyword,
-      banned,
-      type,
-      page: page ? Number(page) : undefined,
-      pageSize: pageSize ? Number(pageSize) : undefined,
-    });
+    return this.visitor.adminProfiles({ q, page: Number(page), limit: Number(limit) });
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Put('admin/profiles/:id/ban')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  @Post('admin/profiles/:id/ban')
-  async banProfile(@Param('id') id: string) {
-    return this.visitorService.setBan(id, true);
-  }
-
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
-  @Post('admin/profiles/:id/unban')
-  async unbanProfile(@Param('id') id: string) {
-    return this.visitorService.setBan(id, false);
+  setBanned(@Param('id') id: string, @Body() dto: BanDto) {
+    return this.visitor.setBanned(id, dto.banned === 'true');
   }
 }

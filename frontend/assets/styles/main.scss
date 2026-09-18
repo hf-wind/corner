@@ -7,9 +7,10 @@
 }
 
 :root {
-  --hue-theme: 220deg;
+  --hue-theme: 152deg;
 
   --font-ayuan: "HanYi A-Yuan", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-misans: "MiSans", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-rounded:
     "Noto Sans SC Variable", "Noto Sans SC", "PingFang SC",
     "Microsoft YaHei UI", sans-serif;
@@ -49,8 +50,8 @@
   --c-text-2: hsl(var(--hue-theme) 0% 40%);
   --c-text-3: hsl(var(--hue-theme) 0% 70%);
 
-  --c-primary: hsl(var(--hue-theme) 100% 55%);
-  --c-primary-soft: hsl(var(--hue-theme) 100% 60% / 15%);
+  --c-primary: hsl(var(--hue-theme) 62% 42%);
+  --c-primary-soft: hsl(var(--hue-theme) 62% 45% / 15%);
 
   --ld-bg-card: var(--c-bg);
   --ld-bg-active: var(--c-bg-1);
@@ -77,7 +78,7 @@
   --ui-shadow-soft: 0 6px 20px
     color-mix(in srgb, var(--ld-shadow) 25%, transparent);
   --ui-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --app-transition-bg: #eaf5ff;
+  --app-transition-bg: #e8f6ee;
   --devtools-widget-bg: #fff;
   --devtools-widget-fg: #111;
   --devtools-widget-border: #efefef;
@@ -149,7 +150,7 @@
 
 .dark,
 .constellation-route {
-  --app-transition-bg: #030b18;
+  --app-transition-bg: #05130c;
   --c-bg: hsl(var(--hue-theme) 0% 7%);
   --c-bg-1: hsl(var(--hue-theme) 10% 10%);
   --c-bg-2: hsl(var(--hue-theme) 10% 14%);
@@ -161,10 +162,10 @@
   --c-text-2: hsl(var(--hue-theme) 0% 70%);
   --c-text-3: hsl(var(--hue-theme) 0% 50%);
 
-  --c-primary: hsl(var(--hue-theme) 100% 70%);
-  --c-primary-soft: hsl(var(--hue-theme) 100% 60% / 20%);
+  --c-primary: hsl(var(--hue-theme) 58% 64%);
+  --c-primary-soft: hsl(var(--hue-theme) 58% 62% / 20%);
 
-  --ld-bg-card: hsl(220deg 10% 14%);
+  --ld-bg-card: hsl(var(--hue-theme) 10% 13%);
   --ld-bg-active: var(--c-primary-soft);
   --ld-bg-blur: color-mix(in srgb, var(--c-bg-1) 80%, transparent);
   --ld-shadow: hsla(var(--hue-theme) 10% 10% / 50%);
@@ -187,6 +188,24 @@
 html.space-route,
 html.dark.space-route {
   --app-transition-bg: #030712;
+}
+
+/* ===== 蔚蓝主题色板（沿用旧版蓝色主题的 220deg 色相） ===== */
+:root[data-palette="ocean"] {
+  --hue-theme: 220deg;
+  --app-transition-bg: #e8f1fb;
+}
+
+html[data-palette="ocean"].dark,
+html[data-palette="ocean"].constellation-route {
+  --app-transition-bg: #04101d;
+}
+
+/* 主题/色板切换：View Transition 整页交叉淡化，让渐变表面也平滑过渡 */
+html::view-transition-old(root),
+html::view-transition-new(root) {
+  animation-duration: 0.42s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 *,

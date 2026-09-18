@@ -249,21 +249,6 @@ const routes: RouteRecordRaw[] = [
     meta: adminMeta,
   },
   {
-    path: "/admin/visitor-content",
-    component: lazyRoute(() => import("./pages/admin/visitor.vue")),
-    meta: adminMeta,
-  },
-  {
-    path: "/admin/visitor-messages",
-    redirect: { path: "/admin/visitor-content", query: { tab: "messages" } },
-    meta: adminMeta,
-  },
-  {
-    path: "/admin/visitor-bottles",
-    redirect: { path: "/admin/visitor-content", query: { tab: "bottles" } },
-    meta: adminMeta,
-  },
-  {
     path: "/admin/memory-graph",
     component: lazyRoute(() => import("./pages/admin/memory-graph.vue")),
     meta: adminMeta,

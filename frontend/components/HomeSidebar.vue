@@ -1,35 +1,58 @@
 <template>
   <div class="home-sidebar ready">
     <WeatherClock />
-    <section
-      class="side-card overview-card"
-      aria-labelledby="home-overview-title"
-    >
-      <div class="side-card-head">
-        <div>
-          <span class="side-kicker">CORNER INDEX</span>
-          <span id="home-overview-title">风隅坐标</span>
-        </div>
-        <AppLink to="/archive" aria-label="查看归档" title="查看归档"
-          ><Icon name="ph:arrow-up-right-bold"
-        /></AppLink>
-      </div>
-      <div class="overview-grid">
-        <div
-          v-for="item in overviewItems"
-          :key="item.label"
-          class="overview-item"
-        >
-          <span class="overview-copy"
-            ><strong>{{ loading ? "--" : compactNumber(item.value) }}</strong
-            ><small>{{ item.label }}</small></span
-          >
-          <i aria-hidden="true" />
-        </div>
-      </div>
+
+    <!-- 最近旅人 -->
+    <section class="side-card footprints-card" aria-label="最近旅人">
+      <header class="side-head">
+        <span class="side-kicker">PASSING WINDS</span>
+        <span class="side-title">最近旅人</span>
+      </header>
+      <ul v-if="visitors.length" class="footprint-list">
+        <li v-for="(visitor, index) in visitors" :key="index" class="footprint-item">
+          <i class="footprint-dot" aria-hidden="true" />
+          <span class="footprint-name">{{ visitor.nickname || "神秘旅人" }}</span>
+          <span class="footprint-place">{{ visitorFrom(visitor.region) }}</span>
+          <time>{{ fromNow(visitor.at) }}</time>
+        </li>
+      </ul>
+      <p v-else class="footprint-empty">风还未带来旅人的消息</p>
     </section>
 
-    <VisitorFootprints />
+    <!-- 最近动态 -->
+    <section class="side-card activity-card" aria-label="最近动态">
+      <header class="side-head">
+        <span class="side-kicker">MOMENTS AGO</span>
+        <span class="side-title">最近动态</span>
+      </header>
+      <ul v-if="activities.length" class="activity-list">
+        <li v-for="activity in activities" :key="activity.id + activity.type" class="activity-item">
+          <span class="activity-icon" :class="`is-${activity.type}`">
+            <Icon :name="activityIcon(activity.type)" />
+          </span>
+          <AppLink :to="activity.href" class="activity-copy">
+            <b>{{ activityLabel(activity.type) }}</b>
+            <span>{{ activity.title }}</span>
+          </AppLink>
+          <time>{{ fromNow(activity.timestamp) }}</time>
+        </li>
+      </ul>
+      <p v-else class="footprint-empty">这里还没有新的故事</p>
+    </section>
+
+    <!-- 一言 -->
+    <section class="side-card hitokoto-card" aria-label="一言">
+      <span class="hitokoto-mark" aria-hidden="true">“</span>
+      <Transition name="hitokoto-fade" mode="out-in">
+        <p :key="hitokoto.text" class="hitokoto-text">{{ hitokoto.text }}</p>
+      </Transition>
+      <footer>
+        <span>—— {{ hitokoto.from || "一言" }}</span>
+        <button type="button" title="换一句" aria-label="换一句" @click="nextHitokoto">
+          <Icon name="ph:arrows-clockwise-bold" />
+        </button>
+      </footer>
+    </section>
 
     <BrowserOnly>
       <div class="pet-dock" aria-label="AI 伙伴">
@@ -40,79 +63,128 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, onMounted, ref } from "vue";
 
 const AiPet = defineAsyncComponent(() => import("@/components/AiPet.vue"));
 const api = useApi();
 const { state: homePreload } = useHomePreload();
-const loading = ref(homePreload.value.stats === null);
-const stats = ref({
-  posts: 0,
-  comments: 0,
-  views: 0,
-  ...(homePreload.value.stats || {}),
-});
-let idleHandle: number | null = null;
-let petIdleHandle: number | null = null;
+const { identify, fetchRecent } = useVisitor();
 const showPet = ref(false);
 
-const overviewItems = computed(() => [
-  { label: "文章", value: stats.value.posts, icon: "ph:article-bold" },
-  {
-    label: "字间回声",
-    value: stats.value.comments,
-    icon: "ph:chat-circle-dots-bold",
-  },
-  { label: "翻阅", value: stats.value.views, icon: "ph:book-open-text-bold" },
-]);
+interface ActivityItem {
+  id: string;
+  type: string;
+  label: string;
+  title: string;
+  href: string;
+  timestamp: string | null;
+}
 
-function compactNumber(value: number) {
-  return new Intl.NumberFormat("zh-CN", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value || 0);
+const visitors = ref<Array<{
+  nickname: string;
+  region: string | null;
+  at: string;
+}>>([]);
+const activities = ref<ActivityItem[]>([]);
+const hitokoto = ref({ text: "把日子过成诗，把风声听成歌。", from: "风隅随笔" });
+
+const LOCAL_QUOTES = [
+  { text: "山风会替你记住，你来过这里。", from: "风隅随笔" },
+  { text: "慢一点也没关系，风一直在。", from: "风隅随笔" },
+  { text: "读过的书、走过的路，都会悄悄变成你的一部分。", from: "风隅随笔" },
+  { text: "生活明朗，万物可爱，人间值得。", from: "人间值得" },
+  { text: "凡是过往，皆为序章。", from: "莎士比亚" },
+];
+
+const activityMeta: Record<string, { icon: string; label: string }> = {
+  post: { icon: "ph:article-bold", label: "发布了文章" },
+  moment: { icon: "ph:sparkle-bold", label: "新增了瞬间" },
+  album: { icon: "ph:images-square-bold", label: "整理了相册" },
+  library: { icon: "ph:books-bold", label: "收录了书影" },
+  comment: { icon: "ph:chat-circle-dots-bold", label: "一条回应" },
+  guestbook: { icon: "ph:chat-teardrop-text-bold", label: "墙上的新留言" },
+  like: { icon: "ph:heart-bold", label: "收到一次点赞" },
+};
+
+function activityIcon(type: string) {
+  return activityMeta[type]?.icon || "ph:sparkle-bold";
+}
+
+function activityLabel(type: string) {
+  return activityMeta[type]?.label || "新动态";
+}
+
+const VISITOR_TITLES = ["旅人", "朋友", "过客", "同行者", "信使"];
+
+function visitorFrom(region: string | null | undefined) {
+  if (!region) return "乘风而来";
+  const seed = [...region].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return `来自${region}的${VISITOR_TITLES[seed % VISITOR_TITLES.length]}`;
+}
+
+function fromNow(value: string | null) {
+  if (!value) return "";
+  const at = new Date(value).getTime();
+  const diff = Date.now() - at;
+  if (diff < 60_000) return "刚刚";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
+  if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)} 天前`;
+  return new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(at);
+}
+
+async function fetchHitokoto() {
+  try {
+    const response = await fetch("https://v1.hitokoto.cn/?c=i&c=k&c=d&max_length=28", {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) throw new Error("hitokoto unavailable");
+    const data = await response.json();
+    if (data?.hitokoto) {
+      hitokoto.value = { text: data.hitokoto, from: data.from || "" };
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function nextHitokoto() {
+  void fetchHitokoto().then((ok) => {
+    if (!ok) {
+      const current = hitokoto.value.text;
+      const next = LOCAL_QUOTES[Math.floor(Math.random() * LOCAL_QUOTES.length)];
+      if (next.text !== current) hitokoto.value = next;
+    }
+  });
 }
 
 async function loadSidebar() {
   try {
-    const overview = await api.get<any>("/stats/overview");
-    stats.value = { ...stats.value, ...(overview || {}) };
+    if (homePreload.value.visitors) {
+      visitors.value = homePreload.value.visitors.slice(0, 3);
+    } else {
+      visitors.value = (await fetchRecent(3)).slice(0, 3);
+    }
+    const acts = await api.get<ActivityItem[]>("/stats/activities", { limit: 5 }, { signal: AbortSignal.timeout(9000) });
+    activities.value = (acts || []).slice(0, 5);
   } catch {
-    // Sidebar content is supplementary; keep the page usable when it fails.
-  } finally {
-    loading.value = false;
+    // 侧栏是补充内容，失败时保持页面可用
   }
 }
 
 onMounted(() => {
-  if ("requestIdleCallback" in window) {
-    if (homePreload.value.stats === null)
-      idleHandle = window.requestIdleCallback(() => void loadSidebar(), {
-        timeout: 1200,
-      });
-    petIdleHandle = window.requestIdleCallback(
-      () => {
-        showPet.value = true;
-      },
-      { timeout: 2200 },
-    );
-  } else {
-    if (homePreload.value.stats === null)
-      idleHandle = window.setTimeout(() => void loadSidebar(), 220);
-    petIdleHandle = window.setTimeout(() => {
-      showPet.value = true;
-    }, 1000);
-  }
-});
-
-onUnmounted(() => {
-  const cancel = (handle: number | null) => {
-    if (handle === null) return;
-    if ("cancelIdleCallback" in window) window.cancelIdleCallback(handle);
-    else window.clearTimeout(handle);
+  void identify();
+  void loadSidebar();
+  void fetchHitokoto();
+  const idle = (callback: () => void, timeout: number) => {
+    if ("requestIdleCallback" in window) window.requestIdleCallback(callback, { timeout });
+    else window.setTimeout(callback, timeout);
   };
-  cancel(idleHandle);
-  cancel(petIdleHandle);
+  idle(() => {
+    showPet.value = true;
+  }, 2200);
 });
 </script>
 
@@ -126,38 +198,37 @@ onUnmounted(() => {
   overflow: visible;
 }
 
-.side-card,
-.footprints {
+.side-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+  border-radius: 10px;
+  background: var(--ld-bg-card);
+  box-shadow: var(--ui-shadow-soft);
   opacity: 0;
   transform: translate3d(10px, 0, 0);
 }
 
-.side-card {
-  min-height: 94px;
-  flex: 0 0 94px;
-  padding: 13px 14px 12px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
-  border-radius: 8px;
-  background: var(--ld-bg-card);
-  box-shadow: var(--ui-shadow-soft);
-}
-
 .home-sidebar.ready .side-card,
-.home-sidebar.ready .footprints,
 .home-sidebar.ready .pet-dock {
   animation: side-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.home-sidebar.ready .side-card {
+.home-sidebar.ready .footprints-card {
   animation-delay: 55ms;
 }
-.home-sidebar.ready .footprints {
+.home-sidebar.ready .activity-card {
   animation-delay: 85ms;
 }
-.home-sidebar.ready .pet-dock {
+.home-sidebar.ready .hitokoto-card {
   animation-delay: 110ms;
+}
+.home-sidebar.ready .pet-dock {
+  animation-delay: 140ms;
 }
 
 @keyframes side-card-in {
@@ -167,90 +238,251 @@ onUnmounted(() => {
   }
 }
 
-.side-card-head {
+.side-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
-  color: var(--c-text-2);
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 8px;
+}
+
+.side-kicker {
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+  font-size: 0.42rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.side-title {
+  color: var(--c-text);
   font-size: 0.7rem;
   font-weight: 700;
 }
 
-.side-card-head > div,
-.side-card-head a {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.side-card-head > div {
-  flex-direction: column;
-  align-items: flex-start;
+/* ---- 最近旅人 ---- */
+.footprint-list {
+  display: grid;
   gap: 2px;
-}
-.side-kicker {
-  color: var(--c-primary);
-  font-family: var(--font-mono);
-  font-size: 0.44rem;
-  font-weight: 700;
-}
-#home-overview-title {
-  color: var(--c-text);
-  font-size: 0.72rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.side-card-head a {
-  display: grid;
-  width: 27px;
-  height: 27px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+.footprint-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 4px 0;
+  color: var(--c-text-2);
+  font-size: 0.64rem;
+}
+
+.footprint-dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--c-primary), color-mix(in srgb, var(--c-primary) 45%, #fff));
+  opacity: 0.85;
+}
+
+.footprint-name {
+  flex-shrink: 0;
+  max-width: 34%;
+  overflow: hidden;
+  color: var(--c-text);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footprint-place {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
   color: var(--c-text-3);
-  text-decoration: none;
-  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footprint-item time {
+  flex-shrink: 0;
+  color: var(--c-text-3);
+  font-size: 0.56rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 最近动态 ---- */
+.activity-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4.5px 0;
+}
+
+.activity-icon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-primary-soft) 62%, transparent);
+  color: var(--c-primary);
+  font-size: 0.68rem;
   place-items: center;
 }
 
-.side-card-head a:hover {
+.activity-icon.is-like {
+  background: color-mix(in srgb, #e0699a 12%, transparent);
+  color: #d96895;
+}
+
+.activity-icon.is-guestbook {
+  background: color-mix(in srgb, var(--ui-accent-warm) 13%, transparent);
+  color: var(--ui-accent-warm);
+}
+
+.activity-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  text-decoration: none;
+}
+
+.activity-copy b {
+  color: var(--c-text-3);
+  font-size: 0.52rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+}
+
+.activity-copy span {
+  overflow: hidden;
+  color: var(--c-text-1);
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.16s ease;
+}
+
+.activity-item {
+  border-radius: 9px;
+  padding-inline: 5px;
+  margin-inline: -5px;
+  transition: background-color 0.18s ease;
+}
+
+.activity-item:hover {
+  background: color-mix(in srgb, var(--c-primary-soft) 34%, transparent);
+}
+
+.activity-copy:hover span {
   color: var(--c-primary);
 }
 
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.overview-item {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  align-items: end;
-  padding: 0 0 0 9px;
-  border-left: 2px solid color-mix(in srgb, var(--c-primary) 52%, var(--border));
-}
-
-.overview-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-.overview-copy strong {
-  color: var(--c-text);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.overview-copy small {
+.activity-item time {
+  flex-shrink: 0;
   color: var(--c-text-3);
-  font-size: 0.48rem;
+  font-size: 0.54rem;
 }
-.overview-item > i {
-  display: none;
+
+/* ---- 一言 ---- */
+.hitokoto-card {
+  gap: 2px;
+  padding: 12px 14px 10px;
+}
+
+.hitokoto-mark {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  color: var(--c-primary);
+  font-family: Georgia, serif;
+  font-size: 2.2rem;
+  line-height: 1;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.hitokoto-text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--c-text-1);
+  font-family: var(--font-summary);
+  font-size: 0.7rem;
+  line-height: 1.65;
+  letter-spacing: 0.03em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.hitokoto-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 5px;
+}
+
+.hitokoto-card footer span {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: 0.54rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitokoto-card footer button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 0;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c-bg-2) 72%, transparent);
+  color: var(--c-text-3);
+  cursor: pointer;
+  font-size: 0.6rem;
+  place-items: center;
+  transition: color 0.16s ease, transform 0.3s ease;
+}
+
+.hitokoto-card footer button:hover {
+  color: var(--c-primary);
+  transform: rotate(180deg);
+}
+
+.hitokoto-fade-enter-active,
+.hitokoto-fade-leave-active {
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.hitokoto-fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.hitokoto-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.footprint-empty {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: 0.62rem;
 }
 
 .pet-dock {
@@ -261,34 +493,19 @@ onUnmounted(() => {
   align-items: flex-end;
   justify-content: flex-end;
   margin-top: auto;
-  border-top: 0;
-}
-
-.footprints {
-  display: flex;
-  height: calc(80px + var(--fp-visible-count, 3) * 56px);
-  min-height: 264px;
-  max-height: 100%;
-  flex: 0 1 auto;
-  flex-direction: column;
-}
-
-@media (max-height: 680px) and (min-width: 901px) {
-  .overview-card {
-    display: none;
-  }
-  .footprints {
-    min-height: 248px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .home-sidebar.ready .side-card,
-  .home-sidebar.ready .footprints,
   .home-sidebar.ready .pet-dock {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+
+  .hitokoto-fade-enter-active,
+  .hitokoto-fade-leave-active {
+    transition: none;
   }
 }
 </style>

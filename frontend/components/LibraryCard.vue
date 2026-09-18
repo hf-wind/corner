@@ -48,10 +48,10 @@ const experienceDate = computed(() => {
 <style scoped>
 .library-card { position:relative; display:grid; grid-template-columns:148px minmax(0,1fr); min-height:238px; overflow:hidden; border:0; border-radius:14px; background:var(--ld-bg-card); box-shadow:0 2px 8px color-mix(in srgb,var(--ld-shadow) 34%,transparent); color:inherit; text-decoration:none; contain:layout paint; animation:library-card-enter .54s cubic-bezier(.16,1,.3,1) backwards; transition:transform .28s cubic-bezier(.16,1,.3,1),box-shadow .28s ease; }
 .library-card:hover { box-shadow:0 10px 24px color-mix(in srgb,var(--ld-shadow) 50%,transparent); transform:translate3d(0,-3px,0); }
-.cover-wrap { position:relative; min-height:100%; overflow:hidden; background:var(--c-bg-2); }
-.cover-wrap>img { width:100%; height:100%; min-height:238px; object-fit:cover; transition:transform .6s cubic-bezier(.16,1,.3,1); }
+.cover-wrap { position:relative; overflow:hidden; aspect-ratio:2/3; background:var(--c-bg-2); }
+.cover-wrap>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; transition:transform .6s cubic-bezier(.16,1,.3,1); }
 .library-card:hover .cover-wrap>img { transform:scale(1.045); }
-.cover-placeholder { display:flex; height:100%; min-height:238px; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; background:radial-gradient(circle at 30% 20%,var(--c-primary-soft),transparent 45%),linear-gradient(155deg,var(--c-bg-2),var(--ld-bg-card)); color:var(--c-text-2); text-align:center; }
+.cover-placeholder { display:flex; position:absolute; inset:0; align-items:center; justify-content:center; flex-direction:column; gap:16px; padding:20px; background:radial-gradient(circle at 30% 20%,var(--c-primary-soft),transparent 45%),linear-gradient(155deg,var(--c-bg-2),var(--ld-bg-card)); color:var(--c-text-2); text-align:center; }
 .cover-placeholder :deep(svg) { color:var(--c-primary); font-size:2.5rem; opacity:.65; }.cover-placeholder span { font-family:var(--font-heading); font-size:.85rem; line-height:1.7; }
 .rank-badge,.recommend-badge { position:absolute; top:12px; left:11px; display:inline-flex; align-items:center; gap:4px; padding:5px 8px; border-radius:999px; background:rgb(18 22 29 / 82%); color:#fff; font-size:.62rem; font-weight:750; letter-spacing:.04em; backdrop-filter:blur(8px); }
 .rank-badge small { color:#d7a85a; font-size:.48rem; }.recommend-badge { background:color-mix(in srgb,var(--c-primary) 88%,transparent); }

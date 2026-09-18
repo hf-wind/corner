@@ -182,7 +182,12 @@ if ($Stop) {
 Remove-Item -LiteralPath $stopSignal -Force -ErrorAction SilentlyContinue
 Stop-OrphanDevProcesses
 foreach ($logFile in $logFiles.Values) {
-  Set-Content -LiteralPath $logFile -Value '' -Encoding utf8
+  try {
+    $stream = [System.IO.File]::Open($logFile, [System.IO.FileMode]::Truncate, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
+    $stream.Close()
+  } catch {
+    Remove-Item -LiteralPath $logFile -Force -ErrorAction SilentlyContinue
+  }
 }
 
 try {
@@ -219,7 +224,7 @@ try {
   if ($SkipSetup) { $tunnelArgumentString += ' -SkipSetup' }
   $tunnel = Start-ManagedProcess -FilePath $powershellPath -ArgumentList $tunnelArgumentString -WorkingDirectory $repoRoot -StandardOutput $logFiles.tunnelOut -StandardError $logFiles.tunnelErr
 
-  $tunnelReady = Wait-ForPorts -Ports @(15432, 16379) -Deadline (Get-Date).AddMinutes(2) -Processes @($tunnel)
+  $tunnelReady = Wait-ForPorts -Ports @(15432, 16379) -Deadline (Get-Date).AddMinutes(4) -Processes @($tunnel)
   if (-not $tunnelReady -or -not (Test-Path -LiteralPath $backendEnv)) {
     $processState = if ($tunnel.HasExited) { "exited (code $($tunnel.ExitCode))" } else { 'still running' }
     $listeners = Get-PortListeners -Ports @(15432, 16379)

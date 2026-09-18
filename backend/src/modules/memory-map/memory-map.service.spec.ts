@@ -48,6 +48,7 @@ describe('MemoryMapService', () => {
 
     expect(result.totalMemories).toBe(1);
     expect(result.items).toHaveLength(1);
+    expect(result.recentMemories).toHaveLength(1);
     expect(result.places).toEqual([{ slug: 'west-lake', name: '西湖' }]);
     expect(result.items[0]).toMatchObject({
       kind: 'memory',
@@ -115,6 +116,10 @@ describe('MemoryMapService', () => {
       count: 3,
       types: { moment: 2, album: 1, photo: 0 },
     });
+    expect(result.recentMemories).toHaveLength(3);
+    expect(result.recentMemories.every((item) => item.kind === 'memory')).toBe(
+      true,
+    );
   });
 
   it('rejects invalid latitude bounds', async () => {

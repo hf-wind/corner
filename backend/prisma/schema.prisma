@@ -1055,3 +1055,22 @@ model ChangelogSyncState {
   @@unique([repository, branch])
   @@map("changelog_sync_states")
 }
+
+model CircleItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  sourceKey   String   @map("source_key") @db.VarChar(120)
+  sourceTitle String   @map("source_title") @db.VarChar(120)
+  guidHash    String   @map("guid_hash") @db.VarChar(64)
+  link        String   @db.VarChar(600)
+  title       String   @db.VarChar(400)
+  summary     String?  @db.Text
+  author      String?  @db.VarChar(120)
+  publishedAt DateTime @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([sourceKey, guidHash])
+  @@index([publishedAt])
+  @@index([sourceKey, publishedAt])
+  @@map("circle_items")
+}

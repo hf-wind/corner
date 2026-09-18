@@ -29,6 +29,7 @@ export type MemoryMapCluster = {
 
 export type MemoryMapResult = {
   items: Array<MemoryMapItem | MemoryMapCluster>
+  recentMemories: MemoryMapItem[]
   totalMemories: number
   returned: number
   truncated: boolean

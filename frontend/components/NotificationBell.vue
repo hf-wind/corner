@@ -236,7 +236,7 @@ watch(panelOpen, (v) => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  z-index: 12020;
+  z-index: 12040;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -245,7 +245,7 @@ watch(panelOpen, (v) => {
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 12019;
+  z-index: 12039;
   padding: 0;
   border: 0;
   background: rgb(8 15 30 / 38%);

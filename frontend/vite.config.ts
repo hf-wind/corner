@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { extname, resolve, sep } from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import { getIconData, type IconifyJSON } from "@iconify/utils";
@@ -9,6 +10,74 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 const root = fileURLToPath(new URL(".", import.meta.url));
 const virtualIcons = "virtual:app-icons";
 const resolvedVirtualIcons = `\0${virtualIcons}`;
+
+const mediaMimeTypes: Record<string, string> = {
+  ".avif": "image/avif",
+  ".epub": "application/epub+zip",
+  ".gif": "image/gif",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".mp3": "audio/mpeg",
+  ".mp4": "video/mp4",
+  ".ogg": "audio/ogg",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webm": "video/webm",
+  ".webp": "image/webp",
+};
+
+function devUploadsPlugin(fallbackOrigin: string): Plugin {
+  const uploadsRoot = resolve(root, "../backend/uploads");
+  const normalizedFallback = fallbackOrigin.replace(/\/$/, "");
+  return {
+    name: "corner-dev-uploads",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use(async (request, response, next) => {
+        if (!request.url || !["GET", "HEAD"].includes(request.method || "")) return next();
+        const url = new URL(request.url, "http://localhost");
+        if (!url.pathname.startsWith("/uploads/")) return next();
+
+        let relativePath = "";
+        try {
+          relativePath = decodeURIComponent(url.pathname.slice("/uploads/".length));
+        } catch {
+          response.statusCode = 400;
+          response.end("Invalid media path");
+          return;
+        }
+        const localPath = resolve(uploadsRoot, relativePath);
+        if (localPath.startsWith(`${uploadsRoot}${sep}`) && existsSync(localPath) && statSync(localPath).isFile()) {
+          const extension = extname(localPath).toLowerCase();
+          response.statusCode = 200;
+          response.setHeader("Content-Type", mediaMimeTypes[extension] || "application/octet-stream");
+          response.setHeader("Content-Length", statSync(localPath).size);
+          response.setHeader("Cache-Control", "no-cache");
+          if (request.method === "HEAD") response.end();
+          else createReadStream(localPath).pipe(response);
+          return;
+        }
+
+        try {
+          const upstream = await fetch(`${normalizedFallback}${url.pathname}${url.search}`, {
+            method: request.method,
+            signal: AbortSignal.timeout(15_000),
+          });
+          response.statusCode = upstream.status;
+          for (const header of ["accept-ranges", "cache-control", "content-length", "content-range", "content-type", "etag", "last-modified"]) {
+            const value = upstream.headers.get(header);
+            if (value) response.setHeader(header, value);
+          }
+          if (request.method === "HEAD" || !upstream.body) response.end();
+          else Readable.fromWeb(upstream.body as never).pipe(response);
+        } catch {
+          response.statusCode = 502;
+          response.end("Media fallback unavailable");
+        }
+      });
+    },
+  };
+}
 
 function sourceFiles(path: string): string[] {
   if (!statSync(path).isDirectory()) return [path];
@@ -157,6 +226,7 @@ export default defineConfig(({ mode }) => {
   return {
     envDir: envRoot,
     plugins: [
+      devUploadsPlugin(env.VITE_MEDIA_FALLBACK_ORIGIN || "https://corner.ink"),
       appIconsPlugin(),
       autoComponentsPlugin(),
       vue(),
@@ -164,17 +234,27 @@ export default defineConfig(({ mode }) => {
         imports: [
           ...[
             "computed",
+            "defineAsyncComponent",
+            "effectScope",
             "nextTick",
             "onBeforeUnmount",
             "onMounted",
             "onUnmounted",
+            "onActivated",
+            "onDeactivated",
             "reactive",
             "readonly",
             "ref",
             "shallowRef",
+            "toRef",
+            "toValue",
             "unref",
+            "useAttrs",
             "useId",
+            "useSlots",
             "watch",
+            "watchEffect",
+            "watchPostEffect",
           ].map((name) => ({ name, from: "vue" })),
           ...["useRoute", "useRouter"].map((name) => ({
             name,

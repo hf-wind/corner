@@ -13,6 +13,12 @@ export class StatsController {
     return this.stats.overview();
   }
 
+  /** 今日风向标：后台手选优先，未配置时按日期自动轮换 */
+  @Get('daily-featured')
+  dailyFeatured() {
+    return this.stats.dailyFeatured();
+  }
+
   @Get('activities')
   activities(@Query('limit') limit?: string) {
     return this.stats.activities(limit ? Number(limit) : 5);

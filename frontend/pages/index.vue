@@ -28,27 +28,21 @@
         aria-live="polite"
         :aria-label="`${loadingStage}，${roundedProgress}%`"
       >
-        <div class="loading-window">
-          <header>
-            <span class="loading-brand">
-              <img src="/logo.png" alt="" width="32" height="32" />
-              <span
-                ><strong>WIND CORNER</strong><small>RETURNING TO YOUR CORNER</small></span
-              >
-            </span>
-            <b
-              >{{ String(roundedProgress).padStart(2, "0") }}<small>%</small></b
-            >
-          </header>
-          <div class="loading-track" aria-hidden="true">
-            <span class="loading-track__ticks"><i v-for="tick in 11" :key="tick" /></span>
+        <div class="loading-light">
+          <span class="loading-orb" aria-hidden="true">
+            <img src="/logo.png" alt="" width="30" height="30" />
+            <i />
+          </span>
+          <div class="loading-line" aria-hidden="true">
             <i :style="{ transform: `scaleX(${displayProgress / 100})` }" />
-            <b :style="{ left: `${displayProgress}%` }" />
           </div>
-          <footer>
-            <span><i />{{ loadingStage }}</span>
-            <small><em />{{ loadingDetail }} · {{ completedLoadingTasks.length }}/{{ loadingTaskTotal }} 项</small>
-          </footer>
+          <div class="loading-meta">
+            <strong
+              >{{ String(roundedProgress).padStart(2, "0")
+              }}<small>%</small></strong
+            >
+            <span>{{ loadingStage }}</span>
+          </div>
         </div>
       </div>
     </Transition>
@@ -258,6 +252,29 @@ function handleSceneFallback() {
 }
 
 onMounted(async () => {
+  const clientState = useClientState();
+  const isFirstVisit = !clientState.get("site", "welcomed", false);
+
+  if (!isFirstVisit) {
+    // 老访客：跳过加载页，资源后台静默预载
+    loaderVisible.value = false;
+    entryReady.value = true;
+    const settingsRequest = loadSiteSettings();
+    void Promise.allSettled([
+      preloadHomeContent(),
+      import("@/pages/home.vue"),
+      import("@/components/FeaturedSwiper.vue"),
+      import("@/components/HomeSidebar.vue"),
+      api.get<any>(
+        "/memories/graph",
+        { limit: 260 },
+        { signal: AbortSignal.timeout(6500) },
+      ),
+    ]);
+    void settingsRequest;
+    return;
+  }
+
   advanceProgress(0, "准备页面环境", "等待真实资源响应");
   await nextPaint();
 
@@ -313,6 +330,7 @@ onMounted(async () => {
   entryReady.value = true;
   await new Promise((resolve) => window.setTimeout(resolve, 180));
   loaderVisible.value = false;
+  clientState.set("site", "welcomed", true);
 });
 
 onUnmounted(() => {
@@ -688,10 +706,11 @@ useHead(() => ({
   display: grid;
   align-content: center;
   justify-items: center;
-  background: #030712;
-  color: var(--space-muted);
+  background: var(--app-transition-bg, #030712);
+  color: var(--c-text-2);
   overflow: hidden;
 }
+
 .entry-loading::before {
   position: absolute;
   width: min(78vw, 560px);
@@ -703,149 +722,99 @@ useHead(() => ({
   transform: rotate(-12deg) scaleY(.3);
   pointer-events: none;
 }
-.entry-loading .loading-window {
+
+/* 轻量加载器：呼吸 logo + 细进度线 + 阶段文字，随主题变色 */
+.loading-light {
   position: relative;
   z-index: 1;
-}
-
-.loading-window {
-  width: min(390px, calc(100vw - 40px));
-  padding: 22px 22px 18px;
-  border: 1px solid color-mix(in srgb, var(--space-accent) 26%, transparent);
-  border-radius: 12px;
-  background: linear-gradient(145deg, rgb(13 24 48 / 92%), rgb(4 10 24 / 94%));
-  box-shadow:
-    0 24px 80px rgb(0 0 0 / 42%),
-    0 0 0 1px rgb(255 255 255 / 4%) inset,
-    0 0 50px color-mix(in srgb, var(--space-accent) 8%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-.loading-window header,
-.loading-brand,
-.loading-window footer,
-.loading-window footer > span {
-  display: flex;
-  align-items: center;
-}
-
-.loading-window header {
-  justify-content: space-between;
-}
-
-.loading-brand {
-  gap: 11px;
-}
-
-.loading-brand img {
-  width: 34px;
-  height: 34px;
-  padding: 5px;
-  border: 1px solid color-mix(in srgb, var(--space-accent) 38%, transparent);
-  border-radius: 10px;
-  background: rgb(255 255 255 / 4%);
-  object-fit: contain;
-}
-
-.loading-brand > span {
   display: grid;
-  gap: 2px;
+  justify-items: center;
+  gap: 22px;
 }
 
-.loading-brand strong {
-  color: var(--space-text);
-  font: 700 0.62rem var(--font-brand);
-  letter-spacing: 0.12em;
-}
-
-.loading-brand small,
-.loading-window footer small {
-  color: rgb(221 235 255 / 42%);
-  font: 0.39rem var(--font-mono);
-}
-
-.loading-window header > b {
-  min-width: 46px;
-  color: var(--space-text);
-  font: 500 1.05rem var(--font-mono);
-  text-align: right;
-}
-
-.loading-window header > b small {
-  margin-left: 2px;
-  color: var(--space-accent);
-  font-size: 0.46rem;
-}
-
-.loading-track {
+.loading-orb {
   position: relative;
-  height: 7px;
-  margin: 24px 0 16px;
-  border: 1px solid rgb(174 205 255 / 12%);
-  border-radius: 99px;
-  background: rgb(174 205 255 / 7%);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 4%) inset;
-  isolation: isolate;
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
 }
-.loading-track__ticks { position: absolute; z-index: 0; inset: -5px 0; display: flex; justify-content: space-between; pointer-events: none; }
-.loading-track__ticks i { width: 1px; height: 3px; background: rgb(174 205 255 / 22%); }
 
-.loading-track > i {
+.loading-orb img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  animation: loader-breathe 2.4s ease-in-out infinite;
+}
+
+.loading-orb i {
   position: absolute;
-  z-index: 1;
-  inset: 1px;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 42%, transparent);
+  border-radius: 50%;
+  animation: loader-ring 2.4s ease-out infinite;
+}
+
+.loading-line {
+  width: min(180px, 52vw);
+  height: 2px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--c-text) 10%, transparent);
+  overflow: hidden;
+}
+
+.loading-line > i {
+  display: block;
+  height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c-primary) 72%, #244b8f), color-mix(in srgb, var(--c-primary) 26%, #fff) 52%, var(--c-primary));
-  box-shadow: 0 0 16px color-mix(in srgb, var(--c-primary) 62%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c-primary) 60%, transparent), var(--c-primary));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c-primary) 55%, transparent);
   transform: scaleX(0);
   transform-origin: left center;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
-.loading-track > b {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  width: 11px;
-  height: 11px;
-  border: 2px solid color-mix(in srgb, var(--c-primary) 30%, #fff);
-  border-radius: 50%;
-  background: var(--c-primary);
-  box-shadow: 0 0 0 4px var(--c-primary-soft), 0 0 16px color-mix(in srgb, var(--c-primary) 70%, transparent);
-  transform: translate(-50%, -50%);
-  will-change: left;
+.loading-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--c-text-2);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
 }
 
-.loading-window footer {
-  justify-content: space-between;
-  gap: 16px;
+.loading-meta strong {
+  color: var(--c-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-.loading-window footer > span {
-  min-width: 0;
-  gap: 7px;
-  color: var(--space-muted);
-  font-size: 0.57rem;
-  white-space: nowrap;
+.loading-meta strong small {
+  margin-left: 1px;
+  color: var(--c-primary);
+  font-size: 0.5rem;
 }
 
-.loading-window footer > span i {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--space-accent);
-  box-shadow: 0 0 0 3px var(--c-primary-soft);
-  animation: loading-pulse 1.5s ease-in-out infinite;
+@keyframes loader-breathe {
+  50% {
+    opacity: 0.72;
+    transform: scale(0.94);
+  }
 }
 
-.loading-window footer > small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+@keyframes loader-ring {
+  from {
+    opacity: 0.65;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.28);
+  }
 }
-.loading-window footer > small em { display: inline-block; width: 4px; height: 4px; margin-right: 6px; border-radius: 50%; background: var(--c-primary); opacity: .65; }
 
 .entry-fade-leave-active {
   transition:
@@ -965,7 +934,8 @@ useHead(() => ({
   }
 
   .scene-fallback i,
-  .loading-window footer > span i {
+  .loading-orb,
+  .loading-orb i {
     animation: none;
   }
 }

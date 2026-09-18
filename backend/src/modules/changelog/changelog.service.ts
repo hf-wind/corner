@@ -6,12 +6,13 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import Parser from 'rss-parser';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { RedisService } from '../../common/redis/redis.service';
 import { BaiduTranslationService } from './baidu-translation.service';
 import {
   UpdateChangelogConfigDto,
@@ -90,6 +91,7 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
     private readonly settings: SettingsService,
     private readonly prisma: PrismaService,
     private readonly baiduTranslation: BaiduTranslationService,
+    private readonly redis: RedisService,
   ) {}
 
   onModuleInit() {
@@ -145,6 +147,213 @@ export class ChangelogService implements OnModuleInit, OnModuleDestroy {
       sourceStatus: snapshot.sourceStatus,
       sourceLabel: snapshot.sourceLabel,
       translationPending: snapshot.translationPending,
+    };
+  }
+
+  /**
+   * 时间聚合视图：所有提交按自然日（Asia/Shanghai）聚合，同日多次推送合并为一条；
+   * 支持关键词搜索与月份筛选，结果按查询指纹写入 Redis 短缓存。
+   */
+  async timeline(query: { q?: string; month?: string; page?: number; limit?: number }) {
+    const q = String(query.q || '').trim().slice(0, 60);
+    const month = String(query.month || '').trim();
+    const limit = Math.min(30, Math.max(4, Number(query.limit) || 10));
+    const page = Math.max(1, Number(query.page) || 1);
+
+    const cacheKey = `corner:changelog:timeline:${createHash('sha1')
+      .update(`${q}|${month}|${page}|${limit}`)
+      .digest('hex')}`;
+    const cached = await this.redis.getJson<unknown>(cacheKey);
+    if (cached) return cached;
+
+    const config = await this.getConfig();
+    const [snapshot, manual] = await Promise.all([
+      this.getAutomatic(config),
+      this.getManualEntries(),
+    ]);
+    const releases = [
+      ...snapshot.releases,
+      ...manual.filter((item) => item.published),
+    ].sort(
+      (left, right) =>
+        Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
+    );
+
+    // 按自然日（Asia/Shanghai）聚合：同一天多次推送合并为一个条目
+    const SHANGHAI_OFFSET = 8 * 3600 * 1000;
+    const dayMap = new Map<
+      string,
+      {
+        date: string;
+        commits: Array<{
+          sha: string;
+          text: string;
+          original: string;
+          author: string;
+          url: string;
+          at: string;
+          source: 'git' | 'manual';
+        }>;
+      }
+    >();
+    for (const release of releases) {
+      const timestamp = Date.parse(release.publishedAt);
+      if (Number.isNaN(timestamp)) continue;
+      const local = new Date(timestamp + SHANGHAI_OFFSET);
+      const day = local.toISOString().slice(0, 10);
+      let bucket = dayMap.get(day);
+      if (!bucket) {
+        bucket = { date: day, commits: [] };
+        dayMap.set(day, bucket);
+      }
+      for (const item of release.items) {
+        bucket.commits.push({
+          sha: item.sha,
+          text: item.text,
+          original: item.original,
+          author: item.author,
+          url: item.url || release.url,
+          at: new Date(timestamp).toISOString(),
+          source: release.source,
+        });
+      }
+    }
+
+    const days = [...dayMap.values()].sort((left, right) =>
+      right.date.localeCompare(left.date),
+    );
+
+    const months: string[] = [];
+    for (const day of days) {
+      const key = day.date.slice(0, 7);
+      if (!months.includes(key)) months.push(key);
+    }
+
+    let filtered = days;
+    if (q) {
+      const needle = q.toLowerCase();
+      filtered = filtered.filter(
+        (day) =>
+          day.date.includes(needle) ||
+          day.commits.some(
+            (commit) =>
+              commit.text.toLowerCase().includes(needle) ||
+              commit.original.toLowerCase().includes(needle),
+          ),
+      );
+    }
+    if (/^\d{4}-\d{2}$/.test(month)) {
+      filtered = filtered.filter((day) => day.date.startsWith(month));
+    }
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
+    const safePage = Math.min(totalPages, page);
+    const start = (safePage - 1) * limit;
+
+    const groups = filtered
+      .slice(start, start + limit)
+      .map((day) => this.summarizeChangelogDay(day));
+
+    const payload = {
+      enabled: config.enabled,
+      title: config.title,
+      subtitle: config.subtitle,
+      repository: {
+        owner: config.repositoryOwner,
+        name: config.repositoryName,
+        branch: config.branch,
+        url: this.repositoryUrl(config),
+      },
+      groups,
+      months: months.slice(0, 24),
+      page: safePage,
+      totalPages,
+      total: filtered.length,
+      itemCount: filtered.reduce((total, day) => total + day.commits.length, 0),
+      fetchedAt: snapshot.fetchedAt,
+      sourceStatus: snapshot.sourceStatus,
+      sourceLabel: snapshot.sourceLabel,
+      translationPending: snapshot.translationPending,
+    };
+    await this.redis.setJson(cacheKey, payload, 120).catch(() => undefined);
+    return payload;
+  }
+
+  /**
+   * 把一天内的提交聚合成一个条目，标题由提交前缀规则化生成：
+   * 如「新增 3 项功能，修复 2 处问题」；无前缀时取首条提交作为标题。
+   */
+  private summarizeChangelogDay(day: {
+    date: string;
+    commits: Array<{
+      sha: string;
+      text: string;
+      original: string;
+      author: string;
+      url: string;
+      at: string;
+      source: 'git' | 'manual';
+    }>;
+  }) {
+    const categories: Array<{ keys: string[]; label: string; counter: string }> = [
+      { keys: ['feat', '新增', '添加', '增加', '支持'], label: '新增', counter: '项功能' },
+      { keys: ['fix', '修复', '修正'], label: '修复', counter: '处问题' },
+      { keys: ['perf', '性能'], label: '性能', counter: '处优化' },
+      {
+        keys: ['refactor', '重构', '优化', '改进', '完善', '调整'],
+        label: '优化',
+        counter: '处细节',
+      },
+      { keys: ['style', '样式', '界面', '视觉', '动效'], label: '打磨', counter: '处界面' },
+      { keys: ['docs', '文档'], label: '更新', counter: '处文档' },
+      { keys: ['revert', '回退'], label: '回退', counter: '次变更' },
+      { keys: ['chore', '维护', '依赖', '构建'], label: '维护', counter: '项杂务' },
+    ];
+    const counts = new Map<string, number>();
+    for (const commit of day.commits) {
+      const message = `${commit.original} ${commit.text}`.toLowerCase();
+      for (const category of categories) {
+        if (category.keys.some((key) => message.includes(key))) {
+          counts.set(category.label, (counts.get(category.label) || 0) + 1);
+          break;
+        }
+      }
+    }
+    const parts = categories
+      .filter((category) => (counts.get(category.label) || 0) > 0)
+      .map(
+        (category) => `${category.label} ${counts.get(category.label)} ${category.counter}`,
+      );
+
+    const total = day.commits.length;
+    let title: string;
+    let summary: string;
+    if (parts.length) {
+      title = parts.slice(0, 3).join('，');
+      if (parts.length > 3) title += '等';
+      summary = `这一天共推送 ${total} 次变更。`;
+    } else {
+      const first = String(day.commits[0]?.text || '').trim();
+      title = first ? first.slice(0, 60) : '当日更新';
+      summary = total > 1 ? `这一天共推送 ${total} 次变更。` : '一次安静的推送。';
+    }
+
+    return {
+      id: `day-${day.date}`,
+      date: day.date,
+      title,
+      summary,
+      count: total,
+      publishedAt: day.commits[0]?.at || `${day.date}T00:00:00+08:00`,
+      source: day.commits[0]?.source || 'git',
+      sourceLabel: day.commits[0]?.source === 'manual' ? '手记' : '仓库推送',
+      items: day.commits.map((commit) => ({
+        sha: commit.sha,
+        text: commit.text,
+        original: commit.original,
+        author: commit.author,
+        url: commit.url,
+      })),
     };
   }
 

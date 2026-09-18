@@ -49,7 +49,43 @@
         </button>
       </div>
 
-      <nav class="channel-nav" aria-label="风讯分类">
+      <div class="archive-toolbar" aria-label="风讯时间与来源筛选">
+        <div class="archive-scopes">
+          <button
+            v-for="option in scopeOptions"
+            :key="option.key"
+            type="button"
+            :class="{ active: archiveScope === option.key }"
+            @click="selectScope(option.key)"
+          >
+            <Icon :name="option.icon" />{{ option.label }}
+          </button>
+        </div>
+        <label class="archive-source">
+          <Icon name="ph:broadcast-bold" />
+          <select v-model="archiveSource" @change="loadArchive(1)">
+            <option value="">全部来源</option>
+            <option
+              v-for="source in archiveSources"
+              :key="source.key"
+              :value="source.key"
+            >
+              {{ source.name }} · {{ source.count }}
+            </option>
+          </select>
+        </label>
+        <label class="archive-search">
+          <Icon name="ph:magnifying-glass-bold" />
+          <input
+            v-model.trim="archiveSearch"
+            type="search"
+            maxlength="60"
+            placeholder="搜索已收录风讯"
+          />
+        </label>
+      </div>
+
+      <nav v-if="!archiveMode" class="channel-nav" aria-label="风讯分类">
         <button
           v-for="section in sections"
           :key="section.key"
@@ -155,7 +191,8 @@ type CircleItem = {
   contentHtml?: string;
   source: {
     name: string;
-    url: string;
+    url?: string;
+    key?: string;
     avatar?: string;
     rssUrl?: string;
     section?: string;
@@ -171,6 +208,18 @@ const loading = ref(false);
 const clock = ref(Date.now());
 const brokenImages = reactive(new Set<string>());
 const brokenAvatars = reactive(new Set<string>());
+const archiveScope = ref("latest");
+const archiveSource = ref("");
+const archiveSearch = ref("");
+const archiveItems = ref<CircleItem[]>([]);
+const archivePage = ref(1);
+const archiveTotalPages = ref(1);
+const archiveTotal = ref(0);
+const archiveSources = ref<Array<{ key: string; name: string; count: number }>>(
+  [],
+);
+const hasLastYearData = ref(false);
+let archiveSearchTimer: ReturnType<typeof setTimeout> | null = null;
 const cache = useSharedState("circle-feed-cache", () => ({
   items: [] as CircleItem[],
   page: 1,
@@ -183,22 +232,56 @@ const cache = useSharedState("circle-feed-cache", () => ({
 const heroReady = ref(
   Boolean(cache.value.fetchedAt || cache.value.items.length),
 );
-const items = computed(() => cache.value.items);
+const archiveMode = computed(
+  () =>
+    archiveScope.value !== "latest" ||
+    Boolean(archiveSource.value || archiveSearch.value),
+);
+const items = computed(() =>
+  archiveMode.value ? archiveItems.value : cache.value.items,
+);
 const page = computed({
-  get: () => cache.value.page,
+  get: () => (archiveMode.value ? archivePage.value : cache.value.page),
   set: (value) => {
-    cache.value.page = value;
+    if (archiveMode.value) archivePage.value = value;
+    else cache.value.page = value;
   },
 });
-const totalPages = computed(() => cache.value.totalPages);
-const totalCount = computed(() => cache.value.total);
+const totalPages = computed(() =>
+  archiveMode.value ? archiveTotalPages.value : cache.value.totalPages,
+);
+const totalCount = computed(() =>
+  archiveMode.value ? archiveTotal.value : cache.value.total,
+);
 const sourceCount = computed(
   () =>
-    cache.value.sourceCount ||
-    new Set(items.value.map((item) => item.source.url)).size,
+    (archiveMode.value
+      ? archiveSources.value.length
+      : cache.value.sourceCount) ||
+    new Set(items.value.map((item) => item.source.url || item.source.key)).size,
 );
 const fetchedAt = computed(() => cache.value.fetchedAt);
 const config = computed(() => cache.value.config);
+const scopeOptions = computed(() => [
+  { key: "latest", label: "最新", icon: "ph:wind-bold" },
+  { key: "today", label: "今天", icon: "ph:sun-horizon-bold" },
+  { key: "month", label: "本月", icon: "ph:calendar-dots-bold" },
+  { key: "year", label: "今年", icon: "ph:calendar-blank-bold" },
+  ...(hasLastYearData.value
+    ? [
+        {
+          key: "last-year-today",
+          label: "去年今天",
+          icon: "ph:clock-counter-clockwise-bold",
+        },
+        {
+          key: "last-year-month",
+          label: "去年本月",
+          icon: "ph:calendar-check-bold",
+        },
+      ]
+    : []),
+]);
 const activeSection = useSharedState<SectionKey>(
   "circle-active-section",
   () => "all",
@@ -375,10 +458,49 @@ async function restoreScroll() {
   }
 }
 function openItem(item: CircleItem) {
+  if (archiveMode.value) {
+    window.open(item.url, "_blank", "noopener,noreferrer");
+    return;
+  }
   persistScroll();
   clientState.setSession("circleReturning", true);
   scrollPersistedForNavigation = true;
   void router.push({ path: "/circle/read", query: { id: item.id } });
+}
+async function loadArchive(target = 1) {
+  loading.value = true;
+  activeSection.value = "all";
+  try {
+    const result = await api.get<any>("/circle/archive", {
+      scope: archiveScope.value === "latest" ? "all" : archiveScope.value,
+      source: archiveSource.value || undefined,
+      q: archiveSearch.value || undefined,
+      page: target,
+      limit: pageSize,
+    });
+    archiveItems.value = Array.isArray(result?.items) ? result.items : [];
+    archivePage.value = Number(result?.page) || target;
+    archiveTotal.value = Number(result?.total) || 0;
+    archiveTotalPages.value = Math.max(
+      1,
+      Math.ceil(archiveTotal.value / pageSize),
+    );
+    archiveSources.value = Array.isArray(result?.sources) ? result.sources : [];
+    hasLastYearData.value = Boolean(result?.hasLastYearData);
+  } finally {
+    loading.value = false;
+    heroReady.value = true;
+  }
+}
+
+async function selectScope(scope: string) {
+  archiveScope.value = scope;
+  if (scope === "latest" && !archiveSource.value && !archiveSearch.value) {
+    await loadFeed(1);
+  } else {
+    await loadArchive(1);
+  }
+  pageRef.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 async function loadFeed(target = page.value) {
   loading.value = true;
@@ -407,7 +529,8 @@ async function loadFeed(target = page.value) {
   }
 }
 async function changePage(target: number) {
-  await loadFeed(target);
+  if (archiveMode.value) await loadArchive(target);
+  else await loadFeed(target);
   pageRef.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -431,6 +554,7 @@ onMounted(async () => {
     await restoreScroll();
   } else {
     await loadFeed(page.value);
+    window.setTimeout(() => void loadArchiveMetadata(), 500);
     await nextTick();
     if (pageRef.value) pageRef.value.scrollTop = 0;
   }
@@ -442,8 +566,23 @@ onUnmounted(() => {
   clearScrollRestore();
   if (!scrollPersistedForNavigation) persistScroll();
   if (clockTimer) clearInterval(clockTimer);
+  if (archiveSearchTimer) clearTimeout(archiveSearchTimer);
   clientState.set("site", "circleLastSeenAt", reading.lastSeenAt);
 });
+watch(archiveSearch, () => {
+  if (archiveSearchTimer) clearTimeout(archiveSearchTimer);
+  archiveSearchTimer = setTimeout(() => void loadArchive(1), 360);
+});
+
+async function loadArchiveMetadata() {
+  try {
+    const result = await api.get<any>("/circle/archive", { page: 1, limit: 1 });
+    archiveSources.value = Array.isArray(result?.sources) ? result.sources : [];
+    hasLastYearData.value = Boolean(result?.hasLastYearData);
+  } catch {
+    // 最新风讯仍可使用，存档元数据稍后随筛选请求重试。
+  }
+}
 useHead(() => ({ title: `${config.value.title || "风讯角"} · 风隅随笔` }));
 </script>
 
@@ -457,6 +596,93 @@ useHead(() => ({ title: `${config.value.title || "风讯角"} · 风隅随笔` }
   background: var(--c-bg);
   color: var(--c-text);
   scrollbar-gutter: stable;
+}
+
+.archive-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(170px, 220px);
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 12px;
+  padding: 10px;
+  border-block: 1px solid var(--border);
+}
+
+.archive-scopes {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.archive-scopes::-webkit-scrollbar {
+  display: none;
+}
+
+.archive-scopes button,
+.archive-source,
+.archive-search {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--c-text-3);
+  font: inherit;
+  font-size: 0.62rem;
+}
+
+.archive-scopes button {
+  flex: 0 0 auto;
+  padding: 0 9px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.archive-scopes button:hover,
+.archive-scopes button.active {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+
+.archive-source,
+.archive-search {
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--ld-bg-card);
+}
+
+.archive-source select,
+.archive-search input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+}
+
+.archive-source select {
+  max-width: 150px;
+}
+.archive-search input {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .archive-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .archive-scopes {
+    grid-column: 1 / -1;
+  }
+  .archive-source select {
+    width: 100%;
+    max-width: none;
+  }
 }
 .wind-shell {
   width: min(1040px, calc(100% - clamp(32px, 7vw, 100px)));

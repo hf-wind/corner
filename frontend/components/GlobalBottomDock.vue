@@ -34,6 +34,7 @@ const {
   contentReady,
   paginationVisible,
   setAutoCollapsed,
+  setNearBottom,
 } = useBottomDockState();
 const musicReady = ref(false);
 const route = useRoute();
@@ -54,8 +55,35 @@ watch(
   { immediate: true },
 );
 
+// 捕获阶段监听所有滚动容器：接近底部时自动展开分页胶囊（与音乐胶囊互斥）
+let nearBottomTick = 0;
+function onScrollCapture(event: Event) {
+  const target = event.target as Document | HTMLElement | null;
+  if (!target) return;
+  const now = Date.now();
+  if (now - nearBottomTick < 120) return;
+  nearBottomTick = now;
+  let near = false;
+  if (target instanceof Document) {
+    const remaining = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+    near = remaining <= 64;
+  } else if (target instanceof HTMLElement) {
+    if (target.scrollHeight - target.clientHeight < 8) return;
+    const remaining = target.scrollHeight - target.scrollTop - target.clientHeight;
+    near = remaining <= 64;
+  }
+  setNearBottom(near);
+}
+
+onMounted(() => {
+  window.addEventListener("scroll", onScrollCapture, { capture: true, passive: true });
+});
+
+watch(() => route.fullPath, () => setNearBottom(false));
+
 onUnmounted(() => {
   setAutoCollapsed(false);
+  window.removeEventListener("scroll", onScrollCapture, { capture: true } as never);
 });
 </script>
 
@@ -129,7 +157,7 @@ onUnmounted(() => {
 }
 
 .music-dock {
-  max-width: 255px;
+  max-width: 186px;
 }
 
 .pagination-dock:empty {

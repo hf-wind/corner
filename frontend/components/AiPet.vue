@@ -304,6 +304,7 @@ type ArticleContext = {
   type?: string;
   sourceId?: string;
   scene?: string;
+  hint?: string;
 };
 
 type ContextProfile = {
@@ -888,6 +889,7 @@ async function sendMessage(text: string) {
           type: contentType.value === "home" ? "" : contentType.value,
           sourceId: props.article?.sourceId || "",
           scene: eventScene.value,
+          hint: props.article?.hint || "",
         }
       : undefined;
     let pendingCards: SourceCard[] = [];

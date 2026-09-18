@@ -41,27 +41,21 @@
           aria-live="polite"
           :aria-label="`${constellationLoadingStage}，${constellationRoundedProgress}%`"
         >
-          <div class="loading-window">
-            <header>
-              <span class="loading-brand">
-                <img src="/logo.png" alt="" width="32" height="32" />
-                <span
-                  ><strong>TIME CONSTELLATION</strong><small>ORBITAL MEMORY ATLAS</small></span
-                >
-              </span>
-              <b
-                >{{ String(constellationRoundedProgress).padStart(2, "0") }}<small>%</small></b
-              >
-            </header>
-            <div class="loading-track" aria-hidden="true">
-              <span class="loading-track__ticks"><i v-for="tick in 13" :key="tick" /></span>
+          <div class="loading-light">
+            <span class="loading-orb" aria-hidden="true">
+              <img src="/logo.png" alt="" width="30" height="30" />
+              <i />
+            </span>
+            <div class="loading-line" aria-hidden="true">
               <i :style="{ transform: `scaleX(${constellationDisplayProgress / 100})` }" />
-              <b :style="{ left: `${constellationDisplayProgress}%` }" />
             </div>
-            <footer>
-              <span><i />{{ constellationLoadingStage }}</span>
-              <small><em />{{ constellationLoadingDetail }} · {{ constellationTaskSummary }}</small>
-            </footer>
+            <div class="loading-meta">
+              <strong
+                >{{ String(constellationRoundedProgress).padStart(2, "0")
+                }}<small>%</small></strong
+              >
+              <span>{{ constellationLoadingStage }}</span>
+            </div>
           </div>
         </div>
       </Transition>
@@ -239,22 +233,7 @@
                 <strong>{{ discoveryResult || activeTelemetry.report }}</strong>
                 <span>{{ activeTelemetry.basis }}</span>
               </div>
-              <div class="knowledge-slot" :class="{ 'has-content': activeKnowledge || knowledgeLoading }">
-                <Transition name="knowledge-reveal" mode="out-in">
-                  <section v-if="activeKnowledge" :key="activeKnowledge.revision" class="telemetry-knowledge" aria-live="polite">
-                    <header>
-                      <span><Icon name="ph:book-open-text-bold" /> 星体科普</span>
-                      <small> {{ activeDiscovery.title }} · 已同步</small>
-                    </header>
-                    <p>{{ activeKnowledge.knowledge }}</p>
-                  </section>
-                </Transition>
-              </div>
-              <button v-if="activeDiscovery.knowledge?.length" class="knowledge-refresh" type="button" :disabled="knowledgeLoading" @click="fetchKnowledge">
-                <Icon :name="knowledgeLoading ? 'ph:circle-notch-bold' : 'ph:book-open-text-bold'" :class="{ spinning: knowledgeLoading }" />
-                <span>{{ knowledgeLoading ? '正在换个说法…' : (activeKnowledge ? '换个说法' : '读取科普') }}</span>
-              </button>
-              <div
+               <div
                 class="discovery-commands"
                 :aria-label="`${activeDiscovery.title}指令`"
               >
@@ -388,7 +367,6 @@ const api = useApi();
 const route = useRoute();
 const router = useRouter();
 const { mediaUrl } = useMediaUrl();
-const { visitorId } = useVisitor();
 const { navigate } = useCosmicNavigation();
 const { selectMemory, clearMemory } = useMemorySelection();
 const { state: homePreload, preloadHomeContent } = useHomePreload();
@@ -411,9 +389,6 @@ const activeDiscoveryId = ref<DiscoveryId | "">("");
 const discoveryResult = ref("");
 const discoverySequence = ref(0);
 const activeCommandId = ref<DiscoveryCommandId | "">("");
-const activeKnowledge = ref<{ knowledge: string; index: number; total: number; reused: boolean; revision: number } | null>(null);
-const knowledgeLoading = ref(false);
-let knowledgeRequestSequence = 0;
 const telemetryNow = ref(new Date());
 const neighbors = ref<GraphRelation[]>([]);
 const neighborsLoading = ref(false);
@@ -1118,7 +1093,6 @@ async function loadGraph() {
 }
 
 async function selectNode(node: GraphNode, syncUrl = true) {
-  knowledgeRequestSequence += 1;
   const sequence = ++neighborRequestSequence;
   activeDiscoveryId.value = "";
   discoveryResult.value = "";
@@ -1148,7 +1122,6 @@ function handleSceneSelect(node: GraphNode) {
 }
 
 function handleDiscovery(id: DiscoveryId) {
-  knowledgeRequestSequence += 1;
   neighborRequestSequence += 1;
   returnDiscoveryId.value = "";
   selected.value = null;
@@ -1160,23 +1133,19 @@ function handleDiscovery(id: DiscoveryId) {
   immersiveMode.value = false;
   discoveryResult.value = "";
   activeCommandId.value = "";
-  activeKnowledge.value = null;
   discoverySequence.value += 1;
   void router.replace({ query: {} });
 }
 
 function clearDiscovery() {
   if (!activeDiscoveryId.value || discoveryClosing.value) return;
-  knowledgeRequestSequence += 1;
   discoveryClosing.value = true;
   activeCommandId.value = "";
-  activeKnowledge.value = null;
   if (sceneRef.value) sceneRef.value.resetView();
   else handleFocusCleared();
 }
 
 function handleFocusCleared() {
-  knowledgeRequestSequence += 1;
   returnDiscoveryId.value = "";
   activeDiscoveryId.value = "";
   discoveryResult.value = "";
@@ -1184,32 +1153,6 @@ function handleFocusCleared() {
   activeKnowledge.value = null;
   discoveryClosing.value = false;
   immersiveMode.value = false;
-}
-
-async function fetchKnowledge() {
-  const discovery = activeDiscovery.value;
-  if (!discovery?.id || knowledgeLoading.value) return;
-  const sequence = ++knowledgeRequestSequence;
-  knowledgeLoading.value = true;
-  try {
-    visitorId();
-    const result = await api.post<any>("/visitor/constellation/knowledge", {
-      planetId: discovery.id,
-    });
-    if (sequence === knowledgeRequestSequence && activeDiscoveryId.value === discovery.id && result?.ok && result.knowledge) {
-      activeKnowledge.value = {
-        knowledge: String(result.knowledge),
-        index: Math.max(0, Number(result.index) || 0),
-        total: Math.max(1, Number(result.total) || 1),
-        reused: Boolean(result.reused),
-        revision: sequence,
-      };
-    }
-  } catch {
-    // 科普接口不可用时保留当前遥测面板。
-  } finally {
-    if (sequence === knowledgeRequestSequence) knowledgeLoading.value = false;
-  }
 }
 
 async function runDiscoveryCommand(commandId: DiscoveryCommandId) {
@@ -1328,7 +1271,6 @@ function resetScene() {
 }
 
 async function clearSelected() {
-  knowledgeRequestSequence += 1;
   neighborRequestSequence += 1;
   const returnTo = returnDiscoveryId.value;
   selected.value = null;
@@ -1544,130 +1486,98 @@ useHead({ title: "时光星图" });
   border-color: color-mix(in srgb, var(--c-primary) 16%, transparent);
   transform: rotate(28deg) scaleY(.34);
 }
-.loading-window {
+/* 轻量加载器：呼吸 logo + 细进度线 + 阶段文字（与欢迎页同款） */
+.loading-light {
   position: relative;
   z-index: 1;
-  width: min(430px, calc(100vw - 36px));
-  padding: 23px 23px 19px;
-  border: 1px solid color-mix(in srgb, var(--space-accent) 26%, transparent);
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgb(7 18 42 / 95%), rgb(2 7 20 / 96%));
-  box-shadow:
-    0 28px 90px rgb(0 0 0 / 52%),
-    0 0 0 1px rgb(255 255 255 / 4%) inset,
-    0 0 70px color-mix(in srgb, var(--space-accent) 12%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-.loading-window header,
-.loading-brand,
-.loading-window footer,
-.loading-window footer > span {
-  display: flex;
-  align-items: center;
-}
-.loading-window header {
-  justify-content: space-between;
-}
-.loading-brand {
-  gap: 12px;
-}
-.loading-brand img {
-  width: 36px;
-  height: 36px;
-  padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--space-accent) 46%, transparent);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgb(104 203 255 / 20%), transparent 68%);
-  object-fit: contain;
-}
-.loading-brand > span {
   display: grid;
-  gap: 2px;
+  justify-items: center;
+  gap: 22px;
 }
-.loading-brand strong {
-  color: var(--space-text);
-  font: 700 0.65rem var(--font-brand);
-  letter-spacing: 0.14em;
-}
-.loading-brand small,
-.loading-window footer small {
-  color: rgb(221 235 255 / 42%);
-  font: 0.39rem var(--font-mono);
-}
-.loading-window header > b {
-  min-width: 46px;
-  color: var(--space-text);
-  font: 500 1.05rem var(--font-mono);
-  text-align: right;
-}
-.loading-window header > b small {
-  margin-left: 2px;
-  color: var(--space-accent);
-  font-size: 0.46rem;
-}
-.loading-track {
+
+.loading-orb {
   position: relative;
-  height: 8px;
-  margin: 25px 0 17px;
-  border: 1px solid rgb(174 205 255 / 14%);
-  border-radius: 99px;
-  background: repeating-linear-gradient(90deg, rgb(174 205 255 / 10%) 0 1px, transparent 1px 22px), rgb(174 205 255 / 6%);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 5%) inset;
-  isolation: isolate;
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
 }
-.loading-track__ticks { position: absolute; z-index: 0; inset: -5px 0; display: flex; justify-content: space-between; pointer-events: none; }
-.loading-track__ticks i { width: 1px; height: 3px; background: rgb(174 205 255 / 30%); }
-.loading-track > i {
+
+.loading-orb img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  animation: constellation-loader-breathe 2.4s ease-in-out infinite;
+}
+
+.loading-orb i {
   position: absolute;
-  z-index: 1;
-  inset: 1px;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, #7fd8ff 42%, transparent);
+  border-radius: 50%;
+  animation: constellation-loader-ring 2.4s ease-out infinite;
+}
+
+.loading-line {
+  width: min(180px, 52vw);
+  height: 2px;
+  border-radius: 99px;
+  background: rgb(174 205 255 / 12%);
+  overflow: hidden;
+}
+
+.loading-line > i {
+  display: block;
+  height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c-primary) 74%, #244b8f), color-mix(in srgb, var(--c-primary) 28%, #fff) 48%, var(--c-primary));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--c-primary) 58%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, #7fd8ff 55%, transparent), #bfe9ff);
+  box-shadow: 0 0 12px color-mix(in srgb, #7fd8ff 55%, transparent);
   transform: scaleX(0);
   transform-origin: left center;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
-.loading-track > b {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border: 2px solid color-mix(in srgb, var(--c-primary) 30%, #fff);
-  border-radius: 50%;
-  background: var(--c-primary);
-  box-shadow: 0 0 0 4px var(--c-primary-soft), 0 0 18px color-mix(in srgb, var(--c-primary) 70%, transparent);
-  transform: translate(-50%, -50%);
-  will-change: left;
+
+.loading-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: rgb(221 235 255 / 60%);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
 }
-.loading-window footer {
-  justify-content: space-between;
-  gap: 16px;
+
+.loading-meta strong {
+  color: rgb(236 245 255 / 92%);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.loading-window footer > span {
-  min-width: 0;
-  gap: 7px;
-  color: var(--space-muted);
-  font-size: 0.57rem;
-  white-space: nowrap;
+
+.loading-meta strong small {
+  margin-left: 1px;
+  color: #7fd8ff;
+  font-size: 0.5rem;
 }
-.loading-window footer > span i {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--space-accent);
-  box-shadow: 0 0 0 3px var(--c-primary-soft);
-  animation: constellation-loading-pulse 1.5s ease-in-out infinite;
+
+@keyframes constellation-loader-breathe {
+  50% {
+    opacity: 0.72;
+    transform: scale(0.94);
+  }
 }
-.loading-window footer > small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
+@keyframes constellation-loader-ring {
+  from {
+    opacity: 0.65;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.28);
+  }
 }
-.loading-window footer > small em { display: inline-block; width: 4px; height: 4px; margin-right: 6px; border-radius: 50%; background: var(--space-accent); opacity: .7; }
 .constellation-entry-leave-active {
   transition:
     opacity 0.86s cubic-bezier(0.22, 1, 0.36, 1),

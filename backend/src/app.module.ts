@@ -35,12 +35,12 @@ import { HttpCacheInterceptor } from './common/interceptors/http-cache.intercept
 import { RssModule } from './modules/rss/rss.module';
 import { MemoryGraphModule } from './modules/memory-graph/memory-graph.module';
 import { JourneyModule } from './modules/journey/journey.module';
-import { VisitorModule } from './modules/visitor/visitor.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { CircleModule } from './modules/circle/circle.module';
 import { ChangelogModule } from './modules/changelog/changelog.module';
 import { LogsModule } from './modules/logs/logs.module';
+import { VisitorModule } from './modules/visitor/visitor.module';
 
 @Module({
   imports: [
@@ -88,12 +88,12 @@ import { LogsModule } from './modules/logs/logs.module';
     MemoryGraphModule,
     JourneyModule,
     RssModule,
-    VisitorModule,
     GeoModule,
     BackupModule,
     CircleModule,
     ChangelogModule,
     LogsModule,
+    VisitorModule,
   ],
   controllers: [AppController],
   providers: [

@@ -32,7 +32,7 @@
           <p>{{ description }}</p>
 
           <div class="challenge-widget" :class="{ busy }">
-            <TurnstileWidget v-model="token" />
+            <GeeTestWidget ref="widgetRef" @retry="runValidation" />
             <Transition name="challenge-busy">
               <div v-if="busy" class="challenge-progress" role="status">
                 <Icon name="ph:circle-notch-bold" spin />
@@ -48,6 +48,8 @@
 </template>
 
 <script setup lang="ts">
+import { GeeTestCanceledError } from "@/composables/useGeeTest";
+
 const props = withDefaults(
   defineProps<{
     open: boolean;
@@ -67,24 +69,39 @@ const emit = defineEmits<{
   verified: [token: string];
 }>();
 
-const token = ref("");
-const delivered = ref(false);
+const widgetRef = ref<{ run: () => Promise<string>; reset: () => void } | null>(
+  null,
+);
+let runToken = 0;
+
+async function runValidation() {
+  const widget = widgetRef.value;
+  if (!widget) return;
+  const token = ++runToken;
+  try {
+    const value = await widget.run();
+    if (token !== runToken || !props.open) return;
+    emit("verified", value);
+  } catch (error) {
+    if (token !== runToken || !props.open) return;
+    if (error instanceof GeeTestCanceledError) {
+      emit("cancel");
+    }
+    // 其余错误由组件内部展示并提供重试
+  }
+}
 
 watch(
   () => props.open,
   (open) => {
-    if (open) {
-      token.value = "";
-      delivered.value = false;
-    }
+    if (!open) return;
+    runToken += 1;
+    nextTick(() => {
+      widgetRef.value?.reset();
+      void runValidation();
+    });
   },
 );
-
-watch(token, (value) => {
-  if (!props.open || props.busy || delivered.value || !value) return;
-  delivered.value = true;
-  emit("verified", value);
-});
 
 function cancel() {
   if (!props.busy) emit("cancel");

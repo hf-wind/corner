@@ -24,5 +24,5 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   @MaxLength(2048)
-  turnstileToken?: string;
+  geetestToken?: string;
 }

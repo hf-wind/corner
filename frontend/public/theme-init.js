@@ -5,6 +5,7 @@
     var site = {};
     try { site = JSON.parse(localStorage.getItem("corner:site") || "{}"); } catch (_) { site = {}; }
     root.dataset.font = site.fontPreset || localStorage.getItem("font-preset") || "ayuan";
+    root.dataset.palette = site.palette === "ocean" ? "ocean" : "fresh";
 
     var theme = "auto";
     try {
@@ -21,11 +22,16 @@
     root.classList.toggle("space-route", spaceRoute);
     root.dataset.theme = dark ? "dark" : "light";
     root.style.colorScheme = dark ? "dark" : "light";
-    var themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor)
-      themeColor.setAttribute(
-        "content",
-        spaceRoute ? "#030712" : dark ? "#030b18" : "#eaf5ff",
-      );
+    var ocean = root.dataset.palette === "ocean";
+    var themeColor = ocean
+      ? dark
+        ? "#04101d"
+        : "#e8f1fb"
+      : dark
+        ? "#030b18"
+        : "#eaf5ff";
+    if (spaceRoute) themeColor = "#030712";
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", themeColor);
   } catch (_) {}
 })();

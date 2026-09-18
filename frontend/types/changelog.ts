@@ -50,6 +50,24 @@ export interface ChangelogResponse {
   translationPending: boolean;
 }
 
+/** 时间聚合视图响应（/changelog/timeline） */
+export interface ChangelogTimelineResponse {
+  enabled: boolean;
+  title: string;
+  subtitle: string;
+  repository: ChangelogResponse["repository"];
+  groups: ChangelogRelease[];
+  months: string[];
+  page: number;
+  totalPages: number;
+  total: number;
+  itemCount: number;
+  fetchedAt: string;
+  sourceStatus: ChangelogResponse["sourceStatus"];
+  sourceLabel: string;
+  translationPending: boolean;
+}
+
 export interface ChangelogAdminResponse {
   config: ChangelogConfig;
   manualEntries: ChangelogRelease[];

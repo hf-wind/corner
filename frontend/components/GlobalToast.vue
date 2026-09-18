@@ -218,8 +218,8 @@ html.toast-feedback-info body { transition: background-color 0.45s ease; }
 </style>
 
 <style>
-.toast-container { z-index: 12000; }
-.toast-signal { z-index: 11999; inset: auto; top: max(14px, env(safe-area-inset-top)); left: 50%; width: min(360px, calc(100vw - 28px)); height: 72px; transform: translateX(-50%); border: 0; border-radius: 18px; opacity: 0; background: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 5%, transparent); filter: blur(8px); backdrop-filter: blur(12px) saturate(1.08); }
+.toast-container { z-index: 13500; }
+.toast-signal { z-index: 13499; inset: auto; top: max(14px, env(safe-area-inset-top)); left: 50%; width: min(360px, calc(100vw - 28px)); height: 72px; transform: translateX(-50%); border: 0; border-radius: 18px; opacity: 0; background: color-mix(in srgb, var(--toast-signal-color, var(--c-primary)) 5%, transparent); filter: blur(8px); backdrop-filter: blur(12px) saturate(1.08); }
 .toast-signal.active { animation: toast-soft-focus .72s cubic-bezier(.22,1,.36,1) both; }
 .toast-item::after { display: none; }
 .toast-item::before { position: absolute; inset: -30% 18% auto; height: 75%; border-radius: 50%; background: color-mix(in srgb, var(--toast-accent) 9%, transparent); content: ''; filter: blur(14px); opacity: 0; pointer-events: none; transform: translate3d(0, 8px, 0); }

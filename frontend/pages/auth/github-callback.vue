@@ -125,17 +125,17 @@ async function handleCallback() {
     if (!user) throw new Error("没有读取到 GitHub 授权信息");
     clearOAuthHash();
 
-    const turnstileToken = String(
-      useClientState().getSession("githubTurnstileToken", ""),
+    const geetestToken = String(
+      useClientState().getSession("githubGeetestToken", ""),
     );
-    if (!turnstileToken) throw new Error("安全校验已失效，请重新发起登录");
+    if (!geetestToken) throw new Error("安全校验已失效，请重新发起登录");
     pendingGithubUser.value = {
       id: user.id,
       email: user.email,
       username:
         user.user_metadata?.user_name || user.user_metadata?.preferred_username,
       avatar: user.user_metadata?.avatar_url,
-      turnstileToken,
+      geetestToken,
     };
   } catch (err: any) {
     error.value = err?.message || "GitHub 登录失败，请重试";
@@ -149,11 +149,11 @@ async function completeLogin() {
   if (!pendingGithubUser.value || completing.value) return;
   completing.value = true;
   try {
-    const { turnstileToken, ...githubUser } = pendingGithubUser.value;
-    useClientState().removeSession("githubTurnstileToken");
+    const { geetestToken, ...githubUser } = pendingGithubUser.value;
+    useClientState().removeSession("githubGeetestToken");
     const response = await api.post<any>("/auth/github", {
       githubUser,
-      turnstileToken,
+      geetestToken,
     });
     const result =
       response?.data && typeof response.data === "object"
@@ -190,12 +190,12 @@ async function completeLogin() {
 }
 
 function retry() {
-  useClientState().removeSession("githubTurnstileToken");
+  useClientState().removeSession("githubGeetestToken");
   router.replace({ path: "/login", query: { redirect: safeRedirect() } });
 }
 
 function goToLogin() {
-  useClientState().removeSession("githubTurnstileToken");
+  useClientState().removeSession("githubGeetestToken");
   router.push("/login");
 }
 

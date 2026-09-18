@@ -6,7 +6,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { EmailModule } from '../email/email.module';
 import { UserModule } from '../user/user.module';
-import { TurnstileService } from './turnstile.service';
+import { GeetestModule } from './geetest.module';
 
 @Module({
   imports: [
@@ -17,9 +17,10 @@ import { TurnstileService } from './turnstile.service';
     }),
     EmailModule,
     UserModule,
+    GeetestModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, TurnstileService],
-  exports: [AuthService, TurnstileService],
+  providers: [AuthService, JwtStrategy],
+  exports: [AuthService],
 })
 export class AuthModule {}

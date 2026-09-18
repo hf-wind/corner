@@ -1,119 +1,212 @@
-import { useApi } from "./useApi";
+// frontend/composables/useVisitor.ts
+// 访客身份与互动 API：启动时无感识别（IP+归属地+浏览器+设备 由后端计算指纹），
+// 行为埋点批量上报；留言墙与漂流瓶的读写入口。
 
-let activeVisit: Promise<any> | null = null;
+import { ref } from "vue";
+
+export interface VisitorBrief {
+  visitorId: string;
+  nickname: string;
+  region: string | null;
+  device: { browser: string; os: string; device: string };
+  visits: number;
+  isNew: boolean;
+}
+
+export interface VisitorMessageItem {
+  id: string;
+  content: string;
+  nickname: string;
+  originRegion: string | null;
+  createdAt: string;
+}
+
+export interface BottleChainSegment {
+  id: string;
+  content: string;
+  nickname: string;
+  originRegion: string | null;
+  createdAt: string;
+}
+
+export interface BottleItem {
+  id: string;
+  content: string;
+  nickname: string;
+  originRegion: string | null;
+  currentRegion: string | null;
+  createdAt: string;
+  catchCount: number;
+  holding: boolean;
+  chain?: BottleChainSegment[];
+}
+
+export interface BottleQuota {
+  throwLimit: number;
+  throwUsed: number;
+  fishLimit: number;
+  fishUsed: number;
+}
+
+export interface RecentVisitorItem {
+  nickname: string;
+  region: string | null;
+  browser: string | null;
+  os: string | null;
+  device: string | null;
+  at: string;
+}
+
+const IDENTIFY_INTERVAL = 30 * 60 * 1000;
+let eventBuffer: Array<Record<string, unknown>> = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
-const pendingEvents: any[] = [];
-let flushing: Promise<any> | null = null;
-let pendingHydrated = false;
+let identifyPromise: Promise<VisitorBrief | null> | null = null;
+
+const nickname = ref("");
+const visitorRegion = ref<string | null>(null);
+
+function stableVisitorId(): string {
+  const state = useClientState();
+  const existing = String(state.get("visitor", "visitorId", ""));
+  if (existing && /^[a-zA-Z0-9-]{8,64}$/.test(existing)) return existing;
+  const generated =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) =>
+          value.toString(16).padStart(2, "0"),
+        ).join("");
+  state.set("visitor", "visitorId", generated);
+  return generated;
+}
 
 export function useVisitor() {
   const api = useApi();
-  const state = useClientState();
-  if (!pendingHydrated) {
-    const stored = state.getSession('pendingVisitorEvents', []);
-    if (Array.isArray(stored)) pendingEvents.push(...stored.slice(-100));
-    pendingHydrated = true;
+  const clientState = useClientState();
+
+  function lastIdentifyAt(): number {
+    return Number(clientState.get("visitor", "identifiedAt", 0)) || 0;
   }
 
-  const nickname = ref(
-    String(state.get('visitor', 'nickname', '')),
-  );
-  const setNickname = (value: string) => {
-    const clean = value.trim().slice(0, 20);
-    state.set('visitor', 'nickname', clean);
-    nickname.value = clean;
-  };
+  /** 无感识别：30 分钟内不重复上报；失败静默（不打扰浏览） */
+  function identify(force = false): Promise<VisitorBrief | null> {
+    if (identifyPromise) return identifyPromise;
+    const fresh = Date.now() - lastIdentifyAt() < IDENTIFY_INTERVAL;
+    if (fresh && !force) return Promise.resolve(null);
 
-  const visitorId = () => {
-    if (typeof window === "undefined") return "";
-    const existing = String(state.get('visitor', 'visitorId', ''));
-    if (existing && /^[a-zA-Z0-9-]{8,64}$/.test(existing)) return existing;
-    const generated =
-      typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : Array.from(crypto.getRandomValues(new Uint8Array(16)), (v) =>
-            v.toString(16).padStart(2, "0"),
-          ).join("");
-    state.set('visitor', 'visitorId', generated);
-    return generated;
-  };
+    identifyPromise = (async () => {
+      try {
+        const result = await api.post<VisitorBrief>("/visitor/identify", {
+          screen:
+            typeof screen !== "undefined"
+              ? `${screen.width}x${screen.height}`
+              : "",
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+          locale: navigator.language || "",
+        });
+        nickname.value = result?.nickname || "";
+        visitorRegion.value = result?.region ?? null;
+        clientState.set("visitor", "identifiedAt", Date.now());
+        if (result?.nickname) clientState.set("visitor", "nickname", result.nickname);
+        return result;
+      } catch {
+        return null;
+      } finally {
+        identifyPromise = null;
+      }
+    })();
+    return identifyPromise;
+  }
 
-  const identify = async (name: string, turnstileToken?: string) => {
-    const result = await api.post<any>("/visitor/identify", {
-      nickname: name,
-      turnstileToken,
-    });
-    setNickname(result?.nickname ?? name);
-    return result;
-  };
+  /** 行为埋点入缓冲区，20 秒或退出页面前批量上报 */
+  function queueEvent(event: Record<string, unknown>) {
+    if (typeof window === "undefined") return;
+    eventBuffer.push({ ...event, at: new Date().toISOString() });
+    if (eventBuffer.length >= 20) {
+      void flushEvents(true);
+      return;
+    }
+    if (!flushTimer) {
+      flushTimer = setTimeout(() => void flushEvents(), 20000);
+    }
+  }
 
-  const trackVisit = async () => {
-    if (!visitorId()) return null;
-    const authToken = String(state.get('auth', 'token', ''));
-    const identity = authToken ? 'user' : (nickname.value.trim() ? 'registered' : 'anonymous');
-    const trackedIdentity = String(state.getSession('visitTrackedIdentity', ''));
-    if (trackedIdentity === identity) return { ok: true, deduped: true };
-    queueEvent({ action: 'session_start', path: location.pathname, contentType: 'page' });
-    state.setSession('visitTrackedIdentity', identity);
-    return flushEvents();
-  };
+  async function flushEvents(immediate = false): Promise<void> {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    if (!eventBuffer.length) return;
+    const events = eventBuffer.splice(0, eventBuffer.length);
+    try {
+      await api.post("/visitor/events", { events });
+    } catch {
+      // 埋点失败即丢弃，不阻塞页面
+      if (!immediate) eventBuffer = events.slice(-10);
+    }
+  }
 
-  const queueEvent = (event: Record<string, unknown>) => {
-    if (typeof window === 'undefined' || !visitorId()) return;
-    const authToken = String(state.get('auth', 'token', ''));
-    pendingEvents.push({ ...event, identity: event.identity || (authToken ? 'user' : nickname.value.trim() ? 'registered' : 'anonymous'), at: new Date().toISOString(), sessionId: state.getSession('id', '') });
-    state.setSession('pendingVisitorEvents', pendingEvents.slice(-100));
-    if (pendingEvents.length >= 20) void flushEvents();
-    else if (!flushTimer) flushTimer = setTimeout(() => void flushEvents(), 5 * 60 * 1000);
-  };
-  const flushEvents = async (keepalive = false) => {
-    if (flushing || !pendingEvents.length || !visitorId()) return flushing;
-    const batch = pendingEvents.splice(0);
-    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
-    flushing = api.post<any>('/visitor/track/batch', { events: batch }, keepalive ? { keepalive } as any : undefined)
-      .catch(() => { pendingEvents.unshift(...batch); state.setSession('pendingVisitorEvents', pendingEvents.slice(-100)); return null; })
-      .then((result) => { state.setSession('pendingVisitorEvents', pendingEvents.slice(-100)); return result; })
-      .finally(() => { flushing = null; });
-    return flushing;
-  };
+  async function trackVisit() {
+    await identify(true);
+  }
 
-  const fetchWall = () => api.get<any>("/visitor/wall");
-  const fetchMe = () => api.get<any>("/visitor/me");
-  const fetchRecent = async (fresh = false) => {
-    if (activeVisit) await activeVisit;
-    return api.get<any>(
-      "/visitor/recent",
-      fresh ? { refresh: 1 } : undefined,
-      fresh ? { cache: "no-store" } : undefined,
-    );
-  };
-  const fetchMessages = (page = 1) =>
-    api.get<any>("/visitor/messages", { type: "message", page });
-  const sendMessage = (content: string) =>
-    api.post<any>("/visitor/messages", { content });
-  const throwBottle = (content: string, parentId?: string) =>
-    api.post<any>("/visitor/bottles", { content, parentId });
-  const fetchBottleQuota = () => api.get<any>("/visitor/bottles/quota");
-  const fishBottle = () => api.post<any>("/visitor/bottles/fish");
-  const releaseBottle = (id: string) =>
-    api.post<any>(`/visitor/bottles/${id}/release`);
+  /* ---- 首页侧栏：最近访客 ---- */
+  async function fetchRecent(limit = 3): Promise<RecentVisitorItem[]> {
+    try {
+      return await api.get(`/visitor/recent?limit=${limit}`);
+    } catch {
+      return [];
+    }
+  }
+
+  /* ---- 留言墙 ---- */
+  async function fetchMessages(page = 1, limit = 30): Promise<{
+    items: VisitorMessageItem[];
+    total: number;
+  }> {
+    return api.get(`/visitor/messages?page=${page}&limit=${limit}`);
+  }
+
+  async function sendMessage(payload: {
+    content: string;
+    nickname?: string;
+  }): Promise<{ id: string; status: string; moderated: boolean }> {
+    return api.post("/visitor/messages", payload);
+  }
+
+  /* ---- 漂流瓶 ---- */
+  async function fetchBottleQuota(): Promise<BottleQuota> {
+    return api.get("/visitor/bottle/quota");
+  }
+
+  async function throwBottle(
+    content: string,
+    relayToId?: string,
+  ): Promise<{ id: string; status: string; moderated: boolean; quota: BottleQuota }> {
+    return api.post("/visitor/bottle/throw", { content, relayToId });
+  }
+
+  async function fishBottle(): Promise<BottleItem | null> {
+    return api.post("/visitor/bottle/fish");
+  }
+
+  async function releaseBottle(id: string): Promise<{ ok: boolean }> {
+    return api.post(`/visitor/bottle/${id}/release`);
+  }
 
   return {
     nickname,
-    setNickname,
-    visitorId,
+    visitorRegion,
+    visitorId: stableVisitorId,
     identify,
     trackVisit,
-    fetchWall,
-    fetchMe,
+    queueEvent,
+    flushEvents,
     fetchRecent,
     fetchMessages,
     sendMessage,
-    throwBottle,
     fetchBottleQuota,
+    throwBottle,
     fishBottle,
     releaseBottle,
-    queueEvent,
-    flushEvents,
   };
 }

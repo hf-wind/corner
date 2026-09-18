@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -12,7 +12,7 @@ import {
   IsOptional,
   MaxLength,
 } from 'class-validator';
-import { TurnstileService } from './turnstile.service';
+import { GeetestService } from './geetest.service';
 
 class SendCodeDto {
   @IsEmail()
@@ -25,7 +25,7 @@ class SendCodeDto {
   @IsOptional()
   @IsString()
   @MaxLength(2048)
-  turnstileToken?: string;
+  geetestToken?: string;
 }
 
 class ChangePasswordDto {
@@ -41,26 +41,36 @@ class ChangePasswordDto {
 export class AuthController {
   constructor(
     private auth: AuthService,
-    private turnstile: TurnstileService,
+    private geetest: GeetestService,
   ) {}
+
+  // 极验启用时强制要求前端先完成人机验证，防止跳过校验直接请求
+  private async enforceGeetest(token?: string, ip?: string) {
+    if (this.geetest.isEnabled() && !token) {
+      throw new BadRequestException('请完成人机验证');
+    }
+    if (token) {
+      await this.geetest.verify(token, ip);
+    }
+  }
 
   @Post('send-code')
   async sendCode(@Body() dto: SendCodeDto, @Req() req: any) {
-    await this.turnstile.verify(dto.turnstileToken, req.ip);
+    await this.enforceGeetest(dto.geetestToken, req.ip);
     return this.auth.sendVerificationCode(dto.email, dto.type);
   }
 
   @Post('register')
   async register(@Body() dto: RegisterDto, @Req() req: any) {
-    await this.turnstile.verify(dto.turnstileToken, req.ip);
+    await this.enforceGeetest(dto.geetestToken, req.ip);
     return this.auth.register(dto);
   }
 
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: any) {
-    // The email-code request has already passed Turnstile. The one-time code is
-    // the second proof, so code login must not force users through it twice.
-    if (!dto.code) await this.turnstile.verify(dto.turnstileToken, req.ip);
+    if (!dto.code) {
+      await this.enforceGeetest(dto.geetestToken, req.ip);
+    }
     return this.auth.login(dto);
   }
 
@@ -83,7 +93,7 @@ export class AuthController {
 
   @Post('github')
   async githubLogin(@Body() body: GitHubLoginRequestDto, @Req() req: any) {
-    await this.turnstile.verify(body.turnstileToken, req.ip);
+    await this.enforceGeetest(body.geetestToken, req.ip);
     return this.auth.githubLogin(body.githubUser);
   }
 }

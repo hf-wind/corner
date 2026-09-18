@@ -81,7 +81,8 @@ withDefaults(defineProps<{
   box-shadow: var(--ui-shadow-panel);
   isolation: isolate;
 }
-.content-hero::before { position:absolute; top:28px; bottom:28px; left:0; width:3px; border-radius:0 3px 3px 0; background:linear-gradient(var(--c-primary),transparent); content:''; }
+.content-hero::before { position:absolute; top:24px; bottom:24px; left:0; width:2px; border-radius:0 2px 2px 0; background:linear-gradient(180deg, transparent, color-mix(in srgb, var(--c-primary) 34%, transparent) 30%, color-mix(in srgb, var(--c-primary) 62%, #fff) 50%, color-mix(in srgb, var(--c-primary) 34%, transparent) 70%, transparent); background-size:100% 340%; content:''; animation:hero-edge-breathe 9s ease-in-out infinite; }
+@keyframes hero-edge-breathe { 0%,100% { background-position:50% 0%; opacity:.4; } 50% { background-position:50% 100%; opacity:.9; } }
 .content-hero::after { position:absolute; z-index:-1; right:-70px; bottom:-155px; width:340px; height:340px; border:1px solid color-mix(in srgb,var(--c-primary) 10%,transparent); border-radius:50%; content:''; }
 .hero-copy { position:relative; z-index:2; max-width:610px; }
 .hero-eyebrow { display:flex; align-items:center; gap:8px; margin-bottom:12px; color:var(--c-primary); font-size:.54rem; font-weight:750; letter-spacing:.18em; }
@@ -152,5 +153,5 @@ withDefaults(defineProps<{
   .hero-visual { right:20px; width:112px; height:112px; opacity:.22; }
   .ring-inner { inset:23px; }.visual-core { inset:37px; }
 }
-@media (prefers-reduced-motion:reduce) { .content-hero * { animation:none!important; } }
+@media (prefers-reduced-motion:reduce) { .content-hero *, .content-hero::before { animation:none!important; } }
 </style>

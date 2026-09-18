@@ -43,7 +43,7 @@ describe('CircleService', () => {
         },
       ),
     );
-    const service = new CircleService(settings);
+    const service = new CircleService(settings, {} as any);
 
     const first = await service.getFeed();
     const second = await service.getFeed();
@@ -71,10 +71,25 @@ describe('CircleService', () => {
     const settings = settingsWithFriends(friends);
     const fetchMock = jest
       .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(new Response('<rss><channel><item><title>旧文章</title><link>https://old.example/1</link></item></channel></rss>', { status: 200 }))
-      .mockResolvedValueOnce(new Response('<rss><channel><item><title>旧文章</title><link>https://old.example/1</link></item></channel></rss>', { status: 200 }))
-      .mockResolvedValueOnce(new Response('<rss><channel><item><title>新文章</title><link>https://new.example/1</link></item></channel></rss>', { status: 200 }));
-    const service = new CircleService(settings);
+      .mockResolvedValueOnce(
+        new Response(
+          '<rss><channel><item><title>旧文章</title><link>https://old.example/1</link></item></channel></rss>',
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          '<rss><channel><item><title>旧文章</title><link>https://old.example/1</link></item></channel></rss>',
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          '<rss><channel><item><title>新文章</title><link>https://new.example/1</link></item></channel></rss>',
+          { status: 200 },
+        ),
+      );
+    const service = new CircleService(settings, {} as any);
 
     await service.getFeed();
     friends.push({
@@ -84,7 +99,10 @@ describe('CircleService', () => {
     });
     const refreshed = await service.getFeed();
 
-    expect(refreshed.items.map((item) => item.title).sort()).toEqual(['新文章', '旧文章']);
+    expect(refreshed.items.map((item) => item.title).sort()).toEqual([
+      '新文章',
+      '旧文章',
+    ]);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -96,8 +114,15 @@ describe('CircleService', () => {
         rssUrl: 'https://93.184.216.34/html.xml',
       },
     ]);
-    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>HTML 来源</title><link>https://friend.example</link><item><title>HTML 正文</title><link>https://friend.example/1</link><guid>html-1</guid><description><![CDATA[<p>第一段<strong>重点</strong></p><img src="/cover.jpg"><script>alert(1)</script>]]></description></item></channel></rss>`, { status: 200 }));
-    const service = new CircleService(settings);
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>HTML 来源</title><link>https://friend.example</link><item><title>HTML 正文</title><link>https://friend.example/1</link><guid>html-1</guid><description><![CDATA[<p>第一段<strong>重点</strong></p><img src="/cover.jpg"><script>alert(1)</script>]]></description></item></channel></rss>`,
+          { status: 200 },
+        ),
+      );
+    const service = new CircleService(settings, {} as any);
 
     const result = await service.getFeed();
 
@@ -107,7 +132,9 @@ describe('CircleService', () => {
       image: 'https://friend.example/cover.jpg',
     });
     expect(result.items[0].contentHtml).toContain('<strong>重点</strong>');
-    expect(result.items[0].contentHtml).toContain('src="https://friend.example/cover.jpg"');
+    expect(result.items[0].contentHtml).toContain(
+      'src="https://friend.example/cover.jpg"',
+    );
     expect(result.items[0].contentHtml).not.toContain('<script');
   });
 
@@ -119,8 +146,15 @@ describe('CircleService', () => {
         rssUrl: 'https://93.184.216.34/mobius.xml',
       },
     ]);
-    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(`<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Mobius</title><link>https://mobius.blog</link><item><title>完整正文</title><link>https://mobius.blog/post/1</link><description><![CDATA[<p>这里只是摘要</p>]]></description><content:encoded><![CDATA[<p>这是完整正文</p><p><strong>第二段</strong></p>]]></content:encoded></item></channel></rss>`, { status: 200 }));
-    const service = new CircleService(settings);
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Mobius</title><link>https://mobius.blog</link><item><title>完整正文</title><link>https://mobius.blog/post/1</link><description><![CDATA[<p>这里只是摘要</p>]]></description><content:encoded><![CDATA[<p>这是完整正文</p><p><strong>第二段</strong></p>]]></content:encoded></item></channel></rss>`,
+          { status: 200 },
+        ),
+      );
+    const service = new CircleService(settings, {} as any);
 
     const result = await service.getFeed();
 
@@ -134,13 +168,15 @@ describe('CircleService', () => {
   });
 
   it('interleaves prolific sources instead of letting one source fill the first page', () => {
-    const service = new CircleService(settingsWithFriends([]));
+    const service = new CircleService(settingsWithFriends([]), {} as any);
     const item = (source: string, index: number) => ({
       id: `${source}-${index}`,
       title: `${source}-${index}`,
       summary: '',
       url: `https://${source}.example/${index}`,
-      publishedAt: new Date(Date.UTC(2026, 7, 30, 10, 0, 10 - index)).toISOString(),
+      publishedAt: new Date(
+        Date.UTC(2026, 7, 30, 10, 0, 10 - index),
+      ).toISOString(),
       source: {
         name: source,
         url: `https://${source}.example`,
@@ -149,26 +185,65 @@ describe('CircleService', () => {
       },
       categories: [],
     });
-    const distributed = (service as any).distributeItems([item('frequent', 1), item('frequent', 2), item('frequent', 3), item('quiet', 1), item('other', 1)]);
+    const distributed = (service as any).distributeItems([
+      item('frequent', 1),
+      item('frequent', 2),
+      item('frequent', 3),
+      item('quiet', 1),
+      item('other', 1),
+    ]);
 
-    expect(distributed.slice(0, 3).map((entry: any) => entry.source.name)).toEqual(['frequent', 'quiet', 'other']);
+    expect(
+      distributed.slice(0, 3).map((entry: any) => entry.source.name),
+    ).toEqual(['frequent', 'quiet', 'other']);
+  });
+
+  it('uses a one-month boundary for last-year-month archive queries', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-18T04:00:00.000Z'));
+    const prisma = {
+      circleItem: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
+    } as any;
+    const service = new CircleService(settingsWithFriends([]), prisma);
+
+    await service.archive({ scope: 'last-year-month' });
+
+    const range = prisma.circleItem.count.mock.calls[0][0].where.publishedAt;
+    expect(range.gte.toISOString()).toBe('2025-08-31T16:00:00.000Z');
+    expect(range.lt.toISOString()).toBe('2025-09-30T16:00:00.000Z');
+    jest.useRealTimers();
   });
 
   it('keeps administrator subscriptions across configuration reads', async () => {
     const settings = settingsWithFriends([]);
     settings.get.mockImplementation((key: string) =>
-      Promise.resolve(key === 'circle_config' ? {
-        subscriptions: [{ name: '自定义源', url: 'https://custom.example', rssUrl: 'https://custom.example/feed.xml' }],
-      } : []),
+      Promise.resolve(
+        key === 'circle_config'
+          ? {
+              subscriptions: [
+                {
+                  name: '自定义源',
+                  url: 'https://custom.example',
+                  rssUrl: 'https://custom.example/feed.xml',
+                },
+              ],
+            }
+          : [],
+      ),
     );
-    const service = new CircleService(settings);
+    const service = new CircleService(settings, {} as any);
     const config = await service.getConfig();
-    expect(config.subscriptions).toEqual(expect.arrayContaining([expect.objectContaining({ name: '自定义源' })]));
+    expect(config.subscriptions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: '自定义源' })]),
+    );
     expect(settings.set).not.toHaveBeenCalled();
   });
 
   it('accepts public WordPress addresses in 192.0.78.0/24', () => {
-    const service = new CircleService(settingsWithFriends([]));
+    const service = new CircleService(settingsWithFriends([]), {} as any);
     expect((service as any).isPublicIp('192.0.78.191')).toBe(true);
     expect((service as any).isPublicIp('192.0.0.8')).toBe(false);
   });
@@ -192,8 +267,15 @@ describe('CircleService', () => {
       }
       return Promise.resolve(null);
     });
-    jest.spyOn(global, 'fetch').mockResolvedValue(new Response('<feed><entry><title>科技爱好者周刊</title><link href="https://www.ruanyifeng.com/blog/1"/><updated>Tue, 25 Aug 2026 08:00:00 GMT</updated></entry></feed>', { status: 200 }));
-    const service = new CircleService(settings);
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          '<feed><entry><title>科技爱好者周刊</title><link href="https://www.ruanyifeng.com/blog/1"/><updated>Tue, 25 Aug 2026 08:00:00 GMT</updated></entry></feed>',
+          { status: 200 },
+        ),
+      );
+    const service = new CircleService(settings, {} as any);
     const result = await service.getFeed();
     expect(result.items[0]).toMatchObject({
       title: '科技爱好者周刊',
@@ -243,11 +325,14 @@ describe('CircleService', () => {
       }
       return Promise.resolve(null);
     });
-    const service = new CircleService(settings);
+    const service = new CircleService(settings, {} as any);
     const config = await service.getConfig();
 
     expect(config.subscriptions).toHaveLength(2);
-    expect(config.subscriptions.map((item) => item.name)).toEqual(['自定义名称', '新友链']);
+    expect(config.subscriptions.map((item) => item.name)).toEqual([
+      '自定义名称',
+      '新友链',
+    ]);
   });
 
   it('persists an independent disabled state for friend subscriptions', async () => {
@@ -269,11 +354,13 @@ describe('CircleService', () => {
       if (key === 'circle_config') return Promise.resolve(circleConfig);
       return Promise.resolve(null);
     });
-    settings.set.mockImplementation((key: string, value: Record<string, unknown>) => {
-      if (key === 'circle_config') circleConfig = value;
-      return Promise.resolve();
-    });
-    const service = new CircleService(settings);
+    settings.set.mockImplementation(
+      (key: string, value: Record<string, unknown>) => {
+        if (key === 'circle_config') circleConfig = value;
+        return Promise.resolve();
+      },
+    );
+    const service = new CircleService(settings, {} as any);
     const initial = await service.getConfig();
 
     await service.updateConfig({
@@ -306,7 +393,7 @@ describe('CircleService', () => {
       },
     ]);
     const fetchMock = jest.spyOn(global, 'fetch');
-    const service = new CircleService(settings);
+    const service = new CircleService(settings, {} as any);
     jest.spyOn((service as any).logger, 'warn').mockImplementation();
 
     const result = await service.getFeed();
@@ -329,7 +416,7 @@ describe('CircleService', () => {
         headers: { location: 'http://169.254.169.254/latest/meta-data' },
       }),
     );
-    const service = new CircleService(settings);
+    const service = new CircleService(settings, {} as any);
     jest.spyOn((service as any).logger, 'warn').mockImplementation();
 
     const result = await service.getFeed();
@@ -352,7 +439,7 @@ describe('CircleService', () => {
         headers: { 'content-length': '2000001' },
       }),
     );
-    const service = new CircleService(settings);
+    const service = new CircleService(settings, {} as any);
 
     const result = await service.getFeed();
 

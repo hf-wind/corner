@@ -27,6 +27,22 @@ export class ChangelogController {
     return this.changelog.status();
   }
 
+  /** 时间聚合视图：支持关键词搜索与月份筛选（YYYY-MM） */
+  @Get('timeline')
+  timeline(
+    @Query('q') q?: string,
+    @Query('month') month?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.changelog.timeline({
+      q,
+      month,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   @Get()
   list(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.changelog.list({

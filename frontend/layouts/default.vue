@@ -43,7 +43,7 @@ const route = useRoute();
 const router = useRouter();
 const pageRef = ref<HTMLElement | null>(null);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
-const { selectedMemory } = useMemorySelection();
+const { selectedMemory, memoryContext } = useMemorySelection();
 const showContextAi = computed(() =>
   /^\/(moments|library|places|albums|stories|journeys|time)\//.test(route.path),
 );
@@ -78,13 +78,33 @@ const pageContext = computed(() => {
     selectedType === "photo"
       ? String(selected?.id || "").replace(/^photo:/, "")
       : "";
+  const sectionHints: Record<string, string> = {
+    map: "用户正在时光地图页，页面里有最近记忆、地点与时间线数据，被问到最近记忆、最近的瞬间之类问题时结合站点真实动态回答。",
+    constellation: "用户正在时光星图页，页面展示记忆节点星图，可以介绍当前视野中的记忆与它们的关系。",
+    moments: "用户正在浏览瞬间列表页，可以引导看最新瞬间或推荐内容。",
+    library: "用户正在浏览书影页，可以推荐书影或聊读后感。",
+    albums: "用户正在浏览相册页，可以聊聊照片背后的故事。",
+    stories: "用户正在浏览故事航线页，可以介绍故事与路线。",
+    journeys: "用户正在浏览旅程页，可以介绍旅程与途经点。",
+  };
+  const hint =
+    sectionHints[section] ||
+    sectionHints[parts[1] || ""] ||
+    `用户正在浏览站内「${profile.title}」页面。`;
   return {
     type: selectedType,
     scene: selectedType,
     slug: selectedId || parts.at(-1) || "",
     sourceId: selectedId,
-    title: selectedType === "photo" ? "当前照片" : profile.title,
-    content: "",
+    title:
+      selectedType === "photo"
+        ? "当前照片"
+        : selected?.title
+          ? `${profile.title} · ${String(selected.title).slice(0, 60)}`
+          : profile.title,
+    content: profile.type === "map" ? memoryContext.value : "",
+    hint:
+      hint + (selected?.title ? ` 用户当前选中：${String(selected.title).slice(0, 60)}。` : ""),
   };
 });
 

@@ -2,8 +2,8 @@
   <audio
     ref="audioRef"
     class="music-audio"
-    preload="auto"
-    :src="current?.url || undefined"
+    preload="none"
+    :src="audioSource || undefined"
     @ended="onEnded"
     @timeupdate="onTimeUpdate"
     @loadedmetadata="onMetadata"
@@ -25,8 +25,6 @@
       'has-auth': isLoggedIn,
     }"
     aria-label="音乐播放器"
-    @mousemove="bringUp"
-    @click="bringUp"
   >
     <span class="devtools-glowing" aria-hidden="true" />
 
@@ -116,8 +114,6 @@
             :class="{ active: isCurrentTrack(track) }"
             role="option"
             :aria-selected="isCurrentTrack(track)"
-            @pointerenter="warmTrack(track)"
-            @focus="warmTrack(track)"
             @click="playAt(trackIndex)"
           >
             <span class="track-index">
@@ -129,10 +125,13 @@
                 String(trackIndex + 1).padStart(2, "0")
               }}</template>
             </span>
-            <span v-lazy-cover="track.pic" class="track-cover">
+            <span v-lazy-cover="coverUrl(track)" class="track-cover">
               <img
-                v-if="isQueueCoverVisible(track.pic) && hasCover(track.pic)"
-                :src="track.pic"
+                v-if="
+                  isQueueCoverVisible(coverUrl(track)) &&
+                  hasCover(coverUrl(track))
+                "
+                :src="coverUrl(track)"
                 alt=""
                 draggable="false"
                 @error="onCoverError($event, track)"
@@ -191,13 +190,20 @@
     </Transition>
 
     <div class="capsule-shell">
-      <span class="devtools-toggle" aria-hidden="true">
+      <button
+        type="button"
+        class="devtools-toggle"
+        :aria-expanded="!isDevtoolsCollapsed"
+        :title="isDevtoolsCollapsed ? '展开音乐' : '收起音乐'"
+        :aria-label="isDevtoolsCollapsed ? '展开音乐' : '收起音乐'"
+        @click.stop="toggleDock"
+      >
         <Icon
           class="devtools-mark"
           name="ph:waveform-bold"
           aria-hidden="true"
         />
-      </span>
+      </button>
 
       <span class="water-progress" aria-hidden="true">
         <LiquidProgress
@@ -222,8 +228,12 @@
           >
             <span class="current-cover">
               <img
-                v-if="current && hasCover(current.pic)"
-                :src="current.pic"
+                v-if="
+                  current &&
+                  (expanded || playing) &&
+                  hasCover(coverUrl(current))
+                "
+                :src="coverUrl(current)"
                 alt=""
                 draggable="false"
                 @error="onCoverError($event, current)"
@@ -363,12 +373,12 @@ const queueBodyRef = ref<HTMLElement | null>(null);
 const enabled = ref(false);
 const ready = ref(false);
 const expanded = ref(false);
-const isHovering = ref(false);
-const isTouchDevice = ref(false);
+const dockExpanded = ref(false);
 const queueOpen = ref(false);
 const queueLoading = ref(false);
 const autoplay = ref(false);
 const playing = ref(false);
+const audioSource = ref("");
 const volume = ref(0.55);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -394,8 +404,6 @@ const visibleQueueCovers = ref(new Set<string>());
 let playlistRequestId = 0;
 let playRequestId = 0;
 let coverObserver: IntersectionObserver | null = null;
-let warmAudio: HTMLAudioElement | null = null;
-let hoverTimer = 0;
 
 const vLazyCover = {
   mounted(element: HTMLElement, binding: { value?: string }) {
@@ -429,10 +437,7 @@ const activePlaylistName = computed(() => {
 });
 const isDevtoolsCollapsed = computed(
   () =>
-    !isTouchDevice.value &&
-    !isHovering.value &&
-    !expanded.value &&
-    !queueOpen.value &&
+    !dockExpanded.value &&
     (dockAutoCollapsed.value || recordsIntersecting.value),
 );
 
@@ -440,16 +445,14 @@ watch(isDevtoolsCollapsed, (collapsed) => {
   if (collapsed) {
     expanded.value = false;
     queueOpen.value = false;
-    if (activeBottomDock.value === "music") {
-      setActiveBottomDock(null);
-    }
   }
 });
 
-watch(expanded, (value) => {
-  if (value && !isDevtoolsCollapsed.value) {
-    setActiveBottomDock("music");
-  }
+watch(activeBottomDock, (active) => {
+  if (active !== "pagination") return;
+  dockExpanded.value = false;
+  expanded.value = false;
+  queueOpen.value = false;
 });
 
 watch(playing, (value) => setPlaying(value), { immediate: true });
@@ -466,30 +469,18 @@ watch(isLoggedIn, (loggedIn) => {
 });
 
 onMounted(async () => {
-  isTouchDevice.value =
-    "ontouchstart" in window ||
-    navigator.maxTouchPoints > 0 ||
-    window.matchMedia("(hover: none), (pointer: coarse)").matches;
   document.addEventListener("pointerdown", onDocumentPointerDown);
   document.addEventListener("keydown", onDocumentKeydown);
-  warmAudio = new Audio();
-  warmAudio.preload = "auto";
   await bootstrap();
 });
 
 onUnmounted(() => {
-  window.clearTimeout(hoverTimer);
   document.removeEventListener("pointerdown", onDocumentPointerDown);
   document.removeEventListener("keydown", onDocumentKeydown);
   if (activeBottomDock.value === "music") setActiveBottomDock(null);
   setPlaying(false);
   coverObserver?.disconnect();
   coverObserver = null;
-  if (warmAudio) {
-    warmAudio.pause();
-    warmAudio.onerror = null;
-  }
-  warmAudio = null;
   const audio = audioRef.value;
   if (audio) {
     audio.pause();
@@ -569,8 +560,7 @@ async function loadPlaylist(position: number, initial = false) {
       playbackHasMore.value = hasMoreTracks.value;
       index.value = 0;
       resetProgress();
-      void preloadCovers(nextTracks.slice(0, 1));
-      await prepareCurrentTrack(false);
+      audioSource.value = "";
     }
   } catch (error) {
     if (initial) throw error;
@@ -673,7 +663,6 @@ async function handleExternalPlayRequest(
   request: Track & { requestId: number },
 ) {
   const requestId = ++playRequestId;
-  void preloadCovers([request]);
   if (requestId !== playRequestId) return;
   const existing = tracks.value.findIndex(
     (track) =>
@@ -687,6 +676,8 @@ async function handleExternalPlayRequest(
     index.value = 0;
   }
   playbackHasMore.value = false;
+  dockExpanded.value = true;
+  setActiveBottomDock("music");
   expanded.value = true;
   queueOpen.value = false;
   errorRecoveryAvailable.value = true;
@@ -700,18 +691,15 @@ function toggleExpanded() {
   }
 }
 
-function bringUp() {
-  if (isTouchDevice.value) return;
-  isHovering.value = true;
-  window.clearTimeout(hoverTimer);
-  hoverTimer = window.setTimeout(() => {
-    isHovering.value = false;
-    expanded.value = false;
-    queueOpen.value = false;
-    if (activeBottomDock.value === "music") {
-      setActiveBottomDock(null);
-    }
-  }, 5000);
+function toggleDock() {
+  dockExpanded.value = !dockExpanded.value;
+  if (dockExpanded.value) {
+    setActiveBottomDock("music");
+    return;
+  }
+  expanded.value = false;
+  queueOpen.value = false;
+  if (activeBottomDock.value === "music") setActiveBottomDock(null);
 }
 
 function toggleQueue() {
@@ -748,6 +736,14 @@ async function play() {
   if (!audio || !current.value) return;
   playbackRequested.value = true;
   try {
+    const source = playbackUrl(current.value);
+    if (!source) return;
+    if (audioSource.value !== source) {
+      audioSource.value = source;
+      await nextTick();
+      audio.load();
+    }
+    applyVolume();
     await audio.play();
     playing.value = true;
   } catch {
@@ -767,7 +763,6 @@ async function previous() {
   errorRecoveryAvailable.value = true;
   const targetIndex =
     (index.value - 1 + tracks.value.length) % tracks.value.length;
-  void preloadCovers([tracks.value[targetIndex]]);
   index.value = targetIndex;
   await reloadAndPlay();
 }
@@ -779,7 +774,6 @@ async function next(allowErrorRecovery = true) {
     await loadMorePlaybackTracks();
   }
   const targetIndex = (index.value + 1) % tracks.value.length;
-  void preloadCovers([tracks.value[targetIndex]]);
   index.value = targetIndex;
   await reloadAndPlay();
 }
@@ -794,7 +788,6 @@ function onQueueScroll(event: Event) {
 async function playAt(trackIndex: number) {
   const selectedTrack = queueTracks.value[trackIndex];
   if (!selectedTrack) return;
-  void preloadCovers([selectedTrack]);
   tracks.value = [...queueTracks.value];
   playbackPlaylistTab.value = playlistTab.value;
   playbackPlaylistIndex.value = playlistIndex.value;
@@ -870,35 +863,8 @@ async function prepareCurrentTrack(shouldPlay: boolean) {
   if (!audio || !current.value) return;
   applyVolume();
   delete audio.dataset.proxyFallback;
-  audio.load();
-  warmNextTrack();
+  audioSource.value = "";
   if (shouldPlay) await play();
-}
-
-function warmNextTrack() {
-  if (tracks.value.length < 2) return;
-  const nextTrack = tracks.value[(index.value + 1) % tracks.value.length];
-  warmTrack(nextTrack);
-}
-
-function warmTrack(nextTrack: Track | undefined) {
-  const audio = warmAudio;
-  if (
-    !audio ||
-    !nextTrack?.url ||
-    audio.getAttribute("src") === nextTrack.url
-  )
-    return;
-  delete audio.dataset.proxyFallback;
-  audio.src = nextTrack.url;
-  audio.onerror = () => {
-    if (nextTrack.proxyUrl && !audio.dataset.proxyFallback) {
-      audio.dataset.proxyFallback = "1";
-      audio.src = nextTrack.proxyUrl;
-      audio.load();
-    }
-  };
-  audio.load();
 }
 
 async function tryAutoplay() {
@@ -934,8 +900,14 @@ function onMetadata() {
 function onAudioError() {
   const audio = audioRef.value;
   const track = current.value;
-  if (audio && track?.proxyUrl && !audio.dataset.proxyFallback) {
+  if (
+    audio &&
+    track?.proxyUrl &&
+    audioSource.value !== track.proxyUrl &&
+    !audio.dataset.proxyFallback
+  ) {
     audio.dataset.proxyFallback = "1";
+    audioSource.value = track.proxyUrl;
     audio.src = track.proxyUrl;
     audio.load();
     if (playbackRequested.value) void play();
@@ -1020,21 +992,6 @@ async function removeFavorite(track: Track) {
   toast.success("已从我的歌单移除");
 }
 
-async function preloadCovers(nextTracks: Track[]) {
-  const urls = [
-    ...new Set(nextTracks.map((track) => track.pic).filter(Boolean)),
-  ];
-  const results = await Promise.all(
-    urls.map(async (url) => ({ url, loaded: await preloadImage(url) })),
-  );
-  const nextBroken = new Set(brokenCovers.value);
-  for (const result of results) {
-    if (result.loaded) nextBroken.delete(result.url);
-    else nextBroken.add(result.url);
-  }
-  brokenCovers.value = nextBroken;
-}
-
 function observeQueueCover(element: HTMLElement, url: string | undefined) {
   if (!url || brokenCovers.value.has(url)) return;
   element.dataset.coverUrl = url;
@@ -1065,30 +1022,6 @@ function isQueueCoverVisible(url: string | undefined) {
   return Boolean(url && visibleQueueCovers.value.has(url));
 }
 
-function preloadImage(url: string) {
-  return new Promise<boolean>((resolve) => {
-    const image = new Image();
-    let timer = 0;
-    const finish = (loaded: boolean) => {
-      window.clearTimeout(timer);
-      image.onload = null;
-      image.onerror = null;
-      resolve(loaded);
-    };
-    image.onload = async () => {
-      try {
-        await image.decode();
-      } catch {
-        // A completed load is usable even when decode() is unavailable.
-      }
-      finish(true);
-    };
-    image.onerror = () => finish(false);
-    timer = window.setTimeout(() => finish(false), 12_000);
-    image.src = url;
-  });
-}
-
 function hasCover(url: string | undefined) {
   return Boolean(url && !brokenCovers.value.has(url));
 }
@@ -1100,12 +1033,24 @@ function markCoverBroken(url: string | undefined) {
 
 function onCoverError(event: Event, track: Track) {
   const image = event.currentTarget as HTMLImageElement;
-  if (track.proxyPic && !image.dataset.proxyFallback) {
+  if (
+    track.proxyPic &&
+    image.src !== new URL(track.proxyPic, window.location.href).href &&
+    !image.dataset.proxyFallback
+  ) {
     image.dataset.proxyFallback = "1";
     image.src = track.proxyPic;
     return;
   }
-  markCoverBroken(track.pic);
+  markCoverBroken(coverUrl(track));
+}
+
+function playbackUrl(track: Track | null | undefined) {
+  return track?.proxyUrl || track?.url || "";
+}
+
+function coverUrl(track: Track | null | undefined) {
+  return track?.proxyPic || track?.pic || "";
 }
 
 function locateCurrentTrack() {
@@ -1140,16 +1085,21 @@ function clamp(value: number, minimum: number, maximum: number) {
   view-transition-name: none;
   position: relative;
   display: flex;
-  width: 198px;
+  width: 162px;
   min-width: 0;
-  max-width: 198px;
+  max-width: 162px;
   height: var(--capsule-height);
-  flex: 0 1 198px;
+  flex: 0 1 162px;
   align-items: center;
   opacity: 0;
   visibility: hidden;
   transform: translate3d(0, 9px, 0) scale(0.97);
-  transition: all 0.6s, max-width 0.6s, padding 0.5s, transform 0.4s, opacity 0.2s;
+  transition:
+    all 0.6s,
+    max-width 0.6s,
+    padding 0.5s,
+    transform 0.4s,
+    opacity 0.2s;
 }
 
 .music-capsule.is-ready {
@@ -1159,15 +1109,15 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 .music-capsule.is-expanded {
-  width: 232px;
-  max-width: 232px;
-  flex-basis: 232px;
+  width: 186px;
+  max-width: 186px;
+  flex-basis: 186px;
 }
 
 .music-capsule.has-auth.is-expanded {
-  width: 255px;
-  max-width: 255px;
-  flex-basis: 255px;
+  width: 186px;
+  max-width: 186px;
+  flex-basis: 186px;
 }
 
 .music-capsule.is-devtools-collapsed {
@@ -1193,7 +1143,8 @@ function clamp(value: number, minimum: number, maximum: number) {
   border-radius: 100%;
   background: transparent;
   color: inherit;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
   opacity: 0.8;
   transition: opacity 0.2s ease-in-out;
 }
@@ -1305,6 +1256,17 @@ function clamp(value: number, minimum: number, maximum: number) {
   transform: none;
 }
 
+.music-capsule.is-ready {
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.music-capsule.is-ready.is-expanded,
+.music-capsule.is-ready:hover {
+  box-shadow:
+    0 14px 34px color-mix(in srgb, var(--ld-shadow) 40%, transparent),
+    var(--ui-shadow-soft);
+}
+
 .music-capsule.is-devtools-collapsed .queue-panel {
   visibility: hidden;
   opacity: 0;
@@ -1339,8 +1301,16 @@ function clamp(value: number, minimum: number, maximum: number) {
 .water-level {
   --liquid-fill-top: color-mix(in srgb, var(--c-primary) 9%, transparent);
   --liquid-fill-bottom: color-mix(in srgb, var(--c-primary) 22%, transparent);
-  --liquid-wave-front: color-mix(in srgb, var(--c-primary) 15%, var(--devtools-widget-bg));
-  --liquid-wave-back: color-mix(in srgb, var(--c-primary) 8%, var(--devtools-widget-bg));
+  --liquid-wave-front: color-mix(
+    in srgb,
+    var(--c-primary) 15%,
+    var(--devtools-widget-bg)
+  );
+  --liquid-wave-back: color-mix(
+    in srgb,
+    var(--c-primary) 8%,
+    var(--devtools-widget-bg)
+  );
   --liquid-wave-height: 12px;
   --liquid-wave-front-duration: 8.8s;
   --liquid-wave-back-duration: 12s;

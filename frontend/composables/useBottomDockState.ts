@@ -3,6 +3,7 @@ const contentReady = ref(true);
 const paginationVisible = ref(false);
 const autoCollapsed = ref(false);
 const activeBottomDock = ref<"music" | "pagination" | null>(null);
+const nearBottom = ref(false);
 
 export function useBottomDockState() {
   return {
@@ -11,6 +12,7 @@ export function useBottomDockState() {
     paginationVisible: readonly(paginationVisible),
     autoCollapsed: readonly(autoCollapsed),
     activeBottomDock: readonly(activeBottomDock),
+    nearBottom: readonly(nearBottom),
     setHidden(value: boolean) {
       recordsIntersecting.value = Boolean(value);
     },
@@ -25,6 +27,9 @@ export function useBottomDockState() {
     },
     setActiveBottomDock(value: "music" | "pagination" | null) {
       activeBottomDock.value = value;
+    },
+    setNearBottom(value: boolean) {
+      nearBottom.value = Boolean(value);
     },
     setContentReady(value: boolean) {
       contentReady.value = Boolean(value);

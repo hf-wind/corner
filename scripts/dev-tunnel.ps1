@@ -70,19 +70,21 @@ if (-not (Test-Path -LiteralPath $KeyPath)) {
 }
 
 if (-not $SkipSetup) {
-  Write-TunnelLog 'Running remote development data setup...'
-  & ssh @sshArgs $SshTarget "cd '$RemoteAppPath' && bash ./scripts/setup-dev-data.sh"
-  $setupExit = $LASTEXITCODE
-  Write-TunnelLog "Remote development data setup finished (exit=$setupExit)."
-  if ($setupExit -ne 0) { throw 'Remote development data setup failed.' }
-}
-
-Write-TunnelLog 'Reading remote development data configuration...'
-$remoteEnv = & ssh @sshArgs $SshTarget "cat /srv/corner/dev-data/.env"
-$readExit = $LASTEXITCODE
-Write-TunnelLog "Read remote configuration (exit=$readExit, lines=$($remoteEnv.Count))."
-if ($readExit -ne 0 -or -not $remoteEnv) {
-  throw 'Unable to read the remote development data configuration.'
+  Write-TunnelLog 'Running remote development data setup and reading configuration...'
+  $remoteEnv = & ssh @sshArgs $SshTarget "cd '$RemoteAppPath' && bash ./scripts/setup-dev-data.sh && cat /srv/corner/dev-data/.env"
+  $readExit = $LASTEXITCODE
+  Write-TunnelLog "Remote setup and config read finished (exit=$readExit, lines=$($remoteEnv.Count))."
+  if ($readExit -ne 0 -or -not $remoteEnv) {
+    throw 'Remote development data setup or config read failed.'
+  }
+} else {
+  Write-TunnelLog 'Reading remote development data configuration...'
+  $remoteEnv = & ssh @sshArgs $SshTarget "cat /srv/corner/dev-data/.env"
+  $readExit = $LASTEXITCODE
+  Write-TunnelLog "Read remote configuration (exit=$readExit, lines=$($remoteEnv.Count))."
+  if ($readExit -ne 0 -or -not $remoteEnv) {
+    throw 'Unable to read the remote development data configuration.'
+  }
 }
 
 $values = ConvertFrom-DotEnvLines $remoteEnv

@@ -115,6 +115,7 @@
             <Icon name="ph:arrow-u-up-left-bold" />
           </AppLink>
           <div
+            v-if="!isPanel"
             class="theme-pill"
             :class="`theme-${theme}`"
             role="group"
@@ -149,6 +150,17 @@
             </button>
           </div>
           <button
+            v-if="!isPanel"
+            type="button"
+            class="sidebar-tool palette-button"
+            :class="{ 'is-ocean': palette === 'ocean' }"
+            title="主题色调"
+            aria-label="主题色调"
+            @click="showThemeModal = true"
+          >
+            <Icon name="ph:palette-bold" />
+          </button>
+          <button
             v-if="isPanel && isUserAdmin && allowCollapse"
             type="button"
             class="sidebar-tool admin-collapse-button"
@@ -177,6 +189,7 @@
       </div>
       --></div>
     </div>
+    <ThemePaletteModal v-model:open="showThemeModal" />
   </aside>
 </template>
 
@@ -197,7 +210,8 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ openSearch: []; "toggle-collapse": [] }>();
-const { theme, setTheme } = useTheme();
+const { theme, palette, setTheme } = useTheme();
+const showThemeModal = ref(false);
 const { confirm } = useConfirm();
 const { siteTitle, siteDescription, loadSiteSettings } = useSiteSettings();
 // 字体切换入口暂时隐藏：const { fontPreset, fontPresets, setFontPreset } = useTypography()
@@ -264,11 +278,10 @@ const adminFullNav = [
   { to: "/admin/comments", icon: "ph:shield-check-bold", label: "审核中心" },
   { to: "/admin/media", icon: "ph:image-bold", label: "媒体库" },
   { to: "/admin/users", icon: "ph:users-three-bold", label: "用户管理" },
-  { to: "/admin/visitor", icon: "ph:footprints-bold", label: "访问管理" },
   {
-    to: "/admin/visitor-content",
-    icon: "ph:chat-circle-dots-bold",
-    label: "留言与漂流瓶",
+    to: "/admin/visitor",
+    icon: "ph:footprints-bold",
+    label: "访客与留言",
   },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件功能" },
@@ -363,11 +376,6 @@ const navGroups = computed<NavGroup[]>(() => {
         key: "engagement",
         label: "社区与用户",
         items: select(["/admin/comments", "/admin/users", "/admin/visitor"]),
-      },
-      {
-        key: "community-content",
-        label: "留言与漂流瓶",
-        items: select(["/admin/visitor-content"]),
       },
       {
         key: "intelligence",
@@ -1020,6 +1028,35 @@ watch(
 
 .admin-collapse-button {
   color: var(--c-text-2);
+}
+
+.palette-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.palette-button::after {
+  position: absolute;
+  inset: 3px;
+  border-radius: 7px;
+  background: linear-gradient(
+    135deg,
+    hsl(152 62% 42% / 30%),
+    hsl(45 80% 60% / 22%) 55%,
+    hsl(220 72% 52% / 30%)
+  );
+  content: "";
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.palette-button.is-ocean::after {
+  opacity: 1;
+}
+
+.palette-button :deep(svg) {
+  position: relative;
+  z-index: 1;
 }
 
 .sidebar-divider {

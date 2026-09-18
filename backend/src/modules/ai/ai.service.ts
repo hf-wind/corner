@@ -2484,6 +2484,7 @@ export class AiService {
           type?: string;
           sourceId?: string;
           scene?: string;
+          hint?: string;
         }
       | undefined,
     cfg: AiConfig,
@@ -2544,6 +2545,7 @@ export class AiService {
       8000,
       5000,
     );
+    const pageHint = String(article?.hint || '').slice(0, 500);
     const articleContext =
       resolvedArticle?.title || resolvedArticle?.content
         ? [
@@ -2566,13 +2568,19 @@ export class AiService {
           '相册与照片场景不得在回复正文中展示图片 URL；图片只通过界面缩略图呈现。',
         ].join('\n')
       : '【场景边界】当前是首页探索场景，可以跨文章、相册和书影推荐，但必须清楚标注内容类型。';
+    const hintGuard = pageHint
+      ? `【页面提示】${pageHint}
+回答时应自然贴合用户当前所在页面与选中内容，不要答非所问。`
+      : '';
     const musicContext = musicSuggestions.length
       ? `【可推荐歌曲（仅以下 ${musicSuggestions.length} 首，不得虚构）】\n${musicSuggestions.map((track, index) => `${index + 1}. ${track.name} - ${track.artist}（${track.playlist}）`).join('\n')}\n用户要求播放时，告诉用户已为其准备播放；不要输出音频 URL。`
       : '';
 
     const system: ChatMessage = {
       role: 'system',
-      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${sceneGuard}\n\n${articleContext}\n\n${musicContext}\n\n【博客知识库】\n${knowledge}`,
+      content: `${cfg.ai_pet_system_prompt}\n\n${identity}\n\n${sceneGuard}
+
+${hintGuard}\n\n${articleContext}\n\n${musicContext}\n\n【博客知识库】\n${knowledge}`,
     };
 
     const configuredHistoryLimit = Math.max(
@@ -2684,6 +2692,7 @@ export class AiService {
           type?: string;
           sourceId?: string;
           scene?: string;
+          hint?: string;
         }
       | undefined,
     onToken: (token: string) => void,

@@ -58,24 +58,7 @@
           <div class="review-state" :class="{ attention: data.pending.total }"><Icon :name="data.pending.total ? 'ph:warning-circle-bold' : 'ph:check-circle-bold'" /><span><strong>{{ data.pending.total ? '有内容等待处理' : '审核队列已清空' }}</strong><small>{{ data.pending.total ? '建议优先处理被 AI 转交或拦截的内容。' : '评论、友链申请、留言和漂流瓶均无待办。' }}</small></span></div>
         </section>
 
-        <section class="panel access-panel">
-          <header class="panel-head"><div><h2>访问管理</h2><p>三段身份链路、访问行为与 AI 会话</p></div><a-button type="link" @click="router.push('/admin/visitor')">打开面板 <Icon name="ph:arrow-right-bold" /></a-button></header>
-          <div class="access-identity-grid">
-            <button v-for="item in accessIdentityRows" :key="item.label" type="button" @click="router.push('/admin/visitor')">
-              <span class="access-identity-icon" :class="item.tone"><Icon :name="item.icon" /></span>
-              <span><small>{{ item.label }}</small><strong>{{ formatNumber(item.value) }}</strong><em>{{ item.note }}</em></span>
-              <Icon name="ph:arrow-up-right-bold" />
-            </button>
-          </div>
-          <div class="access-behavior-grid">
-            <div><Icon name="ph:footprints-bold" /><span><strong>{{ formatNumber(data.community.visitsToday) }}</strong><small>今日访问</small></span></div>
-            <div><Icon name="ph:book-open-text-bold" /><span><strong>{{ formatNumber(data.community.contentReads?.articles || 0) }}</strong><small>文章阅读</small></span></div>
-            <div><Icon name="ph:wind-bold" /><span><strong>{{ formatNumber(data.community.contentReads?.circle || 0) }}</strong><small>风讯角阅读</small></span></div>
-            <div><Icon name="ph:robot-bold" /><span><strong>{{ formatNumber(data.community.ai?.sessions || 0) }}</strong><small>AI 会话</small></span></div>
-            <div><Icon name="ph:note-pencil-bold" /><span><strong>{{ formatNumber(data.community.messages || 0) }}</strong><small>留言</small></span></div>
-            <div><Icon name="solar:bottle-outline" /><span><strong>{{ formatNumber(data.community.bottles || 0) }}</strong><small>漂流瓶</small></span></div>
-          </div>
-        </section>
+
 
         <section class="panel ai-panel">
           <header class="panel-head"><div><h2>AI 用量</h2><p>会话调用与 Token 消耗</p></div><a-button type="link" @click="router.push('/admin/ai')">用量详情 <Icon name="ph:arrow-right-bold" /></a-button></header>
@@ -131,18 +114,12 @@ const hasAiTrends = computed(() => ['calls', 'inputTokens', 'outputTokens'].some
 const hasIdentityTrends = computed(() => ['anonymous', 'registered', 'users'].some(key => (data.trends.identity?.[key] || []).some((value: number) => Number(value) > 0)))
 const dailyQuotes = ['把每一次访问都变成可回看的轨迹。', '今天也为站点留下一点新的光。', '内容在被看见时，才开始拥有下一段旅程。', '慢慢整理，站点会越来越接近你想要的样子。']
 const dailyQuote = computed(() => dailyQuotes[new Date().getDate() % dailyQuotes.length])
-const accessIdentityRows = computed(() => [
-  { label: '未登记访客', value: data.community.identity?.anonymous || 0, note: '匿名访问链路', icon: 'ph:user-focus-bold', tone: 'anonymous' },
-  { label: '登记访客', value: data.community.identity?.registered || 0, note: '已建立昵称档案', icon: 'ph:identification-badge-bold', tone: 'registered' },
-  { label: '登录用户', value: data.community.identity?.users || 0, note: '关联完整账号', icon: 'ph:user-circle-gear-bold', tone: 'user' },
-])
 const statusTotal = (status: Record<string, number>) => Object.values(status || {}).reduce((sum, value) => sum + Number(value || 0), 0)
 const publishedTotal = computed(() => ['posts', 'moments', 'albums', 'library'].reduce((sum, key) => sum + Number(data.content[key]?.published || 0), 0))
 const metrics = computed(() => [
   { label: '公开内容', value: publishedTotal.value, note: '文章、瞬间、相册与书影', icon: 'ph:files-bold', tone: 'primary', to: '/admin/posts' },
   { label: '累计阅读', value: data.content.views, note: '公开文章浏览总量', icon: 'ph:eye-bold', tone: 'green', to: '/admin/posts' },
-  { label: '待处理', value: data.pending.total, note: '评论、友链与访客审核', icon: 'ph:shield-warning-bold', tone: 'amber', to: '/admin/comments' },
-  { label: '访客档案', value: data.community.visitors, note: `今日 ${data.community.visitsToday} 次到访`, icon: 'ph:users-three-bold', tone: 'blue', to: '/admin/visitor' },
+  { label: '待处理', value: data.pending.total, note: '评论、友链与审核', icon: 'ph:shield-warning-bold', tone: 'amber', to: '/admin/comments' },
   { label: '媒体资源', value: data.content.media, note: '图片、视频、音频与文档', icon: 'ph:image-square-bold', tone: 'rose', to: '/admin/media' },
   { label: 'AI Token', value: data.ai.inputTokens + data.ai.outputTokens, note: `${formatNumber(data.ai.calls)} 次会话调用`, icon: 'ph:sparkle-bold', tone: 'violet', to: '/admin/ai' },
 ])
@@ -156,8 +133,6 @@ const reviewRows = computed(() => [
   { label: '文章评论', value: data.pending.articleComments, icon: 'ph:article-bold', to: '/admin/comments' },
   { label: '瞬间评论', value: data.pending.momentComments, icon: 'ph:sparkle-bold', to: '/admin/comments?section=moment' },
   { label: '友链申请', value: data.pending.friendApplications, icon: 'ph:handshake-bold', to: '/admin/comments?section=applications' },
-  { label: '访客留言', value: data.pending.messages, icon: 'ph:note-pencil-bold', to: '/admin/visitor-messages' },
-  { label: '漂流瓶', value: data.pending.bottles, icon: 'solar:bottle-outline', to: '/admin/visitor-bottles' },
 ])
 const quickActions = [{ to: '/admin/moments/create', icon: 'ph:sparkle-bold', label: '写瞬间', note: '记录此刻' }, { to: '/admin/media', icon: 'ph:image-square-bold', label: '媒体库', note: '整理素材' }, { to: '/admin/library/create', icon: 'ph:books-bold', label: '记书影', note: '添加收藏' }, { to: '/admin/settings', icon: 'ph:sliders-horizontal-bold', label: '站点设置', note: '检查配置' }]
 

@@ -203,7 +203,7 @@ function validateConfirm(_rule: any, value: string) {
 
 let cooldownTimer: ReturnType<typeof setInterval> | null = null;
 
-async function sendChangePasswordCode(turnstileToken: string) {
+async function sendChangePasswordCode(geetestToken: string) {
   if (!form.email) {
     toast.warning("请先加载个人信息");
     passwordChallengeOpen.value = false;
@@ -214,7 +214,7 @@ async function sendChangePasswordCode(turnstileToken: string) {
     const res = await api.post<any>("/auth/send-code", {
       email: form.email,
       type: "change_password",
-      turnstileToken,
+      geetestToken,
     });
     if (res.success === false) throw new Error(res.message || "发送失败");
     toast.success("验证码已发送");

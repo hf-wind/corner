@@ -1,6 +1,20 @@
 <template>
   <main ref="detailPageRef" class="detail-page">
-    <div v-if="!loading && !item" class="not-found content-reveal">
+    <div v-if="loading && !item" class="detail-loading content-reveal">
+      <BookLoader :label="peekedTitle || '正在翻开这份记录'" />
+    </div>
+    <div v-else-if="!item && loadError" class="not-found content-reveal">
+      <Icon name="ph:wifi-slash" />
+      <h1>暂时打不开这份记录</h1>
+      <p>{{ loadError }}</p>
+      <div class="not-found-actions">
+        <button type="button" class="retry-button" @click="load">
+          <Icon name="ph:arrow-clockwise-bold" /> 重新加载
+        </button>
+        <AppLink to="/library">返回书影</AppLink>
+      </div>
+    </div>
+    <div v-else-if="!item" class="not-found content-reveal">
       <Icon name="ph:books" />
       <h1>没有找到这份记录</h1>
       <p>它可能还在草稿箱，或已经被移走。</p>
@@ -187,16 +201,22 @@
 
 <script setup lang="ts">
 import type { LibraryItem } from "@/types/library";
+import BookLoader from "@/components/BookLoader.vue";
 const api = useApi();
 const route = useRoute();
 const router = useRouter();
 const { mediaUrl } = useMediaUrl();
+const { fetchItem, peekCache } = useLibraryItem();
+// 访客模块已移除，阅读进度键使用空访客段保持历史格式兼容
 const { visitorId } = useVisitor();
 const loading = ref(true);
 const item = ref<LibraryItem | null>(null);
 const related = ref<LibraryItem[]>([]);
 const hasReadProgress = ref(false);
 const coverFailed = ref(false);
+const loadError = ref("");
+// 立即从本地缓存取标题，loading 界面可显示书名
+const peekedTitle = ref("");
 
 function redirectNotFound() {
   void router.replace({ path: "/404", query: { from: route.fullPath } });
@@ -275,13 +295,17 @@ function formatMonth(value: string) {
 }
 async function load() {
   loading.value = true;
+  loadError.value = "";
+  const slug = String(route.params.slug || "");
+  peekedTitle.value = peekCache(slug)?.title || "";
   try {
-    item.value = await api.get<LibraryItem>(`/library/${route.params.slug}`);
-    if (typeof window !== 'undefined') hasReadProgress.value = Boolean(localStorage.getItem(`corner:epub:${visitorId()}:${route.params.slug}`));
+    const { item: cachedItem } = await fetchItem(slug);
+    item.value = cachedItem;
     if (!item.value) {
       redirectNotFound();
       return;
     }
+    if (typeof window !== 'undefined') hasReadProgress.value = Boolean(localStorage.getItem(`corner:epub:${visitorId()}:${slug}`));
     const res = await api.get<any>("/library", {
       type: item.value.type,
       limit: 3,
@@ -292,7 +316,12 @@ async function load() {
       .slice(0, 2);
   } catch (cause: any) {
     item.value = null;
-    if (cause?.status === 404) redirectNotFound();
+    if (cause?.status === 404) {
+      redirectNotFound();
+      return;
+    }
+    loadError.value =
+      cause?.message || "网络似乎打了个盹，稍后再试一次吧。";
   } finally {
     loading.value = false;
   }
@@ -364,6 +393,47 @@ useHead({
   font-size: 0.72rem;
   text-decoration: none;
 }
+
+.not-found-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-primary);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.retry-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--c-primary) 32%, transparent);
+}
+
+.detail-loading {
+  position: relative;
+  display: grid;
+  height: 100%;
+  min-height: 60vh;
+  place-items: center;
+}
+
+.detail-loading :deep(.book-loader) {
+  background: transparent;
+}
+
 
 .detail-hero {
   position: relative;
