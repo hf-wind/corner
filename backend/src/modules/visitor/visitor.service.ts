@@ -276,7 +276,15 @@ export class VisitorService {
     const cacheKey = `corner:visitor:recent:${take}`;
     const cached =
       await this.redis.getJson<Array<Record<string, unknown>>>(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      return cached.map((row) => ({
+        ...row,
+        nickname: String(row.nickname || '神秘旅人').replace(
+          /undefined/gi,
+          '旅人',
+        ),
+      }));
+    }
 
     const visits = await this.prisma.visitorVisit.findMany({
       orderBy: { createdAt: 'desc' },
@@ -320,7 +328,10 @@ export class VisitorService {
         profiles.map((profile) => [profile.visitorIdHash, profile.nickname]),
       );
       for (const row of rows) {
-        row.nickname = nicknameMap.get(row.hash) || '神秘旅人';
+        row.nickname = String(nicknameMap.get(row.hash) || '神秘旅人').replace(
+          /undefined/gi,
+          '旅人',
+        );
       }
     }
 
