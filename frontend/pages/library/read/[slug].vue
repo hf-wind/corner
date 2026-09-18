@@ -55,11 +55,21 @@
         <Icon name="ph:corners-in-bold" />
       </button>
       <Transition name="reader-loader">
-        <BookLoader v-if="loading" :label="item?.title || '正在加载'" :stage="loadStage" />
+        <BookLoader
+          v-if="loading"
+          :label="item?.title || '正在加载'"
+          :stage="loadStage"
+        />
       </Transition>
       <div v-if="loadError && !loading" class="reader-failed">
         <Icon name="ph:book-open-text-bold" />
-        <h1>{{ loadError === "timeout" ? "这本书加载太慢了" : loadErrorMessage || "图书资源加载失败" }}</h1>
+        <h1>
+          {{
+            loadError === "timeout"
+              ? "这本书加载太慢了"
+              : loadErrorMessage || "图书资源加载失败"
+          }}
+        </h1>
         <p>
           {{
             loadError === "timeout"
@@ -76,7 +86,10 @@
           <AppLink :to="`/library/${route.params.slug}`">返回书影详情</AppLink>
         </div>
       </div>
-      <div v-if="!loading && !loadError && !item?.epubMediaPath" class="reader-empty">
+      <div
+        v-if="!loading && !loadError && !item?.epubMediaPath"
+        class="reader-empty"
+      >
         <Icon name="ph:book-open-text-bold" />
         <h1>这本书还没有绑定 EPUB</h1>
         <AppLink :to="`/library/${route.params.slug}`">返回详情</AppLink>
@@ -243,8 +256,12 @@ const attachedDocuments = new WeakSet<Document>();
 const storageKey = computed(
   () => `corner:epub:${visitorId()}:${route.params.slug}`,
 );
-const readerTheme = ref<"warm-sun" | "mist" | "dawn" | "midnight" | "ink" | "forest">("warm-sun");
-const readerFont = ref<"rounded" | "serif" | "sans" | "system" | "misans">("rounded");
+const readerTheme = ref<
+  "warm-sun" | "mist" | "dawn" | "midnight" | "ink" | "forest"
+>("warm-sun");
+const readerFont = ref<"rounded" | "serif" | "sans" | "system" | "misans">(
+  "rounded",
+);
 const readerFontSize = ref(16);
 const readerLineHeight = ref(1.85);
 const readerLetterSpacing = ref(0.02);
@@ -268,7 +285,7 @@ const fontOptions = [
 ] as const;
 const effectOptions = [
   { value: "slide", label: "平滑滑动" },
-  { value: "curl", label: "仿真翻页" },
+  { value: "curl", label: "柔和纸感" },
 ] as const;
 const settingsKey = computed(() => `${storageKey.value}:settings`);
 function persistReaderSettings() {
@@ -289,7 +306,11 @@ function restoreReaderSettings() {
   if (typeof localStorage === "undefined") return;
   try {
     const saved = JSON.parse(localStorage.getItem(settingsKey.value) || "{}");
-    if (["warm-sun", "mist", "dawn", "midnight", "ink", "forest"].includes(saved.theme)) {
+    if (
+      ["warm-sun", "mist", "dawn", "midnight", "ink", "forest"].includes(
+        saved.theme,
+      )
+    ) {
       readerTheme.value = saved.theme;
       themeTouched.value = true;
     } else if (document.documentElement.classList.contains("dark")) {
@@ -303,7 +324,10 @@ function restoreReaderSettings() {
     if (Number.isFinite(saved.line))
       readerLineHeight.value = Math.max(1.5, Math.min(2.3, saved.line));
     if (Number.isFinite(saved.letterSpacing))
-      readerLetterSpacing.value = Math.max(0, Math.min(0.2, saved.letterSpacing));
+      readerLetterSpacing.value = Math.max(
+        0,
+        Math.min(0.2, saved.letterSpacing),
+      );
     if (["slide", "curl"].includes(saved.effect))
       pageEffect.value = saved.effect;
   } catch {
@@ -408,10 +432,10 @@ function clamp(value: number, min: number, max: number) {
 function applyDragTransform(dx: number, width: number) {
   if (pageEffect.value === "curl") {
     const origin = dx < 0 ? "left center" : "right center";
-    const angle = clamp((dx / Math.max(width, 1)) * 72, -72, 72);
+    const angle = clamp((dx / Math.max(width, 1)) * 3.5, -3.5, 3.5);
     dragStyle.value = {
       transformOrigin: origin,
-      transform: `perspective(1600px) rotateY(${angle}deg)`,
+      transform: `perspective(1800px) translateX(${dx}px) rotateY(${angle}deg)`,
     };
   } else {
     dragStyle.value = { transform: `translateX(${dx}px)` };
@@ -426,15 +450,19 @@ function animateElement(
   keyframes: Keyframe[],
   duration: number,
 ): Promise<void> | null {
-  const el = bookEl.value as (HTMLElement & {
-    animate?: (k: Keyframe[], o: KeyframeAnimationOptions) => Animation;
-  }) | null;
+  const el = bookEl.value as
+    | (HTMLElement & {
+        animate?: (k: Keyframe[], o: KeyframeAnimationOptions) => Animation;
+      })
+    | null;
   if (!el?.animate) return null;
-  return el.animate(keyframes, {
-    duration,
-    easing: EASE_TURN,
-    fill: "none",
-  }).finished.catch(() => undefined);
+  return el
+    .animate(keyframes, {
+      duration,
+      easing: EASE_TURN,
+      fill: "forwards",
+    })
+    .finished.catch(() => undefined);
 }
 
 function exitKeyframes(
@@ -444,41 +472,41 @@ function exitKeyframes(
 ): Keyframe[] {
   const sign = direction === "next" ? -1 : 1;
   if (pageEffect.value === "curl") {
-    const startAngle = clamp((startDx / Math.max(width, 1)) * 72, -72, 72);
+    const startAngle = clamp((startDx / Math.max(width, 1)) * 3.5, -3.5, 3.5);
     return [
       {
-        transform: `perspective(1600px) rotateY(${startAngle}deg)`,
+        transform: `perspective(1800px) translateX(${startDx}px) rotateY(${startAngle}deg)`,
         filter: "brightness(1)",
       },
       {
-        transform: `perspective(1600px) rotateY(${sign * 72}deg)`,
-        filter: "brightness(0.84)",
+        transform: `perspective(1800px) translateX(${sign * width}px) rotateY(${sign * 3.5}deg)`,
+        filter: "brightness(0.92)",
       },
     ];
   }
   return [
-    { transform: `translateX(${startDx}px)`, opacity: 1 },
-    { transform: `translateX(${sign * width * 0.42}px)`, opacity: 0 },
+    { transform: `translateX(${startDx}px)` },
+    { transform: `translateX(${sign * width}px)` },
   ];
 }
 
-function enterKeyframes(
-  direction: "next" | "prev",
-  width: number,
-): Keyframe[] {
+function enterKeyframes(direction: "next" | "prev", width: number): Keyframe[] {
   const sign = direction === "next" ? -1 : 1;
   if (pageEffect.value === "curl") {
     return [
       {
-        transform: `perspective(1600px) rotateY(${-sign * 72}deg)`,
-        filter: "brightness(0.86)",
+        transform: `perspective(1800px) translateX(${-sign * width}px) rotateY(${-sign * 3.5}deg)`,
+        filter: "brightness(0.92)",
       },
-      { transform: "perspective(1600px) rotateY(0deg)", filter: "brightness(1)" },
+      {
+        transform: "perspective(1800px) translateX(0) rotateY(0deg)",
+        filter: "brightness(1)",
+      },
     ];
   }
   return [
-    { transform: `translateX(${-sign * width * 0.42}px)`, opacity: 0 },
-    { transform: "translateX(0px)", opacity: 1 },
+    { transform: `translateX(${-sign * width}px)` },
+    { transform: "translateX(0px)" },
   ];
 }
 
@@ -491,16 +519,19 @@ async function animateTurn(
   if (!el) return;
   navigationBusy.value = true;
   const width = el.offsetWidth || 1;
-  const duration = pageEffect.value === "curl" ? 300 : 230;
+  const duration = pageEffect.value === "curl" ? 360 : 320;
   if (pageEffect.value === "curl") {
-    el.style.transformOrigin = direction === "next" ? "left center" : "right center";
+    el.style.transformOrigin =
+      direction === "next" ? "left center" : "right center";
   }
   try {
-    // 先清掉拖拽残留偏移（退场关键帧自带起点），避免退场结束瞬间跳回
-    clearDragTransform();
-    const exit = animateElement(exitKeyframes(direction, startDx, width), duration);
+    const exit = animateElement(
+      exitKeyframes(direction, startDx, width),
+      duration,
+    );
     if (exit) await exit;
     await rendition.value[direction]();
+    // 内容已经完全离开舞台，切页发生在不可见边界帧；随后从另一侧接回。
     const enter = animateElement(enterKeyframes(direction, width), duration);
     if (enter) await enter;
   } catch {
@@ -527,9 +558,12 @@ function animateReleaseBack(): void {
     .animate(
       [
         { transform: current },
-        { transform: pageEffect.value === "curl"
-            ? "perspective(1600px) rotateY(0deg)"
-            : "translateX(0px)" },
+        {
+          transform:
+            pageEffect.value === "curl"
+              ? "perspective(1800px) translateX(0) rotateY(0deg)"
+              : "translateX(0px)",
+        },
       ],
       { duration: 220, easing: EASE_TURN },
     )
@@ -537,16 +571,22 @@ function animateReleaseBack(): void {
     .finally(() => clearDragTransform());
 }
 
-function finishDrag(dx: number, dy: number, width: number): void {
+function finishDrag(
+  dx: number,
+  dy: number,
+  width: number,
+  velocityX = 0,
+): void {
   const threshold = Math.max(48, width * 0.18);
   const horizontal = Math.abs(dx) >= Math.abs(dy);
-  const distance = horizontal ? Math.abs(dx) : Math.abs(dy);
-  if (distance < threshold) {
+  const distance = horizontal ? Math.abs(dx) : 0;
+  if (!horizontal || (distance < threshold && Math.abs(velocityX) < 0.42)) {
     animateReleaseBack();
     return;
   }
-  const direction: "next" | "prev" = (horizontal ? dx < 0 : dy < 0) ? "next" : "prev";
-  void animateTurn(direction, horizontal ? dx : 0);
+  const direction: "next" | "prev" =
+    dx < 0 || velocityX < -0.42 ? "next" : "prev";
+  void animateTurn(direction, dx);
 }
 
 function handleKey(event: KeyboardEvent) {
@@ -578,13 +618,13 @@ function handleKey(event: KeyboardEvent) {
 }
 function handleWheel(event: WheelEvent) {
   if (Math.abs(event.deltaY) < 8 && Math.abs(event.deltaX) < 8) return;
-  void animateTurn(
-    event.deltaY > 0 || event.deltaX > 0 ? "next" : "prev",
-  );
+  void animateTurn(event.deltaY > 0 || event.deltaX > 0 ? "next" : "prev");
 }
 /* 手势跟随：同时绑定到舞台与 EPUB 内容 iframe（触摸设备上 iframe 会拦截事件） */
 function bindPageDrag(target: HTMLElement | Document) {
   let start: { x: number; y: number } | null = null;
+  let lastPoint: { x: number; at: number } | null = null;
+  let velocityX = 0;
   let active = false;
 
   const point = (event: Event) => {
@@ -601,6 +641,8 @@ function bindPageDrag(target: HTMLElement | Document) {
     )
       return;
     start = point(event);
+    lastPoint = { x: start.x, at: performance.now() };
+    velocityX = 0;
     active = false;
   };
   const onMove = (event: Event) => {
@@ -610,6 +652,10 @@ function bindPageDrag(target: HTMLElement | Document) {
     const dy = p.y - start.y;
     if (!active) {
       if (Math.hypot(dx, dy) < 8) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        start = null;
+        return;
+      }
       active = true;
       dragging.value = true;
     }
@@ -617,6 +663,10 @@ function bindPageDrag(target: HTMLElement | Document) {
       (event as PointerEvent).preventDefault?.();
     }
     dragDx.value = dx;
+    const now = performance.now();
+    if (lastPoint)
+      velocityX = (p.x - lastPoint.x) / Math.max(1, now - lastPoint.at);
+    lastPoint = { x: p.x, at: now };
     applyDragTransform(dx, bookEl.value?.offsetWidth || 1);
   };
   const onUp = (event: Event) => {
@@ -629,13 +679,19 @@ function bindPageDrag(target: HTMLElement | Document) {
     dragging.value = false;
     if (!active) return;
     active = false;
-    finishDrag(p.x - sx, p.y - sy, width);
+    finishDrag(p.x - sx, p.y - sy, width, velocityX);
   };
 
   target.addEventListener("pointerdown", onDown);
   target.addEventListener("pointermove", onMove, { passive: false });
   target.addEventListener("pointerup", onUp);
   target.addEventListener("pointercancel", onUp);
+  contentCleanups.push(() => {
+    target.removeEventListener("pointerdown", onDown);
+    target.removeEventListener("pointermove", onMove);
+    target.removeEventListener("pointerup", onUp);
+    target.removeEventListener("pointercancel", onUp);
+  });
 }
 
 async function continueReading() {
@@ -698,7 +754,11 @@ async function loadEpubBuffer(url: string): Promise<ArrayBuffer> {
   loadStage.value = "下载图书资源…";
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) {
-    throw new Error(response.status === 404 ? "图书资源不存在（404）" : `图书资源请求失败（${response.status}）`);
+    throw new Error(
+      response.status === 404
+        ? "图书资源不存在（404）"
+        : `图书资源请求失败（${response.status}）`,
+    );
   }
   const buffer = await response.arrayBuffer();
   if (!(await looksLikeZip(buffer))) {
@@ -708,7 +768,12 @@ async function loadEpubBuffer(url: string): Promise<ArrayBuffer> {
   if (typeof caches !== "undefined") {
     try {
       const cache = await caches.open("corner:epub-files");
-      await cache.put(url, new Response(buffer.slice(0), { headers: { "content-type": "application/epub+zip" } }));
+      await cache.put(
+        url,
+        new Response(buffer.slice(0), {
+          headers: { "content-type": "application/epub+zip" },
+        }),
+      );
     } catch {
       /* 缓存写入失败不影响阅读 */
     }
@@ -717,7 +782,11 @@ async function loadEpubBuffer(url: string): Promise<ArrayBuffer> {
 }
 
 /* 给 display 等可能挂起的 Promise 加看门狗，避免加载动画永远不消失 */
-function withTimeout(promise: Promise<unknown>, ms: number, kind: "timeout" | "network") {
+function withTimeout(
+  promise: Promise<unknown>,
+  ms: number,
+  kind: "timeout" | "network",
+) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(kind)), ms);
     promise.then(
@@ -794,7 +863,11 @@ async function load() {
     savedCfi.value = saved;
     loadStage.value = "渲染排版…";
     try {
-      await withTimeout(rendition.value.display(saved || undefined), 45000, "timeout");
+      await withTimeout(
+        rendition.value.display(saved || undefined),
+        45000,
+        "timeout",
+      );
     } catch (error) {
       if ((error as Error).message === "timeout") throw error;
       savedCfi.value = "";
@@ -874,7 +947,8 @@ async function load() {
       });
     });
   } catch (error) {
-    loadError.value = (error as Error)?.message === "timeout" ? "timeout" : "network";
+    loadError.value =
+      (error as Error)?.message === "timeout" ? "timeout" : "network";
     loadErrorMessage.value = (error as Error)?.message || "";
   } finally {
     loading.value = false;
@@ -1143,7 +1217,9 @@ useHead({ title: computed(() => `${item.value?.title || "在线阅读"} · 书�
   cursor: pointer;
   font: inherit;
   font-size: 0.74rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .failed-retry:hover {
   transform: translateY(-1px);
@@ -1337,7 +1413,10 @@ useHead({ title: computed(() => `${item.value?.title || "在线阅读"} · 书�
 }
 .book-view {
   will-change: transform;
-  transition: opacity 0.6s ease 0.05s;
+  transition:
+    border-radius 0.45s ease,
+    box-shadow 0.45s ease,
+    width 0.45s ease;
 }
 .book-view.is-ready {
   opacity: 1;

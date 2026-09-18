@@ -1,7 +1,16 @@
 <template>
-  <section class="daily-compass" :class="{ 'is-ready': ready }" aria-label="今日风向标">
+  <section
+    class="daily-compass"
+    :class="{ 'is-ready': ready }"
+    aria-label="今日风向标"
+  >
     <Transition name="compass-swap" mode="out-in">
-      <AppLink v-if="item" :key="item.slug" :to="item.href" class="compass-card">
+      <AppLink
+        v-if="item"
+        :key="item.slug"
+        :to="item.href"
+        class="compass-card"
+      >
         <span class="compass-veil" aria-hidden="true" />
         <img
           v-if="item.image"
@@ -20,7 +29,8 @@
           <span class="compass-kind">{{ kindLabel(item.type) }}</span>
           <h3 class="compass-title">{{ item.title }}</h3>
           <p v-if="item.reason" class="compass-reason">
-            <i aria-hidden="true">“</i>{{ item.reason }}<i aria-hidden="true">”</i>
+            <i aria-hidden="true">“</i>{{ item.reason
+            }}<i aria-hidden="true">”</i>
           </p>
 
           <footer class="compass-foot">
@@ -73,10 +83,7 @@ const dayNumber = String(dayOfYear).padStart(3, "0");
 const dateLabel = `${now.getMonth() + 1} 月 ${now.getDate()} 日`;
 const dayProgress = Math.min(
   1,
-  Math.max(
-    0.02,
-    (now.getHours() * 3600 + now.getMinutes() * 60) / 86400,
-  ),
+  Math.max(0.02, (now.getHours() * 3600 + now.getMinutes() * 60) / 86400),
 );
 
 const KIND_LABELS: Record<string, string> = {
@@ -110,25 +117,27 @@ onMounted(async () => {
     ready.value = true;
   }
 });
-
 </script>
 
 <style scoped>
 .daily-compass {
   position: relative;
-  min-height: 330px;
+  min-height: 252px;
 }
 
 .compass-card {
   position: relative;
   display: flex;
-  min-height: 330px;
+  min-height: 252px;
   align-items: flex-end;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: var(--ui-radius-hero);
-  background:
-    linear-gradient(160deg, color-mix(in srgb, var(--c-primary-soft) 46%, var(--ld-bg-card)), var(--ld-bg-card) 58%);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--c-primary-soft) 46%, var(--ld-bg-card)),
+    var(--ld-bg-card) 58%
+  );
   box-shadow: var(--ui-shadow-panel);
   isolation: isolate;
   text-decoration: none;
@@ -147,7 +156,8 @@ onMounted(async () => {
 
 @media (hover: hover) {
   .compass-card:hover {
-    box-shadow: 0 22px 52px color-mix(in srgb, var(--ld-shadow) 44%, transparent);
+    box-shadow: 0 22px 52px
+      color-mix(in srgb, var(--ld-shadow) 44%, transparent);
   }
 
   .compass-card:hover .compass-image {
@@ -160,8 +170,16 @@ onMounted(async () => {
   z-index: 1;
   inset: 0;
   background:
-    linear-gradient(180deg, transparent 30%, color-mix(in srgb, var(--ld-bg-card) 92%, transparent) 78%),
-    linear-gradient(90deg, color-mix(in srgb, var(--ld-bg-card) 78%, transparent), transparent 55%);
+    linear-gradient(
+      180deg,
+      transparent 30%,
+      color-mix(in srgb, var(--ld-bg-card) 92%, transparent) 78%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ld-bg-card) 78%, transparent),
+      transparent 55%
+    );
   pointer-events: none;
 }
 
@@ -182,7 +200,7 @@ onMounted(async () => {
   width: 100%;
   flex-direction: column;
   gap: 6px;
-  padding: 26px 30px 22px;
+  padding: 22px 26px 20px;
 }
 
 .compass-head {
@@ -220,7 +238,7 @@ onMounted(async () => {
   margin: 0;
   color: var(--c-text);
   font-family: var(--font-heading);
-  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-size: clamp(1.32rem, 2.4vw, 1.8rem);
   font-weight: 640;
   line-height: 1.32;
   letter-spacing: 0.02em;
@@ -249,7 +267,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin-top: 14px;
+  margin-top: 9px;
 }
 
 .compass-go {
@@ -293,7 +311,11 @@ onMounted(async () => {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c-primary) 55%, transparent), var(--c-primary));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--c-primary) 55%, transparent),
+    var(--c-primary)
+  );
   transform-origin: left center;
   transform: scaleX(0.1);
   transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.25s;
@@ -304,7 +326,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  min-height: 330px;
+  min-height: 252px;
   border: 1px dashed color-mix(in srgb, var(--border) 78%, transparent);
   border-radius: var(--ui-radius-hero);
   color: var(--c-text-3);
@@ -318,7 +340,9 @@ onMounted(async () => {
 }
 
 .compass-swap-enter-active {
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
 }
 
 .compass-swap-leave-active {
@@ -338,7 +362,7 @@ onMounted(async () => {
   .daily-compass,
   .compass-card,
   .compass-empty {
-    min-height: 230px;
+    min-height: 218px;
   }
 
   .compass-copy {

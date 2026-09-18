@@ -9,10 +9,17 @@
           isSpaceRoute
             ? undefined
             : viewRoute.meta.layout === 'admin'
-              ? (isAdminEditorRoute(viewRoute.path) ? undefined : 'admin-page')
+              ? isAdminEditorRoute(viewRoute.path)
+                ? undefined
+                : 'admin-page'
               : 'route-page'
         "
-        :mode="viewRoute.meta.layout === 'admin' && !isAdminEditorRoute(viewRoute.path) ? 'out-in' : undefined"
+        :mode="
+          viewRoute.meta.layout === 'admin' &&
+          !isAdminEditorRoute(viewRoute.path)
+            ? 'out-in'
+            : undefined
+        "
       >
         <KeepAlive v-if="viewRoute.meta.keepAlive">
           <component :is="Component" :key="viewRoute.path" />
@@ -63,6 +70,56 @@ const clientProtection = useProductionClientProtection(isAdmin);
 
 readStorage();
 const sessionReady = ref(isLoggedIn.value);
+let pageEnteredAt = Date.now();
+let currentTrackedPath = "";
+
+function reportPageLeave(path = currentTrackedPath) {
+  if (!path) return;
+  visitor.queueEvent({
+    action: "page_leave",
+    path,
+    contentType: path.startsWith("/library/")
+      ? "library"
+      : path.startsWith("/article/")
+        ? "article"
+        : "page",
+    metadata: {
+      title: document.title,
+      durationMs: Math.max(0, Date.now() - pageEnteredAt),
+      referrer: document.referrer || "",
+    },
+  });
+}
+
+function reportInteraction(event: PointerEvent) {
+  const target =
+    event.target instanceof Element
+      ? event.target.closest("a, button, [role='button']")
+      : null;
+  if (!target || target.closest("[data-track='off']")) return;
+  const label = (
+    target.getAttribute("aria-label") ||
+    target.getAttribute("title") ||
+    target.textContent ||
+    ""
+  )
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  visitor.queueEvent({
+    action: "click",
+    path: route.fullPath,
+    contentType: "interaction",
+    metadata: {
+      label: label || target.tagName.toLowerCase(),
+      href:
+        target instanceof HTMLAnchorElement
+          ? target.getAttribute("href") || ""
+          : "",
+      control: target.tagName.toLowerCase(),
+    },
+  });
+}
 
 const activeLayout = computed(() => {
   if (route.meta.layout === false) return WelcomeLayout;
@@ -108,9 +165,28 @@ watch(
   () => route.fullPath,
   (path) => {
     void trackUmamiPageview(path);
-    if (typeof window !== 'undefined') {
-      const contentType = path.startsWith('/circle') ? 'circle' : path.startsWith('/article/') ? 'article' : route.meta.layout === 'admin' ? 'admin' : 'page';
-      visitor.queueEvent({ action: 'page_view', path, contentType, sourceId: path.split('/').filter(Boolean).pop() });
+    if (typeof window !== "undefined") {
+      reportPageLeave(currentTrackedPath);
+      currentTrackedPath = path;
+      pageEnteredAt = Date.now();
+      const contentType = path.startsWith("/circle")
+        ? "circle"
+        : path.startsWith("/article/")
+          ? "article"
+          : route.meta.layout === "admin"
+            ? "admin"
+            : "page";
+      visitor.queueEvent({
+        action: "page_view",
+        path,
+        contentType,
+        sourceId: path.split("/").filter(Boolean).pop(),
+        metadata: {
+          title: document.title,
+          referrer: document.referrer || "",
+          viewport: `${window.innerWidth}x${window.innerHeight}`,
+        },
+      });
     }
   },
   { immediate: true },
@@ -122,7 +198,11 @@ onMounted(() => {
   initTheme();
   initTypography();
   void visitor.identify();
-  window.addEventListener('pagehide', () => { void visitor.flushEvents(true) });
+  window.addEventListener("pointerup", reportInteraction, { passive: true });
+  window.addEventListener("pagehide", () => {
+    reportPageLeave();
+    void visitor.flushEvents(true);
+  });
   if (sessionReady.value) {
     void refreshProfile();
     connectRealtime();
@@ -132,6 +212,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   clientProtection.stop();
+  window.removeEventListener("pointerup", reportInteraction);
   disconnectRealtime();
   void visitor.flushEvents();
 });

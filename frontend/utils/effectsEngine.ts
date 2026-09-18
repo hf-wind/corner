@@ -24,9 +24,9 @@ export const DEFAULT_EFFECT_CONFIG: EffectConfig = {
 };
 
 type ParticleKind =
-  | "spark"      // 烟花主体
-  | "ember"      // 烟花余烬（重力下落闪烁）
-  | "star"       // 星尘（点击）/ 星光（氛围）
+  | "spark" // 烟花主体
+  | "ember" // 烟花余烬（重力下落闪烁）
+  | "star" // 星尘（点击）/ 星光（氛围）
   | "heart"
   | "petal"
   | "fly";
@@ -56,17 +56,20 @@ interface Particle {
   twinkle: number;
   gravity: number;
   drag: number;
-  depth: number;      // 0 远 ~ 1 近：影响尺寸与透明度层次
-  spin: number;       // 花瓣 scaleX 摆动相位
+  depth: number; // 0 远 ~ 1 近：影响尺寸与透明度层次
+  spin: number; // 花瓣 scaleX 摆动相位
   spinSpeed: number;
-  fadePower: number;  // 淡出曲线指数
+  fadePower: number; // 淡出曲线指数
 }
 
 const MAX_CLICK_PARTICLES = 420;
 const MAX_AMBIENT_PARTICLES = 180;
 const MAX_PARTICLES = MAX_CLICK_PARTICLES + MAX_AMBIENT_PARTICLES;
 
-function makeSprite(size: number, draw: (ctx: CanvasRenderingContext2D, s: number) => void): Sprite {
+function makeSprite(
+  size: number,
+  draw: (ctx: CanvasRenderingContext2D, s: number) => void,
+): Sprite {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -111,9 +114,15 @@ function starSprite(color: string, size = 52): Sprite {
       const angle = (Math.PI / 2) * i;
       const spike = half * 0.92;
       ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(angle - 0.12) * half * 0.1, Math.sin(angle - 0.12) * half * 0.1);
+      ctx.lineTo(
+        Math.cos(angle - 0.12) * half * 0.1,
+        Math.sin(angle - 0.12) * half * 0.1,
+      );
       ctx.lineTo(Math.cos(angle) * spike, Math.sin(angle) * spike);
-      ctx.lineTo(Math.cos(angle + 0.12) * half * 0.1, Math.sin(angle + 0.12) * half * 0.1);
+      ctx.lineTo(
+        Math.cos(angle + 0.12) * half * 0.1,
+        Math.sin(angle + 0.12) * half * 0.1,
+      );
       ctx.closePath();
     }
     ctx.fill();
@@ -197,7 +206,14 @@ function flySprite(color: string, size = 72): Sprite {
     halo.addColorStop(1, withAlpha(color, 0));
     ctx.fillStyle = halo;
     ctx.fillRect(0, 0, s, s);
-    const core = ctx.createRadialGradient(half, half, 0, half, half, half * 0.22);
+    const core = ctx.createRadialGradient(
+      half,
+      half,
+      0,
+      half,
+      half,
+      half * 0.22,
+    );
     core.addColorStop(0, "#fffff2");
     core.addColorStop(0.5, withAlpha(color, 0.9));
     core.addColorStop(1, withAlpha(color, 0));
@@ -208,7 +224,10 @@ function flySprite(color: string, size = 72): Sprite {
 
 function withAlpha(color: string, alpha: number): string {
   if (color.startsWith("hsl(") || color.startsWith("hsla(")) {
-    const body = color.replace(/^hsla?\(/, "").replace(/\)$/, "").split(",")[0];
+    const body = color
+      .replace(/^hsla?\(/, "")
+      .replace(/\)$/, "")
+      .split(",")[0];
     const rest = color.slice(color.indexOf("(") + 1, color.lastIndexOf(")"));
     const parts = rest.split(",").map((part) => part.trim());
     return `hsla(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
@@ -246,7 +265,9 @@ export class EffectEngine {
     const target = event.target as HTMLElement | null;
     if (
       target &&
-      (target.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']") ||
+      (target.closest(
+        "input, textarea, select, [contenteditable='true'], [contenteditable='']",
+      ) ||
         target.closest(".no-click-effect"))
     ) {
       return;
@@ -286,11 +307,11 @@ export class EffectEngine {
         twinkle: 0,
         gravity: 0,
         drag: 1,
-      depth: 1,
-      spin: 0,
-      spinSpeed: 0,
-      fadePower: 1,
-    });
+        depth: 1,
+        spin: 0,
+        spinSpeed: 0,
+        fadePower: 1,
+      });
     }
     this.resize();
   }
@@ -312,11 +333,14 @@ export class EffectEngine {
     const rect = this.canvas.getBoundingClientRect();
     const x = clientX - rect.left;
     const y = clientY - rect.top;
-    if (x < -60 || y < -60 || x > rect.width + 60 || y > rect.height + 60) return;
+    if (x < -60 || y < -60 || x > rect.width + 60 || y > rect.height + 60)
+      return;
     const count = Math.max(8, Math.round(this.config.clickCount));
     const speed = this.config.clickSpeed;
-    if (this.config.clickEffect === "fireworks") this.burstFireworks(x, y, count, speed);
-    else if (this.config.clickEffect === "stardust") this.burstStardust(x, y, count, speed);
+    if (this.config.clickEffect === "fireworks")
+      this.burstFireworks(x, y, count, speed);
+    else if (this.config.clickEffect === "stardust")
+      this.burstStardust(x, y, count, speed);
     else this.burstHearts(x, y, count, speed);
     this.resumeLoop();
   }
@@ -327,7 +351,10 @@ export class EffectEngine {
     this.resetAmbient();
     window.addEventListener("resize", this.resizeListener, { passive: true });
     document.addEventListener("visibilitychange", this.onVisibility);
-    if (this.interactive) window.addEventListener("pointerdown", this.onPointerDown, { passive: true });
+    if (this.interactive)
+      window.addEventListener("pointerdown", this.onPointerDown, {
+        passive: true,
+      });
     this.resumeLoop();
   }
 
@@ -336,7 +363,8 @@ export class EffectEngine {
     this.pauseLoop();
     window.removeEventListener("resize", this.resizeListener);
     document.removeEventListener("visibilitychange", this.onVisibility);
-    if (this.interactive) window.removeEventListener("pointerdown", this.onPointerDown);
+    if (this.interactive)
+      window.removeEventListener("pointerdown", this.onPointerDown);
   }
 
   destroy() {
@@ -347,25 +375,32 @@ export class EffectEngine {
   /* ---------------- 特效编排 ---------------- */
 
   private burstFireworks(x: number, y: number, count: number, speed: number) {
-    const half = Math.max(6, Math.round(count / 2));
+    const half = Math.max(8, Math.round(count * 0.62));
     for (let i = 0; i < count; i += 1) {
       const isEmber = i >= half;
       const particle = this.acquire();
       if (!particle || !this.sprites) return;
       const index = isEmber ? i - half : i;
-      const angle = (Math.PI * 2 * index) / half + (Math.random() - 0.5) * 0.22;
+      const ringOffset = isEmber ? Math.PI / half : 0;
+      const angle =
+        (Math.PI * 2 * index) / half +
+        ringOffset +
+        (Math.random() - 0.5) * 0.14;
       const velocity = isEmber
-        ? (1.1 + Math.random() * 1.6) * speed
-        : (2.6 + Math.random() * 2.8) * speed;
+        ? (1.25 + Math.random() * 1.4) * speed
+        : (2.9 + Math.random() * 2.35) * speed;
       const sprite = isEmber
         ? this.sprites.embers[index % this.sprites.embers.length]
         : this.sprites.sparks[index % this.sprites.sparks.length];
       this.init(particle, isEmber ? "ember" : "spark", sprite, x, y);
       particle.vx = Math.cos(angle) * velocity * 60;
       particle.vy = Math.sin(angle) * velocity * 60 - (isEmber ? 20 : 40);
-      particle.maxLife = isEmber ? 1.15 + Math.random() * 0.7 : 0.72 + Math.random() * 0.4;
+      particle.maxLife = isEmber
+        ? 1.25 + Math.random() * 0.65
+        : 0.82 + Math.random() * 0.34;
       particle.life = particle.maxLife;
-      particle.size = (isEmber ? 3.4 : 5) + Math.random() * (isEmber ? 2.6 : 4.4);
+      particle.size =
+        (isEmber ? 2.2 : 3.8) + Math.random() * (isEmber ? 2.2 : 3.8);
       particle.gravity = isEmber ? 150 : 62;
       particle.drag = isEmber ? 1.4 : 2.2;
       particle.twinkle = isEmber ? 9 + Math.random() * 8 : 0;
@@ -375,57 +410,81 @@ export class EffectEngine {
   }
 
   private burstStardust(x: number, y: number, count: number, speed: number) {
-    for (let i = 0; i < count; i += 1) {
+    const stars = Math.max(12, Math.round(count * 1.15));
+    for (let i = 0; i < stars; i += 1) {
       const particle = this.acquire();
       if (!particle || !this.sprites) return;
       const angle = Math.random() * Math.PI * 2;
-      const radius = Math.pow(Math.random(), 0.7) * 52;
+      const radius = 4 + Math.pow(Math.random(), 1.5) * 18;
       const sprite = this.sprites.stars[i % this.sprites.stars.length];
-      this.init(particle, "star", sprite, x + Math.cos(angle) * radius, y + Math.sin(angle) * radius * 0.7);
-      particle.vx = Math.cos(angle) * (10 + Math.random() * 26) * speed;
-      particle.vy = (-34 - Math.random() * 58) * speed;
-      particle.maxLife = 1.15 + Math.random() * 0.85;
+      this.init(
+        particle,
+        "star",
+        sprite,
+        x + Math.cos(angle) * radius,
+        y + Math.sin(angle) * radius * 0.7,
+      );
+      const velocity = (52 + Math.random() * 108) * speed;
+      particle.vx = Math.cos(angle) * velocity;
+      particle.vy = Math.sin(angle) * velocity - 12 * speed;
+      particle.maxLife = 0.72 + Math.random() * 0.72;
       particle.life = particle.maxLife;
-      particle.size = 4.5 + Math.random() * 9;
+      particle.size = 2.6 + Math.random() * 5.8;
       particle.rotation = Math.random() * Math.PI;
-      particle.rotationSpeed = (Math.random() - 0.5) * 1.6;
+      particle.rotationSpeed = (Math.random() - 0.5) * 3.2;
       particle.phase = Math.random() * Math.PI * 2;
-      particle.freq = 1.2 + Math.random() * 1.8;
-      particle.amp = 8 + Math.random() * 16;
-      particle.twinkle = 5 + Math.random() * 6;
-      particle.drag = 0.6;
+      particle.freq = 0.8 + Math.random() * 1.2;
+      particle.amp = 2 + Math.random() * 5;
+      particle.twinkle = 8 + Math.random() * 9;
+      particle.gravity = 24;
+      particle.drag = 1.15;
       particle.depth = 0.6 + Math.random() * 0.4;
       particle.fadePower = 1.25;
     }
   }
 
   private burstHearts(x: number, y: number, count: number, speed: number) {
-    const hearts = Math.max(6, Math.round(count * 0.55));
+    const hearts = Math.max(10, Math.round(count * 0.9));
     for (let i = 0; i < hearts; i += 1) {
       const particle = this.acquire();
       if (!particle || !this.sprites) return;
       const sprite = this.sprites.hearts[i % this.sprites.hearts.length];
-      this.init(particle, "heart", sprite, x + (Math.random() - 0.5) * 46, y + (Math.random() - 0.5) * 22);
-      particle.vx = (Math.random() - 0.5) * 26 * speed;
-      particle.vy = (-52 - Math.random() * 70) * speed;
-      particle.maxLife = 1.5 + Math.random() * 0.8;
+      const angle = -Math.PI + Math.random() * Math.PI;
+      const velocity = (42 + Math.random() * 76) * speed;
+      this.init(
+        particle,
+        "heart",
+        sprite,
+        x + (Math.random() - 0.5) * 16,
+        y + (Math.random() - 0.5) * 12,
+      );
+      particle.vx = Math.cos(angle) * velocity;
+      particle.vy = Math.sin(angle) * velocity - 24 * speed;
+      particle.maxLife = 1.15 + Math.random() * 0.75;
       particle.life = particle.maxLife;
-      particle.size = 9 + Math.random() * 12;
+      particle.size = 4.8 + Math.random() * 7.2;
       particle.rotation = (Math.random() - 0.5) * 0.36;
       particle.rotationSpeed = (Math.random() - 0.5) * 0.8;
       particle.phase = Math.random() * Math.PI * 2;
       particle.freq = 1 + Math.random() * 1.4;
-      particle.amp = 14 + Math.random() * 20;
-      particle.drag = 0.35;
+      particle.amp = 4 + Math.random() * 8;
+      particle.gravity = -8;
+      particle.drag = 0.72;
       particle.depth = 0.7 + Math.random() * 0.3;
       particle.fadePower = 1;
     }
     // 少量星尘点缀
-    const dust = Math.max(4, Math.round(count * 0.28));
+    const dust = Math.max(5, Math.round(count * 0.22));
     for (let i = 0; i < dust; i += 1) {
       const particle = this.acquire();
       if (!particle || !this.sprites) return;
-      this.init(particle, "star", this.sprites.stars[i % this.sprites.stars.length], x + (Math.random() - 0.5) * 60, y + (Math.random() - 0.5) * 30);
+      this.init(
+        particle,
+        "star",
+        this.sprites.stars[i % this.sprites.stars.length],
+        x + (Math.random() - 0.5) * 60,
+        y + (Math.random() - 0.5) * 30,
+      );
       particle.vx = (Math.random() - 0.5) * 34 * speed;
       particle.vy = (-40 - Math.random() * 60) * speed;
       particle.maxLife = 0.9 + Math.random() * 0.6;
@@ -482,7 +541,11 @@ export class EffectEngine {
 
   private ambientTarget(): number {
     if (this.config.ambientEffect === "none") return 0;
-    return Math.min(MAX_AMBIENT_PARTICLES, Math.max(4, Math.round(this.config.ambientDensity)));
+    const multiplier = this.config.ambientEffect === "starlight" ? 1.7 : 1;
+    return Math.min(
+      MAX_AMBIENT_PARTICLES,
+      Math.max(4, Math.round(this.config.ambientDensity * multiplier)),
+    );
   }
 
   private resetAmbient() {
@@ -500,7 +563,8 @@ export class EffectEngine {
     const kind = this.config.ambientEffect;
     particle.active = true;
     particle.ambient = true;
-    particle.kind = kind === "petals" ? "petal" : kind === "fireflies" ? "fly" : "star";
+    particle.kind =
+      kind === "petals" ? "petal" : kind === "fireflies" ? "fly" : "star";
     particle.maxLife = Infinity;
     particle.life = Infinity;
     particle.gravity = 0;
@@ -508,13 +572,21 @@ export class EffectEngine {
     particle.fadePower = 1;
 
     if (kind === "petals") {
-      particle.sprite = this.sprites.petals[Math.floor(Math.random() * this.sprites.petals.length)];
+      particle.sprite =
+        this.sprites.petals[
+          Math.floor(Math.random() * this.sprites.petals.length)
+        ];
       particle.depth = 0.35 + Math.random() * 0.65;
       particle.x = Math.random() * this.width;
-      particle.y = initial ? Math.random() * this.height : -30 - Math.random() * 80;
-      particle.vx = (6 + Math.random() * 16) * speed * (0.4 + particle.depth * 0.6);
-      particle.vy = (16 + Math.random() * 30) * speed * (0.4 + particle.depth * 0.6);
-      particle.size = (10 + Math.random() * 13) * (0.55 + particle.depth * 0.45);
+      particle.y = initial
+        ? Math.random() * this.height
+        : -30 - Math.random() * 80;
+      particle.vx =
+        (6 + Math.random() * 16) * speed * (0.4 + particle.depth * 0.6);
+      particle.vy =
+        (16 + Math.random() * 30) * speed * (0.4 + particle.depth * 0.6);
+      particle.size =
+        (10 + Math.random() * 13) * (0.55 + particle.depth * 0.45);
       particle.rotation = Math.random() * Math.PI * 2;
       particle.rotationSpeed = (Math.random() - 0.5) * 1.6;
       particle.phase = Math.random() * Math.PI * 2;
@@ -537,17 +609,24 @@ export class EffectEngine {
       particle.amp = 26 + Math.random() * 42;
       particle.twinkle = 0.3 + Math.random() * 0.45; // 呼吸频率
     } else {
-      particle.sprite = this.sprites.stars[Math.floor(Math.random() * this.sprites.stars.length)];
+      particle.sprite =
+        this.sprites.stars[
+          Math.floor(Math.random() * this.sprites.stars.length)
+        ];
       particle.depth = 0.3 + Math.random() * 0.7;
       particle.x = Math.random() * this.width;
-      particle.y = initial ? Math.random() * this.height : -16 - Math.random() * 40;
-      particle.vx = (Math.random() - 0.5) * 5 * speed;
-      particle.vy = (3.5 + Math.random() * 9) * speed * (0.4 + particle.depth * 0.6);
-      particle.size = (2.4 + Math.random() * 4.4) * (0.55 + particle.depth * 0.45);
+      particle.y = initial
+        ? Math.random() * this.height
+        : -16 - Math.random() * 40;
+      particle.vx = (Math.random() - 0.5) * 2.8 * speed;
+      particle.vy =
+        (1.2 + Math.random() * 3.8) * speed * (0.35 + particle.depth * 0.65);
+      particle.size =
+        (1.35 + Math.random() * 4.8) * (0.45 + particle.depth * 0.55);
       particle.phase = Math.random() * Math.PI * 2;
       particle.freq = 0.2 + Math.random() * 0.3;
-      particle.amp = 8 + Math.random() * 14;
-      particle.twinkle = 0.5 + Math.random() * 0.9;
+      particle.amp = 4 + Math.random() * 10;
+      particle.twinkle = 0.22 + Math.random() * 0.78;
     }
     return particle;
   }
@@ -559,7 +638,6 @@ export class EffectEngine {
       if (particle.active && particle.ambient) current += 1;
     }
     if (current < target) this.spawnAmbient(false);
-
   }
 
   /* ---------------- 主循环 ---------------- */
@@ -593,7 +671,8 @@ export class EffectEngine {
 
     for (const particle of this.particles) {
       if (!particle.active) continue;
-      const lifeRatio = particle.maxLife === Infinity ? 1 : particle.life / particle.maxLife;
+      const lifeRatio =
+        particle.maxLife === Infinity ? 1 : particle.life / particle.maxLife;
 
       if (!particle.ambient) {
         // 阻力按指数衰减，与帧率无关
@@ -610,7 +689,11 @@ export class EffectEngine {
         burstAlive += 1;
       } else {
         ambientAlive += 1;
-        particle.x += particle.vx * dt + Math.sin(this.time * particle.freq + particle.phase) * particle.amp * dt;
+        particle.x +=
+          particle.vx * dt +
+          Math.sin(this.time * particle.freq + particle.phase) *
+            particle.amp *
+            dt;
         particle.y += particle.vy * dt;
         particle.rotation += particle.rotationSpeed * dt;
         particle.spin += particle.spinSpeed * dt;
@@ -635,13 +718,28 @@ export class EffectEngine {
         const ageRatio = 1 - lifeRatio;
         const fadeIn = Math.min(1, ageRatio / 0.12);
         alpha = fadeIn * Math.pow(lifeRatio, particle.fadePower);
-        if (particle.twinkle) alpha *= 0.7 + 0.3 * Math.sin(this.time * particle.twinkle + particle.phase);
+        if (particle.twinkle)
+          alpha *=
+            0.7 + 0.3 * Math.sin(this.time * particle.twinkle + particle.phase);
       } else if (particle.kind === "fly") {
         // 萤火呼吸：多数时间微暗，周期性亮起
-        const breath = 0.5 + 0.5 * Math.sin(this.time * particle.twinkle * Math.PI * 2 + particle.phase * 3);
+        const breath =
+          0.5 +
+          0.5 *
+            Math.sin(
+              this.time * particle.twinkle * Math.PI * 2 + particle.phase * 3,
+            );
         alpha = 0.1 + 0.85 * Math.pow(breath, 2.4);
       } else if (particle.kind === "star") {
-        alpha = (0.22 + 0.68 * (0.5 + 0.5 * Math.sin(this.time * particle.twinkle * Math.PI * 2 + particle.phase * 5))) * (0.45 + particle.depth * 0.55);
+        const shimmer =
+          0.5 +
+          0.5 *
+            Math.sin(
+              this.time * particle.twinkle * Math.PI * 2 + particle.phase * 5,
+            );
+        alpha =
+          (0.1 + 0.82 * Math.pow(shimmer, 2.2)) *
+          (0.32 + particle.depth * 0.68);
       } else if (particle.kind === "petal") {
         alpha = 0.5 + particle.depth * 0.5;
       }
@@ -667,7 +765,13 @@ export class EffectEngine {
         ctx.drawImage(sprite.canvas, -w / 2, -h / 2, w, h);
         ctx.restore();
       } else {
-        ctx.drawImage(sprite.canvas, particle.x - w / 2, particle.y - h / 2, w, h);
+        ctx.drawImage(
+          sprite.canvas,
+          particle.x - w / 2,
+          particle.y - h / 2,
+          w,
+          h,
+        );
       }
     }
 
@@ -694,8 +798,12 @@ export class EffectEngine {
     const fireworkColors = FIREWORK_HUES.map((h) => hsl(h, 90, 66));
     this.sprites = {
       sparks: fireworkColors.map((color) => sparkSprite(color)),
-      embers: [hsl(hue, 85, 70), hsl(38, 96, 64), hsl(20, 92, 62)].map((color) => sparkSprite(color)),
-      stars: ["#fff8e1", accent, hsl(46, 100, 78)].map((color) => starSprite(color)),
+      embers: [hsl(hue, 85, 70), hsl(38, 96, 64), hsl(20, 92, 62)].map(
+        (color) => sparkSprite(color),
+      ),
+      stars: ["#fff8e1", accent, hsl(46, 100, 78)].map((color) =>
+        starSprite(color),
+      ),
       hearts: [
         heartSprite(hsl(348, 84, 66), hsl(348, 90, 80)),
         heartSprite(hsl(326, 80, 70), hsl(326, 88, 84)),

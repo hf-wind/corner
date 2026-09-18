@@ -61,6 +61,7 @@ const IDENTIFY_INTERVAL = 30 * 60 * 1000;
 let eventBuffer: Array<Record<string, unknown>> = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let identifyPromise: Promise<VisitorBrief | null> | null = null;
+let sessionId = "";
 
 const nickname = ref("");
 const visitorRegion = ref<string | null>(null);
@@ -82,6 +83,20 @@ function stableVisitorId(): string {
 export function useVisitor() {
   const api = useApi();
   const clientState = useClientState();
+  const { isLoggedIn } = useAuth();
+
+  function currentSessionId(): string {
+    if (sessionId) return sessionId;
+    if (typeof window === "undefined") return "ssr";
+    const stored = window.sessionStorage.getItem("corner:visitor-session");
+    if (stored) return (sessionId = stored);
+    sessionId =
+      typeof globalThis.crypto?.randomUUID === "function"
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.sessionStorage.setItem("corner:visitor-session", sessionId);
+    return sessionId;
+  }
 
   function lastIdentifyAt(): number {
     return Number(clientState.get("visitor", "identifiedAt", 0)) || 0;
@@ -106,7 +121,8 @@ export function useVisitor() {
         nickname.value = result?.nickname || "";
         visitorRegion.value = result?.region ?? null;
         clientState.set("visitor", "identifiedAt", Date.now());
-        if (result?.nickname) clientState.set("visitor", "nickname", result.nickname);
+        if (result?.nickname)
+          clientState.set("visitor", "nickname", result.nickname);
         return result;
       } catch {
         return null;
@@ -120,7 +136,12 @@ export function useVisitor() {
   /** 行为埋点入缓冲区，20 秒或退出页面前批量上报 */
   function queueEvent(event: Record<string, unknown>) {
     if (typeof window === "undefined") return;
-    eventBuffer.push({ ...event, at: new Date().toISOString() });
+    eventBuffer.push({
+      ...event,
+      sessionId: currentSessionId(),
+      identity: isLoggedIn.value ? "user" : "anonymous",
+      at: new Date().toISOString(),
+    });
     if (eventBuffer.length >= 20) {
       void flushEvents(true);
       return;
@@ -138,7 +159,7 @@ export function useVisitor() {
     if (!eventBuffer.length) return;
     const events = eventBuffer.splice(0, eventBuffer.length);
     try {
-      await api.post("/visitor/events", { events });
+      await api.post("/visitor/events", { events }, { keepalive: immediate });
     } catch {
       // 埋点失败即丢弃，不阻塞页面
       if (!immediate) eventBuffer = events.slice(-10);
@@ -159,7 +180,10 @@ export function useVisitor() {
   }
 
   /* ---- 留言墙 ---- */
-  async function fetchMessages(page = 1, limit = 30): Promise<{
+  async function fetchMessages(
+    page = 1,
+    limit = 30,
+  ): Promise<{
     items: VisitorMessageItem[];
     total: number;
   }> {
@@ -181,7 +205,12 @@ export function useVisitor() {
   async function throwBottle(
     content: string,
     relayToId?: string,
-  ): Promise<{ id: string; status: string; moderated: boolean; quota: BottleQuota }> {
+  ): Promise<{
+    id: string;
+    status: string;
+    moderated: boolean;
+    quota: BottleQuota;
+  }> {
     return api.post("/visitor/bottle/throw", { content, relayToId });
   }
 
@@ -197,6 +226,7 @@ export function useVisitor() {
     nickname,
     visitorRegion,
     visitorId: stableVisitorId,
+    sessionId: currentSessionId,
     identify,
     trackVisit,
     queueEvent,

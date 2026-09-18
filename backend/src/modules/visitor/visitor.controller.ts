@@ -10,7 +10,13 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -139,7 +145,13 @@ export class VisitorController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.visitor.adminMessages({ type, status, q, page: Number(page), limit: Number(limit) });
+    return this.visitor.adminMessages({
+      type,
+      status,
+      q,
+      page: Number(page),
+      limit: Number(limit),
+    });
   }
 
   @Put('admin/messages/:id/status')
@@ -164,7 +176,40 @@ export class VisitorController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.visitor.adminProfiles({ q, page: Number(page), limit: Number(limit) });
+    return this.visitor.adminProfiles({
+      q,
+      page: Number(page),
+      limit: Number(limit),
+    });
+  }
+
+  @Get('admin/access')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  adminAccess(
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.visitor.adminAccess({
+      q,
+      page: Number(page),
+      limit: Number(limit),
+    });
+  }
+
+  @Get('admin/access/:visitorIdHash/timeline')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  adminAccessTimeline(
+    @Param('visitorIdHash') visitorIdHash: string,
+    @Query('sessionId') sessionId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.visitor.adminAccessTimeline(visitorIdHash, {
+      sessionId,
+      limit: Number(limit),
+    });
   }
 
   @Put('admin/profiles/:id/ban')

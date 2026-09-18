@@ -201,6 +201,42 @@ html[data-palette="ocean"].constellation-route {
   --app-transition-bg: #04101d;
 }
 
+/* ===== 樱雾：柔粉主色配冷灰文字，保留足够的阅读对比度 ===== */
+:root[data-palette="sakura"] {
+  --hue-theme: 338deg;
+  --c-bg: #fffafd;
+  --c-bg-1: #fff5f9;
+  --c-bg-2: #f9edf3;
+  --c-bg-3: #f1dfe8;
+  --c-text: #2f252a;
+  --c-text-1: #493b42;
+  --c-text-2: #77656e;
+  --c-text-3: #ad98a2;
+  --c-primary: #d85f91;
+  --c-primary-soft: rgb(225 112 156 / 16%);
+  --border: #f0dce5;
+  --ld-shadow: #e8d1dc;
+  --app-transition-bg: #fff3f7;
+  --ui-accent-warm: #c98567;
+}
+
+html[data-palette="sakura"].dark {
+  --c-bg: #150b10;
+  --c-bg-1: #1c1016;
+  --c-bg-2: #271720;
+  --c-bg-3: #34202a;
+  --c-text: #fff7fa;
+  --c-text-1: #f4e5ec;
+  --c-text-2: #cdb3bf;
+  --c-text-3: #8e717e;
+  --c-primary: #f28bb4;
+  --c-primary-soft: rgb(242 139 180 / 20%);
+  --border: #3d2631;
+  --ld-bg-card: #21131a;
+  --ld-shadow: rgb(5 0 3 / 55%);
+  --app-transition-bg: #1b0c13;
+}
+
 /* 主题/色板切换：View Transition 整页交叉淡化，让渐变表面也平滑过渡 */
 html::view-transition-old(root),
 html::view-transition-new(root) {

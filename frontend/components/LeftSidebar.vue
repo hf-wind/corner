@@ -281,7 +281,7 @@ const adminFullNav = [
   {
     to: "/admin/visitor",
     icon: "ph:footprints-bold",
-    label: "访客与留言",
+    label: "访问管理",
   },
   { to: "/admin/ai", icon: "ph:robot-bold", label: "功能与模型" },
   { to: "/admin/email", icon: "ph:envelope-bold", label: "邮件功能" },

@@ -1,5 +1,9 @@
 <template>
-  <canvas ref="canvasRef" class="global-effect-canvas" aria-hidden="true"></canvas>
+  <canvas
+    ref="canvasRef"
+    class="global-effect-canvas"
+    aria-hidden="true"
+  ></canvas>
 </template>
 
 <script setup lang="ts">
@@ -16,7 +20,7 @@ let engine: EffectEngine | null = null;
 onMounted(() => {
   if (!canvasRef.value) return;
   engine = new EffectEngine(canvasRef.value, { interactive: true });
-  engine.setPalette(palette.value === "ocean" ? 220 : 152);
+  engine.setPalette(paletteHue(palette.value));
   engine.setConfig(config.value);
   engine.start();
 });
@@ -30,8 +34,12 @@ watch(
 );
 
 watch(palette, (value) => {
-  engine?.setPalette(value === "ocean" ? 220 : 152);
+  engine?.setPalette(paletteHue(value));
 });
+
+function paletteHue(value: string) {
+  return value === "ocean" ? 220 : value === "sakura" ? 338 : 152;
+}
 
 onBeforeUnmount(() => {
   engine?.destroy();

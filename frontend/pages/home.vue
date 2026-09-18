@@ -81,7 +81,9 @@
           <i aria-hidden="true" />
           <button type="button" @click="openLegal('privacy')">隐私政策</button>
           <i aria-hidden="true" />
-          <button type="button" @click="openLegal('disclaimer')">免责声明</button>
+          <button type="button" @click="openLegal('disclaimer')">
+            免责声明
+          </button>
         </span>
       </footer>
     </main>
@@ -352,7 +354,8 @@ onUnmounted(() => {
 }
 
 .featured-module-slot {
-  min-height: 330px;
+  min-height: 252px;
+  margin-bottom: 20px;
 }
 
 .home-module {
@@ -506,7 +509,8 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .featured-module-slot {
-    min-height: 264px;
+    min-height: 218px;
+    margin-bottom: 16px;
   }
 }
 
@@ -514,7 +518,8 @@ onUnmounted(() => {
   width: var(--right-w);
   flex-shrink: 0;
   padding: 24px 14px;
-  overflow: visible;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;

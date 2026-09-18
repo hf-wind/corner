@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeoService } from '../geo/geo.service';
@@ -24,7 +30,10 @@ export type VisitorContext = {
   device: DeviceInfo;
 };
 
-const VISITOR_SALT = process.env.VISITOR_ID_SALT || process.env.JWT_SECRET || 'corner-visitor-salt';
+const VISITOR_SALT =
+  process.env.VISITOR_ID_SALT ||
+  process.env.JWT_SECRET ||
+  'corner-visitor-salt';
 const DAILY_THROW_LIMIT = 3;
 const DAILY_FISH_LIMIT = 8;
 const IDENTIFY_VISIT_THROTTLE_SECONDS = 3600;
@@ -32,8 +41,19 @@ const RECENT_CACHE_TTL = 45;
 
 // 轻量敏感词审查：命中后进入待审核而不是直接展示
 const SENSITIVE_WORDS = [
-  '赌博', '博彩', '色情', '毒品', '枪支', '代开发票', '办证',
-  '加微信赚钱', '刷单', '兼职日结', '网贷', '反动', '法轮',
+  '赌博',
+  '博彩',
+  '色情',
+  '毒品',
+  '枪支',
+  '代开发票',
+  '办证',
+  '加微信赚钱',
+  '刷单',
+  '兼职日结',
+  '网贷',
+  '反动',
+  '法轮',
 ];
 
 function parseUserAgent(userAgent: string): DeviceInfo {
@@ -101,16 +121,43 @@ function shanghaiDayStart(): Date {
     month: '2-digit',
     day: '2-digit',
   });
-  const [year, month, day] = formatter.format(new Date()).split('-').map(Number);
+  const [year, month, day] = formatter
+    .format(new Date())
+    .split('-')
+    .map(Number);
   return new Date(Date.UTC(year, month - 1, day, -8));
 }
 
 function pickNickname(seed: string): string {
-  const prefixes = ['晚风', '拾光', '听雨', '南屿', '青栀', '云深', '星野', '木白', '柚夏', '临江'];
-  const suffixes = ['旅人', '信使', '拾贝者', '看云客', '守灯人', '信笺', '小鹿', '少年', '候鸟', '旅者'];
+  const prefixes = [
+    '晚风',
+    '拾光',
+    '听雨',
+    '南屿',
+    '青栀',
+    '云深',
+    '星野',
+    '木白',
+    '柚夏',
+    '临江',
+  ];
+  const suffixes = [
+    '旅人',
+    '信使',
+    '拾贝者',
+    '看云客',
+    '守灯人',
+    '信笺',
+    '小鹿',
+    '少年',
+    '候鸟',
+    '旅者',
+  ];
   let hash = 0;
   for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  const nickname = `${prefixes[hash % prefixes.length]}${suffixes[(hash >> 5) % suffixes.length]}`;
+  // 位移后的有符号结果可能为负数，负索引会拼出 "undefined"。
+  const suffixIndex = (hash >>> 5) % suffixes.length;
+  const nickname = `${prefixes[hash % prefixes.length]}${suffixes[suffixIndex]}`;
   return nickname.length <= 20 ? nickname : nickname.slice(0, 20);
 }
 
@@ -146,7 +193,10 @@ export class VisitorService {
   }
 
   /** 识别访客：登记到访 + 档案 upsert，返回访客上下文 */
-  async identify(req: any, hints?: { screen?: string; timezone?: string; locale?: string }) {
+  async identify(
+    req: any,
+    hints?: { screen?: string; timezone?: string; locale?: string },
+  ) {
     const env = this.clientEnv(req);
     const device = parseUserAgent(env.userAgent);
     const visitorIdHash = this.fingerprint(env, device);
@@ -163,32 +213,50 @@ export class VisitorService {
       where: { visitorIdHash },
     });
 
+    const repairedNickname = existing?.nickname?.includes('undefined')
+      ? pickNickname(visitorIdHash)
+      : null;
     const profile = existing
       ? await this.prisma.visitorProfile.update({
           where: { visitorIdHash },
           data: {
             lastSeenAt: new Date(),
             visitCount: { increment: 1 },
-            ipHash: createHash('sha256').update(`${env.ip}|${VISITOR_SALT}`).digest('hex'),
+            ...(repairedNickname ? { nickname: repairedNickname } : {}),
+            ipHash: createHash('sha256')
+              .update(`${env.ip}|${VISITOR_SALT}`)
+              .digest('hex'),
           },
         })
       : await this.prisma.visitorProfile.create({
           data: {
             visitorIdHash,
             nickname: pickNickname(visitorIdHash),
-            ipHash: createHash('sha256').update(`${env.ip}|${VISITOR_SALT}`).digest('hex'),
+            ipHash: createHash('sha256')
+              .update(`${env.ip}|${VISITOR_SALT}`)
+              .digest('hex'),
             visitCount: 1,
           },
         });
 
     // 每小时最多落一条到访记录，避免翻倍膨胀
     const throttleKey = `corner:visitor:visit:${visitorIdHash}:${Math.floor(Date.now() / (IDENTIFY_VISIT_THROTTLE_SECONDS * 1000))}`;
-    const shouldRecord = existing ? !(await this.redis.getJson(throttleKey)) : true;
+    const shouldRecord = existing
+      ? !(await this.redis.getJson(throttleKey))
+      : true;
     if (shouldRecord) {
       await this.prisma.visitorVisit.create({
-        data: { visitorIdHash, region, browser: device.browser, os: device.os, device: device.device },
+        data: {
+          visitorIdHash,
+          region,
+          browser: device.browser,
+          os: device.os,
+          device: device.device,
+        },
       });
-      await this.redis.setJson(throttleKey, 1, IDENTIFY_VISIT_THROTTLE_SECONDS).catch(() => undefined);
+      await this.redis
+        .setJson(throttleKey, 1, IDENTIFY_VISIT_THROTTLE_SECONDS)
+        .catch(() => undefined);
     }
 
     return {
@@ -206,7 +274,8 @@ export class VisitorService {
   async recentVisitors(limit = 3) {
     const take = Math.min(Math.max(Number(limit) || 3, 1), 10);
     const cacheKey = `corner:visitor:recent:${take}`;
-    const cached = await this.redis.getJson<Array<Record<string, unknown>>>(cacheKey);
+    const cached =
+      await this.redis.getJson<Array<Record<string, unknown>>>(cacheKey);
     if (cached) return cached;
 
     const visits = await this.prisma.visitorVisit.findMany({
@@ -215,7 +284,15 @@ export class VisitorService {
     });
 
     const seen = new Set<string>();
-    const rows: Array<{ hash: string; nickname: string; region: string | null; browser: string | null; os: string | null; device: string | null; at: Date }> = [];
+    const rows: Array<{
+      hash: string;
+      nickname: string;
+      region: string | null;
+      browser: string | null;
+      os: string | null;
+      device: string | null;
+      at: Date;
+    }> = [];
     for (const visit of visits) {
       if (seen.has(visit.visitorIdHash)) continue;
       seen.add(visit.visitorIdHash);
@@ -233,17 +310,24 @@ export class VisitorService {
 
     if (rows.length) {
       const profiles = await this.prisma.visitorProfile.findMany({
-        where: { visitorIdHash: { in: rows.map((row) => row.hash) }, isBanned: false },
+        where: {
+          visitorIdHash: { in: rows.map((row) => row.hash) },
+          isBanned: false,
+        },
         select: { visitorIdHash: true, nickname: true },
       });
-      const nicknameMap = new Map(profiles.map((profile) => [profile.visitorIdHash, profile.nickname]));
+      const nicknameMap = new Map(
+        profiles.map((profile) => [profile.visitorIdHash, profile.nickname]),
+      );
       for (const row of rows) {
         row.nickname = nicknameMap.get(row.hash) || '神秘旅人';
       }
     }
 
     const payload = rows.map(({ hash, ...rest }) => rest);
-    await this.redis.setJson(cacheKey, payload, RECENT_CACHE_TTL).catch(() => undefined);
+    await this.redis
+      .setJson(cacheKey, payload, RECENT_CACHE_TTL)
+      .catch(() => undefined);
     return payload;
   }
 
@@ -252,20 +336,162 @@ export class VisitorService {
     const env = this.clientEnv(req);
     const device = parseUserAgent(env.userAgent);
     const visitorIdHash = this.fingerprint(env, device);
-    const profile = await this.prisma.visitorProfile.findUnique({ where: { visitorIdHash } });
+    const profile = await this.prisma.visitorProfile.findUnique({
+      where: { visitorIdHash },
+    });
     if (profile?.isBanned) return { saved: 0 };
 
-    const rows = events.slice(0, 30).map((event) => ({
-      visitorIdHash,
-      action: String(event.action || 'unknown').slice(0, 40),
-      path: event.path ? String(event.path).slice(0, 500) : null,
-      contentType: event.contentType ? String(event.contentType).slice(0, 40) : null,
-      sourceId: event.sourceId ? String(event.sourceId).slice(0, 180) : null,
-      metadata: (event.metadata && typeof event.metadata === 'object' ? event.metadata : {}) as object,
-    }));
+    const userId = req.user?.sub || req.user?.id || null;
+    const rows = events.slice(0, 40).map((event) => {
+      const parsedAt =
+        typeof event.at === 'string' ? Date.parse(event.at) : Number.NaN;
+      const clientAt =
+        Number.isFinite(parsedAt) &&
+        Math.abs(Date.now() - parsedAt) < 86_400_000
+          ? new Date(parsedAt)
+          : null;
+      const metadata =
+        event.metadata && typeof event.metadata === 'object'
+          ? {
+              ...(event.metadata as Record<string, unknown>),
+              clientAt: clientAt?.toISOString() || null,
+            }
+          : { clientAt: clientAt?.toISOString() || null };
+      return {
+        visitorIdHash,
+        userId,
+        sessionId: event.sessionId
+          ? String(event.sessionId).slice(0, 64)
+          : null,
+        identity: event.identity
+          ? String(event.identity).slice(0, 20)
+          : userId
+            ? 'user'
+            : 'anonymous',
+        action: String(event.action || 'unknown').slice(0, 40),
+        path: event.path ? String(event.path).slice(0, 500) : null,
+        contentType: event.contentType
+          ? String(event.contentType).slice(0, 40)
+          : null,
+        sourceId: event.sourceId ? String(event.sourceId).slice(0, 180) : null,
+        metadata: metadata as object,
+        createdAt: clientAt || new Date(),
+      };
+    });
     if (!rows.length) return { saved: 0 };
     await this.prisma.visitorEvent.createMany({ data: rows });
     return { saved: rows.length };
+  }
+
+  /** 后台访问管理：访客概览与可展开的完整访问链路。 */
+  async adminAccess(params: { q?: string; page?: number; limit?: number }) {
+    const take = Math.min(Math.max(Number(params.limit) || 20, 1), 60);
+    const page = Math.max(Number(params.page) || 1, 1);
+    const skip = (page - 1) * take;
+    const where: Record<string, unknown> = {};
+    if (params.q) {
+      where.OR = [
+        { nickname: { contains: params.q } },
+        { visitorIdHash: { contains: params.q } },
+      ];
+    }
+    const [total, profiles] = await Promise.all([
+      this.prisma.visitorProfile.count({ where }),
+      this.prisma.visitorProfile.findMany({
+        where,
+        orderBy: { lastSeenAt: 'desc' },
+        skip,
+        take,
+        select: {
+          id: true,
+          visitorIdHash: true,
+          nickname: true,
+          visitCount: true,
+          lastSeenAt: true,
+          firstSeenAt: true,
+          isBanned: true,
+        },
+      }),
+    ]);
+    const hashes = profiles.map((profile) => profile.visitorIdHash);
+    const [visits, eventCounts] = hashes.length
+      ? await Promise.all([
+          this.prisma.visitorVisit.findMany({
+            where: { visitorIdHash: { in: hashes } },
+            orderBy: { createdAt: 'desc' },
+            take: hashes.length * 2,
+          }),
+          this.prisma.visitorEvent.groupBy({
+            by: ['visitorIdHash'],
+            where: { visitorIdHash: { in: hashes } },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], []];
+    const latestVisit = new Map<string, (typeof visits)[number]>();
+    for (const visit of visits)
+      if (!latestVisit.has(visit.visitorIdHash))
+        latestVisit.set(visit.visitorIdHash, visit);
+    const countMap = new Map(
+      eventCounts.map((item) => [item.visitorIdHash, item._count._all]),
+    );
+    return {
+      items: profiles.map((profile) => {
+        const visit = latestVisit.get(profile.visitorIdHash);
+        return {
+          ...profile,
+          region: visit?.region || null,
+          environment:
+            [visit?.device, visit?.browser, visit?.os]
+              .filter(Boolean)
+              .join(' · ') || null,
+          eventCount: countMap.get(profile.visitorIdHash) || 0,
+        };
+      }),
+      total,
+      page,
+      limit: take,
+    };
+  }
+
+  async adminAccessTimeline(
+    visitorIdHash: string,
+    params: { sessionId?: string; limit?: number },
+  ) {
+    const take = Math.min(Math.max(Number(params.limit) || 200, 1), 500);
+    const profile = await this.prisma.visitorProfile.findUnique({
+      where: { visitorIdHash },
+      select: {
+        visitorIdHash: true,
+        nickname: true,
+        firstSeenAt: true,
+        lastSeenAt: true,
+      },
+    });
+    if (!profile) throw new NotFoundException('访客不存在');
+    const events = await this.prisma.visitorEvent.findMany({
+      where: {
+        visitorIdHash,
+        ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+      },
+      orderBy: { createdAt: 'asc' },
+      take,
+      select: {
+        id: true,
+        sessionId: true,
+        identity: true,
+        action: true,
+        path: true,
+        contentType: true,
+        sourceId: true,
+        metadata: true,
+        createdAt: true,
+      },
+    });
+    const sessions = [
+      ...new Set(events.map((event) => event.sessionId).filter(Boolean)),
+    ];
+    return { profile, events, sessions };
   }
 
   /* ---------------- 留言墙 ---------------- */
@@ -295,11 +521,16 @@ export class VisitorService {
 
   async createMessage(req: any, dto: { content: string; nickname?: string }) {
     const context = await this.ensureVisitorContext(req);
-    const content = String(dto.content || '').trim().slice(0, 200);
+    const content = String(dto.content || '')
+      .trim()
+      .slice(0, 200);
     if (!content) throw new BadRequestException('留言内容不能为空');
-    if (context.nickname === '') throw new ForbiddenException('当前身份无法留言');
+    if (context.nickname === '')
+      throw new ForbiddenException('当前身份无法留言');
 
-    const nickname = (String(dto.nickname || '').trim() || context.nickname).slice(0, 20);
+    const nickname = (
+      String(dto.nickname || '').trim() || context.nickname
+    ).slice(0, 20);
     const flagged = containsSensitiveWord(content);
     const message = await this.prisma.visitorMessage.create({
       data: {
@@ -329,10 +560,17 @@ export class VisitorService {
     const dayStart = shanghaiDayStart();
     const [thrown, fished] = await Promise.all([
       this.prisma.visitorMessage.count({
-        where: { type: 'bottle', visitorIdHash: context.visitorIdHash, createdAt: { gte: dayStart } },
+        where: {
+          type: 'bottle',
+          visitorIdHash: context.visitorIdHash,
+          createdAt: { gte: dayStart },
+        },
       }),
       this.prisma.visitorBottleCatch.count({
-        where: { catcherVisitorIdHash: context.visitorIdHash, caughtAt: { gte: dayStart } },
+        where: {
+          catcherVisitorIdHash: context.visitorIdHash,
+          caughtAt: { gte: dayStart },
+        },
       }),
     ]);
     return {
@@ -343,29 +581,45 @@ export class VisitorService {
     };
   }
 
-  async throwBottle(req: any, dto: { content: string; nickname?: string; relayToId?: string }) {
+  async throwBottle(
+    req: any,
+    dto: { content: string; nickname?: string; relayToId?: string },
+  ) {
     const context = await this.ensureVisitorContext(req);
-    const content = String(dto.content || '').trim().slice(0, 200);
+    const content = String(dto.content || '')
+      .trim()
+      .slice(0, 200);
     if (!content) throw new BadRequestException('瓶子内容不能为空');
 
     const dayStart = shanghaiDayStart();
     const thrown = await this.prisma.visitorMessage.count({
-      where: { type: 'bottle', visitorIdHash: context.visitorIdHash, createdAt: { gte: dayStart } },
+      where: {
+        type: 'bottle',
+        visitorIdHash: context.visitorIdHash,
+        createdAt: { gte: dayStart },
+      },
     });
     if (thrown >= DAILY_THROW_LIMIT) {
-      throw new ForbiddenException(`今天已经投出 ${DAILY_THROW_LIMIT} 只瓶子了，明天再来吧`);
+      throw new ForbiddenException(
+        `今天已经投出 ${DAILY_THROW_LIMIT} 只瓶子了，明天再来吧`,
+      );
     }
 
     const flagged = containsSensitiveWord(content);
     const parent = dto.relayToId
-      ? await this.prisma.visitorMessage.findUnique({ where: { id: dto.relayToId } })
+      ? await this.prisma.visitorMessage.findUnique({
+          where: { id: dto.relayToId },
+        })
       : null;
 
     const bottle = await this.prisma.visitorMessage.create({
       data: {
         type: 'bottle',
         content,
-        nickname: (String(dto.nickname || '').trim() || context.nickname).slice(0, 20),
+        nickname: (String(dto.nickname || '').trim() || context.nickname).slice(
+          0,
+          20,
+        ),
         visitorIdHash: context.visitorIdHash,
         status: flagged ? 'pending' : 'approved',
         rejectReason: flagged ? '命中敏感词，等待人工审核' : null,
@@ -386,20 +640,28 @@ export class VisitorService {
     const context = await this.ensureVisitorContext(req);
     const dayStart = shanghaiDayStart();
     const fished = await this.prisma.visitorBottleCatch.count({
-      where: { catcherVisitorIdHash: context.visitorIdHash, caughtAt: { gte: dayStart } },
+      where: {
+        catcherVisitorIdHash: context.visitorIdHash,
+        caughtAt: { gte: dayStart },
+      },
     });
     if (fished >= DAILY_FISH_LIMIT) {
       throw new ForbiddenException(`今天的打捞次数用完了，明天海面再见`);
     }
 
     const holding = await this.prisma.visitorBottleCatch.findFirst({
-      where: { catcherVisitorIdHash: context.visitorIdHash, resolution: 'holding', releasedAt: null },
+      where: {
+        catcherVisitorIdHash: context.visitorIdHash,
+        resolution: 'holding',
+        releasedAt: null,
+      },
       include: { bottle: true },
     });
     if (holding) {
       const chain = await this.buildChain(holding.bottle);
       return { ...this.presentBottle(holding.bottle, true), chain };
-    }    const seaWhere = {
+    }
+    const seaWhere = {
       type: 'bottle',
       status: 'approved',
       caughtByIdHash: null,
@@ -476,13 +738,20 @@ export class VisitorService {
 
   async releaseBottle(req: any, bottleId: string) {
     const context = await this.ensureVisitorContext(req);
-    const bottle = await this.prisma.visitorMessage.findUnique({ where: { id: bottleId } });
+    const bottle = await this.prisma.visitorMessage.findUnique({
+      where: { id: bottleId },
+    });
     if (!bottle) throw new NotFoundException('瓶子不存在');
     if (bottle.caughtByIdHash !== context.visitorIdHash) {
       throw new ForbiddenException('这只瓶子不在你手中');
     }
     const catchEvent = await this.prisma.visitorBottleCatch.findFirst({
-      where: { bottleId, catcherVisitorIdHash: context.visitorIdHash, resolution: 'holding', releasedAt: null },
+      where: {
+        bottleId,
+        catcherVisitorIdHash: context.visitorIdHash,
+        resolution: 'holding',
+        releasedAt: null,
+      },
       orderBy: { caughtAt: 'desc' },
     });
     await this.prisma.$transaction([
@@ -502,15 +771,18 @@ export class VisitorService {
     return { ok: true };
   }
 
-  private presentBottle(bottle: {
-    id: string;
-    content: string;
-    nickname: string;
-    originRegion: string | null;
-    currentRegion: string | null;
-    createdAt: Date;
-    catchCount: number;
-  }, holding: boolean) {
+  private presentBottle(
+    bottle: {
+      id: string;
+      content: string;
+      nickname: string;
+      originRegion: string | null;
+      currentRegion: string | null;
+      createdAt: Date;
+      catchCount: number;
+    },
+    holding: boolean,
+  ) {
     return {
       id: bottle.id,
       content: bottle.content,
@@ -525,13 +797,23 @@ export class VisitorService {
 
   /* ---------------- 后台管理 ---------------- */
 
-  async adminMessages(params: { type?: string; status?: string; q?: string; page?: number; limit?: number }) {
+  async adminMessages(params: {
+    type?: string;
+    status?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const take = Math.min(Math.max(Number(params.limit) || 20, 1), 60);
     const skip = (Math.max(Number(params.page) || 1, 1) - 1) * take;
     const where: Record<string, unknown> = {};
     if (params.type) where.type = params.type;
     if (params.status) where.status = params.status;
-    if (params.q) where.OR = [{ content: { contains: params.q } }, { nickname: { contains: params.q } }];
+    if (params.q)
+      where.OR = [
+        { content: { contains: params.q } },
+        { nickname: { contains: params.q } },
+      ];
     const [total, items] = await Promise.all([
       this.prisma.visitorMessage.count({ where }),
       this.prisma.visitorMessage.findMany({
@@ -548,8 +830,15 @@ export class VisitorService {
     if (!['approved', 'pending', 'rejected'].includes(status)) {
       throw new BadRequestException('非法状态');
     }
-    const message = await this.prisma.visitorMessage.update({ where: { id }, data: { status } });
-    if (status === 'approved' && message.type === 'message' && message.visitorIdHash) {
+    const message = await this.prisma.visitorMessage.update({
+      where: { id },
+      data: { status },
+    });
+    if (
+      status === 'approved' &&
+      message.type === 'message' &&
+      message.visitorIdHash
+    ) {
       await this.prisma.visitorProfile.updateMany({
         where: { visitorIdHash: message.visitorIdHash },
         data: { messageCount: { increment: 1 } },
@@ -598,9 +887,14 @@ export class VisitorService {
     const latestRegion = new Map<string, string | null>();
     const latestDevice = new Map<string, string | null>();
     for (const visit of visits) {
-      if (!latestRegion.has(visit.visitorIdHash)) latestRegion.set(visit.visitorIdHash, visit.region);
+      if (!latestRegion.has(visit.visitorIdHash))
+        latestRegion.set(visit.visitorIdHash, visit.region);
       if (!latestDevice.has(visit.visitorIdHash)) {
-        latestDevice.set(visit.visitorIdHash, [visit.browser, visit.os, visit.device].filter(Boolean).join(' · ') || null);
+        latestDevice.set(
+          visit.visitorIdHash,
+          [visit.browser, visit.os, visit.device].filter(Boolean).join(' · ') ||
+            null,
+        );
       }
     }
     return {
@@ -635,19 +929,24 @@ export class VisitorService {
     } catch {
       region = null;
     }
-    const profile = await this.prisma.visitorProfile.findUnique({ where: { visitorIdHash } });
+    const profile = await this.prisma.visitorProfile.findUnique({
+      where: { visitorIdHash },
+    });
     if (!profile) {
       const created = await this.prisma.visitorProfile.create({
         data: {
           visitorIdHash,
           nickname: pickNickname(visitorIdHash),
-          ipHash: createHash('sha256').update(`${env.ip}|${VISITOR_SALT}`).digest('hex'),
+          ipHash: createHash('sha256')
+            .update(`${env.ip}|${VISITOR_SALT}`)
+            .digest('hex'),
           visitCount: 1,
         },
       });
       return { visitorIdHash, nickname: created.nickname, region, device };
     }
-    if (profile.isBanned) throw new ForbiddenException('当前身份已被限制，无法参与互动');
+    if (profile.isBanned)
+      throw new ForbiddenException('当前身份已被限制，无法参与互动');
     return { visitorIdHash, nickname: profile.nickname, region, device };
   }
 }

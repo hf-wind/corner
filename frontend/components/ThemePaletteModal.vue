@@ -10,7 +10,12 @@
         @click.self="close"
       >
         <div class="tp-panel">
-          <button type="button" class="tp-close" aria-label="关闭" @click="close">
+          <button
+            type="button"
+            class="tp-close"
+            aria-label="关闭"
+            @click="close"
+          >
             <Icon name="ph:x-bold" />
           </button>
 
@@ -39,7 +44,11 @@
             >
               <Icon name="ph:sparkle-bold" />特效
             </button>
-            <span class="tp-tab-thumb" :class="`on-${activeTab}`" aria-hidden="true" />
+            <span
+              class="tp-tab-thumb"
+              :class="`on-${activeTab}`"
+              aria-hidden="true"
+            />
           </nav>
 
           <div v-if="activeTab === 'theme'" class="tp-body">
@@ -65,7 +74,10 @@
                     }"
                     aria-hidden="true"
                   >
-                    <span class="tp-preview-dot" :style="{ background: option.chips[0] }" />
+                    <span
+                      class="tp-preview-dot"
+                      :style="{ background: option.chips[0] }"
+                    />
                     <span class="tp-preview-hero">
                       <span class="tp-preview-kicker"></span>
                       <span class="tp-preview-line tp-preview-line-long"></span>
@@ -125,7 +137,13 @@
                     max="60"
                     step="2"
                     :value="config.clickCount"
-                    @input="setConfig({ clickCount: Number(($event.target as HTMLInputElement).value) })"
+                    @input="
+                      setConfig({
+                        clickCount: Number(
+                          ($event.target as HTMLInputElement).value,
+                        ),
+                      })
+                    "
                   />
                   <b>{{ config.clickCount }}</b>
                 </label>
@@ -137,7 +155,13 @@
                     max="2"
                     step="0.1"
                     :value="config.clickSpeed"
-                    @input="setConfig({ clickSpeed: Number(($event.target as HTMLInputElement).value) })"
+                    @input="
+                      setConfig({
+                        clickSpeed: Number(
+                          ($event.target as HTMLInputElement).value,
+                        ),
+                      })
+                    "
                   />
                   <b>{{ config.clickSpeed.toFixed(1) }}x</b>
                 </label>
@@ -168,7 +192,13 @@
                     max="48"
                     step="2"
                     :value="config.ambientDensity"
-                    @input="setConfig({ ambientDensity: Number(($event.target as HTMLInputElement).value) })"
+                    @input="
+                      setConfig({
+                        ambientDensity: Number(
+                          ($event.target as HTMLInputElement).value,
+                        ),
+                      })
+                    "
                   />
                   <b>{{ config.ambientDensity }}</b>
                 </label>
@@ -180,13 +210,18 @@
                     max="2"
                     step="0.1"
                     :value="config.ambientSpeed"
-                    @input="setConfig({ ambientSpeed: Number(($event.target as HTMLInputElement).value) })"
+                    @input="
+                      setConfig({
+                        ambientSpeed: Number(
+                          ($event.target as HTMLInputElement).value,
+                        ),
+                      })
+                    "
                   />
                   <b>{{ config.ambientSpeed.toFixed(1) }}x</b>
                 </label>
               </div>
             </section>
-
           </div>
         </div>
       </div>
@@ -224,6 +259,14 @@ const paletteOptions = [
     line: "hsl(220 12% 40% / 32%)",
     bg: "linear-gradient(140deg, hsl(212 62% 90%), hsl(220 48% 82%))",
   },
+  {
+    id: "sakura" as const,
+    name: "樱雾",
+    desc: "少女柔粉 · 春日薄雾",
+    chips: ["#d85f91", "#efa2bf", "#c98567"],
+    line: "rgb(99 67 81 / 30%)",
+    bg: "linear-gradient(140deg, #fff0f6, #f4dce7)",
+  },
 ];
 
 const modeOptions = [
@@ -239,12 +282,13 @@ const clickOptions: { id: ClickEffectKind; label: string; icon: string }[] = [
   { id: "hearts", label: "爱心", icon: "ph:heart-bold" },
 ];
 
-const ambientOptions: { id: AmbientEffectKind; label: string; icon: string }[] = [
-  { id: "none", label: "关闭", icon: "ph:prohibit-bold" },
-  { id: "petals", label: "花瓣", icon: "ph:flower-lotus-bold" },
-  { id: "fireflies", label: "萤火", icon: "ph:lightbulb-bold" },
-  { id: "starlight", label: "星光", icon: "ph:moon-stars-bold" },
-];
+const ambientOptions: { id: AmbientEffectKind; label: string; icon: string }[] =
+  [
+    { id: "none", label: "关闭", icon: "ph:prohibit-bold" },
+    { id: "petals", label: "花瓣", icon: "ph:flower-lotus-bold" },
+    { id: "fireflies", label: "萤火", icon: "ph:lightbulb-bold" },
+    { id: "starlight", label: "星光", icon: "ph:moon-stars-bold" },
+  ];
 
 function close() {
   emit("update:open", false);
@@ -299,7 +343,10 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   color: var(--c-text-2);
   cursor: pointer;
   font-size: 0.78rem;
-  transition: color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s ease;
 }
 
 .tp-close:hover {
@@ -415,7 +462,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 /* ---- 主题 tab ---- */
 .tp-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -464,7 +511,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   font-size: 0.6rem;
   opacity: 0;
   transform: scale(0.4);
-  transition: opacity 0.2s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.5, 1);
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.5, 1);
 }
 
 .tp-card.is-active .tp-check {
@@ -734,7 +783,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 }
 
 .tp-modal-leave-active .tp-panel {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .tp-modal-enter-from,
@@ -756,6 +807,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   .tp-panel {
     padding: 22px 18px 18px;
     border-radius: 18px;
+  }
+  .tp-cards {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
